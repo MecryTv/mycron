@@ -1,0 +1,11 @@
+{
+  "name": "mycron",
+  "owner": { "name": "MecryTv" },
+  "plugins": [
+    {
+      "name": "works",
+      "source": "./plugins/works",
+      "description": "Aufgabenverwaltung in .works/ mit Prioritäten, Bildern, Designentscheidungen und Übergaben"
+    }
+  ]
+}
