@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import { findRoot, loadConfig } from '../scripts/lib.mjs';
 import { sessionSummary, generateIndex } from '../scripts/views.mjs';
+import { refreshBoardIfPresent } from '../scripts/board.mjs';
 
 let input = {};
 try {
@@ -16,6 +17,7 @@ try {
   const config = loadConfig(root);
   if (config.hooks && config.hooks.session_start === false) process.exit(0);
   generateIndex(root);
+  refreshBoardIfPresent(root);
   process.stdout.write(sessionSummary(root) + '\n');
 } catch (e) {
   process.stderr.write(`works session-start: ${e.message}\n`);

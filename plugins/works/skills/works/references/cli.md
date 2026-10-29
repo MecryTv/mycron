@@ -1,6 +1,6 @@
 # CLI-Referenz
 
-Aufruf: `node <skill-dir>/scripts/works.mjs <befehl> [argumente]`. Benötigt Node.js 18 oder neuer, keine Abhängigkeiten. Arbeitet im nächstgelegenen Elternordner mit `.works/config.json`.
+Aufruf: `node "${CLAUDE_SKILL_DIR}/scripts/works.mjs" <befehl> [argumente]`. Benötigt Node.js 18 oder neuer, keine Abhängigkeiten. Arbeitet im nächstgelegenen Elternordner mit `.works/config.json`.
 
 IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichwertig. Listen werden mit Komma getrennt. Datumswerte im Format `JJJJ-MM-TT`.
 
@@ -32,7 +32,8 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `next [--n 3]` | Empfehlung für die nächste Aufgabe mit Begründung |
 | `status` | Kurzübersicht wie beim Sessionstart |
 | `index` | WORKS.md neu erzeugen |
-| `board [--open]` | `.works/board.html` erzeugen und optional im Browser öffnen |
+| `board [--open]` | `.works/board.html` erzeugen und optional im Browser öffnen. Danach wird die Datei nach jeder Änderung automatisch neu erzeugt |
+| `board --serve [--port 4747] [--host 127.0.0.1] [--open]` | Live-Board auf einem lokalen Server, aktualisiert sich im Browser selbst. Ist der Standardport belegt, wird der nächste freie genommen. Siehe board.md |
 | `milestone list` | Meilensteine mit Fortschritt |
 | `milestone add M1 --title ".." [--due ..] [--desc ..]` | Meilenstein anlegen |
 | `milestone set M1 status=erledigt due=2026-12-20` | Meilenstein ändern |

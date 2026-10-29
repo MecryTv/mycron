@@ -84,7 +84,7 @@ PDFs, Videos und andere Dateien funktionieren genauso und werden als normaler Li
 
 ## Komprimierung
 
-Mit installiertem `sharp` (im Projekt `npm i -D sharp` oder im Skill-Ordner `npm i sharp`):
+Mit `sharp` als Entwicklungsabhängigkeit im Projekt (`npm i -D sharp`). Im Plugin-Ordner selbst nichts installieren, er wird bei jedem Update ersetzt.
 
 ```
 works asset <ID> <pfad> --desc "..." --compress

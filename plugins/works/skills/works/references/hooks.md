@@ -1,10 +1,20 @@
 # Hooks
 
-Ein Skill wird nur geladen, wenn Claude ihn für relevant hält. Hooks sorgen dafür, dass die Aufgaben beim Sessionstart sichtbar sind und die Übergabe nicht vergessen wird. Alle Hooks bleiben still in Projekten ohne `.works/`, deshalb können sie global installiert werden.
+Ein Skill wird nur geladen, wenn Claude ihn für relevant hält. Hooks sorgen dafür, dass die Aufgaben beim Sessionstart sichtbar sind und die Übergabe nicht vergessen wird. Alle Hooks bleiben still in Projekten ohne `.works/`.
 
-## Einrichten
+## Installation über das Plugin mycron
 
-Die Einrichtung ändert Konfigurationsdateien des Nutzers. Vorher fragen und mit `--dry-run` zeigen, was passiert.
+Wird works als Plugin aus dem Marketplace mycron installiert, bringt es den SessionStart und den Stop Hook selbst mit (`plugins/works/hooks/hooks.json`). Sie sind aktiv, solange das Plugin aktiviert ist, und werden mit jedem Plugin-Update automatisch aktualisiert. `works install-hooks --claude` ist dann nicht nötig und meldet das auch so.
+
+Pro Projekt einrichten muss man nur den Git pre-commit Hook:
+
+```
+works install-hooks --git
+```
+
+## Installation als einfacher Skill-Ordner
+
+Liegt der Skill direkt unter `~/.claude/skills/works`, richtet `works install-hooks` die Claude Code Hooks ein. Die Einrichtung ändert Konfigurationsdateien des Nutzers. Vorher fragen und mit `--dry-run` zeigen, was passiert.
 
 ```
 works install-hooks --dry-run
@@ -19,7 +29,9 @@ works install-hooks --git
 | `--scope project` | `.claude/settings.json` im Projekt, wird mit dem Repo geteilt |
 | `--scope local` | `.claude/settings.local.json`, nur lokal |
 
-Liegt der Skill unter dem Home-Verzeichnis, wird der Pfad als `$HOME/...` eingetragen. Dadurch funktioniert dieselbe Konfiguration auf mehreren Rechnern, wenn der Skill dort am gleichen Ort liegt. Mehrfaches Ausführen legt keine Duplikate an.
+Liegt der Skill unter dem Home-Verzeichnis, wird der Pfad als `$HOME/...` eingetragen. Mehrfaches Ausführen legt keine Duplikate an.
+
+Ist das Plugin installiert und der Skill zusätzlich als Ordner vorhanden, die Hooks nur einmal einrichten, sonst laufen sie doppelt.
 
 ## SessionStart
 
@@ -41,11 +53,11 @@ Abschalten pro Projekt: `"hooks": { "stop_reminder": false }`.
 
 ## Git pre-commit
 
-Wird an `.git/hooks/pre-commit` angehängt (vorhandene Inhalte bleiben erhalten). Werden Dateien aus `.works/` committet, läuft `works doctor --quiet`. Bei Fehlern (nicht bei Warnungen) wird der Commit abgebrochen. Umgehen im Notfall mit `git commit --no-verify`.
+Wird an `.git/hooks/pre-commit` angehängt (vorhandene Inhalte bleiben erhalten). Werden Dateien aus `.works/` committet, läuft `works doctor --quiet`. Bei Fehlern (nicht bei Warnungen) wird der Commit abgebrochen. Bei der Plugin-Installation sucht der Hook den aktuellen Pfad des CLI zur Laufzeit, weil sich der Installationsordner bei Updates ändert. Wird das CLI nicht gefunden, wird die Prüfung übersprungen statt den Commit zu blockieren. Umgehen im Notfall mit `git commit --no-verify`.
 
 ## Manuell eintragen
 
-Falls der Nutzer die Einstellungen lieber selbst pflegt:
+Nur für die Installation als Skill-Ordner:
 
 ```json
 {
@@ -63,4 +75,4 @@ Falls der Nutzer die Einstellungen lieber selbst pflegt:
 
 ## Entfernen
 
-Die beiden Einträge aus der jeweiligen settings.json löschen und den Block ab `# works-doctor` aus `.git/hooks/pre-commit` entfernen.
+Plugin: über `/plugin` deaktivieren oder deinstallieren. Skill-Ordner: die beiden Einträge aus der jeweiligen settings.json löschen. In beiden Fällen den Block ab `# works-doctor` aus `.git/hooks/pre-commit` entfernen.

@@ -1,6 +1,6 @@
 # Abläufe
 
-`works` steht für `node <skill-dir>/scripts/works.mjs`.
+`works` steht für `node "${CLAUDE_SKILL_DIR}/scripts/works.mjs"` (siehe SKILL.md).
 
 ## Einrichtung
 
@@ -13,7 +13,7 @@
 | `--gitignore all` | Der ganze Ordner bleibt lokal |
 | `--gitignore none` | Keine `.works/.gitignore` anlegen |
 
-Danach optional Meilensteine (`works milestone add M1 --title "Beta" --due 2026-12-01`) und Hooks (`works install-hooks`, siehe hooks.md).
+Danach optional Meilensteine (`works milestone add M1 --title "Beta" --due 2026-12-01`) und den Git pre-commit Hook (`works install-hooks --git`, siehe hooks.md). Bei der Plugin-Installation sind die Claude Code Hooks bereits aktiv.
 
 ## Sessionbeginn
 
@@ -146,5 +146,5 @@ Wiedereröffnen holt die Aufgabe aus dem Archiv zurück und zählt `reopened` ho
 - `works report --days 7 [--write]`: Wochenbericht mit Erledigtem, Neuem, Blockiertem, Überfälligem und Meilensteinen
 - `works changelog [--since 2026-10-01] [--milestone M1] [--version 1.2.0] [--write]`: gruppiert nach Neu, Behoben, Verbessert, Sonstiges
 - `works commits <ID> [--write]`: alle Commits mit der ID
-- `works board [--open]`: Kanban im Browser
+- `works board --serve`: Live-Kanban im Browser, siehe board.md
 - `works doctor [--fix]`: Konsistenzprüfung, danach Warnungen mit dem Nutzer durchgehen

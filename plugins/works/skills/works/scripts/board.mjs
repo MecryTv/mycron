@@ -1,4 +1,4 @@
-// Erzeugt .works/board.html: statisches Kanban-Board ohne Abhängigkeiten.
+// Kanban-Board: erzeugt .works/board.html und liefert die Daten für die Live-Ansicht (works board --serve).
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -16,7 +16,7 @@ function excerpt(t) {
   return '';
 }
 
-export function generateBoard(root) {
+export function boardData(root) {
   const config = loadConfig(root);
   const all = loadTasks(root);
   const byId = byIdMap(all);
@@ -41,11 +41,30 @@ export function generateBoard(root) {
     statusLabel: STATUS_LABEL, prioLabel: PRIO_LABEL, typeLabel: TYPE_LABEL,
     milestones: milestoneProgress(config, all),
   };
-  const json = JSON.stringify({ tasks: data, meta }).replace(/</g, '\\u003c');
-  const html = TEMPLATE.replace('__DATA__', json).replace('__TITLE__', `Works · ${meta.project}`);
-  const file = path.join(worksDir(root), 'board.html');
-  fs.writeFileSync(file, html);
+  return { tasks: data, meta };
+}
+
+export function renderBoard(data, { live = false } = {}) {
+  const json = JSON.stringify(data).replace(/</g, '\\u003c');
+  return TEMPLATE
+    .replace('__DATA__', () => json)
+    .replace('__LIVE__', live ? 'true' : 'false')
+    .replace('__TITLE__', () => `Works · ${data.meta.project}`.replace(/</g, '&lt;'));
+}
+
+export function boardFile(root) {
+  return path.join(worksDir(root), 'board.html');
+}
+
+export function generateBoard(root) {
+  const file = boardFile(root);
+  fs.writeFileSync(file, renderBoard(boardData(root)));
   return file;
+}
+
+// Aktualisiert board.html nur, wenn sie bereits existiert (wird nach jeder Änderung aufgerufen).
+export function refreshBoardIfPresent(root) {
+  if (fs.existsSync(boardFile(root))) generateBoard(root);
 }
 
 const TEMPLATE = `<!doctype html>
@@ -101,11 +120,16 @@ dialog img { max-width: 100%; border-radius: 6px; border: 1px solid var(--line);
 dialog a { color: inherit; }
 .close { float: right; }
 .empty { color: var(--muted); font-size: 12px; padding: 8px 2px; }
+.live { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #3a9a5b; }
+.live.off::before { background: var(--p1); }
+.card.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { from { box-shadow: 0 0 0 3px var(--p3); } to { box-shadow: var(--shadow); } }
 @media (max-width: 640px) { header, .toolbar, .ms, main { padding-left: 16px; padding-right: 16px; } .toolbar input[type="search"] { min-width: 0; flex: 1 1 100%; } }
 </style>
 </head>
 <body>
-<header><h1 id="h"></h1><span class="meta" id="gen"></span></header>
+<header><h1 id="h"></h1><span class="meta" id="gen"></span><span class="live" id="live" hidden></span></header>
 <div class="toolbar">
   <input id="q" type="search" placeholder="Suchen (Titel, ID, Tag)">
   <span id="prios"></span>
@@ -116,13 +140,19 @@ dialog a { color: inherit; }
 <main id="board"></main>
 <dialog id="dlg"></dialog>
 <script>
-const DATA = __DATA__;
-const { tasks, meta } = DATA;
+let DATA = __DATA__;
+const LIVE = __LIVE__;
+let tasks = DATA.tasks;
+let meta = DATA.meta;
+let openId = null;
+let flashIds = new Set();
 const COLS = ['backlog', 'geplant', 'in-arbeit', 'review', 'erledigt', 'verworfen'];
 const state = { q: '', prios: new Set(['P1','P2','P3','P4']), type: '', arch: false };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-document.getElementById('h').textContent = 'Works · ' + meta.project;
-document.getElementById('gen').textContent = 'Stand ' + meta.generated + ' · ' + tasks.length + ' Aufgaben';
+function renderHeader() {
+  document.getElementById('h').textContent = 'Works · ' + meta.project;
+  document.getElementById('gen').textContent = 'Stand ' + meta.generated + ' · ' + tasks.length + ' Aufgaben';
+}
 const pr = document.getElementById('prios');
 ['P1','P2','P3','P4'].forEach((p) => {
   const b = document.createElement('button');
@@ -135,12 +165,15 @@ Object.entries(meta.typeLabel).forEach(([k, v]) => { const o = document.createEl
 sel.onchange = () => { state.type = sel.value; render(); };
 document.getElementById('q').oninput = (e) => { state.q = e.target.value.toLowerCase(); render(); };
 document.getElementById('arch').onchange = (e) => { state.arch = e.target.checked; render(); };
-const ms = document.getElementById('ms');
-meta.milestones.forEach((m) => {
-  const d = document.createElement('div');
-  d.innerHTML = '<strong>' + esc(m.id) + '</strong> ' + esc(m.title) + (m.due ? ' · ' + esc(m.due) : '') + '<br>' + m.done + '/' + m.total + ' (' + m.pct + ' %)<div class="bar"><span style="width:' + m.pct + '%"></span></div>';
-  ms.appendChild(d);
-});
+function renderMilestones() {
+  const ms = document.getElementById('ms');
+  ms.innerHTML = '';
+  meta.milestones.forEach((m) => {
+    const d = document.createElement('div');
+    d.innerHTML = '<strong>' + esc(m.id) + '</strong> ' + esc(m.title) + (m.due ? ' · ' + esc(m.due) : '') + '<br>' + m.done + '/' + m.total + ' (' + m.pct + ' %)<div class="bar"><span style="width:' + m.pct + '%"></span></div>';
+    ms.appendChild(d);
+  });
+}
 function match(t) {
   if (!state.prios.has(t.priority)) return false;
   if (state.type && t.type !== state.type) return false;
@@ -160,7 +193,7 @@ function card(t) {
   if (t.questions.length) flags.push('<span class="tag">' + t.questions.length + ' Frage(n)</span>');
   const tags = t.tags.map((x) => '<span class="tag">#' + esc(x) + '</span>').join('');
   const crit = t.crit[1] ? '<span class="tag">' + t.crit[0] + '/' + t.crit[1] + ' Kriterien</span>' : '';
-  return '<div class="card ' + esc(t.priority) + '" data-id="' + esc(t.id) + '">' +
+  return '<div class="card ' + esc(t.priority) + (flashIds.has(t.id) ? ' flash' : '') + '" data-id="' + esc(t.id) + '">' +
     '<div class="top"><span>' + esc(t.id) + ' · ' + esc(meta.typeLabel[t.type] || t.type) + (t.effort ? ' · ' + esc(t.effort) : '') + '</span><span class="prio ' + esc(t.priority) + '">' + esc(t.priority) + '</span></div>' +
     '<div class="title">' + esc(t.title) + '</div>' +
     (t.thumb ? '<img loading="lazy" src="' + esc(t.thumb) + '" alt="' + esc(t.thumbAlt) + '">' : '') +
@@ -180,6 +213,8 @@ function render() {
 function open(id) {
   const t = tasks.find((x) => x.id === id);
   const d = document.getElementById('dlg');
+  if (!t) { if (d.open) d.close(); return; }
+  openId = id;
   d.innerHTML = '<button class="chip close" onclick="this.closest(\\'dialog\\').close()">Schließen</button>' +
     '<div class="meta">' + esc(t.id) + ' · ' + esc(meta.typeLabel[t.type]) + ' · <span class="prio ' + esc(t.priority) + '">' + esc(t.priority) + ' ' + esc(meta.prioLabel[t.priority]) + '</span> · ' + esc(meta.statusLabel[t.status]) + '</div>' +
     '<h3>' + esc(t.title) + '</h3>' +
@@ -189,9 +224,38 @@ function open(id) {
     (t.questions.length ? '<p>Offene Fragen:</p><ul>' + t.questions.map((q) => '<li>' + esc(q) + '</li>').join('') + '</ul>' : '') +
     (t.thumb ? '<p><img src="' + esc(t.thumb) + '" alt="' + esc(t.thumbAlt) + '"></p>' : '') +
     '<p class="meta">Aktualisiert ' + esc(t.updated) + (t.completed ? ' · abgeschlossen ' + esc(t.completed) : '') + ' · <a href="' + esc(t.file) + '">task.md öffnen</a></p>';
-  d.showModal();
+  if (!d.open) d.showModal();
 }
-render();
+document.getElementById('dlg').addEventListener('close', () => { openId = null; });
+function renderAll() { renderHeader(); renderMilestones(); render(); }
+renderAll();
+
+if (LIVE) {
+  const liveEl = document.getElementById('live');
+  liveEl.hidden = false;
+  const setLive = (ok, text) => { liveEl.classList.toggle('off', !ok); liveEl.textContent = text; };
+  setLive(true, 'Live');
+  const fingerprint = (t) => JSON.stringify(t);
+  async function reload() {
+    try {
+      const res = await fetch('data.json', { cache: 'no-store' });
+      const next = await res.json();
+      const before = new Map(tasks.map((t) => [t.id, fingerprint(t)]));
+      flashIds = new Set(next.tasks.filter((t) => before.get(t.id) !== fingerprint(t)).map((t) => t.id));
+      DATA = next; tasks = next.tasks; meta = next.meta;
+      renderAll();
+      if (openId) open(openId);
+      setLive(true, 'Live · aktualisiert ' + new Date().toLocaleTimeString('de-DE'));
+      setTimeout(() => { flashIds = new Set(); }, 1700);
+    } catch (e) {
+      setLive(false, 'Aktualisierung fehlgeschlagen');
+    }
+  }
+  const es = new EventSource('events');
+  es.addEventListener('update', reload);
+  es.onopen = () => setLive(true, liveEl.textContent.startsWith('Live') ? liveEl.textContent : 'Live');
+  es.onerror = () => setLive(false, 'Verbindung getrennt, neuer Versuch läuft');
+}
 </script>
 </body>
 </html>

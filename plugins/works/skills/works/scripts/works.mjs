@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // works: Aufgabenverwaltung im Projektordner .works/
-// Aufruf: node <skill-dir>/scripts/works.mjs <befehl> [argumente]
+// Aufruf: node "${CLAUDE_SKILL_DIR}/scripts/works.mjs" <befehl> [argumente]
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -17,7 +17,8 @@ import {
   isOverdue, openQuestions, sortTasks, readTemplate, fillTemplate, parseArgs, listFlag,
 } from './lib.mjs';
 import { generateIndex, nextCandidates, dodCheck, sessionSummary, byIdMap, milestoneProgress } from './views.mjs';
-import { generateBoard } from './board.mjs';
+import { generateBoard, refreshBoardIfPresent } from './board.mjs';
+import { serveBoard } from './serve.mjs';
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
 const ASSET_KINDS = ['ist', 'vorher', 'nachher', 'referenz', 'mockup', 'skizze', 'fehler', 'diagramm'];
@@ -29,6 +30,7 @@ const out = (s = '') => process.stdout.write(s + '\n');
 
 function refresh(root) {
   generateIndex(root);
+  refreshBoardIfPresent(root);
 }
 
 function validateEnum(name, value, allowed) {
@@ -583,6 +585,16 @@ function cmdIndex() {
 
 function cmdBoard() {
   const root = requireRoot();
+  if (flags.serve) {
+    generateIndex(root);
+    serveBoard(root, {
+      port: parseInt(flags.port || 4747, 10),
+      fixedPort: !!flags.port,
+      host: flags.host && flags.host !== true ? String(flags.host) : '127.0.0.1',
+      open: !!flags.open,
+    });
+    return new Promise(() => {}); // läuft bis Strg+C
+  }
   const file = generateBoard(root);
   out(`Board erzeugt: ${file}`);
   if (flags.open) {
@@ -805,7 +817,7 @@ async function cmdCompress() {
   const root = requireRoot();
   const config = loadConfig(root);
   const sharp = loadSharp(root);
-  if (!sharp) fail('sharp ist nicht installiert. Im Projekt `npm i -D sharp` ausführen oder im Skill-Ordner `npm i sharp`.');
+  if (!sharp) fail('sharp ist nicht installiert. Im Projekt `npm i -D sharp` ausführen.');
   const tasks = pos[0] ? [findTask(root, config, pos[0])] : loadTasks(root);
   let total = 0; let saved = 0;
   for (const t of tasks) {
@@ -1222,11 +1234,18 @@ function homeRel(p) {
   return p.startsWith(home + path.sep) ? `$HOME/${path.relative(home, p).split(path.sep).join('/')}` : p;
 }
 
+// Läuft der Skill als Teil eines Plugins? Dann liegt zwei Ebenen höher ein Plugin-Manifest.
+const IS_PLUGIN = exists(path.resolve(SKILL_DIR, '..', '..', '.claude-plugin', 'plugin.json'));
+
 function cmdInstallHooks() {
   const root = findRoot() || process.cwd();
-  const doClaude = flags.claude || !flags.git;
+  let doClaude = flags.claude || !flags.git;
   const doGit = flags.git || !flags.claude;
   const scope = flags.scope || 'user';
+  if (doClaude && IS_PLUGIN && !flags.force) {
+    out('Claude Code Hooks: werden vom Plugin mitgeliefert und sind aktiv, solange das Plugin aktiviert ist. Nichts einzurichten.');
+    doClaude = false;
+  }
   if (doClaude) {
     const file = scope === 'user' ? path.join(os.homedir(), '.claude', 'settings.json')
       : scope === 'project' ? path.join(root, '.claude', 'settings.json')
@@ -1253,7 +1272,14 @@ function cmdInstallHooks() {
     if (!gitDir.ok) { out('Git: kein Repository, pre-commit Hook übersprungen.'); return; }
     const hookFile = path.resolve(root, gitDir.stdout.trim(), 'hooks', 'pre-commit');
     const marker = '# works-doctor';
-    const block = `${marker}\nif git diff --cached --name-only | grep -q '^\\.works/'; then\n  node "${homeRel(path.join(SKILL_DIR, 'scripts', 'works.mjs'))}" doctor --quiet || { echo "works doctor meldet Fehler in .works/. Commit abgebrochen."; exit 1; }\nfi\n`;
+    // Im Plugin ändert sich der Installationspfad bei jedem Update, daher den aktuellen Pfad zur Laufzeit suchen.
+    const locate = IS_PLUGIN
+      ? '  WORKS_CLI=$(ls -t $(find "$HOME/.claude/plugins" -path "*/skills/works/scripts/works.mjs" 2>/dev/null) 2>/dev/null | head -n 1)\n'
+      : `  WORKS_CLI="${homeRel(path.join(SKILL_DIR, 'scripts', 'works.mjs'))}"\n`;
+    const block = `${marker}\nif git diff --cached --name-only | grep -q '^\\.works/'; then\n${locate}`
+      + '  if [ -n "$WORKS_CLI" ] && [ -f "$WORKS_CLI" ]; then\n'
+      + '    node "$WORKS_CLI" doctor --quiet || { echo "works doctor meldet Fehler in .works/. Commit abgebrochen."; exit 1; }\n'
+      + '  else\n    echo "works: CLI nicht gefunden, Prüfung übersprungen."\n  fi\nfi\n';
     let cur = exists(hookFile) ? fs.readFileSync(hookFile, 'utf8') : '#!/bin/sh\n';
     if (cur.includes(marker)) out('Git pre-commit: bereits eingerichtet');
     else {
@@ -1283,7 +1309,8 @@ Erfassen
 
 Ansehen
   list [--status ..] [--priority ..] [--type ..] [--tag ..] [--milestone M1] [--blocked] [--overdue] [--incomplete] [--all] [--json]
-  show <ID> [--section "Name"]     next [--n 3]     status     index     board [--open]
+  show <ID> [--section "Name"]     next [--n 3]     status     index
+  board [--open]                   board --serve [--port 4747] [--host 127.0.0.1] [--open]
   milestone list|add M1 --title ".." [--due ..]|set M1 status=erledigt
 
 Bearbeiten

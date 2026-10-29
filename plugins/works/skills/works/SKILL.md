@@ -13,7 +13,7 @@ Verwaltet alle Aufgaben eines Projekts in `.works/`. Jede Aufgabe hat einen eige
   config.json         Präfix, nächste ID, Meilensteine, Definition of Done, Einstellungen
   state.json          aktive Aufgabe und letzte Übergabe (lokal)
   ideas.md            Ideen-Parkplatz
-  board.html          generiertes Kanban-Board (lokal)
+  board.html          generiertes Kanban-Board (lokal, wird nach jeder Änderung aktualisiert)
   inbox/              Ablage für Screenshots, die noch zugeordnet werden
   reports/            gespeicherte Berichte
   tasks/W-0012-slug/  task.md, decisions.md, assets/, docs/
@@ -22,18 +22,20 @@ Verwaltet alle Aufgaben eines Projekts in `.works/`. Jede Aufgabe hat einen eige
 
 ## Das CLI
 
-Alle Verwaltungsschritte laufen über ein Node-Script ohne Abhängigkeiten. Das Basisverzeichnis dieses Skills wird beim Laden angezeigt; im Folgenden steht `works` für:
+Alle Verwaltungsschritte laufen über ein Node-Script ohne Abhängigkeiten. Im Folgenden steht `works` für:
 
 ```
-node <skill-dir>/scripts/works.mjs
+node "${CLAUDE_SKILL_DIR}/scripts/works.mjs"
 ```
+
+Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Skills. Steht die Variable unersetzt da, den beim Laden angezeigten Basisordner des Skills einsetzen.
 
 `works help` zeigt alle Befehle. Die vollständige Referenz steht in `references/cli.md`.
 
 ## Grundregeln
 
 1. Aufgabenteilung: Das CLI erledigt alles Strukturelle (IDs, Ordner, Frontmatter, Status, Verlauf, Abhängigkeiten, Assets, Index). Claude schreibt die Inhalte der Abschnitte per Edit direkt in die `task.md` und `decisions.md`. Frontmatter nie von Hand ändern, sondern `works set`.
-2. `WORKS.md` und `board.html` werden generiert. Jeder schreibende CLI-Befehl aktualisiert `WORKS.md` automatisch. Nach manuellen Edits an einer task.md einmal `works index` ausführen.
+2. `WORKS.md` und `board.html` werden generiert. Jeder schreibende CLI-Befehl aktualisiert beide automatisch (board.html nur, wenn sie existiert). Nach manuellen Edits an einer task.md einmal `works index` ausführen, sofern keine Live-Ansicht läuft.
 3. Nachfragen statt raten. Fehlen Angaben (Ziel, Akzeptanzkriterien, Priorität bei Unklarheit), den Nutzer fragen. Fragen, die nicht sofort geklärt werden können, mit `works question <ID> "..."` festhalten. Keine Annahmen als Fakten in die Aufgabe schreiben.
 4. Vor der Arbeit an einer Aufgabe `works start <ID>`, am Ende jeder Arbeitsphase `works handoff <ID> --text "..."`. Damit kann jede neue Session nahtlos weitermachen.
 5. Commit-Messages enthalten die Task-ID, zum Beispiel `feat(W-0012): Validierung ergänzen`.
@@ -62,9 +64,10 @@ node <skill-dir>/scripts/works.mjs
 | Aufgabe wird nicht mehr gebraucht | `works drop <ID> --reason "..."` | `references/workflow.md` |
 | Erledigte Aufgabe muss nachgebessert werden | `works reopen <ID> --reason "..."` | `references/workflow.md` |
 | TODO-Kommentare im Code, GitHub Issues | `works scan`, `works gh-import` | `references/workflow.md` |
-| Bericht, Changelog, Übersicht im Browser | `works report`, `works changelog`, `works board` | `references/cli.md` |
+| Bericht, Changelog | `works report`, `works changelog` | `references/cli.md` |
+| Übersicht im Browser, Board | `works board --serve` im Hintergrund starten und die URL nennen. Für eine einfache Datei `works board` | `references/board.md` |
 | Struktur prüfen, Fehler vermuten | `works doctor`, bei Bedarf `--fix` | `references/cli.md` |
-| Hooks einrichten | Nach Rückfrage `works install-hooks` | `references/hooks.md` |
+| Hooks einrichten | Bei Plugin-Installation nur `works install-hooks --git`, sonst nach Rückfrage `works install-hooks` | `references/hooks.md` |
 
 ## Ablauf einer typischen Aufgabe
 
@@ -87,6 +90,7 @@ Nur die Datei laden, die für den aktuellen Schritt gebraucht wird.
 - `references/assets.md`: Bilder speichern, Inbox, Screenshots, Benennung, Komprimierung
 - `references/integrations.md`: Superpowers Brainstorming, UI UX Pro Max, git-workflow, code-audit, responsive-website-check, second-brain-sync, GitHub
 - `references/hooks.md`: SessionStart, Stop und pre-commit Hook
+- `references/board.md`: Kanban-Board, automatische Aktualisierung und Live-Ansicht
 - `references/cli.md`: alle Befehle und Optionen
 - `references/config.md`: Felder der config.json
 - `references/templates/`: Vorlagen für alle Aufgabentypen und decisions.md
