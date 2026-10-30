@@ -56,6 +56,10 @@ Alle Typen haben am Ende: Assets, Offene Fragen, Übergabe, Verlauf.
 
 Die Vorlagen liegen in `templates/`. Platzhalterkommentare (`<!-- ... -->`) beim Ausfüllen durch Inhalt ersetzen. Leere Abschnitte dürfen bestehen bleiben, Abschnittsüberschriften nicht umbenennen, weil das CLI sie für Prüfungen liest. Zusätzliche Abschnitte sind erlaubt (zum Beispiel `## Herkunft` bei importierten Aufgaben oder `## Commits` nach `works commits --write`).
 
+## Abschnitt Beschreibung
+
+Optional bei jedem Typ, direkt unter dem Hauptabschnitt. Hier stehen Hintergrund, Details, Links und Hinweise des Nutzers, etwa aus dem Board-Dialog "Neue Aufgabe" oder mit `works new --description "..."`. Bei Chores ist der Hauptabschnitt selbst "Beschreibung", dort wird beides zusammengeführt. Claude liest den Abschnitt vor der Arbeit und behandelt ihn als Vorgabe.
+
 ## Schreibregeln für Inhalte
 
 - Ziel: Ein bis drei Sätze, die das Ergebnis beschreiben, nicht die Tätigkeit. Gut: "Neue Accounts erhalten nach der Verifizierung zuverlässig die Rolle Mitglied." Schlecht: "Verifizierung fixen."

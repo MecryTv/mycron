@@ -60,7 +60,7 @@ Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Se
 
 | Aktion | So geht es | Was dahinter passiert |
 |---|---|---|
-| Aufgabe anlegen | "Neue Aufgabe" oder `N`: Typ, Titel, Priorität, Spalte, Aufwand, Risiko, Fälligkeit, Meilenstein, Tags, Abhängigkeit, Ziel, Akzeptanzkriterien | `works new`, danach `section` und `item`. Ohne Ziel oder Kriterien wird die Aufgabe als unvollständig markiert |
+| Aufgabe anlegen | "Neue Aufgabe" oder `N`: Typ, Titel, Priorität, Spalte, Aufwand, Risiko, Fälligkeit, Meilenstein, Tags, Abhängigkeit, Ziel, Beschreibung, Akzeptanzkriterien | `works new`, danach `section` und `item`. Ohne Ziel oder Kriterien wird die Aufgabe als unvollständig markiert |
 | Schnell anlegen | `+` in Backlog oder Geplant, Titel eingeben, Enter | `works new` mit Feature und P3 |
 | Verschieben | Karte in eine andere Spalte ziehen oder Status im Detailpanel wählen | Siehe Tabelle unten |
 | Felder ändern | Detailpanel: Titel, Status, Priorität, Typ, Aufwand, Risiko, Fälligkeit, Meilenstein, Tags | `works set` |

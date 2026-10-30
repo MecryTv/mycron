@@ -20,7 +20,7 @@ import { generateIndex, nextCandidates, dodCheck, sessionSummary, byIdMap, miles
 import { generateBoard, refreshBoardIfPresent } from './board.mjs';
 import { serveBoard } from './serve.mjs';
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
-import { adaptToType, repairTasks } from './sections.mjs';
+import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
 import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion } from './server-control.mjs';
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
@@ -118,12 +118,20 @@ function createTask(root, config, opts) {
     incomplete: !!opts.incomplete,
   };
   let filled = fillTemplate(body, { id, title: data.title, date: today() });
+  // Wer die Aufgabe angelegt hat, steht auch im ersten Verlaufseintrag (das Board erkennt so eigene Änderungen).
+  if (process.env.WORKS_ACTOR) filled = filled.replace(/^(- \d{4}-\d{2}-\d{2}: Aufgabe angelegt)$/m, `$1 [${process.env.WORKS_ACTOR}]`);
   fs.writeFileSync(path.join(dir, 'task.md'), serializeFrontmatter(data) + '\n' + filled.replace(/^\n+/, ''));
 
   const task = loadTask(dir);
   if (opts['log-file']) {
     const log = fs.readFileSync(String(opts['log-file']), 'utf8').trim();
     task._body = setSection(task._body, 'Logs und Fehlermeldungen', '```\n' + log + '\n```');
+  }
+  if (opts.description && opts.description !== true) {
+    const goal = GOAL_SECTION[type] || 'Ziel';
+    const text = String(opts.description).trim();
+    if (goal === 'Beschreibung') task._body = setSection(task._body, 'Beschreibung', text);
+    else task._body = insertAfter(task._body, goal, `## Beschreibung\n${text}\n`);
   }
   if (opts.context) {
     task._body = setSection(task._body, 'Herkunft', String(opts.context));
@@ -371,7 +379,7 @@ function printContext(root, t) {
   out(`Typ ${TYPE_LABEL[t.type]}, ${t.priority} ${PRIO_LABEL[t.priority]}, Status ${STATUS_LABEL[t.status]}${t.effort ? `, Aufwand ${t.effort}` : ''}`);
   out(`Datei: ${t._file}`);
   if (t.branch) out(`Branch: ${t.branch}`);
-  for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Beschreibung', 'Akzeptanzkriterien', 'Umsetzungsplan', 'Übergabe', 'Offene Fragen']) {
+  for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Abkürzung', 'Beschreibung', 'Kontext und Problem', 'Akzeptanzkriterien', 'Umsetzungsplan', 'Checkliste', 'Übergabe', 'Offene Fragen']) {
     const c = getSection(t._body, s);
     if (hasContent(c)) out(`\n## ${s}\n${stripComments(c).trim()}`);
   }
@@ -466,7 +474,12 @@ function cmdSection() {
     out(s === null ? '' : stripComments(s).trim());
     return;
   }
-  t._body = setSection(t._body, name, String(text).replace(/\r\n/g, '\n').trim());
+  const clean = String(text).replace(/\r\n/g, '\n').trim();
+  if (getSection(t._body, name) === null && flags.after && flags.after !== true) {
+    t._body = insertAfter(t._body, String(flags.after), `## ${name}\n${clean}\n`);
+  } else {
+    t._body = setSection(t._body, name, clean);
+  }
   addHistory(t, `Abschnitt ${name} aktualisiert`);
   saveTask(t);
   refresh(root);
@@ -1519,7 +1532,7 @@ Einrichtung
 Erfassen
   new --type <typ> --title "..." [--priority P1-P4] [--effort S|M|L|XL] [--risk niedrig|mittel|hoch]
       [--due JJJJ-MM-TT] [--milestone M1] [--tags a,b] [--blocked-by W-1] [--blocks W-2] [--related W-3]
-      [--source text] [--incomplete] [--decisions] [--log-file pfad] [--status backlog]
+      [--source text] [--incomplete] [--decisions] [--log-file pfad] [--status backlog] [--description "..."]
   idea "Text" [--tags a,b]          ideas                      promote I-001 [--type ...] [--priority ...]
   scan [--create] [--marker FIXME,HACK] [--json]
   gh-import [--state open] [--limit 100] [--dry-run]         gh-export <ID> [--dry-run]

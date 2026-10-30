@@ -44,6 +44,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 8. Prioritäten nach den Kriterien in `references/priorities.md` vergeben. Eine neue P1 dem Nutzer sofort melden.
 9. Schreibstil in Aufgaben: sachlich, konkret, ohne Floskeln. Akzeptanzkriterien müssen mit ja oder nein prüfbar sein.
 10. Der Nutzer kann Aufgaben auch im Live-Board anlegen, verschieben und bearbeiten. Solche Verlaufseinträge enden mit `[Board]`. Vor jedem Edit an einer task.md die Datei neu lesen, statt einen älteren Stand aus dem Kontext zu überschreiben. Neue Aufgaben mit `source: board` und `incomplete: true` beim nächsten passenden Moment mit dem Nutzer vervollständigen.
+11. Der Abschnitt `## Beschreibung` enthält Hintergrund, Details und Hinweise des Nutzers. Vor der Arbeit an einer Aufgabe vollständig lesen und als verbindliche Vorgabe behandeln, genau wie Ziel und Akzeptanzkriterien. Widerspricht etwas darin dem Plan oder dem Code, beim Nutzer nachfragen statt es zu übergehen. Den Abschnitt nicht umschreiben; eigene Erkenntnisse gehören in andere Abschnitte oder den Verlauf.
 
 ## Wann was tun
 

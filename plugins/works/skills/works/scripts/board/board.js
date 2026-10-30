@@ -441,6 +441,7 @@
     try { m = await ensureMeta(); metaInfo = null; } catch (e) { return fail(e); }
     const type = prefill.type || 'feature';
     const goalOf = (ty) => (m.types.find((x) => x.id === ty) || {}).goal || 'Ziel';
+    const descLabel = (goal) => (goal === 'Beschreibung' ? 'Weitere Details' : 'Beschreibung');
     const html = '<h2>Neue Aufgabe</h2>' +
       '<div class="field span4"><span>Typ</span>' + segCtl('type', m.types.map((x) => ({ id: x.id, label: x.label })), type) + '</div>' +
       '<label class="field span4"><span>Titel</span><input class="input" name="title" required maxlength="160" placeholder="Was soll am Ende anders sein?" value="' + esc(prefill.title || '') + '" autofocus></label>' +
@@ -454,7 +455,8 @@
       '<label class="field span2"><span>Tags, mit Komma getrennt</span><input class="input" name="tags" list="tagList" placeholder="bot, dashboard"><datalist id="tagList">' + m.tags.map((x) => '<option value="' + esc(x) + '">').join('') + '</datalist></label>' +
       '<label class="field span2"><span>Wartet auf</span><select name="blocked_by"><option value="">Nichts</option>' + m.tasks.filter((x) => !['erledigt', 'verworfen'].includes(x.status)).map((x) => '<option value="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</option>').join('') + '</select></label>' +
       '</div>' +
-      '<label class="field"><span id="goalLabel">' + esc(goalOf(type)) + '</span><textarea class="input" name="goal" rows="3" placeholder="Ein bis drei Sätze zum gewünschten Ergebnis"></textarea></label>' +
+      '<label class="field"><span id="goalLabel">' + esc(goalOf(type)) + '</span><textarea class="input" name="goal" rows="2" placeholder="Ein bis drei Sätze zum gewünschten Ergebnis"></textarea></label>' +
+      '<label class="field"><span id="descLabel">' + esc(descLabel(goalOf(type))) + '</span><textarea class="input" name="description" rows="5" placeholder="Hintergrund, Details, Links, Hinweise für Claude. Markdown möglich, Listen mit - beginnen."></textarea><span class="sublabel">Claude liest diese Beschreibung beim Start der Aufgabe als Vorgabe von dir.</span></label>' +
       '<label class="field"><span>Akzeptanzkriterien, eins pro Zeile</span><textarea class="input" name="criteria" rows="3" placeholder="Prüfbar mit ja oder nein"></textarea></label>' +
       '<p class="sublabel">Ohne Ziel oder Kriterien wird die Aufgabe als unvollständig markiert. Claude fragt dann nach.</p>' +
       foot('Aufgabe anlegen');
@@ -464,11 +466,11 @@
         effort: fd.get('effort') || '', risk: fd.get('risk') || '', due: fd.get('due') || '', milestone: fd.get('milestone') || '',
         tags: String(fd.get('tags') || '').split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean),
         blocked_by: fd.get('blocked_by') ? [fd.get('blocked_by')] : [],
-        goal: String(fd.get('goal') || ''), criteria: String(fd.get('criteria') || '').split('\n').map((s) => s.replace(/^\s*[-*]\s*(\[ \]\s*)?/, '').trim()).filter(Boolean),
+        goal: String(fd.get('goal') || ''), description: String(fd.get('description') || ''), criteria: String(fd.get('criteria') || '').split('\n').map((s) => s.replace(/^\s*[-*]\s*(\[ \]\s*)?/, '').trim()).filter(Boolean),
       };
       return act('create', payload);
     }, (f) => {
-      $$('input[name="type"]', f).forEach((i) => i.onchange = () => { $('#goalLabel').textContent = goalOf(i.value); });
+      $$('input[name="type"]', f).forEach((i) => i.onchange = () => { $('#goalLabel').textContent = goalOf(i.value); $('#descLabel').textContent = descLabel(goalOf(i.value)); });
     });
     if (r) { ok(r.message); pendingOpen = r.id; }
   }
@@ -582,7 +584,9 @@
     const mi = metaInfo || { types: Object.entries(meta.typeLabel).map(([id, label]) => ({ id, label })), efforts: ['S', 'M', 'L', 'XL'], risks: ['niedrig', 'mittel', 'hoch'], milestones: meta.milestones };
     const closed = !OPEN.includes(t.status);
     const goal = d.sections.find((s) => s.name === d.goalSection);
-    const others = d.sections.filter((s) => s.name !== d.goalSection && s.name !== 'Übergabe');
+    const showDesc = d.goalSection !== 'Beschreibung';
+    const desc = d.sections.find((s) => s.name === 'Beschreibung');
+    const others = d.sections.filter((s) => s.name !== d.goalSection && s.name !== 'Übergabe' && !(showDesc && s.name === 'Beschreibung'));
     const handoff = d.sections.find((s) => s.name === 'Übergabe');
     const h = [];
 
@@ -610,6 +614,7 @@
     h.push(alerts.join(''));
 
     h.push(sectionBlock(d.goalSection, goal ? goal.content : '', true));
+    if (showDesc) h.push(sectionBlock('Beschreibung', desc ? desc.content : '', true, 'Hintergrund und Hinweise für Claude'));
 
     for (const c of d.checklists) {
       const done = c.items.filter((i) => i.done).length;
@@ -714,7 +719,7 @@
       ta.onkeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') $('[data-secsave]', box).click(); };
       $('[data-seccancel]', box).onclick = () => { dirty = false; renderDetail(); };
       $('[data-secsave]', box).onclick = async () => {
-        const r = await run(() => act('section', { id, name, text: ta.value }), name + ' gespeichert');
+        const r = await run(() => act('section', { id, name, text: ta.value, after: name === 'Beschreibung' ? detail.goalSection : undefined }), name + ' gespeichert');
         if (r) dirty = false;
       };
     });

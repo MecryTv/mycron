@@ -31,6 +31,15 @@ export function insertBefore(body, block) {
   return `${body.replace(/\s+$/, '')}\n\n${block}`;
 }
 
+// Fügt einen neuen Abschnitt direkt hinter einem vorhandenen ein, sonst wie insertBefore.
+export function insertAfter(body, after, block) {
+  const h = after.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = body.match(new RegExp(`(^|\\n)## ${h}[ \\t]*\\n[\\s\\S]*?(?=\\n## |$)`));
+  if (!m) return insertBefore(body, block);
+  const end = m.index + m[0].length;
+  return `${body.slice(0, end).replace(/\s+$/, '')}\n\n${block}${body.slice(end)}`;
+}
+
 export function removeSection(body, name) {
   const h = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return body.replace(new RegExp(`\\n## ${h}[ \\t]*\\n[\\s\\S]*?(?=\\n## |$)`), '');

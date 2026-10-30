@@ -275,12 +275,17 @@ const actions = {
     const blockedBy = list(b.blocked_by, 'Blockiert durch', ID_RE); if (blockedBy.length) args.push(`--blocked-by=${blockedBy.join(',')}`);
     args.push('--source=board');
     const goal = str(b.goal, 'Ziel', { max: 20000 });
+    const description = str(b.description, 'Beschreibung', { max: 50000 });
     const criteria = (Array.isArray(b.criteria) ? b.criteria : []).map((c) => str(c, 'Kriterium', { max: 500 })).filter(Boolean).slice(0, 50);
     if (!goal || !criteria.length) args.push('--incomplete');
     const outText = await must(root, args);
     const newId = (outText.match(/Angelegt: (\S+)/) || [])[1];
     if (!newId) throw new ApiError(500, 'Neue Aufgaben-ID nicht erkannt.');
-    if (goal) await withTextFile(root, goal, (f) => must(root, ['section', newId, GOAL_SECTION[type], `--file=${f}`]));
+    const goalName = GOAL_SECTION[type];
+    // Bei Chores ist der Hauptabschnitt schon "Beschreibung", dann beides dort zusammenführen.
+    const goalText = goalName === 'Beschreibung' ? [goal, description].filter(Boolean).join('\n\n') : goal;
+    if (goalText) await withTextFile(root, goalText, (f) => must(root, ['section', newId, goalName, `--file=${f}`]));
+    if (description && goalName !== 'Beschreibung') await withTextFile(root, description, (f) => must(root, ['section', newId, 'Beschreibung', `--file=${f}`, `--after=${goalName}`]));
     for (const c of criteria) await must(root, ['item', newId, `--text=${c}`]);
     return { id: newId, message: `${newId} angelegt.` };
   },
@@ -383,7 +388,8 @@ const actions = {
       if (!text.trim()) bad('Übergabe ist leer.');
       await withTextFile(root, text, (f) => must(root, ['handoff', tid, `--file=${f}`]));
     } else {
-      await withTextFile(root, text, (f) => must(root, ['section', tid, name, `--file=${f}`]));
+      const after = b.after && typeof b.after === 'string' && b.after.length < 80 && !/[\n#]/.test(b.after) ? [`--after=${b.after}`] : [];
+      await withTextFile(root, text, (f) => must(root, ['section', tid, name, `--file=${f}`, ...after]));
     }
     return { message: `${name} gespeichert.` };
   },
