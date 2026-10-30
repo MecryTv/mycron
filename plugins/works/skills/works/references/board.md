@@ -16,13 +16,21 @@ Das Board zeigt alle Aufgaben als Spalten nach Status. In der Live-Ansicht kann 
 
 Wenn der Nutzer das Board sehen oder selbst Aufgaben pflegen will, die Live-Ansicht starten.
 
-In Claude Code den Befehl als Hintergrundprozess starten (Bash mit `run_in_background`), damit die Session weiterläuft:
+In Claude Code so starten:
 
 ```
-works board --serve
+works board --serve --detach
 ```
 
-Danach dem Nutzer die ausgegebene URL nennen. Vorher prüfen, ob bereits ein Server für dieses Projekt läuft, und keinen zweiten starten. Nach einem Plugin-Update den Server neu starten, sonst liefert er die alte Oberfläche aus. Mit `--open` öffnet sich der Standardbrowser auf dem Rechner, auf dem der Befehl läuft. Bei Remote-SSH kein `--open`, sondern auf die Portweiterleitung des Editors hinweisen; ein anderer lokaler Port ist dabei kein Problem.
+Der Server läuft dann losgelöst im Hintergrund weiter, auch nach dem Ende der Session, und der Befehl gibt die URL aus. Diese dem Nutzer nennen. Läuft für das Projekt schon ein Server mit der aktuellen Version, startet kein zweiter, sondern es wird nur dessen URL ausgegeben. Ein Server einer älteren Version wird beendet und durch die aktuelle ersetzt.
+
+Weitere Befehle:
+
+- `works board --status`: läuft ein Server, welche Version, ist sie aktuell?
+- `works board --restart`: Server mit der aktuellen Version neu starten, gleicher Port.
+- `works board --stop`: Server beenden.
+
+Ohne `--detach` läuft der Server im Vordergrund, bis er mit Strg+C beendet wird. Das ist für ein eigenes Terminal gedacht. Mit `--open` öffnet sich der Standardbrowser auf dem Rechner, auf dem der Befehl läuft. Bei Remote-SSH kein `--open`, sondern auf die Portweiterleitung des Editors hinweisen; ein anderer lokaler Port ist dabei kein Problem.
 
 Optionen:
 
@@ -70,8 +78,24 @@ Verschieben im Detail:
 
 Jeder Verlaufseintrag aus dem Board endet mit `[Board]`. So ist in der task.md und in der Aktivitätsliste erkennbar, was der Nutzer selbst geändert hat.
 
+## Updates
+
+Nach einem Plugin-Update stellt sich alles selbst auf die neue Version um:
+
+| Stelle | Was passiert |
+|---|---|
+| Laufender Server | Prüft alle 30 Sekunden, ob eine neuere Version installiert ist (über `~/.claude/plugins/installed_plugins.json`, sonst die Plugin-Ordner). Ist sie bei zwei Prüfungen hintereinander gleich, startet er die neue Version auf demselben Port und beendet sich |
+| Sessionstart | Der SessionStart Hook ersetzt Server mit veralteter Version, auch solche aus works-Versionen vor dieser Funktion, und erzeugt WORKS.md und eine vorhandene board.html neu |
+| Offene Tabs | Erkennen die neue Version, merken sich Suche, Filter, geöffnete Aufgabe und Scrollposition und laden sich einmal neu. Ist gerade ein Text in Bearbeitung, wartet das Neuladen bis nach dem Speichern |
+| board.html | Wird beim Sessionstart und nach jedem schreibenden Befehl mit der neuen Version erzeugt. Ein bereits geöffneter Tab der Datei muss von Hand neu geladen werden |
+
+Die Version ist ein Hash über alle Skripte und Board-Dateien. Sie ändert sich also mit jedem Update, auch ohne Versionsnummer in plugin.json. Registriert wird der Server in `.works/server.json` (PID, Port, Version), Ausgaben landen in `.works/server.log`. Beide stehen in `.works/.gitignore` und werden dort bei Bedarf ergänzt.
+
+Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen das automatische Neuladen noch nicht. Sie brauchen nach dem Update einmal F5.
+
 ## Für Claude wichtig
 
+- Sagt der Nutzer, das Board sehe alt aus oder verhalte sich falsch, zuerst `works board --status`, dann `works board --restart` und den Nutzer bitten, einen Tab, der noch eine sehr alte Version zeigt, einmal neu zu laden.
 - Vor jedem Edit an einer task.md die Datei neu lesen. Der Nutzer kann sie inzwischen im Board geändert haben.
 - Aufgaben mit `source: board` und `incomplete: true` hat der Nutzer schnell angelegt. Bei passender Gelegenheit Ziel und Akzeptanzkriterien mit ihm klären.
 - Offene Fragen, die der Nutzer im Board notiert, sind oft an Claude gerichtet. Beim Start einer solchen Aufgabe zuerst darauf eingehen.

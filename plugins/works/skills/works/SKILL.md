@@ -66,7 +66,8 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Erledigte Aufgabe muss nachgebessert werden | `works reopen <ID> --reason "..."` | `references/workflow.md` |
 | TODO-Kommentare im Code, GitHub Issues | `works scan`, `works gh-import` | `references/workflow.md` |
 | Bericht, Changelog | `works report`, `works changelog` | `references/cli.md` |
-| Übersicht im Browser, Board, "ich will selbst Aufgaben anlegen" | `works board --serve` im Hintergrund starten und die URL nennen. Dort kann der Nutzer alles selbst bearbeiten. Für eine reine Ansicht `works board` | `references/board.md` |
+| Übersicht im Browser, Board, "ich will selbst Aufgaben anlegen" | `works board --serve --detach` und die URL nennen. Läuft schon ein aktueller Server, wird nur seine URL ausgegeben. Dort kann der Nutzer alles selbst bearbeiten. Für eine reine Ansicht `works board` | `references/board.md` |
+| Board zeigt altes Design, Board neu starten | `works board --restart` | `references/board.md` |
 | Struktur prüfen, Fehler vermuten | `works doctor`, bei Bedarf `--fix` | `references/cli.md` |
 | Hooks einrichten | Bei Plugin-Installation nur `works install-hooks --git`, sonst nach Rückfrage `works install-hooks` | `references/hooks.md` |
 

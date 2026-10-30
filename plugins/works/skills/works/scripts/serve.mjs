@@ -8,6 +8,7 @@ import { worksDir, run } from './lib.mjs';
 import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
 import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf } from './api.mjs';
+import { runningVersion, writeServer, clearServer, newestCli, cliVersion, OWN_CLI, startDetached, ensureGitignore } from './server-control.mjs';
 
 const MIME = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
@@ -21,6 +22,7 @@ const POLL_MS = 1000;
 const KEEPALIVE_MS = 25000;
 const MAX_JSON = 1024 * 1024;
 const MAX_UPLOAD = 20 * 1024 * 1024;
+const UPDATE_CHECK_MS = parseInt(process.env.WORKS_UPDATE_CHECK_MS || "30000", 10);
 
 function statPart(file) {
   try { const s = fs.statSync(file); return `${s.mtimeMs}:${s.size}`; } catch { return '-'; }
@@ -76,7 +78,7 @@ function safeEqual(a, b) {
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 }
 
-export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false, fixedPort = false } = {}) {
+export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false, fixedPort = false, takeover = false } = {}) {
   const wd = worksDir(root);
   const clients = new Set();
   // Zufälliges Token pro Serverstart. Nur Seiten, die dieser Server ausgeliefert hat, kennen es.
@@ -102,6 +104,32 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   };
   const timer = setInterval(tick, POLL_MS);
   const keepalive = setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, KEEPALIVE_MS);
+
+  // Selbstprüfung: Ist inzwischen eine neuere Version installiert, übergibt der Server an sie.
+  // Die neue Version muss bei zwei Prüfungen hintereinander gleich sein, damit kein halb kopiertes Update startet.
+  let seenVersion = null;
+  let handingOver = false;
+  const updateTimer = setInterval(() => {
+    if (handingOver) return;
+    let cli; let v;
+    try { cli = newestCli(); v = cliVersion(cli); } catch { return; }
+    if (v === runningVersion()) { seenVersion = null; return; }
+    if (seenVersion !== `${cli}|${v}`) { seenVersion = `${cli}|${v}`; return; }
+    handOver(cli, v);
+  }, UPDATE_CHECK_MS);
+  updateTimer.unref();
+
+  function handOver(cli, v) {
+    handingOver = true;
+    process.stdout.write(`Neue Version ${v} gefunden, übergebe an ${cli}\n`);
+    clearInterval(timer); clearInterval(keepalive); clearInterval(updateTimer);
+    for (const res of clients) { res.write('event: restart\ndata: 1\n\n'); res.end(); }
+    clients.clear();
+    clearServer(root, process.pid);
+    server.close();
+    startDetached(root, { cli, port: boundPort, host, takeover: true });
+    setTimeout(() => process.exit(0), 300).unref();
+  }
 
   // Schutz vor DNS-Rebinding: nur lokale Hostnamen annehmen, außer der Nutzer hat bewusst 0.0.0.0 gewählt.
   // Der Port bleibt frei, weil Portweiterleitungen (etwa VS Code Remote-SSH) einen anderen lokalen Port nutzen können.
@@ -198,14 +226,19 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   });
 
   let attempt = 0;
+  const takeoverUntil = Date.now() + 20000;
   const listen = (p) => {
     server.once('error', (e) => {
+      // Bei einer Übergabe wartet der neue Server, bis der alte den Port freigegeben hat.
+      if (e.code === 'EADDRINUSE' && takeover && Date.now() < takeoverUntil) { setTimeout(() => listen(p), 300); return; }
       if (e.code === 'EADDRINUSE' && !fixedPort && attempt < 10) { attempt++; listen(p + 1); return; }
       process.stderr.write(`Fehler: Port ${p} ist nicht verfügbar (${e.code}). Anderen Port mit --port wählen.\n`);
       process.exit(1);
     });
     server.listen(p, host, () => {
       boundPort = p;
+      ensureGitignore(root, ['server.json', 'server.log', '.tmp/']);
+      writeServer(root, { pid: process.pid, port: p, host, version: runningVersion(), cli: OWN_CLI, started: new Date().toISOString() });
       const url = `http://${host === '0.0.0.0' || host === '::' ? 'localhost' : host}:${p}/`;
       process.stdout.write(`Live-Board läuft: ${url}\nBeobachte ${wd}\nBeenden mit Strg+C.\n`);
       if (open) {
@@ -219,6 +252,8 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   const shutdown = () => {
     clearInterval(timer);
     clearInterval(keepalive);
+    clearInterval(updateTimer);
+    clearServer(root, process.pid);
     for (const res of clients) res.end();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 500).unref();

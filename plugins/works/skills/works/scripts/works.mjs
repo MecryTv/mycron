@@ -19,6 +19,7 @@ import {
 import { generateIndex, nextCandidates, dodCheck, sessionSummary, byIdMap, milestoneProgress } from './views.mjs';
 import { generateBoard, refreshBoardIfPresent } from './board.mjs';
 import { serveBoard } from './serve.mjs';
+import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion } from './server-control.mjs';
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
 const ASSET_KINDS = ['ist', 'vorher', 'nachher', 'referenz', 'mockup', 'skizze', 'fehler', 'diagramm'];
@@ -65,7 +66,7 @@ function cmdInit() {
     if (!exists(keep)) fs.writeFileSync(keep, '');
   }
   const mode = flags.gitignore || 'default';
-  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', '.tmp/', 'inbox/*', '!inbox/.gitkeep'];
+  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'inbox/*', '!inbox/.gitkeep'];
   if (mode === 'assets') ignore.push('tasks/*/assets/', 'archive/*/assets/');
   if (mode === 'all') ignore.splice(1, ignore.length - 1, '*', '!.gitignore');
   if (mode !== 'none') fs.writeFileSync(path.join(wd, '.gitignore'), ignore.join('\n') + '\n');
@@ -679,15 +680,71 @@ function cmdIndex() {
   out(`WORKS.md aktualisiert: ${path.join(worksDir(root), 'WORKS.md')}`);
 }
 
-function cmdBoard() {
+function serverUrl(info) {
+  const h = !info.host || info.host === '0.0.0.0' || info.host === '::' ? '127.0.0.1' : info.host;
+  return `http://${h}:${info.port}/`;
+}
+
+async function waitForServer(root, oldPid, ms = 8000) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    const info = readServer(root);
+    if (info && info.pid !== oldPid) return info;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return null;
+}
+
+async function cmdBoard() {
   const root = requireRoot();
-  if (flags.serve) {
+  const current = cliVersion(newestCli());
+  const info = readServer(root);
+  const legacy = info ? [] : findServerProcesses(root);
+
+  if (flags.status) {
+    if (info) out(`Live-Board läuft: ${serverUrl(info)} (PID ${info.pid}, Version ${info.version}${info.version === current ? ', aktuell' : `, veraltet, aktuell ist ${current}`})`);
+    for (const p of legacy) out(`Board-Server einer älteren works-Version läuft: PID ${p.pid}${p.port ? `, Port ${p.port}` : ''}. Mit works board --restart ersetzen.`);
+    if (!info && !legacy.length) out('Kein Live-Board für dieses Projekt aktiv.');
+    return;
+  }
+  if (flags.stop) {
+    let n = 0;
+    if (info && await stopProcess(info.pid)) { clearServer(root, info.pid); n++; }
+    for (const p of legacy) if (await stopProcess(p.pid)) n++;
+    out(n ? `${n} Board-Server beendet.` : 'Kein Live-Board für dieses Projekt aktiv.');
+    return;
+  }
+
+  if (flags.serve || flags.restart) {
+    const host = flags.host && flags.host !== true ? String(flags.host) : (info && info.host) || '127.0.0.1';
+    let port = parseInt(flags.port || (info && info.port) || (legacy[0] && legacy[0].port) || 4747, 10);
+    // Läuft schon ein aktueller Server, keinen zweiten starten.
+    if (info && info.version === current && !flags.restart && !flags.takeover) {
+      out(`Live-Board läuft bereits: ${serverUrl(info)}`);
+      return;
+    }
+    // Veraltete oder alte Server dieses Projekts durch die aktuelle Version ersetzen.
+    if (!flags.takeover) {
+      if (info) { await stopProcess(info.pid); clearServer(root, info.pid); out(`Vorherigen Board-Server (Version ${info.version}) beendet.`); }
+      for (const p of legacy) { await stopProcess(p.pid); out(`Board-Server einer älteren works-Version (PID ${p.pid}) beendet.`); }
+    }
     generateIndex(root);
+    if (flags.detach || flags.restart) {
+      const pid = startDetached(root, { cli: newestCli(), port, host, takeover: !!(info || legacy.length) });
+      const started = await waitForServer(root, info ? info.pid : null);
+      if (!started) fail(`Board-Server startet nicht (PID ${pid}). Details in .works/server.log`);
+      out(`Live-Board läuft: ${serverUrl(started)}`);
+      out('Läuft im Hintergrund weiter. Beenden mit works board --stop.');
+      if (flags.open) {
+        const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
+        run(opener, [serverUrl(started)], { detached: true, stdio: 'ignore' });
+      }
+      return;
+    }
     serveBoard(root, {
-      port: parseInt(flags.port || 4747, 10),
-      fixedPort: !!flags.port,
-      host: flags.host && flags.host !== true ? String(flags.host) : '127.0.0.1',
-      open: !!flags.open,
+      port, host, open: !!flags.open,
+      fixedPort: !!flags.port || !!flags.takeover || !!info || legacy.length > 0,
+      takeover: !!flags.takeover || !!info || legacy.length > 0,
     });
     return new Promise(() => {}); // läuft bis Strg+C
   }
@@ -1419,7 +1476,8 @@ Erfassen
 Ansehen
   list [--status ..] [--priority ..] [--type ..] [--tag ..] [--milestone M1] [--blocked] [--overdue] [--incomplete] [--all] [--json]
   show <ID> [--section "Name"]     next [--n 3]     status     index
-  board [--open]                   board --serve [--port 4747] [--host 127.0.0.1] [--open]
+  board [--open]                   board --serve [--detach] [--port 4747] [--host 127.0.0.1] [--open]
+  board --status | --stop | --restart
   milestone list|add M1 --title ".." [--due ..]|set M1 status=erledigt
 
 Bearbeiten

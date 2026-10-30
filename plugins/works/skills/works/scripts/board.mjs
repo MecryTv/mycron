@@ -8,6 +8,7 @@ import {
   PRIO_LABEL, TYPE_LABEL, OPEN_STATUSES,
 } from './lib.mjs';
 import { byIdMap, milestoneProgress } from './views.mjs';
+import { runningVersion } from './server-control.mjs';
 
 function excerpt(t) {
   for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Beschreibung', 'Abkürzung']) {
@@ -46,6 +47,7 @@ export function boardData(root) {
   });
   const meta = {
     generated: nowStamp(),
+    version: runningVersion(),
     project: path.basename(root),
     statusLabel: STATUS_LABEL, prioLabel: PRIO_LABEL, typeLabel: TYPE_LABEL,
     milestones: milestoneProgress(config, all).map((m) => ({

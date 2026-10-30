@@ -15,6 +15,8 @@
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const state = { q: '', prios: new Set(PRIOS), type: '', tag: '', ms: '', closed: false, signal: '' };
+  const PAGE_VERSION = meta.version || '';
+  const UI_KEY = 'works-ui-' + meta.project;
   const changes = new Map();
   let openId = null;
   let detail = null;
@@ -65,7 +67,13 @@
   const fail = (e) => toast('<div class="what">Nicht gespeichert</div><div class="why">' + esc(e.message || e) + '</div>', 'err');
 
   async function run(fn, success) {
-    try { const r = await fn(); if (success) ok(typeof success === 'function' ? success(r) : success); return r; } catch (e) { fail(e); return null; }
+    try {
+      const r = await fn();
+      if (success) ok(typeof success === 'function' ? success(r) : success);
+      return r;
+    } catch (e) { fail(e); return null; } finally {
+      setTimeout(() => { if (updateWaiting && !dirty) { updateWaiting = false; reloadForUpdate(); } }, 600);
+    }
   }
 
   // ---------- Markdown (klein und sicher) ----------
@@ -909,12 +917,27 @@
   }
 
   let reloadPending = false;
+  // Neue works-Version auf dem Server: Ansicht merken und Seite neu laden, damit Design und Skript aktuell sind.
+  function reloadForUpdate() {
+    if (dirty) { setLive(true, 'Neue Version verfügbar, wird nach dem Speichern geladen'); updateWaiting = true; return; }
+    try {
+      sessionStorage.setItem(UI_KEY, JSON.stringify({
+        q: state.q, prios: [...state.prios], type: state.type, tag: state.tag, ms: state.ms, closed: state.closed, signal: state.signal,
+        openId, side, scrollX: $('#board').scrollLeft, scrollY: window.scrollY,
+      }));
+    } catch (e) { /* privat */ }
+    setLive(true, 'Neue Version wird geladen');
+    location.reload();
+  }
+  let updateWaiting = false;
+
   async function reload() {
     // Während eine Karte gezogen wird, nicht neu zeichnen, sonst springt das Board unter dem Mauszeiger.
     if (dragId) { reloadPending = true; return; }
     try {
       const res = await fetch('data.json', { cache: 'no-store' });
       const next = await res.json();
+      if (next.meta && next.meta.version && PAGE_VERSION && next.meta.version !== PAGE_VERSION) return reloadForUpdate();
       const found = diff(tasks, next.tasks);
       const now = new Date();
       const time = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1001,7 +1024,12 @@
     setLive(true, 'Live');
     let first = true;
     const es = new EventSource('events');
-    es.addEventListener('update', () => { if (first) { first = false; return; } reload(); });
+    es.addEventListener('update', () => {
+      // Das erste update nach dem Verbinden prüft nur die Version, die Daten sind schon in der Seite.
+      if (first) { first = false; fetch('data.json', { cache: 'no-store' }).then((r) => r.json()).then((n) => { if (n.meta && n.meta.version && PAGE_VERSION && n.meta.version !== PAGE_VERSION) reloadForUpdate(); }).catch(() => {}); return; }
+      reload();
+    });
+    es.addEventListener('restart', () => { first = true; setLive(true, 'Neue Version startet'); });
     es.onopen = () => { if ($('#live').classList.contains('off')) setLive(true, 'Live'); };
     es.onerror = () => setLive(false, 'Verbindung getrennt, neuer Versuch läuft');
     ensureMeta().then(() => { if (detail) renderDetail(); }).catch(() => {});
@@ -1011,5 +1039,21 @@
       if (d) renderBoard();
     }, 1000);
   }
+  // Ansicht nach einem Update-Neuladen wiederherstellen.
+  let restored = null;
+  try { restored = JSON.parse(sessionStorage.getItem(UI_KEY) || 'null'); sessionStorage.removeItem(UI_KEY); } catch (e) { restored = null; }
+  if (restored) {
+    Object.assign(state, { q: restored.q || '', type: restored.type || '', tag: restored.tag || '', ms: restored.ms || '', closed: !!restored.closed, signal: restored.signal || '' });
+    if (Array.isArray(restored.prios) && restored.prios.length) state.prios = new Set(restored.prios);
+    $('#q').value = state.q;
+    $('#showClosed').checked = state.closed;
+  }
   renderAll();
+  if (restored) {
+    $('#board').scrollLeft = restored.scrollX || 0;
+    window.scrollTo(0, restored.scrollY || 0);
+    if (LIVE && restored.openId) openTask(restored.openId);
+    else if (LIVE && restored.side) openSide(restored.side);
+    if (LIVE) toast('<div class="what">Board aktualisiert</div><div class="why">Eine neue works-Version ist installiert. Ansicht und Filter wurden übernommen.</div>');
+  }
 })();
