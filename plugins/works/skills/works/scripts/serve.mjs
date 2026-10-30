@@ -112,6 +112,14 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   // Die neue Version muss bei zwei Prüfungen hintereinander gleich sein, damit kein halb kopiertes Update startet.
   let seenVersion = null;
   let handingOver = false;
+  // Laufende Schreibaktionen. Vor Neustart oder Übergabe wird gewartet, bis sie fertig sind.
+  let inflight = 0;
+  let stopping = false;
+  const drain = async (ms) => {
+    stopping = true;
+    const until = Date.now() + ms;
+    while (inflight > 0 && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+  };
   const updateTimer = setInterval(() => {
     if (handingOver) return;
     let cli; let v;
@@ -122,8 +130,9 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   }, UPDATE_CHECK_MS);
   updateTimer.unref();
 
-  function handOver(cli, v) {
+  async function handOver(cli, v) {
     handingOver = true;
+    await drain(15000);
     process.stdout.write(`Neue Version ${v} gefunden, übergebe an ${cli}\n`);
     clearInterval(timer); clearInterval(keepalive); clearInterval(updateTimer);
     for (const res of clients) { res.write('event: restart\ndata: 1\n\n'); res.end(); }
@@ -151,6 +160,12 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
 
   async function handleApi(req, res, url) {
     if (!apiAllowed(req)) return json(res, 403, { error: 'Zugriff verweigert. Board neu laden.' });
+    if (stopping && req.method !== 'GET') return json(res, 503, { error: 'Das Board startet gerade neu. Bitte in ein paar Sekunden erneut versuchen.' });
+    inflight++;
+    try { return await handleApiInner(req, res, url); } finally { inflight--; }
+  }
+
+  async function handleApiInner(req, res, url) {
     const p = url.pathname;
     const q = url.searchParams;
     try {
@@ -252,7 +267,11 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   };
   listen(port);
 
-  const shutdown = () => {
+  let shuttingDown = false;
+  const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    await drain(8000);
     clearInterval(timer);
     clearInterval(keepalive);
     clearInterval(updateTimer);

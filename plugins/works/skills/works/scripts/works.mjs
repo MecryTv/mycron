@@ -127,11 +127,22 @@ function createTask(root, config, opts) {
     const log = fs.readFileSync(String(opts['log-file']), 'utf8').trim();
     task._body = setSection(task._body, 'Logs und Fehlermeldungen', '```\n' + log + '\n```');
   }
-  if (opts.description && opts.description !== true) {
-    const goal = GOAL_SECTION[type] || 'Ziel';
-    const text = String(opts.description).trim();
-    if (goal === 'Beschreibung') task._body = setSection(task._body, 'Beschreibung', text);
-    else task._body = insertAfter(task._body, goal, `## Beschreibung\n${text}\n`);
+  // Ziel, Beschreibung und Kriterien in einem Schritt schreiben, damit nie eine halb angelegte Aufgabe entsteht.
+  const textOpt = (name) => {
+    const file = opts[`${name}-file`];
+    if (file && file !== true) return fs.readFileSync(String(file), 'utf8').replace(/\r\n/g, '\n').trim();
+    return opts[name] && opts[name] !== true ? String(opts[name]).trim() : '';
+  };
+  const goalName = GOAL_SECTION[type] || 'Ziel';
+  const goalText = textOpt('goal');
+  const descText = textOpt('description');
+  const mainText = goalName === 'Beschreibung' ? [goalText, descText].filter(Boolean).join('\n\n') : goalText;
+  if (mainText) task._body = setSection(task._body, goalName, mainText);
+  if (descText && goalName !== 'Beschreibung') task._body = insertAfter(task._body, goalName, `## Beschreibung\n${descText}\n`);
+  const criteria = textOpt('criteria').split('\n').map((s) => s.replace(/^\s*[-*]\s*(\[ \]\s*)?/, '').trim()).filter(Boolean);
+  if (criteria.length) {
+    const sec = stripComments(getSection(task._body, 'Akzeptanzkriterien') || '').split('\n').filter((l) => l.trim() && !/^\s*[-*]\s+\[ \]\s*$/.test(l));
+    task._body = setSection(task._body, 'Akzeptanzkriterien', [...sec, ...criteria.map((c) => `- [ ] ${c}`)].join('\n'));
   }
   if (opts.context) {
     task._body = setSection(task._body, 'Herkunft', String(opts.context));
@@ -1532,7 +1543,8 @@ Einrichtung
 Erfassen
   new --type <typ> --title "..." [--priority P1-P4] [--effort S|M|L|XL] [--risk niedrig|mittel|hoch]
       [--due JJJJ-MM-TT] [--milestone M1] [--tags a,b] [--blocked-by W-1] [--blocks W-2] [--related W-3]
-      [--source text] [--incomplete] [--decisions] [--log-file pfad] [--status backlog] [--description "..."]
+      [--source text] [--incomplete] [--decisions] [--log-file pfad] [--status backlog]
+      [--goal ".." | --goal-file pfad] [--description ".." | --description-file pfad] [--criteria-file pfad]
   idea "Text" [--tags a,b]          ideas                      promote I-001 [--type ...] [--priority ...]
   scan [--create] [--marker FIXME,HACK] [--json]
   gh-import [--state open] [--limit 100] [--dry-run]         gh-export <ID> [--dry-run]

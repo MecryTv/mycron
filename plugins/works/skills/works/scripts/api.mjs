@@ -278,15 +278,16 @@ const actions = {
     const description = str(b.description, 'Beschreibung', { max: 50000 });
     const criteria = (Array.isArray(b.criteria) ? b.criteria : []).map((c) => str(c, 'Kriterium', { max: 500 })).filter(Boolean).slice(0, 50);
     if (!goal || !criteria.length) args.push('--incomplete');
-    const outText = await must(root, args);
+    // Alles in einem einzigen CLI-Aufruf, Texte über Dateien. So entsteht die Aufgabe ganz oder gar nicht.
+    const files = [];
+    const fileArg = (name, text) => { if (!text) return; const f = tmpFile(root, text); files.push(f); args.push(`--${name}-file=${f}`); };
+    fileArg('goal', goal);
+    fileArg('description', description);
+    fileArg('criteria', criteria.join('\n'));
+    let outText;
+    try { outText = await must(root, args); } finally { files.forEach(removeQuiet); }
     const newId = (outText.match(/Angelegt: (\S+)/) || [])[1];
     if (!newId) throw new ApiError(500, 'Neue Aufgaben-ID nicht erkannt.');
-    const goalName = GOAL_SECTION[type];
-    // Bei Chores ist der Hauptabschnitt schon "Beschreibung", dann beides dort zusammenführen.
-    const goalText = goalName === 'Beschreibung' ? [goal, description].filter(Boolean).join('\n\n') : goal;
-    if (goalText) await withTextFile(root, goalText, (f) => must(root, ['section', newId, goalName, `--file=${f}`]));
-    if (description && goalName !== 'Beschreibung') await withTextFile(root, description, (f) => must(root, ['section', newId, 'Beschreibung', `--file=${f}`, `--after=${goalName}`]));
-    for (const c of criteria) await must(root, ['item', newId, `--text=${c}`]);
     return { id: newId, message: `${newId} angelegt.` };
   },
 

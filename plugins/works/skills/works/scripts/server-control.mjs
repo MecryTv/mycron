@@ -158,7 +158,7 @@ export function findServerProcesses(root) {
   return out;
 }
 
-export async function stopProcess(pid, timeoutMs = 4000) {
+export async function stopProcess(pid, timeoutMs = 10000) {
   if (!isAlive(pid)) return true;
   try { process.kill(pid, 'SIGTERM'); } catch { return !isAlive(pid); }
   const until = Date.now() + timeoutMs;
