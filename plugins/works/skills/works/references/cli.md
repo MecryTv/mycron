@@ -91,7 +91,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 
 Fehler: ungültiges oder fehlendes Frontmatter, fehlende Pflichtfelder, ungültige Werte, Ordnername passt nicht zur ID, doppelte IDs, offene Aufgaben im Archiv, Verweise auf unbekannte Aufgaben, Zyklen, zu kleine next_id, fehlende Bilder und verlinkte Dateien.
 
-Warnungen: fehlender Aufwand, unbekannter Meilenstein, fehlende Akzeptanzkriterien, erledigt mit offenen Kriterien, laufende Aufgabe ohne oder mit veralteter Übergabe, unvollständige Aufgaben, Bilder ohne Alternativtext oder Beschreibungszeile, nicht referenzierte Assets, einseitige Abhängigkeiten, Dateien in der Inbox, ungültige aktive Aufgabe.
+Warnungen: Beschreibung nicht im Hauptabschnitt des Typs oder fehlende Vorlagenabschnitte (`--fix` übernimmt die Beschreibung und ergänzt die Abschnitte, Inhalte bleiben erhalten; das passiert auch einmal automatisch beim Sessionstart), fehlender Aufwand, unbekannter Meilenstein, fehlende Akzeptanzkriterien, erledigt mit offenen Kriterien, laufende Aufgabe ohne oder mit veralteter Übergabe, unvollständige Aufgaben, Bilder ohne Alternativtext oder Beschreibungszeile, nicht referenzierte Assets, einseitige Abhängigkeiten, Dateien in der Inbox, ungültige aktive Aufgabe.
 
 ## Exit-Codes
 
