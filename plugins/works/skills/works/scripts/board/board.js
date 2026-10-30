@@ -440,8 +440,6 @@
     let m;
     try { m = await ensureMeta(); metaInfo = null; } catch (e) { return fail(e); }
     const type = prefill.type || 'feature';
-    const goalOf = (ty) => (m.types.find((x) => x.id === ty) || {}).goal || 'Ziel';
-    const descLabel = (goal) => (goal === 'Beschreibung' ? 'Weitere Details' : 'Beschreibung');
     const html = '<h2>Neue Aufgabe</h2>' +
       '<div class="field span4"><span>Typ</span>' + segCtl('type', m.types.map((x) => ({ id: x.id, label: x.label })), type) + '</div>' +
       '<label class="field span4"><span>Titel</span><input class="input" name="title" required maxlength="160" placeholder="Was soll am Ende anders sein?" value="' + esc(prefill.title || '') + '" autofocus></label>' +
@@ -455,10 +453,9 @@
       '<label class="field span2"><span>Tags, mit Komma getrennt</span><input class="input" name="tags" list="tagList" placeholder="bot, dashboard"><datalist id="tagList">' + m.tags.map((x) => '<option value="' + esc(x) + '">').join('') + '</datalist></label>' +
       '<label class="field span2"><span>Wartet auf</span><select name="blocked_by"><option value="">Nichts</option>' + m.tasks.filter((x) => !['erledigt', 'verworfen'].includes(x.status)).map((x) => '<option value="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</option>').join('') + '</select></label>' +
       '</div>' +
-      '<label class="field"><span id="goalLabel">' + esc(goalOf(type)) + '</span><textarea class="input" name="goal" rows="2" placeholder="Ein bis drei Sätze zum gewünschten Ergebnis"></textarea></label>' +
-      '<label class="field"><span id="descLabel">' + esc(descLabel(goalOf(type))) + '</span><textarea class="input" name="description" rows="5" placeholder="Hintergrund, Details, Links, Hinweise für Claude. Markdown möglich, Listen mit - beginnen."></textarea><span class="sublabel">Claude liest diese Beschreibung beim Start der Aufgabe als Vorgabe von dir.</span></label>' +
+      '<label class="field"><span>Beschreibung</span><textarea class="input" name="description" rows="7" placeholder="Was soll passieren und warum? Hintergrund, Details, Links und Hinweise für Claude. Markdown möglich, Listen mit - beginnen."></textarea><span class="sublabel">Hier gehört alles Relevante zur Aufgabe hinein. Claude liest die Beschreibung beim Start als Vorgabe von dir.</span></label>' +
       '<label class="field"><span>Akzeptanzkriterien, eins pro Zeile</span><textarea class="input" name="criteria" rows="3" placeholder="Prüfbar mit ja oder nein"></textarea></label>' +
-      '<p class="sublabel">Ohne Ziel oder Kriterien wird die Aufgabe als unvollständig markiert. Claude fragt dann nach.</p>' +
+      '<p class="sublabel">Ohne Beschreibung oder Kriterien wird die Aufgabe als unvollständig markiert. Claude fragt dann nach.</p>' +
       foot('Aufgabe anlegen');
     const r = await showDialog(html, async (fd) => {
       const payload = {
@@ -466,11 +463,9 @@
         effort: fd.get('effort') || '', risk: fd.get('risk') || '', due: fd.get('due') || '', milestone: fd.get('milestone') || '',
         tags: String(fd.get('tags') || '').split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean),
         blocked_by: fd.get('blocked_by') ? [fd.get('blocked_by')] : [],
-        goal: String(fd.get('goal') || ''), description: String(fd.get('description') || ''), criteria: String(fd.get('criteria') || '').split('\n').map((s) => s.replace(/^\s*[-*]\s*(\[ \]\s*)?/, '').trim()).filter(Boolean),
+        description: String(fd.get('description') || ''), criteria: String(fd.get('criteria') || '').split('\n').map((s) => s.replace(/^\s*[-*]\s*(\[ \]\s*)?/, '').trim()).filter(Boolean),
       };
       return act('create', payload);
-    }, (f) => {
-      $$('input[name="type"]', f).forEach((i) => i.onchange = () => { $('#goalLabel').textContent = goalOf(i.value); $('#descLabel').textContent = descLabel(goalOf(i.value)); });
     });
     if (r) { ok(r.message); pendingOpen = r.id; }
   }
@@ -583,10 +578,10 @@
     const t = d.task;
     const mi = metaInfo || { types: Object.entries(meta.typeLabel).map(([id, label]) => ({ id, label })), efforts: ['S', 'M', 'L', 'XL'], risks: ['niedrig', 'mittel', 'hoch'], milestones: meta.milestones };
     const closed = !OPEN.includes(t.status);
-    const goal = d.sections.find((s) => s.name === d.goalSection);
-    const showDesc = d.goalSection !== 'Beschreibung';
+    // Die Beschreibung ist der zentrale Abschnitt. Ein Ziel älterer Aufgaben erscheint nur, wenn es gefüllt ist.
     const desc = d.sections.find((s) => s.name === 'Beschreibung');
-    const others = d.sections.filter((s) => s.name !== d.goalSection && s.name !== 'Übergabe' && !(showDesc && s.name === 'Beschreibung'));
+    const legacy = d.goalSection !== 'Beschreibung' ? d.sections.find((s) => s.name === d.goalSection && s.content) : null;
+    const others = d.sections.filter((s) => s.name !== 'Beschreibung' && s.name !== 'Übergabe' && !(legacy && s.name === legacy.name) && !(!s.content && s.name === d.goalSection));
     const handoff = d.sections.find((s) => s.name === 'Übergabe');
     const h = [];
 
@@ -609,12 +604,14 @@
 
     const alerts = [];
     if (d.blocked) alerts.push('<div class="alert bad">Wartet auf ' + d.openBlockers.map((x) => '<a href="#" data-goto="' + esc(x) + '">' + esc(x) + '</a>').join(', ') + '. Starten geht erst, wenn diese erledigt sind.</div>');
-    if (t.incomplete && !closed) alerts.push('<div class="alert info"><span>Schnell erfasst, Details fehlen noch. Ergänze ' + esc(d.goalSection) + ' und Akzeptanzkriterien, dann <button class="btn link" data-act="complete">als vollständig markieren</button>.</span></div>');
+    if (t.incomplete && !closed) alerts.push('<div class="alert info"><span>Schnell erfasst, Details fehlen noch. Ergänze Beschreibung und Akzeptanzkriterien, dann <button class="btn link" data-act="complete">als vollständig markieren</button>.</span></div>');
     if (staleDetail) alerts.push('<div class="alert info">Die Aufgabe wurde inzwischen geändert. <button class="btn link" data-act="reload">Neu laden</button></div>');
     h.push(alerts.join(''));
 
-    h.push(sectionBlock(d.goalSection, goal ? goal.content : '', true));
-    if (showDesc) h.push(sectionBlock('Beschreibung', desc ? desc.content : '', true, 'Hintergrund und Hinweise für Claude'));
+    const descBlock = sectionBlock('Beschreibung', desc ? desc.content : '', true, 'Alles Relevante zur Aufgabe, Claude liest das als Vorgabe');
+    // Ältere Aufgaben ohne Beschreibung: das gefüllte Ziel zuerst, darunter die leere Beschreibung zum Ergänzen.
+    if (legacy && !(desc && desc.content)) h.push(sectionBlock(legacy.name, legacy.content, true), descBlock);
+    else { h.push(descBlock); if (legacy) h.push(sectionBlock(legacy.name, legacy.content, true)); }
 
     for (const c of d.checklists) {
       const done = c.items.filter((i) => i.done).length;
@@ -719,7 +716,7 @@
       ta.onkeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') $('[data-secsave]', box).click(); };
       $('[data-seccancel]', box).onclick = () => { dirty = false; renderDetail(); };
       $('[data-secsave]', box).onclick = async () => {
-        const r = await run(() => act('section', { id, name, text: ta.value, after: name === 'Beschreibung' ? detail.goalSection : undefined }), name + ' gespeichert');
+        const r = await run(() => act('section', { id, name, text: ta.value, after: name === 'Beschreibung' ? detail.typeGoal : undefined }), name + ' gespeichert');
         if (r) dirty = false;
       };
     });

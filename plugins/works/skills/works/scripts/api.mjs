@@ -188,6 +188,7 @@ export function taskDetail(root, taskId) {
     file: relFromWorks(root, t._file),
     archived: t._archived,
     goalSection,
+    typeGoal: GOAL_SECTION[t.type] || 'Ziel',
     sections,
     editable: [...new Set([...EDITABLE_SECTIONS, ...sections.map((s) => s.name).filter((n) => n !== t.title)])],
     checklists,
@@ -277,7 +278,7 @@ const actions = {
     const goal = str(b.goal, 'Ziel', { max: 20000 });
     const description = str(b.description, 'Beschreibung', { max: 50000 });
     const criteria = (Array.isArray(b.criteria) ? b.criteria : []).map((c) => str(c, 'Kriterium', { max: 500 })).filter(Boolean).slice(0, 50);
-    if (!goal || !criteria.length) args.push('--incomplete');
+    if ((!goal && !description) || !criteria.length) args.push('--incomplete');
     // Alles in einem einzigen CLI-Aufruf, Texte über Dateien. So entsteht die Aufgabe ganz oder gar nicht.
     const files = [];
     const fileArg = (name, text) => { if (!text) return; const f = tmpFile(root, text); files.push(f); args.push(`--${name}-file=${f}`); };

@@ -68,7 +68,7 @@ export function seedDemo(root) {
   const add = (key, args, extra = {}) => {
     const id = newId(w(root, ['new', ...args]));
     tasks[key] = id;
-    if (extra.goal) w(root, ['section', id, extra.goalSection || 'Ziel', `--text=${extra.goal}`]);
+    if (extra.goal) w(root, ['section', id, 'Beschreibung', `--text=${extra.goal}`, `--after=${extra.goalSection || 'Ziel'}`]);
     for (const c of extra.criteria || []) w(root, ['item', id, `--text=${c}`]);
     for (const s of extra.plan || []) w(root, ['item', id, '--section=Umsetzungsplan', `--text=${s}`]);
     for (const n of extra.done || []) w(root, ['check', id, String(n)]);

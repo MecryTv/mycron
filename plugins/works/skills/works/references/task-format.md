@@ -58,7 +58,7 @@ Die Vorlagen liegen in `templates/`. Platzhalterkommentare (`<!-- ... -->`) beim
 
 ## Abschnitt Beschreibung
 
-Optional bei jedem Typ, direkt unter dem Hauptabschnitt. Hier stehen Hintergrund, Details, Links und Hinweise des Nutzers, etwa aus dem Board-Dialog "Neue Aufgabe" oder mit `works new --description "..."`. Bei Chores ist der Hauptabschnitt selbst "Beschreibung", dort wird beides zusammengeführt. Claude liest den Abschnitt vor der Arbeit und behandelt ihn als Vorgabe.
+Die zentrale Stelle jeder Aufgabe: was passieren soll, warum, Hintergrund, Details, Links und Hinweise des Nutzers. Im Board-Dialog "Neue Aufgabe" gibt es dafür nur dieses eine Textfeld, im CLI `works new --description "..."`. Der Abschnitt steht direkt unter dem Hauptabschnitt der Vorlage (Ziel, Zusammenfassung und so weiter), bei Chores ist er selbst der Hauptabschnitt. Das Detailpanel zeigt ihn als ersten Abschnitt; ein Ziel nur, wenn es gefüllt ist. Claude liest die Beschreibung vor der Arbeit zuerst und behandelt sie als Vorgabe.
 
 ## Schreibregeln für Inhalte
 
