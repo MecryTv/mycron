@@ -36,8 +36,17 @@ Optionen:
 
 - Prüft jede Sekunde, ob sich task.md, decisions.md, Assets, config.json, state.json oder ideas.md geändert haben.
 - Bei einer Änderung werden WORKS.md und eine vorhandene board.html neu erzeugt, und alle offenen Browser-Tabs laden die Daten nach.
-- Geänderte Karten leuchten kurz auf. Oben rechts zeigt ein grüner Punkt die Verbindung und die Uhrzeit der letzten Aktualisierung. Rot bedeutet, dass der Server nicht erreichbar ist; der Browser versucht es automatisch weiter.
+- Verschobene Karten gleiten sichtbar von der alten in die neue Spalte. Die Zielspalte leuchtet kurz auf, ihr Zähler springt.
+- Geänderte Karten tragen zehn Sekunden lang einen farbigen Rahmen und ein Etikett wie "In Arbeit → Review", "Priorität P3 → P2" oder "neu angelegt in Backlog". Die Farbe entspricht der Zielspalte.
+- Jede Änderung erscheint zusätzlich unten rechts als Hinweis mit dem letzten Verlaufseintrag als Begründung. Ein Klick darauf springt zur Karte und öffnet die Details.
+- Der Knopf "Aktivität" oben rechts zählt ungesehene Änderungen und öffnet eine Liste aller Änderungen mit Uhrzeit. Die Liste bleibt im Browser gespeichert, auch nach dem Neuladen, und lässt sich leeren.
+- Oben zeigt ein grüner Punkt die Verbindung und die Uhrzeit der letzten Aktualisierung. Rot bedeutet, dass der Server nicht erreichbar ist; der Browser versucht es automatisch weiter und holt verpasste Änderungen nach.
+- Bei der Systemeinstellung für reduzierte Bewegung entfallen die Animationen, Rahmen und Hinweise bleiben.
 - Ausgeliefert werden nur das Board, seine Daten und Dateien unter `tasks/`, `archive/` und `reports/` sowie WORKS.md und ideas.md. Der Server bindet standardmäßig nur an 127.0.0.1.
+
+## Meilensteine
+
+Meilensteine fassen Aufgaben zu einem Ziel zusammen, etwa einem Release oder dem Livegang. Sie werden mit `works milestone add M1 --title "Livegang" --due 2026-11-15` angelegt und Aufgaben mit `works set <ID> milestone=M1` zugeordnet. Das Board zeigt je Meilenstein, wie viele Aufgaben erledigt und offen sind, das Zieldatum und einen Fortschrittsbalken. Verworfene Aufgaben zählen nicht mit. Ein Klick auf einen Meilenstein filtert das Board auf dessen Aufgaben, ein zweiter Klick hebt den Filter auf.
 
 ## Statische Datei
 
