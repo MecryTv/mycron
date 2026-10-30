@@ -641,7 +641,7 @@
 
     for (const s of others) {
       if (!s.content && !d.editable.includes(s.name)) continue;
-      h.push('<details class="sec"><summary>' + esc(s.name) + (s.content ? '' : ' <span class="meta">leer</span>') + '</summary><div class="body">' + sectionInner(s.name, s.content, d.editable.includes(s.name)) + '</div></details>');
+      h.push('<details class="sec"' + (s.content ? ' open' : '') + '><summary>' + esc(s.name) + (s.content ? '' : ' <span class="meta">leer</span>') + '</summary><div class="body">' + sectionInner(s.name, s.content, d.editable.includes(s.name)) + '</div></details>');
     }
     if (d.decisions) h.push('<details class="sec"><summary>Designentscheidungen <span class="meta">decisions.md</span></summary><div class="body"><div class="md">' + md(d.decisions.replace(/^# .*\n?/, '')) + '</div></div></details>');
 

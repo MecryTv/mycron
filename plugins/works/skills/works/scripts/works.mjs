@@ -261,6 +261,7 @@ function cmdSet() {
     if (key === 'status' && value === 'erledigt' && !flags.force) fail('Zum Abschließen `works done` verwenden, damit die Definition of Done geprüft wird.');
     if (key === 'status' && value === 'verworfen' && !flags.reason) fail('Verwerfen braucht eine Begründung (--reason "...") oder `works drop`.');
     const old = applyField(t, key, value, config);
+    if (key === 'type' && old && old !== t[key]) adaptToType(t, old, t[key]);
     const fmt = (x) => (Array.isArray(x) ? `[${x.join(', ')}]` : (x ?? 'leer'));
     if (key === 'status') changes.push(`Status: ${fmt(old)} → ${fmt(t[key])}`);
     else if (key === 'priority') changes.push(`Priorität: ${fmt(old)} → ${fmt(t[key])}`);
@@ -271,6 +272,50 @@ function cmdSet() {
   if (t.status === 'in-arbeit') { const st = loadState(root); st.active = t.id; saveState(root, st); }
   refresh(root);
   out(`${t.id} aktualisiert: ${changes.join('; ')}`);
+}
+
+// Hauptabschnitt mit der Beschreibung je Typ.
+const GOAL_SECTION = {
+  feature: 'Ziel', design: 'Ziel', refactor: 'Ziel', bug: 'Zusammenfassung',
+  spike: 'Forschungsfrage', chore: 'Beschreibung', debt: 'Abkürzung',
+};
+
+// Beim Typwechsel fehlende Abschnitte der neuen Vorlage ergänzen und die Beschreibung mitnehmen.
+// Vorhandene Inhalte bleiben stehen, nichts wird gelöscht.
+function adaptToType(t, oldType, newType) {
+  const tpl = parseFrontmatter(readTemplate(`task-${newType}.md`)).body;
+  const oldGoal = GOAL_SECTION[oldType];
+  const newGoal = GOAL_SECTION[newType];
+  const oldText = stripComments(getSection(t._body, oldGoal) || '').trim();
+  const newText = stripComments(getSection(t._body, newGoal) || '').trim();
+  const re = /(?:^|\n)## ([^\n]+)\n([\s\S]*?)(?=\n## |$)/g;
+  let m;
+  const added = [];
+  while ((m = re.exec(tpl))) {
+    const name = m[1].trim();
+    if (['Verlauf', 'Assets', 'Offene Fragen', 'Übergabe'].includes(name)) continue;
+    if (getSection(t._body, name) !== null) continue;
+    t._body = insertBefore(t._body, `## ${name}\n${m[2].replace(/\{\{date\}\}/g, today()).replace(/\s+$/, '')}\n`);
+    added.push(name);
+  }
+  if (oldGoal !== newGoal && oldText && !newText) {
+    t._body = setSection(t._body, newGoal, oldText);
+    if (!tpl.includes(`\n## ${oldGoal}\n`)) t._body = removeSection(t._body, oldGoal);
+  }
+  if (added.length) addHistory(t, `Typwechsel ${oldType} → ${newType}: Abschnitte ergänzt (${added.join(', ')})`);
+}
+
+function insertBefore(body, block) {
+  for (const anchor of ['Assets', 'Offene Fragen', 'Übergabe', 'Verlauf']) {
+    const i = body.search(new RegExp(`\\n## ${anchor}[ \\t]*\\n`));
+    if (i !== -1) return `${body.slice(0, i)}\n${block}${body.slice(i)}`;
+  }
+  return `${body.replace(/\s+$/, '')}\n\n${block}`;
+}
+
+function removeSection(body, name) {
+  const h = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return body.replace(new RegExp(`\\n## ${h}[ \\t]*\\n[\\s\\S]*?(?=\\n## |$)`), '');
 }
 
 function cmdLog() {
@@ -967,7 +1012,7 @@ async function cmdAsset() {
   if (kind && !ASSET_KINDS.includes(kind)) warn(`Unübliche Art "${kind}". Üblich: ${ASSET_KINDS.join(', ')}`);
   const desc = flags.desc && flags.desc !== true ? String(flags.desc) : '';
   if (!desc) warn('Ohne --desc fehlt die Textbeschreibung. Spätere Sessions müssen das Bild dann laden.');
-  const alt = flags.alt && flags.alt !== true ? String(flags.alt) : (desc.split(/[.!?]/)[0].slice(0, 80) || path.basename(src));
+  const alt = flags.alt && flags.alt !== true ? String(flags.alt) : (desc.split(/[.!?]/)[0].slice(0, 80) || (kind ? `Bild (${kind})` : 'Bild ohne Beschreibung'));
   const ext = path.extname(src).toLowerCase();
   const name = flags.name && flags.name !== true ? slugify(flags.name, 50) : slugify(alt, 40);
   const adir = path.join(t._dir, 'assets');

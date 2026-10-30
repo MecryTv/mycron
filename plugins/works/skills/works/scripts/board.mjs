@@ -11,7 +11,7 @@ import { byIdMap, milestoneProgress } from './views.mjs';
 import { runningVersion } from './server-control.mjs';
 
 function excerpt(t) {
-  for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Beschreibung', 'Abkürzung']) {
+  for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Beschreibung', 'Abkürzung', 'Kontext und Problem', 'Problem', 'Herkunft']) {
     const c = stripComments(getSection(t._body, s) || '').trim();
     if (c) return c.slice(0, 400);
   }

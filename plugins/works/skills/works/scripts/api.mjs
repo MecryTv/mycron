@@ -33,6 +33,9 @@ const EDITABLE_SECTIONS = [
   'Abkürzung', 'Grund', 'Folgekosten und Risiko', 'Auslöser', 'Rückzahlung', 'Übergabe', 'Herkunft',
 ];
 const SKIP_IN_DETAIL = new Set(['Verlauf', 'Assets', 'Offene Fragen', ...CHECK_SECTIONS]);
+// Abschnitte, in denen eine Beschreibung stehen kann, falls der Hauptabschnitt des Typs fehlt oder leer ist
+// (etwa nach einem Typwechsel oder wenn die task.md von Hand geschrieben wurde).
+const DESCRIPTION_SECTIONS = ['Ziel', 'Zusammenfassung', 'Beschreibung', 'Forschungsfrage', 'Abkürzung', 'Kontext und Problem', 'Problem', 'Herkunft'];
 
 export class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -171,13 +174,22 @@ export function taskDetail(root, taskId) {
   const decFile = path.join(t._dir, 'decisions.md');
   const checklists = CHECK_SECTIONS.map((name) => ({ name, items: checklist(t._body, name) })).filter((c) => c.items !== null);
   const data = Object.fromEntries(Object.entries(t).filter(([k]) => !k.startsWith('_')));
+  const sections = sectionList(t._body).filter((s) => !SKIP_IN_DETAIL.has(s.name));
+  let goalSection = GOAL_SECTION[t.type] || 'Ziel';
+  const typed = sections.find((s) => s.name === goalSection);
+  if (!typed || !typed.content) {
+    const alt = DESCRIPTION_SECTIONS.map((n) => sections.find((s) => s.name === n && s.content)).find(Boolean)
+      || sections.find((s) => s.content && !EDITABLE_SECTIONS.includes(s.name));
+    if (alt) goalSection = alt.name;
+  }
+  if (!checklists.some((c) => c.name === 'Akzeptanzkriterien')) checklists.unshift({ name: 'Akzeptanzkriterien', items: [] });
   return {
     task: data,
     file: relFromWorks(root, t._file),
     archived: t._archived,
-    goalSection: GOAL_SECTION[t.type] || 'Ziel',
-    sections: sectionList(t._body).filter((s) => !SKIP_IN_DETAIL.has(s.name)),
-    editable: EDITABLE_SECTIONS,
+    goalSection,
+    sections,
+    editable: [...new Set([...EDITABLE_SECTIONS, ...sections.map((s) => s.name).filter((n) => n !== t.title)])],
     checklists,
     questions,
     history,
@@ -361,7 +373,10 @@ const actions = {
   },
   async section(root, b) {
     const tid = id(b.id);
-    const name = oneOf(b.name, 'Abschnitt', EDITABLE_SECTIONS, { required: true });
+    // Erlaubt sind die bekannten Abschnitte und jeder eigene Abschnitt, den die Aufgabe bereits hat.
+    const name = str(b.name, 'Abschnitt', { max: 80, required: true });
+    if (/[\n#]/.test(name) || ['Verlauf', 'Assets', 'Offene Fragen', ...CHECK_SECTIONS].includes(name)) bad('Dieser Abschnitt lässt sich hier nicht bearbeiten.');
+    if (!EDITABLE_SECTIONS.includes(name) && getSection(findTaskSafe(root, tid)._body, name) === null) bad(`Abschnitt ${name} gibt es in dieser Aufgabe nicht.`);
     const text = typeof b.text === 'string' ? b.text : bad('Text fehlt.');
     if (text.length > 50000) bad('Text ist zu lang.');
     if (name === 'Übergabe') {
