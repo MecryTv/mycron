@@ -19,6 +19,7 @@ import {
 import { generateIndex, nextCandidates, dodCheck, sessionSummary, byIdMap, milestoneProgress } from './views.mjs';
 import { generateBoard, refreshBoardIfPresent } from './board.mjs';
 import { serveBoard } from './serve.mjs';
+import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion } from './server-control.mjs';
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
@@ -28,6 +29,8 @@ const { pos, flags } = parseArgs(process.argv.slice(2));
 const cmd = pos.shift() || 'help';
 
 const out = (s = '') => process.stdout.write(s + '\n');
+// Ausgabe in eine geschlossene Pipe (etwa | head) ist kein Fehler.
+process.stdout.on('error', (e) => { if (e.code === 'EPIPE') process.exit(0); throw e; });
 
 function refresh(root) {
   generateIndex(root);
@@ -756,6 +759,46 @@ async function cmdBoard() {
   }
 }
 
+// ---------- Demo ----------
+
+async function cmdDemo() {
+  const root = path.resolve(flags.path && flags.path !== true ? String(flags.path) : defaultDemoPath());
+  const marker = path.join(root, '.works', '.demo');
+  const wd = path.join(root, '.works');
+  const isDemo = exists(marker);
+  const sub = (args) => run(process.execPath, [path.join(SKILL_DIR, 'scripts', 'works.mjs'), ...args], { cwd: root, encoding: 'utf8' });
+
+  if (flags.remove) {
+    if (!isDemo) fail(`${root} ist kein Demo-Projekt, nichts entfernt.`);
+    sub(['board', '--stop']);
+    fs.rmSync(root, { recursive: true, force: true });
+    out(`Demo entfernt: ${root}`);
+    return;
+  }
+  // Niemals ein echtes Projekt überschreiben.
+  if (exists(wd) && !isDemo) fail(`${root} enthält bereits ein echtes .works. Für die Demo einen anderen Ordner mit --path wählen.`);
+  if (exists(root) && !exists(wd) && fs.readdirSync(root).length && flags.path) fail(`${root} ist nicht leer. Für die Demo einen leeren oder neuen Ordner wählen.`);
+
+  if (isDemo) sub(['board', '--stop']);
+  out(`Lege Beispielprojekt an: ${root}`);
+  const tasks = seedDemo(root);
+  fs.writeFileSync(path.join(root, '.works', '.demo'), 'Von works demo angelegt. Mit works demo --remove entfernen.\n');
+  const args = ['board', '--serve', '--detach'];
+  if (flags.port && flags.port !== true) args.push(`--port=${flags.port}`);
+  if (flags.open) args.push('--open');
+  const r = sub(args);
+  if (!r.ok) fail(`Board startet nicht: ${(r.stderr || r.stdout).trim()}`);
+  out(r.stdout.trim().split('\n')[0]);
+  out(`${Object.keys(tasks).length} Aufgaben, 2 Meilensteine und 3 Ideen sind angelegt. Im Board kannst du alles ausprobieren.`);
+  if (flags.simulate) {
+    const delay = Math.max(2, parseInt(flags.delay || 6, 10)) * 1000;
+    out(`\nSpiele jetzt alle ${delay / 1000} Sekunden eine Änderung vor, wie Claude sie macht. Schau dabei aufs Board:`);
+    await simulate(root, tasks, { delay, log: out });
+    out('\nVorführung beendet. Das Board läuft weiter.');
+  }
+  out(`Beenden: works board --stop im Ordner ${root}, oder alles entfernen mit works demo --remove`);
+}
+
 // ---------- doctor ----------
 
 function cmdDoctor() {
@@ -1478,6 +1521,7 @@ Ansehen
   show <ID> [--section "Name"]     next [--n 3]     status     index
   board [--open]                   board --serve [--detach] [--port 4747] [--host 127.0.0.1] [--open]
   board --status | --stop | --restart
+  demo [--simulate] [--delay 6] [--open] [--port 4747] [--path ordner] | demo --remove
   milestone list|add M1 --title ".." [--due ..]|set M1 status=erledigt
 
 Bearbeiten
@@ -1518,7 +1562,7 @@ const commands = {
   promote: cmdPromote, milestone: cmdMilestone, scan: cmdScan, 'gh-import': cmdGhImport,
   'gh-export': cmdGhExport, commits: cmdCommits, changelog: cmdChangelog, report: cmdReport,
   'install-hooks': cmdInstallHooks, section: cmdSection, check: cmdCheck, item: cmdItem,
-  'idea-drop': cmdIdeaDrop,
+  'idea-drop': cmdIdeaDrop, demo: cmdDemo,
 };
 
 const fn = commands[cmd];

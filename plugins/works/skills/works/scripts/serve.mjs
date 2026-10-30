@@ -83,6 +83,9 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   const clients = new Set();
   // Zufälliges Token pro Serverstart. Nur Seiten, die dieser Server ausgeliefert hat, kennen es.
   const token = crypto.randomBytes(24).toString('hex');
+  // Öffentliche Kennung dieses Serverstarts. Ändert sie sich, laden offene Tabs neu und erhalten das neue Token.
+  const serverId = crypto.randomBytes(6).toString('hex');
+  const withServer = (d) => { d.meta.server = serverId; return d; };
   let sig = signature(root);
   let boundPort = port;
 
@@ -194,10 +197,10 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'text/plain', 'Nur GET');
 
     if (pathname === '/' || pathname === '/index.html') {
-      try { return send(res, 200, 'text/html; charset=utf-8', renderBoard(boardData(root), { live: true, token })); } catch (e) { return send(res, 500, 'text/plain; charset=utf-8', `Fehler beim Erzeugen: ${e.message}`); }
+      try { return send(res, 200, 'text/html; charset=utf-8', renderBoard(withServer(boardData(root)), { live: true, token })); } catch (e) { return send(res, 500, 'text/plain; charset=utf-8', `Fehler beim Erzeugen: ${e.message}`); }
     }
     if (pathname === '/data.json') {
-      try { return json(res, 200, boardData(root)); } catch (e) { return json(res, 500, { error: e.message }); }
+      try { return json(res, 200, withServer(boardData(root))); } catch (e) { return json(res, 500, { error: e.message }); }
     }
     if (pathname === '/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });

@@ -38,6 +38,8 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `board [--open]` | `.works/board.html` erzeugen und optional im Browser öffnen. Danach wird die Datei nach jeder Änderung automatisch neu erzeugt |
 | `board --serve [--detach] [--port 4747] [--host 127.0.0.1] [--open]` | Live-Board auf einem lokalen Server, mit `--detach` im Hintergrund. Läuft schon ein aktueller Server, wird nur seine URL ausgegeben, ein veralteter wird ersetzt. Ist der Standardport belegt, wird der nächste freie genommen. Siehe board.md |
 | `board --status` / `--restart` / `--stop` | Server abfragen, mit aktueller Version neu starten oder beenden |
+| `demo [--simulate] [--delay 6] [--open] [--port ..] [--path ordner]` | Beispielprojekt anlegen (Standard: Temp-Ordner `works-demo`) und Live-Board starten. `--simulate` spielt zehn typische Änderungen von Claude vor. Überschreibt nie ein echtes `.works` |
+| `demo --remove [--path ordner]` | Demo-Server beenden und Demo-Ordner löschen |
 | `milestone list` | Meilensteine mit Fortschritt |
 | `milestone add M1 --title ".." [--due ..] [--desc ..]` | Meilenstein anlegen |
 | `milestone set M1 status=erledigt due=2026-12-20` | Meilenstein ändern |

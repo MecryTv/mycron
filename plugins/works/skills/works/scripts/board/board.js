@@ -16,6 +16,8 @@
 
   const state = { q: '', prios: new Set(PRIOS), type: '', tag: '', ms: '', closed: false, signal: '' };
   const PAGE_VERSION = meta.version || '';
+  const PAGE_SERVER = meta.server || '';
+  const outdated = (m) => !!m && ((m.version && PAGE_VERSION && m.version !== PAGE_VERSION) || (m.server && PAGE_SERVER && m.server !== PAGE_SERVER));
   const UI_KEY = 'works-ui-' + meta.project;
   const changes = new Map();
   let openId = null;
@@ -937,7 +939,7 @@
     try {
       const res = await fetch('data.json', { cache: 'no-store' });
       const next = await res.json();
-      if (next.meta && next.meta.version && PAGE_VERSION && next.meta.version !== PAGE_VERSION) return reloadForUpdate();
+      if (outdated(next.meta)) return reloadForUpdate();
       const found = diff(tasks, next.tasks);
       const now = new Date();
       const time = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1026,7 +1028,7 @@
     const es = new EventSource('events');
     es.addEventListener('update', () => {
       // Das erste update nach dem Verbinden prüft nur die Version, die Daten sind schon in der Seite.
-      if (first) { first = false; fetch('data.json', { cache: 'no-store' }).then((r) => r.json()).then((n) => { if (n.meta && n.meta.version && PAGE_VERSION && n.meta.version !== PAGE_VERSION) reloadForUpdate(); }).catch(() => {}); return; }
+      if (first) { first = false; fetch('data.json', { cache: 'no-store' }).then((r) => r.json()).then((n) => { if (outdated(n.meta)) reloadForUpdate(); }).catch(() => {}); return; }
       reload();
     });
     es.addEventListener('restart', () => { first = true; setLive(true, 'Neue Version startet'); });
@@ -1054,6 +1056,6 @@
     window.scrollTo(0, restored.scrollY || 0);
     if (LIVE && restored.openId) openTask(restored.openId);
     else if (LIVE && restored.side) openSide(restored.side);
-    if (LIVE) toast('<div class="what">Board aktualisiert</div><div class="why">Eine neue works-Version ist installiert. Ansicht und Filter wurden übernommen.</div>');
+    if (LIVE) toast('<div class="what">Board neu geladen</div><div class="why">Der Board-Server wurde neu gestartet oder aktualisiert. Ansicht und Filter sind übernommen.</div>');
   }
 })();

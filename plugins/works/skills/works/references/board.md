@@ -37,6 +37,16 @@ Optionen:
 - `--port 4800`: fester Port. Ohne Angabe wird ab 4747 der nächste freie Port gesucht.
 - `--host 0.0.0.0`: im lokalen Netz erreichbar machen. Nur auf ausdrücklichen Wunsch, weil dann jeder im Netz, der die Seite öffnet, Aufgaben ändern kann.
 
+## Demo zum Ausprobieren
+
+```
+works demo --simulate --open
+```
+
+Legt im Temp-Ordner ein Beispielprojekt `works-demo` mit elf Aufgaben aller Typen an, mit Bildern, Ideen, zwei Meilensteinen, einer überfälligen und einer blockierten Aufgabe, und startet das Live-Board. Mit `--simulate` folgen im Abstand von `--delay` Sekunden (Standard 6) zehn Änderungen, wie Claude sie macht: Aufgabe starten, Kriterium abhaken, Frage notieren, nach Review verschieben, neue Aufgabe, Priorität anheben, abschließen, Übergabe schreiben, verwerfen. Im Board lässt sich danach alles selbst ausprobieren.
+
+Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Server und löscht den Ordner. Ein Ordner mit echtem `.works` wird nie angefasst; die Demo erkennt ihre eigenen Ordner an `.works/.demo`.
+
 ## Aufbau der Oberfläche
 
 - Kopfzeile: Projekt, Verbindungsstatus, Suche (Taste `/`), Nächste Aufgabe, Ideen, Aktivität, Farbschema (System, Hell, Dunkel) und Neue Aufgabe (Taste `N`).
