@@ -421,8 +421,10 @@ export function saveTask(task, { touch = true } = {}) {
   Object.assign(task, data);
 }
 
+// WORKS_ACTOR markiert, wer die Änderung ausgelöst hat (das Board setzt "Board").
 export function addHistory(task, text) {
-  task._body = appendToSection(task._body, 'Verlauf', `- ${today()}: ${text}`);
+  const actor = process.env.WORKS_ACTOR ? ` [${process.env.WORKS_ACTOR}]` : '';
+  task._body = appendToSection(task._body, 'Verlauf', `- ${today()}: ${text}${actor}`);
 }
 
 export function relFromWorks(root, p) {

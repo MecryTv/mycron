@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>__TITLE__</title>
+<style>/*__CSS__*/</style>
+</head>
+<body>
+<a class="skip" href="#board">Zum Board springen</a>
+
+<header class="top">
+  <div class="brand">
+    <h1 id="project"></h1>
+    <span class="live" id="live" hidden></span>
+  </div>
+  <label class="search">
+    <span class="sr">Aufgaben durchsuchen</span>
+    <input id="q" type="search" placeholder="Suchen nach Titel, ID oder Tag" autocomplete="off">
+    <kbd>/</kbd>
+  </label>
+  <nav class="actions" aria-label="Aktionen">
+    <button class="btn ghost" id="btnNext" data-live>Nächste Aufgabe</button>
+    <button class="btn ghost" id="btnIdeas" data-live>Ideen <span class="count" id="ideaCount" hidden></span></button>
+    <button class="btn ghost" id="btnActivity" data-live>Aktivität <span class="count" id="actCount" hidden></span></button>
+    <button class="btn ghost icon" id="btnTheme" title="Farbschema wechseln" aria-label="Farbschema wechseln"></button>
+    <button class="btn primary" id="btnNew" data-live>Neue Aufgabe <kbd>N</kbd></button>
+  </nav>
+</header>
+
+<div class="readonly" id="readonly" hidden>
+  Nur Ansicht. Zum Bearbeiten das Board mit <code>works board --serve</code> öffnen oder Claude bitten, das Board zu starten.
+</div>
+
+<section class="overview" aria-label="Überblick">
+  <div class="flow" id="flow" role="list"></div>
+  <div class="signals" id="signals"></div>
+</section>
+
+<section class="filters" aria-label="Filter">
+  <div class="prio-filter" id="prioFilter" role="group" aria-label="Priorität"></div>
+  <select id="typeFilter" aria-label="Typ"><option value="">Alle Typen</option></select>
+  <select id="tagFilter" aria-label="Tag"><option value="">Alle Tags</option></select>
+  <label class="toggle"><input type="checkbox" id="showClosed"> Archiv und Verworfene</label>
+  <button class="btn link" id="resetFilters" hidden>Filter zurücksetzen</button>
+</section>
+
+<section class="milestones" id="milestones" aria-label="Meilensteine"></section>
+
+<main class="board" id="board" tabindex="-1"></main>
+
+<aside class="panel" id="panel" aria-label="Aufgabendetails" hidden>
+  <div class="panel-inner" id="panelBody"></div>
+</aside>
+<div class="scrim" id="scrim" hidden></div>
+
+<aside class="panel narrow" id="sidePanel" aria-label="Seitenleiste" hidden>
+  <div class="panel-inner" id="sideBody"></div>
+</aside>
+
+<dialog id="dialog"><form method="dialog" id="dialogForm"></form></dialog>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>/*__BOOT__*/</script>
+<script>/*__JS__*/</script>
+</body>
+</html>

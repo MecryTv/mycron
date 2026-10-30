@@ -65,7 +65,7 @@ function cmdInit() {
     if (!exists(keep)) fs.writeFileSync(keep, '');
   }
   const mode = flags.gitignore || 'default';
-  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'inbox/*', '!inbox/.gitkeep'];
+  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', '.tmp/', 'inbox/*', '!inbox/.gitkeep'];
   if (mode === 'assets') ignore.push('tasks/*/assets/', 'archive/*/assets/');
   if (mode === 'all') ignore.splice(1, ignore.length - 1, '*', '!.gitignore');
   if (mode !== 'none') fs.writeFileSync(path.join(wd, '.gitignore'), ignore.join('\n') + '\n');
@@ -298,7 +298,7 @@ function cmdQuestion() {
     t._body = setSection(t._body, 'Offene Fragen', lines.join('\n'));
     addHistory(t, `Frage ${n} geklärt${flags.answer ? `: ${flags.answer}` : ''}`);
   } else {
-    const text = pos.join(' ');
+    const text = flags.text && flags.text !== true ? String(flags.text) : pos.join(' ');
     if (!text) {
       const q = openQuestions(t);
       out(q.length ? q.map((x, i) => `${i + 1}. ${x.text}`).join('\n') : 'Keine offenen Fragen.');
@@ -436,7 +436,103 @@ function cmdDod() {
   const root = requireRoot();
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
-  printDod(dodCheck(root, config, t));
+  const res = dodCheck(root, config, t);
+  if (flags.json) { out(JSON.stringify(res, null, 2)); return; }
+  printDod(res);
+}
+
+// ---------- Abschnitte und Checklisten bearbeiten ----------
+
+const CHECK_SECTIONS = ['Akzeptanzkriterien', 'Umsetzungsplan', 'Checkliste', 'Vorgehen'];
+const CHECK_RE = /^(\s*[-*]\s+)\[( |x|X)\](\s*)(.*)$/;
+
+function cmdSection() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const t = findTask(root, config, pos.shift());
+  const name = pos.shift();
+  if (!name) fail('Abschnittsname fehlt. Aufruf: works section <ID> "Ziel" --text "..." | --file pfad');
+  if (['Verlauf', 'Assets'].includes(name)) fail(`Der Abschnitt ${name} wird nur über das CLI gepflegt.`);
+  let text = flags.text;
+  if (flags.file) text = fs.readFileSync(String(flags.file), 'utf8');
+  if (text === undefined || text === true) {
+    const s = getSection(t._body, name);
+    out(s === null ? '' : stripComments(s).trim());
+    return;
+  }
+  t._body = setSection(t._body, name, String(text).replace(/\r\n/g, '\n').trim());
+  addHistory(t, `Abschnitt ${name} aktualisiert`);
+  saveTask(t);
+  refresh(root);
+  out(`${t.id}: Abschnitt ${name} gespeichert.`);
+}
+
+// Zählt nur echte Punkte außerhalb von HTML-Kommentaren, genau wie checkboxes() in lib.mjs.
+function mapChecklist(lines, fn) {
+  let i = 0;
+  let inComment = false;
+  return lines.map((l) => {
+    const opens = l.includes('<!--');
+    const closes = l.includes('-->');
+    if (inComment || opens) { inComment = opens ? !closes : !closes; return l; }
+    const m = l.match(CHECK_RE);
+    if (m && m[4].trim()) { i++; return fn(l, m, i); }
+    return l;
+  });
+}
+
+function cmdCheck() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const t = findTask(root, config, pos.shift());
+  const n = parseInt(pos.shift(), 10);
+  const name = flags.section && flags.section !== true ? String(flags.section) : 'Akzeptanzkriterien';
+  if (!n) fail('Nummer des Punkts fehlt. Aufruf: works check <ID> <Nr> [--section Akzeptanzkriterien] [--undo]');
+  const sec = getSection(t._body, name);
+  if (sec === null) fail(`Abschnitt ${name} nicht gefunden.`);
+  let text = '';
+  const next = mapChecklist(sec.split('\n'), (l, m, i) => {
+    if (i !== n) return l;
+    text = m[4].trim();
+    return `${m[1]}[${flags.undo ? ' ' : 'x'}]${m[3] || ' '}${m[4]}`;
+  });
+  if (!text) fail(`Punkt ${n} in ${name} nicht gefunden.`);
+  t._body = setSection(t._body, name, next.join('\n'));
+  addHistory(t, `${name}: "${text}" ${flags.undo ? 'wieder geöffnet' : 'abgehakt'}`);
+  saveTask(t);
+  refresh(root);
+  out(`${t.id}: ${name} Punkt ${n} ${flags.undo ? 'offen' : 'erledigt'}.`);
+}
+
+function cmdItem() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const t = findTask(root, config, pos.shift());
+  const text = (flags.text && flags.text !== true ? String(flags.text) : pos.join(' ')).trim();
+  const name = flags.section && flags.section !== true ? String(flags.section) : 'Akzeptanzkriterien';
+  if (!CHECK_SECTIONS.includes(name)) warn(`Checklisten stehen üblicherweise in: ${CHECK_SECTIONS.join(', ')}`);
+  const sec = getSection(t._body, name) || '';
+  if (flags.remove) {
+    const n = parseInt(flags.remove, 10);
+    let removed = '';
+    const kept = mapChecklist(sec.split('\n'), (l, m, i) => {
+      if (i !== n) return l;
+      removed = m[4].trim();
+      return null;
+    }).filter((l) => l !== null);
+    if (!removed) fail(`Punkt ${n} nicht gefunden.`);
+    t._body = setSection(t._body, name, kept.join('\n'));
+    addHistory(t, `${name}: "${removed}" entfernt`);
+  } else {
+    if (!text) fail('Text fehlt.');
+    const lines = stripComments(sec).split('\n').filter((l) => l.trim() && !/^\s*[-*]\s+\[ \]\s*$/.test(l));
+    lines.push(`- [ ] ${text}`);
+    t._body = setSection(t._body, name, lines.join('\n'));
+    addHistory(t, `${name}: "${text}" ergänzt`);
+  }
+  saveTask(t);
+  refresh(root);
+  out(`${t.id}: ${name} aktualisiert.`);
 }
 
 function printDod(res) {
@@ -932,6 +1028,19 @@ function cmdIdeas() {
   out(open.length ? open.join('\n') : 'Keine offenen Ideen.');
 }
 
+function cmdIdeaDrop() {
+  const root = requireRoot();
+  const iid = String(pos[0] || '').toUpperCase();
+  const file = ideasFile(root);
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  const idx = lines.findIndex((l) => l.startsWith(`- [${iid}]`));
+  if (idx === -1) fail(`Idee ${iid} nicht gefunden.`);
+  lines[idx] = `- ~~${lines[idx].slice(2)}~~ verworfen${flags.reason && flags.reason !== true ? `: ${flags.reason}` : ''}`;
+  fs.writeFileSync(file, lines.join('\n'));
+  refresh(root);
+  out(`Idee ${iid} verworfen.`);
+}
+
 function cmdPromote() {
   const root = requireRoot();
   const config = loadConfig(root);
@@ -1314,6 +1423,8 @@ Ansehen
   milestone list|add M1 --title ".." [--due ..]|set M1 status=erledigt
 
 Bearbeiten
+  section <ID> "Name" [--text ".." | --file pfad]     check <ID> <Nr> [--section ..] [--undo]
+  item <ID> "Text" [--section Akzeptanzkriterien] [--remove Nr]      idea-drop I-001 [--reason ..]
   set <ID> feld=wert ...           log <ID> "Text"       question <ID> "Frage" | --resolve N [--answer ".."]
   link <A> blocks|blocked-by|related <B>                  unlink <A> <beziehung> <B>
   start <ID> [--git] [--force]     handoff [<ID>] [--text ".." | --file pfad]
@@ -1348,7 +1459,8 @@ const commands = {
   decisions: cmdDecisions, 'attach-doc': cmdAttachDoc, idea: cmdIdea, ideas: cmdIdeas,
   promote: cmdPromote, milestone: cmdMilestone, scan: cmdScan, 'gh-import': cmdGhImport,
   'gh-export': cmdGhExport, commits: cmdCommits, changelog: cmdChangelog, report: cmdReport,
-  'install-hooks': cmdInstallHooks,
+  'install-hooks': cmdInstallHooks, section: cmdSection, check: cmdCheck, item: cmdItem,
+  'idea-drop': cmdIdeaDrop,
 };
 
 const fn = commands[cmd];

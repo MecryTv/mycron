@@ -43,6 +43,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 7. Abschließen nur über `works done`. Erst ohne `--confirm` prüfen, manuelle Punkte tatsächlich erledigen (Tests laufen lassen, code-audit ausführen), dann `--confirm`. Ein Übergehen mit `--force` nur auf ausdrücklichen Wunsch des Nutzers und mit `--reason`.
 8. Prioritäten nach den Kriterien in `references/priorities.md` vergeben. Eine neue P1 dem Nutzer sofort melden.
 9. Schreibstil in Aufgaben: sachlich, konkret, ohne Floskeln. Akzeptanzkriterien müssen mit ja oder nein prüfbar sein.
+10. Der Nutzer kann Aufgaben auch im Live-Board anlegen, verschieben und bearbeiten. Solche Verlaufseinträge enden mit `[Board]`. Vor jedem Edit an einer task.md die Datei neu lesen, statt einen älteren Stand aus dem Kontext zu überschreiben. Neue Aufgaben mit `source: board` und `incomplete: true` beim nächsten passenden Moment mit dem Nutzer vervollständigen.
 
 ## Wann was tun
 
@@ -65,7 +66,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Erledigte Aufgabe muss nachgebessert werden | `works reopen <ID> --reason "..."` | `references/workflow.md` |
 | TODO-Kommentare im Code, GitHub Issues | `works scan`, `works gh-import` | `references/workflow.md` |
 | Bericht, Changelog | `works report`, `works changelog` | `references/cli.md` |
-| Übersicht im Browser, Board | `works board --serve` im Hintergrund starten und die URL nennen. Für eine einfache Datei `works board` | `references/board.md` |
+| Übersicht im Browser, Board, "ich will selbst Aufgaben anlegen" | `works board --serve` im Hintergrund starten und die URL nennen. Dort kann der Nutzer alles selbst bearbeiten. Für eine reine Ansicht `works board` | `references/board.md` |
 | Struktur prüfen, Fehler vermuten | `works doctor`, bei Bedarf `--fix` | `references/cli.md` |
 | Hooks einrichten | Bei Plugin-Installation nur `works install-hooks --git`, sonst nach Rückfrage `works install-hooks` | `references/hooks.md` |
 
@@ -90,7 +91,7 @@ Nur die Datei laden, die für den aktuellen Schritt gebraucht wird.
 - `references/assets.md`: Bilder speichern, Inbox, Screenshots, Benennung, Komprimierung
 - `references/integrations.md`: Superpowers Brainstorming, UI UX Pro Max, git-workflow, code-audit, responsive-website-check, second-brain-sync, GitHub
 - `references/hooks.md`: SessionStart, Stop und pre-commit Hook
-- `references/board.md`: Kanban-Board, automatische Aktualisierung und Live-Ansicht
+- `references/board.md`: Kanban-Board, Bearbeiten im Board, Live-Aktualisierung und Sicherheit
 - `references/cli.md`: alle Befehle und Optionen
 - `references/config.md`: Felder der config.json
 - `references/templates/`: Vorlagen für alle Aufgabentypen und decisions.md

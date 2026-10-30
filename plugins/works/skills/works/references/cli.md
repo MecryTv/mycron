@@ -2,6 +2,8 @@
 
 Aufruf: `node "${CLAUDE_SKILL_DIR}/scripts/works.mjs" <befehl> [argumente]`. Benötigt Node.js 18 oder neuer, keine Abhängigkeiten. Arbeitet im nächstgelegenen Elternordner mit `.works/config.json`.
 
+Werte, die mit `--` beginnen könnten, besser als `--name=wert` übergeben. Ist die Umgebungsvariable `WORKS_ACTOR` gesetzt, wird ihr Wert in eckigen Klammern an jeden Verlaufseintrag angehängt (das Board setzt `Board`).
+
 IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichwertig. Listen werden mit Komma getrennt. Datumswerte im Format `JJJJ-MM-TT`.
 
 ## Einrichtung
@@ -19,6 +21,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `idea "Text" [--tags a,b]` | Idee in ideas.md |
 | `ideas` | Offene Ideen anzeigen |
 | `promote I-001 [--type ..] [--priority ..] [--title ..]` | Idee wird Aufgabe (unvollständig markiert) |
+| `idea-drop I-001 [--reason ..]` | Idee verwerfen |
 | `scan [--create] [--marker FIXME,HACK] [--json]` | TODO, FIXME, HACK, XXX im Code finden und optional als Aufgaben anlegen |
 | `gh-import [--state open\|closed\|all] [--limit 100] [--dry-run]` | GitHub Issues über die gh CLI importieren |
 | `gh-export <ID> [--dry-run]` | Aufgabe als GitHub Issue anlegen (nur mit Zustimmung) |
@@ -44,6 +47,9 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 |---|---|
 | `set <ID> feld=wert [feld=wert ...] [--reason ".."]` | Frontmatter-Felder ändern, Eintrag im Verlauf. `status=erledigt` nur über `done`, `status=verworfen` nur mit `--reason`. Leeren mit `feld=` oder `feld=-`. Eigene Felder mit `--custom` |
 | `log <ID> "Text"` | Verlaufseintrag |
+| `section <ID> "Name" --text ".." \| --file pfad` | Inhalt eines Abschnitts ersetzen. Ohne Text wird der Abschnitt ausgegeben. Verlauf und Assets sind ausgenommen |
+| `check <ID> <Nr> [--section Akzeptanzkriterien] [--undo]` | Punkt einer Checkliste abhaken oder wieder öffnen. Gezählt wird ab 1, Kommentare zählen nicht |
+| `item <ID> "Text" [--section Akzeptanzkriterien]` | Punkt an eine Checkliste anhängen. Mit `--remove <Nr>` entfernen. Abschnitte: Akzeptanzkriterien, Umsetzungsplan, Checkliste, Vorgehen |
 | `question <ID> "Frage"` | Offene Frage hinzufügen |
 | `question <ID>` | Offene Fragen nummeriert anzeigen |
 | `question <ID> --resolve <Nr> [--answer ".."]` | Frage abhaken, Antwort anhängen |
@@ -52,7 +58,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `start <ID> [--git] [--force]` | Status in-arbeit, aktive Aufgabe, Branchvorschlag, Kontextausgabe. `--git` checkt den Branch aus, `--force` startet trotz Blockade |
 | `handoff [<ID>]` | Übergabe anzeigen (ohne ID die aktive Aufgabe) |
 | `handoff <ID> --text ".." \| --file pfad` | Übergabe ersetzen |
-| `dod <ID>` | Definition of Done anzeigen und automatische Punkte prüfen |
+| `dod <ID> [--json]` | Definition of Done anzeigen und automatische Punkte prüfen |
 | `done <ID> [--run] [--confirm] [--force --reason ".."]` | Abschließen. Ohne `--confirm` nur prüfen. `--run` führt `dod.commands` aus |
 | `drop <ID> --reason ".."` | Verwerfen |
 | `reopen <ID> --reason ".." [--status backlog\|geplant\|in-arbeit\|review]` | Wiedereröffnen, holt aus dem Archiv zurück |
