@@ -4,7 +4,7 @@ Ein Skill wird nur geladen, wenn Claude ihn für relevant hält. Hooks sorgen da
 
 ## Installation über das Plugin mycron
 
-Wird works als Plugin aus dem Marketplace mycron installiert, bringt es SessionStart, UserPromptSubmit, PostToolUse und Stop Hook selbst mit (`plugins/works/hooks/hooks.json`). Sie sind aktiv, solange das Plugin aktiviert ist, und werden mit jedem Plugin-Update automatisch aktualisiert. `works install-hooks --claude` ist dann nicht nötig und meldet das auch so.
+Wird works als Plugin aus dem Marketplace mycron installiert, bringt es SessionStart, UserPromptSubmit, PostToolUse, SubagentStop und Stop Hook selbst mit (`plugins/works/hooks/hooks.json`). Sie sind aktiv, solange das Plugin aktiviert ist, und werden mit jedem Plugin-Update automatisch aktualisiert. `works install-hooks --claude` ist dann nicht nötig und meldet das auch so.
 
 Pro Projekt einrichten muss man nur den Git pre-commit Hook:
 
@@ -70,7 +70,17 @@ Datei: `hooks/post-tool.mjs`, ohne Matcher, Timeout 5 Sekunden.
 
 Schreibt nach jedem Werkzeugaufruf eine kurze Zeile in `.works/activity.json` (zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test"), die das Board auf der aktiven Karte zeigt. Inhalte von Dateien oder Befehlsausgaben werden nicht gespeichert, nur Werkzeug, Dateiname oder die ersten Zeichen des Befehls. Liegt eine neue Anweisung des Nutzers vor, kommt sie hier als Kontext an Claude, sodass sie schon während der Antwort ankommt. Claude soll sie berücksichtigen, sobald es sinnvoll ist.
 
-Abschalten: `"live_activity": false` in `.works/config.json`. Anweisungen kommen dann erst über den Stop Hook.
+Außerdem merkt sich der Hook bei Edit, Write und NotebookEdit, welche Datei für welche Aufgabe geändert wurde (`.works/files.jsonl`, lokal). Wird eine Datei in einer Sitzung zum ersten Mal geändert und haben andere Aufgaben dort Entscheidungen getroffen oder laufen gerade, bekommt Claude einmalig einen Hinweis mit den Aufgaben und ihren Entscheidungen.
+
+Bei Parallelarbeit erkennt der Hook am Pfad, zu welchem Worktree ein Aufruf gehört. Aktivität, Dateien und Anweisungen gehen dann an diese Aufgabe, nicht an die aktive Aufgabe der Hauptsitzung.
+
+Abschalten: `"live_activity": false` in `.works/config.json` (Anweisungen kommen dann erst über den Stop Hook), `"file_tracking": false` für Dateien und Hinweise.
+
+## SubagentStop
+
+Datei: `hooks/subagent-stop.mjs`.
+
+Rechnet den Tokenverbrauch eines Agenten aus dessen eigenem Transkript (`agent_transcript_path`) der passenden Aufgabe zu: der Aufgabe seines Worktrees bei Parallelarbeit, sonst der aktiven Aufgabe. Ältere Claude Code Versionen ohne eigenes Agenten-Transkript zählen den Verbrauch im Stop Hook mit.
 
 ## Git pre-commit
 
@@ -92,6 +102,9 @@ Nur für die Installation als Skill-Ordner:
     ],
     "PostToolUse": [
       { "hooks": [{ "type": "command", "command": "node \"$HOME/.claude/skills/works/hooks/post-tool.mjs\"", "timeout": 5 }] }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "node \"$HOME/.claude/skills/works/hooks/subagent-stop.mjs\"", "timeout": 10 }] }
     ],
     "Stop": [
       { "hooks": [{ "type": "command", "command": "node \"$HOME/.claude/skills/works/hooks/stop-reminder.mjs\"", "timeout": 15 }] }

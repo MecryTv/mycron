@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { findRoot, loadConfig, loadState } from '../scripts/lib.mjs';
 import { recordEvent } from '../scripts/timelog.mjs';
 import { setBusy, takeInstructions, instructionText } from '../scripts/live.mjs';
+import { loadLanes } from '../scripts/parallel.mjs';
 
 let input = {};
 try {
@@ -19,7 +20,8 @@ try {
     if (config.time_tracking !== false && state.active) recordEvent(root, 'start', state.active, input.session_id);
     if (config.live_activity !== false) {
       setBusy(root, state.active || '');
-      const items = takeInstructions(root);
+      const laneTasks = new Set(loadLanes(root).map((l) => l.task));
+    const items = takeInstructions(root, (x) => !laneTasks.has(x.task));
       if (items.length) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: instructionText(items) } }) + '\n');
     }
   }

@@ -23,13 +23,20 @@ export function describeTool(root, name, input = {}) {
   return { verb: VERB[name] || name, what };
 }
 
-export function recordActivity(root, task, tool, input, ok = true) {
+// lane: Pfad des Worktrees einer parallelen Aufgabe. Dann zählt der Aufruf für diese Bahn, nicht für die Hauptsitzung.
+export function recordActivity(root, task, tool, input, ok = true, lane = '') {
   const a = readJson(actFile(root), null) || { recent: [] };
-  const d = describeTool(root, tool, input);
-  const entry = { at: new Date().toISOString(), task: task || '', tool, verb: d.verb, what: d.what, ok };
+  const d = describeTool(lane || root, tool, input);
+  const entry = { at: new Date().toISOString(), task: task || '', tool, verb: d.verb, what: d.what, ok, ...(lane ? { lane: true } : {}) };
+  if (lane) {
+    a.lanes = { ...(a.lanes || {}), [task]: entry };
+    a.recent = [entry, ...(a.recent || [])].slice(0, 24);
+    writeJson(actFile(root), a);
+    return;
+  }
   a.current = entry;
   a.busy = true;
-  a.recent = [entry, ...(a.recent || [])].slice(0, 12);
+  a.recent = [entry, ...(a.recent || [])].slice(0, 24);
   writeJson(actFile(root), a);
 }
 
@@ -64,11 +71,12 @@ export function pendingInstructions(root) {
 }
 
 // Gibt wartende Anweisungen zurück und markiert sie als zugestellt.
-export function takeInstructions(root) {
+// pick: welche Anweisungen dieser Aufrufer bekommt (bei paralleler Arbeit nur die seiner Aufgabe).
+export function takeInstructions(root, pick = () => true) {
   const list = readJson(insFile(root), []) || [];
-  const open = list.filter((x) => !x.delivered);
+  const open = list.filter((x) => !x.delivered && pick(x));
   if (!open.length) return [];
-  for (const x of list) if (!x.delivered) { x.delivered = true; x.deliveredAt = nowStamp(); }
+  for (const x of open) { x.delivered = true; x.deliveredAt = nowStamp(); }
   writeJson(insFile(root), list);
   return open;
 }

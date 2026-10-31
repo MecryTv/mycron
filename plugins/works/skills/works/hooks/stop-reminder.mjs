@@ -6,6 +6,7 @@ import path from 'node:path';
 import { findRoot, loadConfig, loadState, saveState, loadTasks, run } from '../scripts/lib.mjs';
 import { recordEvent } from '../scripts/timelog.mjs';
 import { setIdle, takeInstructions, instructionText } from '../scripts/live.mjs';
+import { loadLanes } from '../scripts/parallel.mjs';
 import { collectUsage, recordUsage } from '../scripts/usage.mjs';
 
 let input = {};
@@ -26,7 +27,8 @@ function main() {
   }
   // Anweisungen aus dem Board, die während der Antwort nicht mehr ankamen: Claude macht damit weiter.
   if (config.live_activity !== false && !input.stop_hook_active) {
-    const items = takeInstructions(root);
+    const laneTasks = new Set(loadLanes(root).map((l) => l.task));
+    const items = takeInstructions(root, (x) => !laneTasks.has(x.task));
     if (items.length) {
       process.stdout.write(JSON.stringify({ decision: 'block', reason: instructionText(items) }) + '\n');
       return;

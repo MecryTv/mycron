@@ -186,9 +186,31 @@ export function deepMerge(base, over) {
 
 // ---------- Projekt ----------
 
+// In einem Worktree einer parallelen Aufgabe zeigt .works.link auf das Hauptprojekt.
+// So schreiben alle Agenten in dieselbe .works statt in die ausgecheckte Kopie.
+export function laneLink(start = process.cwd()) {
+  let dir = path.resolve(start);
+  for (;;) {
+    const f = path.join(dir, '.works.link');
+    if (exists(f)) {
+      const l = readJson(f, null);
+      if (l && l.root && exists(path.join(l.root, '.works', 'config.json'))) return { ...l, path: dir };
+    }
+    if (exists(path.join(dir, '.works', 'config.json'))) return null;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
 export function findRoot(start = process.cwd()) {
   let dir = path.resolve(start);
   for (;;) {
+    const link = path.join(dir, '.works.link');
+    if (exists(link)) {
+      const l = readJson(link, null);
+      if (l && l.root && exists(path.join(l.root, '.works', 'config.json'))) return l.root;
+    }
     if (exists(path.join(dir, '.works', 'config.json'))) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) return null;

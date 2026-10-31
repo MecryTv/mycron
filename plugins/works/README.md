@@ -16,6 +16,8 @@ Es braucht nur Node.js 18 oder neuer, keine Datenbank, keinen Account und keine 
 - [Gestaltung mit UI UX Pro Max und Brainstorming](#gestaltung-mit-ui-ux-pro-max-und-brainstorming)
 - [Projektwissen](#projektwissen)
 - [GitHub](#github)
+- [Mehrere Aufgaben parallel](#mehrere-aufgaben-parallel)
+- [Import](#import)
 - [Qualität vor dem Abschluss](#qualität-vor-dem-abschluss)
 - [Zeit, Kosten und Schätzungen](#zeit-kosten-und-schätzungen)
 - [Berichte](#berichte)
@@ -71,6 +73,8 @@ Du sprichst ganz normal. Ein paar Beispiele und was dann passiert:
 | Bau die Turnierseite für Mobilgeräte. | arbeitet bei einer Gestaltungsaufgabe mit UI UX Pro Max und Brainstorming Entwürfe aus, hängt sie an die Aufgabe und wartet auf deine Wahl |
 | Merk dir für das Projekt: Prisma nur mit migrate deploy. | trägt das ins Projektwissen ein, das jede Sitzung liest |
 | Jeden ersten Montag im Monat Abhängigkeiten aktualisieren. | legt eine wiederkehrende Aufgabe an |
+| Arbeite den Sprint ab. | prüft, ob sich Aufgaben parallel mit Agenten erledigen lassen, und fragt nach, wenn es unsicher ist |
+| Hier ist unser Trello-Export. | zeigt eine Vorschau der Aufgaben und übernimmt sie nach deinem Okay |
 
 Beim Start jeder Sitzung bekommt Claude automatisch eine Kurzübersicht: offene P1, Überfälliges, Warteschlange, Sprint, neue Kommentare von dir, die Bereiche des Projektwissens, Entwürfe, die auf deine Wahl warten, und die Übergabe der aktiven Aufgabe. So macht jede neue Sitzung dort weiter, wo die letzte aufgehört hat.
 
@@ -229,6 +233,36 @@ Ist das Projekt ein GitHub-Repository und das [gh CLI](https://cli.github.com/) 
 
 Jeder Teil lässt sich in den Werkzeugen unter GitHub abschalten. Der erste Abgleich merkt sich nur den Stand und ändert nichts.
 
+## Mehrere Aufgaben parallel
+
+Sollen mehrere Aufgaben erledigt werden, prüft Claude zuerst mit `works parallel plan`, ob sie sich gegenseitig stören: Hängen sie voneinander ab, ändern sie dieselben Dateien oder liegen sie im selben Bereich? Ergebnis ist parallel, nacheinander oder unsicher.
+
+- **Parallel:** Claude legt für jede Aufgabe einen eigenen Git-Worktree mit Branch an, neben deinem Projekt im Ordner `<projekt>.works-lanes`, und startet je Aufgabe einen Agenten. Die Agenten tragen ihren Fortschritt in dieselben Aufgaben ein, die du im Board siehst.
+- **Nacheinander:** Claude arbeitet wie gewohnt eine Aufgabe nach der anderen, etwa weil sie dieselben Dateien ändern oder zu klein sind, um den Aufwand zu lohnen.
+- **Unsicher:** Claude nennt dir die Gründe und fragt.
+
+Unvollständige Aufgaben, offene Fragen und Gestaltung ohne gewählten Entwurf gibt Claude nie an einen Agenten. Wenn ein Agent fertig ist, prüft Claude das Ergebnis, entfernt den Worktree und lässt den Branch für Review oder Pull Request stehen. Gemergt wird nur, wenn du es willst. Bis zu drei Aufgaben laufen gleichzeitig, einstellbar unter `parallel.max`.
+
+Im Board tragen diese Karten "Parallel" und zeigen, was ihr Agent gerade tut. Werkzeuge, Parallelarbeit zeigt laufende Bahnen und wie Claude die nächsten Aufgaben einschätzt.
+
+**Dateien und Aufgaben:** works merkt sich, welche Aufgabe welche Datei geändert hat, aus Commits mit der Aufgaben-ID und aus den Änderungen während der Arbeit. Ändert Claude eine Datei, an der schon eine andere Aufgabe mit Entscheidungen gearbeitet hat, bekommt es einen Hinweis darauf. `works file src/backup.ts` zeigt alle Aufgaben zu einer Datei, der Reiter Code und Commits die Dateien, die auch andere Aufgaben berührt haben.
+
+## Import
+
+Aufgaben aus anderen Werkzeugen übernimmst du in den Werkzeugen unter Importieren oder indem du Claude die Datei gibst:
+
+| Woher | Datei |
+|---|---|
+| Trello | JSON-Export des Boards |
+| Notion | CSV-, Markdown- oder ZIP-Export einer Datenbank |
+| Linear | CSV-Export |
+| Jira, Asana, eigene Tabellen | CSV oder TSV |
+| Excel | .xlsx |
+| Word | .docx mit Listen, Kontrollkästchen oder Tabellen |
+| Notizen | Markdown oder Text mit Listen und `- [ ]` |
+
+Spalten werden über ihre Namen zugeordnet, auf Deutsch und Englisch. Status, Priorität, Aufwand und Datum werden übersetzt, Checklisten werden zu Akzeptanzkriterien. Du siehst vorher eine Vorschau und wählst aus. Duplikate und Erledigtes sind abgewählt, und ein zweiter Import derselben Datei legt nichts doppelt an. Protokolle oder Fließtext liest Claude selbst und schlägt die Aufgaben vor. Ein Import lässt sich wie jede Änderung im Board rückgängig machen.
+
 ## Qualität vor dem Abschluss
 
 In den Werkzeugen oder mit `works checks detect` schlägt works Prüfungen aus deinem Projekt vor, etwa TypeScript, Lint, Tests und Build aus der `package.json`. Gespeichert wird erst, wenn du zustimmst.
@@ -281,15 +315,15 @@ Den Pfad nennt dir Claude auf Nachfrage. Unter Windows funktioniert derselbe Auf
 
 | Bereich | Befehle |
 |---|---|
-| Einrichten | `init`, `doctor [--fix]`, `install-hooks`, `demo` |
-| Erfassen | `new`, `idea`, `promote`, `scan`, `gh-import`, `recur` |
+| Einrichten | `init`, `doctor [--fix]`, `install-hooks`, `demo`, `selftest` |
+| Erfassen | `new`, `idea`, `promote`, `scan`, `gh-import`, `recur`, `import` |
 | Ansehen | `list`, `show`, `next`, `status`, `views` |
 | Arbeiten | `start`, `set`, `section`, `check`, `item`, `log`, `question`, `link`, `handoff`, `asset`, `decisions`, `design`, `know`, `instruct` |
 | Abschließen | `dod`, `done`, `drop`, `reopen`, `archive` |
-| Planen | `queue`, `sprint`, `milestone`, `template` |
+| Planen | `queue`, `sprint`, `milestone`, `template`, `parallel` |
 | Gespräch | `comments`, `comment` |
 | Qualität | `checks` |
-| Auswertung | `time`, `report`, `changelog`, `commits`, `ical` |
+| Auswertung | `time`, `report`, `changelog`, `commits`, `ical`, `file`, `files` |
 | GitHub | `github sync`, `github status`, `github set` |
 | Board | `board [--serve] [--detach] [--restart] [--stop] [--status] [--share] [--private]`, `share`, `export`, `undo`, `hub` |
 
@@ -312,19 +346,22 @@ Alles steht in `.works/config.json`. Die Datei muss nur enthalten, was vom Stand
 | `recurring` | wiederkehrende Aufgaben |
 | `github_sync` | was der GitHub-Abgleich tun darf |
 | `live_activity` | Anzeige "Claude arbeitet" und Anweisungen während der Arbeit |
+| `parallel` | Höchstzahl paralleler Aufgaben und Ordner für die Worktrees |
+| `file_tracking` | Dateien je Aufgabe merken und Hinweise beim Bearbeiten |
 | `hooks.session_start`, `hooks.stop_reminder` | Hooks pro Projekt abschalten |
 
 Alle Felder erklärt `skills/works/references/config.md`.
 
 ## Hooks
 
-Das Plugin bringt vier Hooks mit, die automatisch aktiv sind:
+Das Plugin bringt fünf Hooks mit, die automatisch aktiv sind:
 
 | Hook | Wofür |
 |---|---|
 | SessionStart | Kurzübersicht für Claude, Board und Server auf die neue Version bringen, fällige wiederkehrende Aufgaben anlegen, GitHub abgleichen, Erinnerung an fällige Wochenberichte |
 | UserPromptSubmit | Beginn einer Anfrage für die Zeiterfassung, Anzeige "Claude arbeitet" |
-| PostToolUse | aktueller Schritt für das Board, Anweisungen von dir während der Arbeit |
+| PostToolUse | aktueller Schritt für das Board, geänderte Dateien je Aufgabe, Hinweis auf frühere Entscheidungen, Anweisungen von dir während der Arbeit |
+| SubagentStop | Tokens und Kosten von Agenten der richtigen Aufgabe zuordnen |
 | Stop | Ende einer Anfrage, Tokens und Kosten, offene Anweisungen, Erinnerung an Verlauf und Übergabe |
 
 Optional richtet `works install-hooks --git` einen pre-commit Hook ein, der die Struktur von `.works/` prüft.
@@ -342,7 +379,7 @@ Optional richtet `works install-hooks --git` einen pre-commit Hook ein, der die 
 
 ## Was ins Git gehört
 
-`works init` legt eine `.works/.gitignore` an. Ins Repository gehören Aufgaben samt Entwürfen, Vorlagen, Berichte, `config.json`, `wissen.md`, `ideas.md` und `WORKS.md`. Lokal bleiben `state.json`, `board.html`, `server.json`, `server.log`, `share.json`, `report.local.json`, `activity.json`, `instructions.json`, `github.json`, `.usage-state.json`, `.undo/`, `.tmp/` und die Inbox. Ältere `.gitignore`-Dateien ergänzt works von selbst. Willst du `.works/` gar nicht im Git haben, richtet `works init --gitignore` das so ein.
+`works init` legt eine `.works/.gitignore` an. Ins Repository gehören Aufgaben samt Entwürfen, Vorlagen, Berichte, `config.json`, `wissen.md`, `ideas.md` und `WORKS.md`. Lokal bleiben `state.json`, `board.html`, `server.json`, `server.log`, `share.json`, `report.local.json`, `activity.json`, `instructions.json`, `github.json`, `.usage-state.json`, `lanes.json`, `files.jsonl`, `.filemap.json`, `.undo/`, `.tmp/` und die Inbox. Ältere `.gitignore`-Dateien ergänzt works von selbst. Willst du `.works/` gar nicht im Git haben, richtet `works init --gitignore` das so ein.
 
 ## Probleme lösen
 
@@ -351,6 +388,10 @@ Optional richtet `works install-hooks --git` einen pre-commit Hook ein, der die 
 **Das Board startet nicht.** `works board --status` zeigt, ob und wo es läuft. Details stehen in `.works/server.log`. Ist der Port belegt, nimmt works den nächsten freien oder du wählst einen mit `--port`.
 
 **Claude arbeitet gerade, und ich will das Board neu starten.** Das geht jederzeit. Der Server wartet, bis laufende Änderungen fertig sind, und offene Tabs verbinden sich danach neu.
+
+**Funktioniert noch alles?** `works selftest` legt ein Wegwerfprojekt an und prüft CLI, Hooks, Import, Parallelarbeit, Board und API. Dasselbe läuft bei jedem Push im Repo mycron als GitHub Action auf Linux, macOS und Windows mit Node 18, 20 und 22.
+
+**Ein paralleler Worktree hängt.** `works parallel status` zeigt alle Bahnen, `works parallel abort <ID>` räumt auf. Commits im Branch bleiben dabei erhalten.
 
 **Ich habe im Board etwas versehentlich geändert.** Strg+Z oder Werkzeuge, Letzte Änderungen. Im Terminal `works undo --list` und `works undo <key>`.
 

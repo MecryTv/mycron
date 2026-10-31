@@ -1,6 +1,6 @@
 ---
 name: works
-description: Projektbezogene Aufgabenverwaltung in einem .works/ Ordner mit Prioritäten P1 bis P4, ausführlichen Task-Dateien, Bildern, Designentscheidungen, Abhängigkeiten, Meilensteinen, Session-Übergaben und Definition of Done. Diesen Skill nutzen, sobald im Projekt ein .works/ Ordner existiert oder der Nutzer Aufgaben, Todos, Bugs, Features, Ideen, Backlog, Prioritäten, Fortschritt oder "was steht an" anspricht, etwas notiert haben will ("notier dir das", "mach daraus eine Aufgabe"), Screenshots zu einer Aufgabe ablegen will, eine Aufgabe startet, abschließt oder wieder aufnimmt, nach der nächsten Aufgabe fragt, einen Bericht oder Changelog möchte, wenn an einer Gestaltungsaufgabe gearbeitet wird (dann UI UX Pro Max und Brainstorming nutzen und die Entwürfe an die Aufgabe hängen), wenn Projektwissen, wiederkehrende Aufgaben, Kosten pro Aufgabe oder der GitHub-Abgleich angesprochen werden. Auch bei /works mit Unterbefehl als Argument.
+description: Projektbezogene Aufgabenverwaltung in .works/ mit Prioritäten, ausführlichen Task-Dateien, Bildern, Entscheidungen, Abhängigkeiten, Sprints, Übergaben und Definition of Done. Nutzen, sobald ein .works/ Ordner existiert oder der Nutzer Aufgaben, Todos, Bugs, Features, Ideen, Backlog, Prioritäten oder "was steht an" anspricht, etwas notiert haben will, Screenshots zu einer Aufgabe ablegt, eine Aufgabe startet, abschließt oder wieder aufnimmt, mehrere Aufgaben abarbeiten lässt (dann Parallelarbeit prüfen), Aufgaben aus Trello, Notion, Linear, Excel, Word oder Listen importieren will, einen Bericht möchte, oder bei Gestaltungsaufgaben (dann UI UX Pro Max und Brainstorming nutzen und die Entwürfe an die Aufgabe hängen). Auch bei Projektwissen, wiederkehrenden Aufgaben, Kosten, GitHub-Abgleich und /works mit Unterbefehl.
 ---
 
 # works
@@ -55,6 +55,9 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 16. Anweisungen aus dem Board kommen während der Arbeit als Hook-Kontext. Lesen, berücksichtigen, sobald es sinnvoll ist (meist nach dem aktuellen Schritt, nicht mitten in einer Änderung), und mit `works comment <ID> "..."` kurz antworten.
 17. Projektwissen (`wissen.md`, `works know`): Die Sitzungsübersicht nennt die Bereiche. Vor Arbeit in einem Bereich `works know search <Begriff>` lesen. Findest du etwas, das spätere Sessions wissen müssen (eine Falle, eine Regel, eine Eigenheit), mit `works know propose --area ".." --title ".." --text ".." --source <ID>` vorschlagen. Der Nutzer übernimmt Vorschläge im Board. Einträge des Nutzers gelten wie die Beschreibung.
 18. Prüfung im Review: Der Nutzer nimmt Aufgaben im Board ab. Gibt er sie mit Text zurück, steht der Text als Kommentar an der Aufgabe und abgehakte Kriterien sind wieder offen. Bei UI-Aufgaben vor dem Review einen Nachher-Screenshot mit `--kind nachher` ablegen, damit der Vergleich mit dem gewählten Entwurf funktioniert.
+19. Mehrere Aufgaben abarbeiten (Warteschlange, Sprint, "mach W-12 bis W-15"): vorher `works parallel plan`. Bei "parallel" ohne Rückfrage mit `works parallel start` Worktrees anlegen und je Aufgabe einen Agenten mit dem Auftrag aus `works parallel prompt <ID>` starten, alle gleichzeitig. Bei "nacheinander" normal arbeiten. Bei "unsicher" oder wenn du selbst Zweifel hast (gemeinsame Schnittstellen, Schema, Konfiguration), den Nutzer mit den Gründen fragen. Ablauf und Abschluss in `references/parallel.md`.
+20. Meldet der PostToolUse Hook, dass eine Datei auch in anderen Aufgaben geändert wurde, die genannten Entscheidungen kurz prüfen (`works file <pfad>`, `works show <ID>`). Widerspricht die Änderung einer Entscheidung, den Nutzer fragen statt sie still zu übergehen.
+21. Gibt der Nutzer eine Datei mit Aufgaben (Trello, Notion, Linear, CSV, Excel, Word, Markdown), zuerst `works import <datei>` als Vorschau, Zuordnung prüfen, bei vielen Einträgen kurz bestätigen lassen, dann `--apply`. Fließtext selbst lesen und als JSON-Liste importieren. Details in `references/import.md`.
 
 ## Wann was tun
 
@@ -95,6 +98,10 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Etwas im Board versehentlich geändert | `works undo --list`, dann `works undo <key>` | `references/board.md` |
 | Termine im Kalender | `works ical --out termine.ics` oder die Abo-URL aus dem Board | `references/board.md` |
 | Mehrere Projekte im Blick | `works hub` startet die Übersicht auf Port 4740 | `references/board.md` |
+| Mehrere Aufgaben abarbeiten, Warteschlange, Sprint | `works parallel plan`, dann parallel mit Agenten, nacheinander oder nachfragen | `references/parallel.md` |
+| Wer hat diese Datei zuletzt geändert, was wurde dort entschieden | `works file <pfad>`, `works files <ID>` | `references/cli.md` |
+| Aufgaben aus Trello, Notion, Linear, CSV, Excel, Word, Liste übernehmen | `works import <datei>`, prüfen, dann `--apply` | `references/import.md` |
+| Funktioniert works noch, nach einem Update oder bei Fehlern | `works selftest` | `references/cli.md` |
 | Struktur prüfen, Fehler vermuten | `works doctor`, bei Bedarf `--fix` | `references/cli.md` |
 | Hooks einrichten | Bei Plugin-Installation nur `works install-hooks --git`, sonst nach Rückfrage `works install-hooks` | `references/hooks.md` |
 
@@ -118,9 +125,11 @@ Nur die Datei laden, die für den aktuellen Schritt gebraucht wird.
 - `references/workflow.md`: Abläufe für Erfassen, Planen, Arbeiten, Übergabe, Abschluss
 - `references/assets.md`: Bilder speichern, Inbox, Screenshots, Benennung, Komprimierung
 - `references/integrations.md`: Superpowers Brainstorming, UI UX Pro Max, git-workflow, code-audit, responsive-website-check, second-brain-sync, GitHub
-- `references/hooks.md`: SessionStart, Stop, UserPromptSubmit, PostToolUse und pre-commit Hook
+- `references/hooks.md`: SessionStart, Stop, UserPromptSubmit, PostToolUse, SubagentStop und pre-commit Hook
 - `references/board.md`: Kanban-Board, Ansichten, Bearbeiten im Board, Abnahme, Rückgängig, Kalender, Projektübersicht, Teilen und Sicherheit
 - `references/planning.md`: Sprint und Rückblick, Kommentare, Ansichten, Vorlagen, Zeit und Kosten, Prüfungen, Wochenbericht, Projektwissen, Wiederkehrendes, Aufräumen
+- `references/parallel.md`: mehrere Aufgaben gleichzeitig mit Worktrees und Agenten, Entscheidung und Ablauf
+- `references/import.md`: Import aus Trello, Notion, Linear, CSV, Excel, Word und Markdown
 - `references/cli.md`: alle Befehle und Optionen
 - `references/config.md`: Felder der config.json
 - `references/templates/`: Vorlagen für alle Aufgabentypen und decisions.md

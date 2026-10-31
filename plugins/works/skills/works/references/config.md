@@ -41,6 +41,8 @@ Liegt unter `.works/config.json`. Fehlende Felder werden mit Standardwerten erg�
 | `recurring` | `[]` | Regeln für wiederkehrende Aufgaben, siehe unten |
 | `github_sync` | siehe unten | Automatischer Abgleich mit GitHub |
 | `prices` | siehe unten | Preise für die Kostenschätzung |
+| `parallel` | `{ "max": 3, "dir": "", "min_effort": "M" }` | Höchstzahl gleichzeitiger Bahnen, Ordner für Worktrees (Standard `<projekt>.works-lanes` neben dem Projekt), ab welchem Aufwand sich Parallelarbeit lohnt |
+| `file_tracking` | `true` | Dateien je Aufgabe merken und Hinweise beim Edit |
 | `cleanup_ignore` | `[]` | Paare wie `["W-0016", "W-0017"]`, die Aufräumen nicht mehr als Duplikat meldet |
 | `sprints[].retro` | | Antworten aus dem Sprint-Rückblick: `good`, `bad`, `change` |
 

@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { worksDir, run } from './lib.mjs';
 import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
-import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background } from './api.mjs';
+import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload } from './api.mjs';
 import { buildIcal } from './ical.mjs';
 import { registerProject } from './hub.mjs';
 import { syncSettings, syncState } from './ghsync.mjs';
@@ -38,7 +38,7 @@ function statPart(file) {
 // Fingerabdruck aller Dateien, die das Board beeinflussen. Generierte Dateien (WORKS.md, board.html) zählen nicht.
 export function signature(root) {
   const wd = worksDir(root);
-  const parts = ['config.json', 'state.json', 'ideas.md', 'wissen.md', 'activity.json', 'instructions.json', 'github.json'].map((f) => statPart(path.join(wd, f)));
+  const parts = ['config.json', 'state.json', 'ideas.md', 'wissen.md', 'activity.json', 'instructions.json', 'github.json', 'lanes.json'].map((f) => statPart(path.join(wd, f)));
   for (const sub of ['tasks', 'archive']) {
     const base = path.join(wd, sub);
     let dirs = [];
@@ -255,6 +255,7 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         if (p === '/api/cleanup') return json(res, 200, cleanupInfo(root));
         if (p === '/api/similar') return json(res, 200, similarTo(root, String(q.get('title') || '').slice(0, 200), String(q.get('text') || '').slice(0, 2000)));
         if (p === '/api/undo') return json(res, 200, level === 'edit' ? undoInfo(root) : []);
+        if (p === '/api/parallel') return json(res, 200, parallelInfo(root));
         if (p === '/api/estimates') return json(res, 200, estimatesInfo(root));
         if (p === '/api/reports') return json(res, 200, reportsInfo(root));
         if (p === '/api/code') return json(res, 200, await codeOf(root, String(q.get('id') || '').toUpperCase()));
@@ -303,6 +304,10 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
           return;
         }
         throw new ApiError(400, 'Unbekannte Aktion.');
+      }
+      if (p === '/api/import') {
+        const data = await readBody(req, MAX_UPLOAD);
+        return json(res, 200, await importUpload(root, { name: q.get('name') || '', data, format: q.get('format') || '', map: q.get('map') || '', sheet: q.get('sheet') || '' }));
       }
       if (p === '/api/asset') {
         const data = await readBody(req, MAX_UPLOAD);
@@ -394,7 +399,7 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     });
     server.listen(p, host, () => {
       boundPort = p;
-      ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json']);
+      ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json']);
       writeServer(root, { pid: process.pid, port: p, host, version: runningVersion(), cli: OWN_CLI, started: new Date().toISOString() });
       const url = `http://${host === '0.0.0.0' || host === '::' ? 'localhost' : host}:${p}/`;
       process.stdout.write(`Live-Board läuft: ${url}\nBeobachte ${wd}\nBeenden mit Strg+C.\n`);

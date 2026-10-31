@@ -944,3 +944,18 @@ dialog:has(.rv-cmp) { width: min(1100px, calc(100vw - 32px)); }
 .dz-wrap iframe { position: absolute; left: 0; top: 0; width: 1024px; border: 0; transform-origin: 0 0; pointer-events: none; background: #fff; }
 a.btn { text-decoration: none; }
 .cl-score > div { flex: none; min-width: 130px; }
+.lane-tag { font-size: 11px; padding: 0 7px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 16%, var(--surface)); color: var(--text); font-weight: 600; }
+.lb-lane { font-size: 11px; color: var(--muted); text-transform: none; }
+.flinks { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; }
+.flinks li { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; padding: 4px 0; border-top: 1px solid var(--line); }
+.flinks li:first-child { border-top: 0; }
+.flinks .btn.link { padding: 0; }
+.imp-drop { display: grid; place-items: center; gap: 4px; padding: 26px; margin-bottom: 12px; border: 1.5px dashed var(--line-strong); border-radius: 12px; cursor: pointer; text-align: center; }
+.imp-drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.imp-wrap { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin: 8px 0 12px; }
+.tbl.imp { width: 100%; font-size: 13px; }
+.tbl.imp td, .tbl.imp th { padding: 6px 8px; vertical-align: top; }
+.tbl.imp td .sublabel { display: block; }
+.tbl.imp tr.dupr td { opacity: .65; }
+.tbl.imp thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+dialog:has(.tbl.imp) { width: min(1100px, calc(100vw - 32px)); }

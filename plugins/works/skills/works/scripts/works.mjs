@@ -15,8 +15,12 @@ import {
   getSection, setSection, appendToSection, stripComments, checkboxes, hasContent, imageLinks,
   loadTasks, loadTask, findTask, saveTask, addHistory, relFromWorks, isBlocked, openBlockers,
   isOverdue, openQuestions, sortTasks, readTemplate, fillTemplate, parseArgs, listFlag,
-  queueOf, pruneQueue,
+  queueOf, pruneQueue, laneLink,
 } from './lib.mjs';
+import { tasksForFile, filesForTask } from './files.mjs';
+import { parseImport, FORMATS } from './import.mjs';
+import { similarity } from './similar.mjs';
+import { planParallel, startLane, laneInfo, loadLanes, laneOf, finishLane, abortLane, lanePrompt, setLaneStatus } from './parallel.mjs';
 import { generateIndex, nextCandidates, dodCheck, sessionSummary, byIdMap, milestoneProgress } from './views.mjs';
 import { generateBoard, refreshBoardIfPresent } from './board.mjs';
 import { serveBoard } from './serve.mjs';
@@ -90,7 +94,7 @@ function cmdInit() {
     if (!exists(keep)) fs.writeFileSync(keep, '');
   }
   const mode = flags.gitignore || 'default';
-  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'inbox/*', '!inbox/.gitkeep'];
+  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json', 'inbox/*', '!inbox/.gitkeep'];
   if (mode === 'assets') ignore.push('tasks/*/assets/', 'archive/*/assets/');
   if (mode === 'all') ignore.splice(1, ignore.length - 1, '*', '!.gitignore');
   if (mode !== 'none') fs.writeFileSync(path.join(wd, '.gitignore'), ignore.join('\n') + '\n');
@@ -427,6 +431,15 @@ function cmdStart() {
   const root = requireRoot();
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
+  const here = laneLink();
+  if (here) {
+    if (here.task !== t.id) fail(`Dieser Worktree gehört zu ${here.task}. Andere Aufgaben nicht von hier starten.`);
+    out(`${t.id} läuft parallel in diesem Worktree. Die aktive Aufgabe des Hauptprojekts bleibt unverändert.`);
+    printContext(root, t);
+    return;
+  }
+  const lane = laneOf(root, t.id);
+  if (lane && !flags.force) fail(`${t.id} läuft parallel im Worktree ${lane.path}. Dort arbeitet ein Agent. Erst works parallel finish ${t.id} oder abort.`);
   if (t._archived) fail(`${t.id} ist archiviert. Zum Wiederaufnehmen \`works reopen\` verwenden.`);
   const all = loadTasks(root);
   const byId = byIdMap(all);
@@ -611,6 +624,8 @@ async function cmdDone() {
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
   if (t.status === 'erledigt') { out(`${t.id} ist bereits erledigt.`); return; }
+  if (laneLink()) fail('Im Worktree einer parallelen Aufgabe nicht abschließen. Status review setzen, das Hauptprojekt schließt ab.');
+  { const lane = laneOf(root, t.id); if (lane && !flags.force) fail(`${t.id} läuft noch parallel im Worktree ${lane.path}. Erst works parallel finish ${t.id} [--merge].`); }
   // Eingerichtete Prüfungen laufen automatisch, wenn es für den aktuellen Stand noch kein Ergebnis gibt.
   if (checksFor(config, t).length && !flags['no-checks']) {
     const st = dodCheck(root, config, t).checks;
@@ -1692,6 +1707,7 @@ function cmdInstallHooks() {
     add('Stop', 'stop-reminder.mjs');
     add('UserPromptSubmit', 'prompt-submit.mjs');
     add('PostToolUse', 'post-tool.mjs');
+    add('SubagentStop', 'subagent-stop.mjs');
     if (!flags['dry-run']) writeJson(file, settings);
     out(`Claude Code Einstellungen: ${file}${flags['dry-run'] ? ' (Probelauf, nichts geschrieben)' : ''}`);
   }
@@ -1791,6 +1807,16 @@ Projektwissen, Wiederkehrendes, GitHub, Übersicht
   instruct <ID> "Text"             Anweisung, die Claude während der Arbeit liest
   github [sync|status|set feld=wert ...] [--quiet]           Abgleich mit PRs, CI und Issues über gh
   hub [--list] [--port 4740]       Übersicht über alle Projekte mit .works
+
+Dateien, Parallelarbeit, Import, Selbsttest
+  file <pfad> [--json]             Aufgaben, die diese Datei geändert haben, mit ihren Entscheidungen
+  files [<ID>] [--json]            Dateien einer Aufgabe und wo sie sonst noch geändert wurden
+  parallel plan [A,B,..] [--max 3] [--json]   Können die Aufgaben gleichzeitig laufen?
+  parallel start A,B | prompt <ID> | status | finish <ID> [--merge] [--force] | abort <ID> [--force]
+  import <datei> [--format auto|trello|notion|linear|csv|xlsx|docx|md|json] [--map title=Spalte,..]
+         [--sheet Name] [--json] [--all] [--apply [--only 1,4 | --skip 3] [--status geplant] [--tags a,b]
+         [--include-done] [--keep-dups] [--include-archived]]
+  selftest [--browser] [--keep] [--verbose]
 
 Typen: ${TYPES.join(', ')}
 Status: ${STATUSES.join(', ')}
@@ -2347,6 +2373,220 @@ function cmdUndo() {
   try { const e = undo(root, pos[0]); refresh(root); out(`Rückgängig gemacht: ${e.label}`); } catch (e) { fail(e.message); }
 }
 
+// ---------- Dateien ----------
+
+function cmdFile() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  if (!pos[0]) fail('Datei fehlt. Beispiel: works file src/commands/backup.ts');
+  const list = tasksForFile(root, config, pos[0]);
+  if (flags.json) { out(JSON.stringify(list, null, 2)); return; }
+  if (!list.length) { out(`Keine Aufgabe hat ${pos[0]} geändert (Commits mit Aufgaben-ID oder Edits während einer aktiven Aufgabe).`); return; }
+  for (const x of list) {
+    out(`${x.id}  ${STATUS_LABEL[x.status] || x.status || '?'}  ${x.title}`);
+    out(`        ${[x.commits ? `${x.commits} Commit${x.commits === 1 ? '' : 's'}` : '', x.edits ? `${x.edits} Edit${x.edits === 1 ? '' : 's'}` : '', x.last ? `zuletzt ${String(x.last).slice(0, 10)}` : ''].filter(Boolean).join(', ')}`);
+    for (const d of x.decisions) out(`        Entscheidung ${d}`);
+  }
+}
+
+function cmdFiles() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const t = findTask(root, config, pos[0] || loadState(root).active);
+  const r = filesForTask(root, config, t.id);
+  if (flags.json) { out(JSON.stringify(r, null, 2)); return; }
+  if (!r.files.length) { out(`${t.id}: noch keine Dateien bekannt.`); return; }
+  for (const f of r.files) out(`${f.file}${r.others[f.file] ? `   auch in ${r.others[f.file].join(', ')}` : ''}`);
+}
+
+// ---------- Import ----------
+
+// Liest Aufgaben aus einer Datei, markiert Duplikate und legt sie erst mit --apply an.
+function importPreview(root, file, opts = {}) {
+  const config = loadConfig(root);
+  const mapping = {};
+  for (const pair of listFlag(opts.map)) { const i = pair.indexOf('='); if (i > 0) mapping[pair.slice(0, i).trim()] = pair.slice(i + 1).trim(); }
+  const fmt = opts.format && opts.format !== true ? String(opts.format) : 'auto';
+  if (!FORMATS.includes(fmt)) fail(`Unbekanntes Format ${fmt}. Möglich: ${FORMATS.join(', ')}`);
+  const r = parseImport(file, { format: fmt, mapping, sheet: opts.sheet && opts.sheet !== true ? String(opts.sheet) : '', includeArchived: !!opts['include-archived'] });
+  const existing = loadTasks(root);
+  const bySource = new Map(existing.filter((t) => String(t.source || '').startsWith('import:')).map((t) => [String(t.source), t.id]));
+  for (const c of r.candidates) {
+    c.source = `import:${r.format}${c.key ? `:${String(c.key).slice(0, 60)}` : ''}`;
+    if (c.key && bySource.has(c.source)) { c.dup = bySource.get(c.source); c.dupKind = 'schon importiert'; continue; }
+    let best = null;
+    for (const t of existing) {
+      const sc = similarity({ title: c.title, tags: c.tags, text: c.description }, { title: t.title, tags: t.tags, text: getSection(t._body, 'Beschreibung') || '' });
+      if (sc >= 0.85 && (!best || sc > best.sc)) best = { id: t.id, sc };
+    }
+    if (best) { c.dup = best.id; c.dupKind = `${Math.round(best.sc * 100)} % ähnlich`; }
+  }
+  // Doppelte Einträge innerhalb der Datei
+  const seen = new Map();
+  for (const c of r.candidates) { const k = c.title.toLowerCase(); if (seen.has(k) && !c.dup) { c.dup = `#${seen.get(k)}`; c.dupKind = 'doppelt in der Datei'; } else seen.set(k, c.n); }
+  return r;
+}
+
+function importSelection(r, opts) {
+  const only = new Set(listFlag(opts.only).map((x) => parseInt(x, 10)));
+  const skip = new Set(listFlag(opts.skip).map((x) => parseInt(x, 10)));
+  return r.candidates.filter((c) => {
+    if (only.size) return only.has(c.n);
+    if (skip.has(c.n)) return false;
+    if (c.dup && !opts['keep-dups']) return false;
+    if (['erledigt', 'verworfen'].includes(c.status) && !opts['include-done']) return false;
+    return true;
+  });
+}
+
+function cmdImport() {
+  const root = requireRoot();
+  const file = pos[0];
+  if (!file || !exists(file)) fail('Datei fehlt oder nicht gefunden. Beispiel: works import trello.json [--apply]');
+  let r;
+  try { r = importPreview(root, path.resolve(file), flags); } catch (e) { fail(e.message); }
+  const pick = importSelection(r, flags);
+  if (flags.json && !flags.apply) { out(JSON.stringify({ format: r.format, mapping: r.mapping || null, header: r.header || null, sheets: r.sheets || null, sheet: r.sheet || null, candidates: r.candidates, selected: pick.map((c) => c.n) }, null, 2)); return; }
+  if (!flags.apply) {
+    out(`Format: ${r.format}${r.sheet ? `, Tabelle ${r.sheet}${r.sheets && r.sheets.length > 1 ? ` (weitere: ${r.sheets.filter((x) => x !== r.sheet).join(', ')})` : ''}` : ''}. ${r.candidates.length} ${r.candidates.length === 1 ? 'Eintrag' : 'Einträge'} gefunden, ${pick.length} ${pick.length === 1 ? 'würde' : 'würden'} angelegt.`);
+    if (r.mapping) out(`Spalten: ${Object.entries(r.mapping).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+    for (const c of r.candidates.slice(0, flags.all ? 2000 : 60)) {
+      const flagsTxt = [c.status && c.status !== 'backlog' ? c.status : '', c.priority, c.effort, c.due ? `fällig ${c.due}` : '', c.tags.length ? '#' + c.tags.join(' #') : '', c.criteria.length ? `${c.criteria.length} Kriterien` : ''].filter(Boolean).join(', ');
+      out(`${pick.includes(c) ? '+' : '-'} ${String(c.n).padStart(3)}  ${c.type.padEnd(8)} ${c.title}${flagsTxt ? `  (${flagsTxt})` : ''}${c.dup ? `  [${c.dupKind}: ${c.dup}]` : ''}`);
+    }
+    if (r.candidates.length > 60 && !flags.all) out(`… ${r.candidates.length - 60} weitere, alle mit --all`);
+    const done = r.candidates.filter((c) => ['erledigt', 'verworfen'].includes(c.status)).length;
+    if (done && !flags['include-done']) out(`${done} erledigte oder verworfene werden übersprungen, übernehmen mit --include-done.`);
+    out(`\nAnlegen mit: works import ${file} --apply${flags.format && flags.format !== true ? ` --format=${flags.format}` : ''}${flags.map ? ` --map="${flags.map}"` : ''}  (Auswahl mit --only 1,4,7 oder --skip 3, Standardspalte mit --status geplant, zusätzliche Tags mit --tags)`);
+    return;
+  }
+  const config = loadConfig(root);
+  const extraTags = listFlag(flags.tags);
+  const created = [];
+  for (const c of pick) {
+    let status = c.status || (flags.status && flags.status !== true ? String(flags.status) : 'backlog');
+    const was = status;
+    if (['in-arbeit', 'review'].includes(status)) status = 'geplant';
+    const desc = c.description || '';
+    const t = createTask(root, config, {
+      type: TYPES.includes(c.type) ? c.type : 'feature', title: c.title, priority: c.priority || (flags.priority && flags.priority !== true ? String(flags.priority) : 'P3'),
+      status, effort: EFFORTS.includes(c.effort) ? c.effort : undefined, due: /^\d{4}-\d{2}-\d{2}$/.test(c.due || '') ? c.due : undefined,
+      tags: [...new Set([...(c.tags || []), ...extraTags])].join(','), description: desc || undefined,
+      criteriaList: (c.criteria || []).map((x) => x.text), source: c.source, incomplete: !desc && !(c.criteria || []).length,
+    });
+    const fresh = loadTask(t._dir);
+    let body = fresh._body;
+    for (const x of (c.criteria || []).filter((y) => y.done)) body = body.replace(`- [ ] ${x.text}`, `- [x] ${x.text}`);
+    fresh._body = body;
+    if (status === 'erledigt') fresh.completed = today();
+    addHistory(fresh, `Importiert aus ${r.format} (${c.origin})${was !== status ? `, dort ${STATUS_LABEL[was] || was}` : ''}`);
+    saveTask(fresh, { touch: false });
+    created.push(fresh.id);
+  }
+  refresh(root);
+  out(created.length ? `Importiert: ${created.length} Aufgabe${created.length === 1 ? '' : 'n'} (${created[0]}${created.length > 1 ? ` bis ${created[created.length - 1]}` : ''}).` : 'Nichts importiert.');
+  const inc = created.length ? loadTasks(root).filter((t) => created.includes(t.id) && t.incomplete).length : 0;
+  if (inc) out(`${inc} davon ohne Beschreibung und Kriterien, als unvollständig markiert.`);
+}
+
+// ---------- Parallelarbeit ----------
+
+function cmdParallel() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const sub = ['plan', 'start', 'prompt', 'status', 'finish', 'abort'].includes(pos[0]) ? pos.shift() : 'status';
+  const ids = () => pos.join(',').split(',').map((x) => x.trim()).filter(Boolean).map((x) => normalizeId(config, x));
+  try {
+    if (sub === 'plan') {
+      const p = planParallel(root, { ids: ids(), max: flags.max });
+      if (flags.json) { out(JSON.stringify(p, null, 2)); return; }
+      const head = { parallel: 'Empfehlung: parallel mit Agenten', nacheinander: 'Empfehlung: nacheinander in dieser Sitzung', unsicher: 'Unsicher: den Nutzer fragen, bevor Agenten starten' }[p.verdict];
+      out(head);
+      for (const r of p.reasons) out(`- ${r}`);
+      if (p.lanes.length && p.verdict !== 'nacheinander') {
+        out('\nBahnen:');
+        for (const l of p.lanes) out(`  ${l.id}  ${l.effort || '-'}  ${l.title}${l.files.length ? `\n        Dateien: ${l.files.slice(0, 5).join(', ')}` : ''}`);
+      }
+      if (p.later.length) out(`\nDanach: ${p.later.map((x) => x.id).join(', ')}`);
+      if (p.skipped.length) { out('\nNicht für Agenten geeignet:'); for (const x of p.skipped.slice(0, 10)) out(`  ${x.id}  ${x.why.join(', ')}`); }
+      if (p.running.length) out(`\nLaufen schon parallel: ${p.running.join(', ')}`);
+      if (p.verdict === 'parallel') out(`\nStarten: works parallel start ${p.lanes.map((l) => l.id).join(',')}, dann je Bahn einen Agenten mit dem Auftrag aus works parallel prompt <ID>.`);
+      if (p.verdict === 'unsicher') out('\nDem Nutzer die Gründe nennen und fragen: parallel starten oder nacheinander arbeiten?');
+      return;
+    }
+    if (sub === 'start') {
+      const list = ids();
+      if (!list.length) fail('IDs fehlen. Beispiel: works parallel start W-0012,W-0015');
+      const all = loadTasks(root);
+      const started = [];
+      for (const id of list) {
+        const t = all.find((x) => x.id === id);
+        if (!t) fail(`Aufgabe ${id} nicht gefunden.`);
+        if (isBlocked(t, byIdMap(all)) && !flags.force) fail(`${id} ist blockiert. Mit --force bewusst übergehen.`);
+        if (['erledigt', 'verworfen'].includes(t.status)) fail(`${id} ist ${t.status}.`);
+        if (t.status === 'review' && !flags.force) fail(`${id} ist in Review. Mit --force trotzdem parallel weiterarbeiten.`);
+        const lane = startLane(root, t);
+        const old = t.status;
+        t.status = 'in-arbeit';
+        t.branch = lane.branch;
+        addHistory(t, `Parallel gestartet im Worktree ${path.basename(lane.path)}${old !== 'in-arbeit' ? ` (Status: ${old} → in-arbeit)` : ''}`);
+        saveTask(t);
+        started.push(lane);
+      }
+      refresh(root);
+      for (const l of started) out(`${l.task}: Worktree ${l.path}, Branch ${l.branch}`);
+      out(`\nJetzt je Bahn einen Agenten starten, gleichzeitig. Auftrag: works parallel prompt <ID>. Danach works parallel status und works parallel finish <ID>.`);
+      return;
+    }
+    if (sub === 'prompt') {
+      const t = findTask(root, config, pos[0]);
+      const lane = laneOf(root, t.id);
+      if (!lane) fail(`${t.id} läuft nicht parallel. Erst works parallel start ${t.id}.`);
+      out(lanePrompt(root, t, lane, path.join(SKILL_DIR, 'scripts', 'works.mjs')));
+      return;
+    }
+    if (sub === 'finish') {
+      const t = findTask(root, config, pos[0]);
+      const r = finishLane(root, t.id, { merge: !!flags.merge, force: !!flags.force });
+      const fresh = findTask(root, config, t.id);
+      if (fresh.status === 'in-arbeit') { fresh.status = 'review'; addHistory(fresh, 'Parallele Arbeit beendet (Status: in-arbeit → review)'); }
+      else addHistory(fresh, `Parallele Arbeit beendet${r.merged ? `, ${r.lane.branch} gemergt` : ''}`);
+      saveTask(fresh);
+      refresh(root);
+      out(`${t.id}: Worktree entfernt.${r.merged ? ` ${r.lane.branch} ist in ${r.lane.base} gemergt.` : ` Branch ${r.lane.branch} bleibt mit ${r.lane.ahead} Commit${r.lane.ahead === 1 ? '' : 's'} für Review oder PR.`} Abschließen weiter mit works done ${t.id}.`);
+      return;
+    }
+    if (sub === 'abort') {
+      const t = findTask(root, config, pos[0]);
+      const r = abortLane(root, t.id, { force: !!flags.force });
+      const fresh = findTask(root, config, t.id);
+      if (fresh.status === 'in-arbeit') fresh.status = 'geplant';
+      addHistory(fresh, `Parallele Arbeit abgebrochen${r.branchKept ? `, Branch ${r.lane.branch} bleibt` : ''}`);
+      saveTask(fresh);
+      refresh(root);
+      out(`${t.id}: abgebrochen.${r.branchKept ? ` Branch ${r.lane.branch} mit ${r.lane.ahead} Commits bleibt erhalten.` : ''}`);
+      return;
+    }
+    const lanes = loadLanes(root).map((l) => laneInfo(root, l));
+    if (flags.json) { out(JSON.stringify(lanes, null, 2)); return; }
+    const here = laneLink();
+    if (here) out(`Dieser Ordner ist der Worktree von ${here.task}.`);
+    if (!lanes.length) { out('Keine parallelen Aufgaben. Prüfen mit works parallel plan.'); return; }
+    const all = loadTasks(root);
+    for (const l of lanes) {
+      const t = all.find((x) => x.id === l.task);
+      out(`${l.task}  ${t ? STATUS_LABEL[t.status] : '?'}  ${t ? t.title : ''}`);
+      out(`        ${l.branch}, ${l.ahead} Commit${l.ahead === 1 ? '' : 's'}, ${l.dirty ? `${l.dirty} Dateien offen` : 'sauber'}${l.status !== 'aktiv' ? `, ${l.status}` : ''}${l.exists ? '' : ', Worktree fehlt'}`);
+    }
+  } catch (e) { fail(e.message); }
+}
+
+async function cmdSelftest() {
+  const { selftest } = await import('./selftest.mjs');
+  const r = await selftest({ keep: !!flags.keep, browser: !!flags.browser, verbose: !!flags.verbose });
+  process.exit(r.ok ? 0 : 1);
+}
+
 // ---------- Dispatcher ----------
 
 const commands = {
@@ -2364,6 +2604,7 @@ const commands = {
   templates: cmdTemplate, time: cmdTime, checks: cmdChecks,
   design: cmdDesign, instruct: cmdInstruct, know: cmdKnow, wissen: cmdKnow, recur: cmdRecur, hub: cmdHub,
   github: cmdGithub, gh: cmdGithub, ical: cmdIcal, undo: cmdUndo,
+  file: cmdFile, files: cmdFiles, parallel: cmdParallel, par: cmdParallel, import: cmdImport, selftest: cmdSelftest,
 };
 
 const fn = commands[cmd];

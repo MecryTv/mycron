@@ -16,6 +16,7 @@ import { configuredChecks } from './checks.mjs';
 import { designSummary } from './design.mjs';
 import { loadActivity, pendingInstructions } from './live.mjs';
 import { loadKnowledge } from './knowledge.mjs';
+import { loadLanes } from './parallel.mjs';
 
 function excerpt(t) {
   for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Beschreibung', 'Abkürzung', 'Kontext und Problem', 'Problem', 'Herkunft']) {
@@ -72,7 +73,8 @@ export function boardData(root) {
     views: Array.isArray(config.views) ? config.views : [],
     effortDays: effortDays(root, all, config),
     hasChecks: Object.keys(configuredChecks(config)).length > 0,
-    activity: (() => { const a = loadActivity(root); return a ? { busy: !!a.busy, current: a.current || null, recent: (a.recent || []).slice(0, 6), since: a.since || '', idleSince: a.idleSince || '' } : null; })(),
+    activity: (() => { const a = loadActivity(root); return a ? { busy: !!a.busy, current: a.current || null, recent: (a.recent || []).slice(0, 12), since: a.since || '', idleSince: a.idleSince || '', lanes: a.lanes || {} } : null; })(),
+    lanes: loadLanes(root).map((l) => ({ task: l.task, branch: l.branch, dir: path.basename(l.path), started: l.started, status: l.status })),
     instructions: pendingInstructions(root).map((x) => ({ task: x.task, text: x.text, at: x.at })),
     knowledgeProposals: loadKnowledge(root).filter((e) => e.status === 'vorschlag').length,
     queueSettings: { auto_next: false, skip_blocked: true, ask_before: true, ...(config.queue_settings || {}) },

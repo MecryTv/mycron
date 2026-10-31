@@ -24,6 +24,8 @@ import { addDays as addDaysIso } from './sprint.mjs';
 import { syncSettings, syncState, DEFAULT_SYNC, prsFor } from './ghsync.mjs';
 import { findSimilar, similarity } from './similar.mjs';
 import { snapshot, relabel, dropSnapshot, undo as undoFn, undoList } from './undo.mjs';
+import { filesForTask } from './files.mjs';
+import { laneOf, laneInfo, loadLanes, planParallel } from './parallel.mjs';
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), 'works.mjs');
 const ID_RE = /^[A-Za-z]{1,8}-?\d{1,6}$/;
@@ -222,9 +224,12 @@ export function taskDetail(root, taskId) {
     usage: taskUsage(root, config, t.id),
     design: designDetail(root, t, relFromWorks),
     prs: prsFor(root, t.id),
+    lane: (() => { const l = laneOf(root, t.id); return l ? laneInfo(root, l) : null; })(),
+    fileLinks: (() => { try { return filesForTask(root, loadConfig(root), t.id); } catch { return { files: [], others: {} }; } })(),
   };
 }
 
+export function parallelInfo(root) { return { plan: planParallel(root), lanes: loadLanes(root).map((l) => laneInfo(root, l)) }; }
 export function undoInfo(root) { return undoList(root).slice(0, 20).map((e) => ({ key: e.key, label: e.label, at: e.at })); }
 export function templatesList(root) { return listTemplates(root); }
 export function templateDraft(root, taskId) { return templateFromTask(findTaskSafe(root, taskId)); }
@@ -768,6 +773,37 @@ export async function saveAsset(root, { taskId, contentType, data, desc, kind, n
   return { message: 'Bild gespeichert.' };
 }
 
+// Import aus dem Board: Datei kommt roh, liegt kurz in .works/.tmp und wird nach dem Anlegen gelöscht.
+const IMPORT_EXT = ['.json', '.csv', '.tsv', '.xlsx', '.xlsm', '.docx', '.md', '.markdown', '.txt', '.zip'];
+const IMPORT_FORMATS = ['', 'auto', 'trello', 'notion', 'linear', 'csv', 'xlsx', 'docx', 'md', 'json'];
+const importFile = (root, token) => {
+  if (!/^[a-f0-9]{16}(\.[a-z]{2,8})$/.test(token || '')) bad('Ungültiger Import.');
+  const f = path.join(worksDir(root), '.tmp', `import-${token}`);
+  if (!exists(f)) bad('Die hochgeladene Datei ist abgelaufen. Bitte erneut wählen.');
+  return f;
+};
+function importArgs(b) {
+  const a = [];
+  const fmt = oneOf(b.format || '', 'Format', IMPORT_FORMATS); if (fmt && fmt !== 'auto') a.push(`--format=${fmt}`);
+  if (b.map) a.push(`--map=${str(b.map, 'Spalten', { max: 400 }).replace(/[^\p{L}\p{N} _=,.()/-]/gu, '')}`);
+  if (b.sheet) a.push(`--sheet=${str(b.sheet, 'Tabelle', { max: 80 })}`);
+  return a;
+}
+export async function importUpload(root, { name, data, format, map, sheet }) {
+  const ext = path.extname(String(name || '')).toLowerCase();
+  if (!IMPORT_EXT.includes(ext)) bad(`Dateityp ${ext || 'unbekannt'} wird nicht unterstützt. Möglich: ${IMPORT_EXT.join(', ')}`);
+  if (!data || !data.length) bad('Leere Datei.');
+  const dir = path.join(worksDir(root), '.tmp');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const f of fs.readdirSync(dir)) if (f.startsWith('import-')) { try { if (Date.now() - fs.statSync(path.join(dir, f)).mtimeMs > 3600000) fs.rmSync(path.join(dir, f)); } catch { /* egal */ } }
+  const token = crypto.randomBytes(8).toString('hex') + ext;
+  const file = path.join(dir, `import-${token}`);
+  fs.writeFileSync(file, data);
+  const r = await cli(root, ['import', file, '--json', ...importArgs({ format, map, sheet })]);
+  if (!r.ok) { removeQuiet(file); throw new ApiError(422, (r.stderr.split('\n').find((l) => l.trim()) || 'Import nicht lesbar.').replace(/^Fehler:\s*/, '')); }
+  return { token, name: path.basename(String(name)).slice(0, 120), ...JSON.parse(r.stdout) };
+}
+
 export { STATUS_LABEL };
 
 // ---------- Runde 3: Entwürfe, Wissen, Wiederkehrend, GitHub, Aufräumen, Rückgängig ----------
@@ -823,10 +859,10 @@ const LABEL = {
   create: 'Aufgabe angelegt', createFromTemplate: 'Aufgabe aus Vorlage', set: 'Felder geändert', move: 'Status geändert', section: 'Text geändert',
   check: 'Häkchen', item: 'Punkt ergänzt', itemRemove: 'Punkt entfernt', link: 'Verknüpfung', archive: 'Archiviert', bulk: 'Mehrere Aufgaben',
   queueAdd: 'Eingereiht', queueRemove: 'Aus der Warteschlange', queueOrder: 'Warteschlange sortiert', comment: 'Kommentar', designChoose: 'Entwurf gewählt',
-  review: 'Abnahme', merge: 'Zusammengeführt', toIdeas: 'In Ideen verschoben', sprintAdd: 'Eingeplant', sprintRemove: 'Aus dem Sprint',
+  review: 'Abnahme', merge: 'Zusammengeführt', toIdeas: 'In Ideen verschoben', importApply: 'Importiert', sprintAdd: 'Eingeplant', sprintRemove: 'Aus dem Sprint',
 };
 const NO_UNDO = new Set(['undo', 'checksRun', 'githubSync', 'reportRun', 'reportWebhook', 'instruct', 'recurRun', 'requestHandoff']);
-const CONFIG_ACTIONS = /^(queue|sprint|view|milestone|recur|checksSave|reportSettings|effortMode|githubSettings|dismissDuplicate)/;
+const CONFIG_ACTIONS = /^(queue|sprint|view|milestone|recur|checksSave|reportSettings|effortMode|githubSettings|dismissDuplicate|importApply)/;
 
 // Schreibaktion mit Sicherung für Rückgängig.
 export async function runActionWithUndo(root, body) {
@@ -936,6 +972,15 @@ Object.assign(actions, {
     await must(root, ['link', keep, 'related', drop]);
     await must(root, ['drop', drop, `--reason=Zusammengeführt in ${keep}`]);
     return { message: `${drop} in ${keep} zusammengeführt.` };
+  },
+  async importApply(root, b) {
+    const file = importFile(root, b.token);
+    const only = (Array.isArray(b.only) ? b.only : []).map((n) => parseInt(n, 10)).filter((n) => n > 0 && n <= 5000);
+    if (!only.length) bad('Keine Einträge gewählt.');
+    const args = ['import', file, '--apply', `--only=${only.join(',')}`, '--keep-dups', '--include-done', '--include-archived', ...importArgs(b)];
+    const st = oneOf(b.status || '', 'Spalte', ['', 'backlog', 'geplant']); if (st) args.push(`--status=${st}`);
+    if (b.tags) args.push(`--tags=${list(b.tags, 'Tags', /^[\p{L}\p{N}_-]+$/u).join(',')}`);
+    try { const m = await must(root, args, { timeout: 120000 }); return { message: m.split('\n')[0] }; } finally { removeQuiet(file); }
   },
   async toIdeas(root, b) {
     const ids = (Array.isArray(b.ids) ? b.ids : []).slice(0, 50).map(id);

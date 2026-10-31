@@ -48,6 +48,7 @@ Der Modus kommt aus `config.json` unter `brainstorm.mode`: `link` (Standard, ver
 - `works start <ID>` schlägt einen Branch nach dem Schema `<präfix>/<id>-<slug>` vor und schreibt ihn ins Frontmatter. Präfixe: feature und design → `feature/`, bug → `fix/` (bei P1 `hotfix/`), refactor und debt → `refactor/`, chore und spike → `chore/`.
 - Ist der git-workflow Skill aktiv, legt dieser den Branch an und verwendet dabei genau diesen Namen. Sonst `works start <ID> --git`.
 - Commit-Messages enthalten die ID: `fix(W-0007): Rolle nach Captcha vergeben`. Dadurch findet `works commits <ID>` alle zugehörigen Commits.
+- Bei Parallelarbeit legt `works parallel start` die Branches selbst an, jeweils in einem eigenen Worktree. Der git-workflow Skill legt dann keinen weiteren Branch an. Gemergt wird mit `works parallel finish <ID> --merge` (ebenfalls `--no-ff`) oder über einen Pull Request.
 - Beim Merge über git-workflow anschließend `works done <ID>` ausführen. Umgekehrt gilt: `works done --confirm` erst, wenn der Merge erfolgreich war oder der Nutzer ihn bewusst später machen will.
 
 ## code-audit

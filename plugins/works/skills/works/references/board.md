@@ -120,6 +120,8 @@ Beim Tippen von Großbuchstaben mit der rechten Shift-Taste öffnet sich nichts,
 | Anweisung an Claude | Auf der aktiven Karte oder in der Übersicht einer Aufgabe in Arbeit | `works instruct`, Claude bekommt sie über den PostToolUse oder Stop Hook |
 | Rückgängig | Meldung nach jeder Änderung mit "Rückgängig", `Strg+Z` außerhalb von Textfeldern, Liste unter Werkzeuge, Letzte Änderungen | `works undo` |
 | Projektwissen, Aufräumen | Werkzeuge, oben | `works know`, siehe planning.md |
+| Importieren | Werkzeuge, oben, oder Schnellsuche: Datei wählen, Vorschau mit Auswahl, Spalte und Tags für alle | `works import --apply --only`, siehe import.md |
+| Parallelarbeit ansehen | Werkzeuge, Parallelarbeit: laufende Bahnen und die Einschätzung für die nächsten Aufgaben | `works parallel status`, `works parallel plan` |
 | Wiederkehrend, GitHub, Kalender, Verbrauch | Abschnitte unter Werkzeuge | `works recur`, `works github`, `kalender.ics`, `works time` |
 
 Verschieben im Detail:
@@ -154,6 +156,10 @@ Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen d
 Solange Claude an einer Aufgabe arbeitet, zeigt der Kopf "Claude arbeitet an W-0003, seit 6 min" (Klick springt zur Karte). Die aktive Karte zeigt den aktuellen Schritt und die letzten drei, zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test", dazu den Knopf "Anweisung an Claude". Die Daten kommen aus dem PostToolUse Hook (`.works/activity.json`, lokal). Nach zehn Minuten ohne Werkzeugaufruf verschwindet die Anzeige.
 
 Anweisungen landen in `.works/instructions.json` und als Kommentar an der Aufgabe. Claude bekommt sie beim nächsten Werkzeugaufruf als Kontext, spätestens am Ende der Antwort, und liest sie, wenn es sinnvoll ist. Bis dahin zeigt das Board "wartet".
+
+## Dateien und Parallelarbeit
+
+Der Reiter Code und Commits zeigt unter "Auch in anderen Aufgaben" Dateien, die andere Aufgaben ebenfalls geändert haben, mit Sprung dorthin. Läuft die Aufgabe parallel, steht dort auch ihr Worktree mit Commits und offenen Dateien. Karten paralleler Aufgaben tragen "Parallel" und zeigen den aktuellen Schritt ihres Agenten.
 
 ## Rückgängig
 

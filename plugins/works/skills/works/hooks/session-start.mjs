@@ -26,7 +26,7 @@ async function main() {
   if (!root) return;
   const config = loadConfig(root);
   if (config.hooks && config.hooks.session_start === false) return;
-  ensureGitignore(root, ['.tmp/', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json']);
+  ensureGitignore(root, ['.tmp/', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json']);
   // Einmalige Reparatur: Beschreibungen, die wegen eines Fehlers älterer Versionen im falschen Abschnitt stehen.
   const repairNotes = [];
   const migrations = Array.isArray(config.migrations) ? config.migrations : [];

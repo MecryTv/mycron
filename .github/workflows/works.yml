@@ -1,0 +1,53 @@
+name: works Selbsttest
+
+on:
+  push:
+    paths:
+      - 'plugins/works/**'
+      - '.github/workflows/works.yml'
+  pull_request:
+    paths:
+      - 'plugins/works/**'
+      - '.github/workflows/works.yml'
+  workflow_dispatch:
+
+jobs:
+  selftest:
+    name: Node ${{ matrix.node }} auf ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Git für Testcommits einrichten
+        run: |
+          git config --global user.name "works selftest"
+          git config --global user.email "works@example.invalid"
+          git config --global init.defaultBranch main
+      - name: Selbsttest
+        run: node plugins/works/skills/works/scripts/works.mjs selftest --verbose
+
+  board:
+    name: Board im Browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Git einrichten
+        run: |
+          git config --global user.name "works selftest"
+          git config --global user.email "works@example.invalid"
+      - name: Playwright installieren
+        run: |
+          npm install --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Selbsttest mit Browser
+        run: node plugins/works/skills/works/scripts/works.mjs selftest --browser --verbose

@@ -177,8 +177,16 @@
     const pill = $('#busy');
     const a = meta.activity;
     const fresh = a && a.busy && a.current && Date.now() - Date.parse(a.current.at) < 10 * 60000;
-    pill.hidden = !fresh;
-    if (fresh) { const mins = Math.max(1, Math.round((Date.now() - Date.parse(a.since || a.current.at)) / 60000)); pill.textContent = 'Claude arbeitet' + (a.current.task ? ' an ' + a.current.task : '') + ', seit ' + mins + ' min'; pill.onclick = () => { if (a.current.task) focusCard(a.current.task); }; }
+    const laneIds = (meta.lanes || []).map((l) => l.task).filter((id) => a && a.lanes && a.lanes[id] && Date.now() - Date.parse(a.lanes[id].at) < 10 * 60000);
+    pill.hidden = !fresh && !laneIds.length;
+    if (fresh || laneIds.length) {
+      const mins = fresh ? Math.max(1, Math.round((Date.now() - Date.parse(a.since || a.current.at)) / 60000)) : 0;
+      const main = fresh ? 'Claude arbeitet' + (a.current.task ? ' an ' + a.current.task : '') + ', seit ' + mins + ' min' : '';
+      const par = laneIds.length ? (laneIds.length === 1 ? '1 Agent parallel an ' + laneIds[0] : laneIds.length + ' Agenten parallel') : '';
+      pill.textContent = [main, par].filter(Boolean).join(', ');
+      const go = fresh && a.current.task ? a.current.task : laneIds[0];
+      pill.onclick = () => { if (go) focusCard(go); };
+    }
     const tc = $('#toolsCount');
     const n = (meta.knowledgeProposals || 0);
     tc.hidden = !n; tc.textContent = n;
@@ -361,6 +369,7 @@
       const closed = !OPEN.includes(t.status);
       meta2.push('<span class="' + (t.overdue ? 'warn' : d <= 3 && !closed ? 'note' : '') + '">' + (t.overdue ? 'Überfällig seit ' : 'Fällig ') + fmtDate(t.due) + '</span>');
     }
+    if ((meta.lanes || []).some((l) => l.task === t.id)) meta2.push('<span class="lane-tag" title="Ein Agent arbeitet in einem eigenen Git-Worktree">Parallel</span>');
     if (t.design && t.design.variants) meta2.push('<span class="' + (t.design.chosen ? '' : 'note') + '" title="Entwürfe aus UI UX Pro Max">' + (t.design.chosen ? 'Entwurf ' + esc(t.design.chosen) + ' gewählt' : t.design.variants + ' Entwürfe zur Wahl') + '</span>');
     if (t.questions.length) meta2.push('<span class="note">' + t.questions.length + (t.questions.length === 1 ? ' offene Frage' : ' offene Fragen') + '</span>');
     if (t.incomplete && OPEN.includes(t.status)) meta2.push('<span>Unvollständig</span>');
@@ -1575,13 +1584,16 @@
         '<div><small>Branch</small><strong class="mono">' + (c.branch ? esc(c.branch) : '<span class="muted">keiner mit ' + esc(id) + ' im Namen</span>') + '</strong></div>' +
         '<div><small>Gegenüber ' + esc(c.base || 'Hauptbranch') + '</small><strong>' + (c.ahead === null ? '<span class="muted">nicht vergleichbar</span>' : c.ahead + (c.ahead === 1 ? ' Commit' : ' Commits') + ' voraus' + (c.behind ? ', ' + c.behind + ' zurück' : '')) + '</strong></div>' +
         '<div><small>Pull Request</small><strong>' + ((detail.prs || []).length ? detail.prs.slice(0, 3).map((p) => (/^https?:/.test(p.url || '') ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">#' + p.number + '</a>' : '#' + p.number) + ' ' + esc({ OPEN: 'offen', MERGED: 'gemergt', CLOSED: 'geschlossen' }[p.state] || p.state) + (p.ci ? ', CI ' + (p.ci === 'ok' ? 'grün' : p.ci === 'fail' ? 'rot' : 'läuft') : '')).join('<br>') : pr) + '</strong></div>' +
+      (detail.lane ? '<div><small>Parallel im Worktree</small><strong class="mono">' + esc(detail.lane.path.split(/[\\/]/).pop()) + '</strong><span class="muted">' + detail.lane.ahead + ' Commit' + (detail.lane.ahead === 1 ? '' : 's') + ', ' + (detail.lane.dirty ? detail.lane.dirty + ' Dateien offen' : 'alles committet') + (detail.lane.status === 'konflikt' ? ', Merge-Konflikt' : '') + '</span></div>' : '') +
       '</div>' +
+      fileLinksHtml(detail.fileLinks) +
       '<div class="block"><div class="block-head"><h3>Commits</h3><span class="meta">mit ' + esc(id) + ' in der Nachricht</span></div>' +
         (c.commits.length ? '<ol class="commits">' + c.commits.map((k) => '<li><span class="mono hash">' + esc(k.short) + '</span><span class="subj">' + esc(k.subject) + '</span><time class="muted num" datetime="' + esc(k.date) + '">' + esc(new Date(k.date).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time></li>').join('') + '</ol>'
           : '<p class="md empty-md">Noch keine Commits gefunden. Claude schreibt die Aufgaben-ID in jede Commit-Nachricht, zum Beispiel <code>feat(' + esc(id) + '): …</code>.</p>') + '</div>' +
       (c.uncommitted.length ? '<div class="block"><div class="block-head"><h3>Noch nicht committet</h3><span class="meta">auf ' + esc(c.branch) + '</span></div><ul class="files">' + c.uncommitted.map((f) => fileRow(f, true)).join('') + '</ul></div>' : '') +
       '<div class="block"><div class="block-head"><h3>Geänderte Dateien</h3><span class="meta">' + (c.source === 'branch' ? 'Branch gegenüber ' + esc(c.base) : c.source === 'commits' ? 'aus den Commits' : '') + '</span></div>' +
         (c.files.length ? '<ul class="files">' + c.files.map((f) => fileRow(f, false)).join('') + '</ul>' : '<p class="md empty-md">Keine Änderungen gefunden.</p>') + '</div>';
+    $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
     $$('.file', box).forEach((b) => b.onclick = async () => {
       const d = b.nextElementSibling;
       const open = b.getAttribute('aria-expanded') === 'true';
@@ -1595,6 +1607,15 @@
         d.innerHTML = diffHtml(r.diff) + (r.truncated ? '<p class="muted diff-more">Gekürzt. Vollständig mit git diff im Terminal.</p>' : '');
       } catch (e) { d.innerHTML = '<p class="err">' + esc(e.message) + '</p>'; }
     });
+  }
+
+  // Dateien, die auch andere Aufgaben geändert haben, mit Sprung dorthin.
+  function fileLinksHtml(fl) {
+    if (!fl || !fl.files || !fl.files.length) return '';
+    const shared = fl.files.filter((f) => fl.others[f.file]);
+    if (!shared.length) return '';
+    return '<div class="block"><div class="block-head"><h3>Auch in anderen Aufgaben</h3><span class="meta">dieselben Dateien, Entscheidungen dort beachten</span></div><ul class="flinks">' +
+      shared.slice(0, 12).map((f) => '<li><span class="mono">' + esc(f.file) + '</span><span>' + fl.others[f.file].map((x) => '<button class="btn link" data-open="' + esc(x) + '">' + esc(x) + '</button>').join(' ') + '</span></li>').join('') + '</ul></div>';
   }
 
   function diffHtml(text) {
@@ -2281,12 +2302,14 @@
 
   function liveBlock(t) {
     const a = meta.activity;
-    if (!a || !a.busy || !a.current || a.current.task !== t.id || t.status !== 'in-arbeit') return '';
-    if (Date.now() - Date.parse(a.current.at) > 10 * 60000) return '';
+    const laneE = a && a.lanes ? a.lanes[t.id] : null;
+    const cur = laneE || (a && a.busy && a.current && a.current.task === t.id ? a.current : null);
+    if (!cur || t.status !== 'in-arbeit') return '';
+    if (Date.now() - Date.parse(cur.at) > 10 * 60000) return '';
     const plan = t.plan || null;
     const recent = (a.recent || []).filter((r) => r.task === t.id).slice(1, 4);
     const pend = (meta.instructions || []).filter((x) => x.task === t.id).length;
-    return '<div class="live-box"><span class="lb-head"><i class="lb-dot" aria-hidden="true"></i>' + esc(a.current.verb) + (a.current.what ? ' <code>' + esc(a.current.what) + '</code>' : '') + '</span>' +
+    return '<div class="live-box">' + (laneE ? '<span class="lb-lane">Agent im eigenen Worktree</span>' : '') + '<span class="lb-head"><i class="lb-dot" aria-hidden="true"></i>' + esc(cur.verb) + (cur.what ? ' <code>' + esc(cur.what) + '</code>' : '') + '</span>' +
       (recent.length ? '<ol class="lb-list">' + recent.map((r) => '<li><span class="muted num">' + esc(timeOf(r.at)) + '</span> ' + esc(r.verb) + ' <span class="mono">' + esc(r.what) + '</span>' + (r.ok === false ? ' <span class="late">Fehler</span>' : '') + '</li>').join('') + '</ol>' : '') +
       (EDIT ? '<button class="btn small" data-instr="' + esc(t.id) + '">Anweisung an Claude' + (pend ? ' (' + pend + ' wartet)' : '') + '</button>' : '') + '</div>';
   }
@@ -2508,6 +2531,59 @@
     ti.addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(check, 350); });
   }
 
+  // ---------- Import ----------
+
+  const IMPORT_HELP = 'Trello (JSON-Export), Notion (CSV oder ZIP-Export), Linear (CSV), CSV und TSV, Excel (.xlsx), Word (.docx) mit Listen, Häkchen oder Tabellen, Markdown und Text mit Listen.';
+  async function openImport(prev) {
+    let file = null;
+    const fmts = [['auto', 'Automatisch erkennen'], ['trello', 'Trello'], ['notion', 'Notion'], ['linear', 'Linear'], ['csv', 'CSV'], ['xlsx', 'Excel'], ['docx', 'Word'], ['md', 'Markdown oder Text']];
+    const pre = await showDialog('<h2>Aufgaben importieren</h2><p class="lead">' + esc(IMPORT_HELP) + ' Du siehst vorher eine Vorschau und wählst aus.</p>' +
+      '<label class="imp-drop" id="impDrop"><input type="file" id="impFile" accept=".json,.csv,.tsv,.xlsx,.xlsm,.docx,.md,.markdown,.txt,.zip" hidden><strong id="impName">Datei wählen oder hierher ziehen</strong><span class="sublabel">bis 20 MB</span></label>' +
+      '<div class="grid"><label class="field span2"><span>Format</span><select name="format">' + fmts.map((f) => '<option value="' + f[0] + '"' + (prev && prev.format === f[0] ? ' selected' : '') + '>' + esc(f[1]) + '</option>').join('') + '</select></label>' +
+      '<label class="field span2"><span>Spalten zuordnen, optional</span><input class="input" name="map" placeholder="title=Aufgabe, status=Liste" value="' + esc(prev ? prev.map : '') + '"></label></div>' +
+      '<p class="sublabel">Für Fließtext ohne Listen, etwa Protokolle oder E-Mails, ist es besser, Claude die Datei zu geben. Claude liest sie und schlägt Aufgaben vor.</p>' + foot('Vorschau'),
+    async (fd) => {
+      if (!file) throw new Error('Bitte eine Datei wählen.');
+      const qs = new URLSearchParams({ name: file.name, format: fd.get('format'), map: fd.get('map') || '' });
+      const r = await api('POST', 'api/import?' + qs.toString(), undefined, { body: file, type: 'application/octet-stream' });
+      return { ...r, chosen: fd.get('format'), map: fd.get('map') || '' };
+    }, (f) => {
+      const inp = $('#impFile', f); const drop = $('#impDrop', f);
+      const setF = (x) => { file = x; $('#impName', f).textContent = x ? x.name + ' (' + Math.max(1, Math.round(x.size / 1024)) + ' KB)' : 'Datei wählen oder hierher ziehen'; };
+      inp.onchange = () => setF(inp.files[0] || null);
+      drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+      drop.ondragleave = () => drop.classList.remove('over');
+      drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) setF(e.dataTransfer.files[0]); };
+    });
+    if (pre) importPreviewDialog(pre);
+  }
+
+  async function importPreviewDialog(r) {
+    const sel = new Set(r.selected);
+    const st = { erledigt: 'Erledigt', verworfen: 'Verworfen', 'in-arbeit': 'dort in Arbeit', review: 'dort in Review', geplant: 'Geplant', backlog: '' };
+    const rows = r.candidates.map((c) => '<tr class="' + (c.dup ? 'dupr' : '') + '"><td><input type="checkbox" class="impc" data-n="' + c.n + '"' + (sel.has(c.n) ? ' checked' : '') + ' aria-label="' + esc(c.title) + ' übernehmen"></td>' +
+      '<td><strong>' + esc(c.title) + '</strong>' + (c.description ? '<span class="sublabel">' + esc(c.description.split('\n')[0].slice(0, 120)) + '</span>' : '') + (c.dup ? '<span class="late sublabel">' + esc(c.dupKind) + ': ' + esc(c.dup) + '</span>' : '') + '</td>' +
+      '<td>' + esc(meta.typeLabel[c.type] || c.type) + '</td><td>' + esc(c.priority || '') + '</td><td>' + esc(st[c.status] ?? c.status) + '</td><td>' + esc([c.effort, c.due ? fmtDate(c.due) : '', c.criteria.length ? c.criteria.length + ' Krit.' : ''].filter(Boolean).join(', ')) + '</td><td>' + (c.tags || []).map((t) => '<span class="tag">#' + esc(t) + '</span>').join(' ') + '</td><td class="muted">' + esc(c.origin) + '</td></tr>').join('');
+    const html = '<h2>Vorschau: ' + esc(r.name) + '</h2><p class="lead">Format ' + esc(r.format) + (r.sheet ? ', Tabelle ' + esc(r.sheet) : '') + '. ' + r.candidates.length + ' Einträge, ' + sel.size + ' vorausgewählt. Duplikate und Erledigtes sind abgewählt.</p>' +
+      (r.mapping ? '<p class="sublabel">Spalten: ' + Object.entries(r.mapping).map(([k, v]) => esc(k) + ' = ' + esc(v)).join(', ') + (r.header ? '. Vorhanden: ' + r.header.map(esc).join(', ') : '') + '</p>' : '') +
+      (r.candidates.length ? '<div class="imp-wrap"><table class="tbl imp"><thead><tr><th><input type="checkbox" id="impAll" aria-label="Alle"></th><th>Titel</th><th>Typ</th><th>Prio</th><th>Status</th><th>Details</th><th>Tags</th><th>Herkunft</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<div class="q-empty">Keine Aufgaben erkannt. Format oder Spaltenzuordnung ändern.</div>') +
+      '<div class="grid"><label class="field span2"><span>Spalte für neue Aufgaben ohne Status</span><select name="status"><option value="backlog">Backlog</option><option value="geplant">Geplant</option></select></label><label class="field span2"><span>Zusätzliche Tags</span><input class="input" name="tags" placeholder="import, trello"></label></div>' +
+      '<p class="sublabel">Aufgaben, die dort in Arbeit oder in Review waren, kommen nach Geplant. Ohne Beschreibung und Kriterien werden sie als unvollständig markiert, Claude fragt dann nach.</p>' +
+      '<p class="err" role="alert"></p><div class="foot"><button type="button" class="btn" id="impBack" style="margin-right:auto">Andere Datei</button><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn primary" value="ok" id="impGo">Importieren</button></div>';
+    const res = await showDialog(html, (fd) => {
+      const only = $$('.impc', form).filter((c) => c.checked).map((c) => +c.dataset.n);
+      if (!only.length) throw new Error('Keine Einträge gewählt.');
+      return act('importApply', { token: r.token, only, status: fd.get('status'), tags: String(fd.get('tags') || '').split(',').map((x) => x.trim().replace(/^#/, '')).filter(Boolean), format: r.format, map: r.map || '' });
+    }, (f) => {
+      const count = () => { const n = $$('.impc', f).filter((c) => c.checked).length; $('#impGo', f).textContent = n === 1 ? '1 Aufgabe importieren' : n ? n + ' Aufgaben importieren' : 'Nichts gewählt'; $('#impGo', f).disabled = !n; };
+      $$('.impc', f).forEach((c) => c.onchange = count);
+      const all = $('#impAll', f); if (all) all.onchange = () => { $$('.impc', f).forEach((c) => { c.checked = all.checked; }); count(); };
+      $('#impBack', f).onclick = () => { $('button[value="cancel"]', f).click(); setTimeout(() => openImport({ format: r.chosen, map: r.map }), 50); };
+      count();
+    });
+    if (res) { if (res.undo) undoToast(res.message, res.undo); else ok(res.message); }
+  }
+
   // ---------- Sprint-Rückblick ----------
 
   async function openRetro(sp, st, list) {
@@ -2565,7 +2641,8 @@
       EDIT ? api('GET', 'api/undo').catch(() => []) : Promise.resolve([]), EDIT ? api('GET', 'api/share').catch(() => null) : Promise.resolve(null),
     ]);
     const h = [];
-    h.push('<div class="row-btns tools-top"><button class="btn small" data-openside="knowledge">Projektwissen' + (meta.knowledgeProposals ? ' (' + meta.knowledgeProposals + ' neu)' : '') + '</button><button class="btn small" data-openside="cleanup">Aufräumen</button></div>');
+    h.push('<div class="row-btns tools-top"><button class="btn small" data-openside="knowledge">Projektwissen' + (meta.knowledgeProposals ? ' (' + meta.knowledgeProposals + ' neu)' : '') + '</button><button class="btn small" data-openside="cleanup">Aufräumen</button>' + (EDIT ? '<button class="btn small" id="btnImport">Importieren</button>' : '') + '</div>');
+    h.push('<details class="sec" id="parSec"><summary>Parallelarbeit <span class="meta">' + ((meta.lanes || []).length ? meta.lanes.length + ' laufen' : 'keine') + '</span></summary><div class="body" id="parBody"><p class="md">Claude prüft vor dem Abarbeiten mehrerer Aufgaben, ob sie gleichzeitig in eigenen Git-Worktrees laufen können, und startet dann je Aufgabe einen Agenten. Ist es unsicher, fragt es dich.</p><p class="muted">Lädt beim Öffnen …</p></div></details>');
     if (rec) {
       h.push('<details class="sec"><summary>Wiederkehrende Aufgaben <span class="meta">' + rec.rules.length + '</span></summary><div class="body">' +
         '<p class="md">works legt sie zum Termin selbst an, beim Sitzungsstart oder solange das Board läuft. Ist die vorige noch offen, wird keine zweite angelegt.</p>' +
@@ -2604,6 +2681,19 @@
   }
 
   function bindToolsExtra(body) {
+    const bi = $('#btnImport', body); if (bi) bi.onclick = () => openImport();
+    const ps = $('#parSec', body);
+    if (ps) ps.addEventListener('toggle', async () => {
+      if (!ps.open || ps.dataset.loaded) return;
+      let r; try { r = await api('GET', 'api/parallel'); } catch (e) { $('#parBody', body).innerHTML = '<p class="err">' + esc(e.message) + '</p>'; return; }
+      ps.dataset.loaded = '1';
+      const v = { parallel: ['good', 'Parallel möglich'], nacheinander: ['', 'Besser nacheinander'], unsicher: ['warn-t', 'Unsicher, Claude fragt dich'] }[r.plan.verdict];
+      $('#parBody', body).innerHTML = (r.lanes.length ? '<div class="block"><div class="block-head"><h3>Laufen gerade</h3></div>' + r.lanes.map((l) => '<div class="tpl-row"><div class="q-t"><button class="q-title" data-open="' + esc(l.task) + '">' + esc(l.task) + '</button><span class="q-meta mono">' + esc(l.branch) + '</span></div><span class="muted">' + l.ahead + ' Commits' + (l.dirty ? ', ' + l.dirty + ' offen' : '') + (l.status === 'konflikt' ? ', Konflikt' : '') + '</span></div>').join('') + '</div>' : '') +
+        '<div class="block"><div class="block-head"><h3>Einschätzung für die nächsten Aufgaben</h3></div><p><strong class="' + v[0] + '">' + v[1] + '</strong></p><ul class="retro">' + r.plan.reasons.map((x) => '<li><span class="muted">·</span><span>' + esc(x) + '</span></li>').join('') + '</ul>' +
+        (r.plan.lanes.length && r.plan.verdict !== 'nacheinander' ? '<p class="sublabel">Gleichzeitig: ' + r.plan.lanes.map((l) => esc(l.id)).join(', ') + (r.plan.later.length ? '. Danach: ' + r.plan.later.slice(0, 6).map((l) => esc(l.id)).join(', ') : '') + '</p>' : '') +
+        (r.plan.skipped.length ? '<p class="sublabel">Nicht für Agenten: ' + r.plan.skipped.slice(0, 6).map((x) => esc(x.id) + ' (' + esc(x.why[0]) + ')').join(', ') + '</p>' : '') + '</div>';
+      $$('[data-open]', $('#parBody', body)).forEach((b) => b.onclick = () => { closeSide(); openTask(b.dataset.open); });
+    });
     $$('[data-openside]', body).forEach((b) => b.onclick = () => { side = null; openSide(b.dataset.openside); });
     $$('[data-copy2]', body).forEach((b) => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy2); } catch (e) { b.previousElementSibling.select(); document.execCommand('copy'); } b.textContent = 'Kopiert'; setTimeout(() => { b.textContent = 'Kopieren'; }, 1500); });
     if (!EDIT) return;
@@ -2653,6 +2743,7 @@
     if (LIVE) c.push({ label: 'Wochenbericht, Vorlagen, Prüfungen, Benachrichtigungen', run: () => openSide('tools') });
     if (LIVE) c.push({ label: 'Projektwissen', run: () => openSide('knowledge') });
     if (LIVE) c.push({ label: 'Aufräumen', run: () => openSide('cleanup') });
+    if (LIVE && EDIT) c.push({ label: 'Aufgaben importieren', run: () => openImport() });
     if (EDIT) c.push({ label: 'Letzte Änderung rückgängig', hint: 'Strg+Z', run: () => run(() => act('undo', {}), (x) => x.message) });
     if (LIVE) {
       c.push({ label: 'Nächste Aufgabe vorschlagen', run: () => openSide('next') });

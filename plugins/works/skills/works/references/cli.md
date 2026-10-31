@@ -138,6 +138,24 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `hub [--port 4740]`, `hub --list` | Übersicht über alle Projekte im Browser oder als Text |
 | `time [<ID>]` | zusätzlich Tokens und geschätzte Kosten |
 
+## Dateien, Parallelarbeit, Import, Selbsttest
+
+| Befehl | Wirkung |
+|---|---|
+| `file <pfad> [--json]` | Aufgaben, die die Datei geändert haben (Commits mit ID und Edits während einer aktiven Aufgabe), mit Status und Entscheidungen |
+| `files [<ID>] [--json]` | Dateien einer Aufgabe und welche anderen Aufgaben sie ebenfalls geändert haben |
+| `parallel plan [A,B] [--max 3] [--json]` | Einschätzung: parallel, nacheinander oder unsicher, mit Gründen, Bahnen, Aufgaben für danach und ungeeigneten Aufgaben |
+| `parallel start A,B [--force]` | Worktree und Branch je Aufgabe, Status In Arbeit |
+| `parallel prompt <ID>` | Auftrag für den Agenten dieser Bahn |
+| `parallel status [--json]` | Bahnen mit Branch, Commits, offenen Dateien |
+| `parallel finish <ID> [--merge] [--force]` | Worktree entfernen, mit `--merge` in den Basis-Branch mergen. Status geht nach Review |
+| `parallel abort <ID> [--force]` | Worktree entfernen, Branch ohne Commits löschen, Status zurück nach Geplant |
+| `import <datei> [--format ..] [--map feld=Spalte,..] [--sheet ..] [--json] [--all]` | Vorschau mit Duplikaten, siehe import.md |
+| `import <datei> --apply [--only 1,4] [--skip 3] [--status geplant] [--tags ..] [--include-done] [--keep-dups] [--include-archived]` | Anlegen |
+| `selftest [--browser] [--keep] [--verbose]` | Prüft CLI, Hooks, Import, Dateien, Parallelarbeit, Server und API in einem Wegwerfprojekt. Exit 1 bei Fehlern |
+
+Im Worktree einer parallelen Aufgabe (erkennbar an `.works.link`) arbeitet das CLI auf der `.works` des Hauptprojekts. `start` ändert dort die aktive Aufgabe nicht, `done` ist gesperrt.
+
 ## Was doctor prüft
 
 Fehler: ungültiges oder fehlendes Frontmatter, fehlende Pflichtfelder, ungültige Werte, Ordnername passt nicht zur ID, doppelte IDs, offene Aufgaben im Archiv, Verweise auf unbekannte Aufgaben, Zyklen, zu kleine next_id, fehlende Bilder und verlinkte Dateien.
