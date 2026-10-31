@@ -13,6 +13,9 @@ import { activeSprint, lastClosedSprint, sprintStats, sprintSettings } from './s
 import { loadComments } from './comments.mjs';
 import { effortDays } from './timelog.mjs';
 import { configuredChecks } from './checks.mjs';
+import { designSummary } from './design.mjs';
+import { loadActivity, pendingInstructions } from './live.mjs';
+import { loadKnowledge } from './knowledge.mjs';
 
 function excerpt(t) {
   for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Beschreibung', 'Abkürzung', 'Kontext und Problem', 'Problem', 'Herkunft']) {
@@ -45,6 +48,7 @@ export function boardData(root) {
     const crit = checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '');
     const com = loadComments(t);
     return {
+      design: designSummary(t),
       comments: com.length, lastCommentBy: com.length ? com[com.length - 1].author : '', lastCommentAt: com.length ? com[com.length - 1].at : '',
       id: t.id, title: t.title, type: t.type, priority: t.priority, status: t.status,
       effort: t.effort || '', due: t.due || '', milestone: t.milestone || '', tags: t.tags || [],
@@ -68,6 +72,9 @@ export function boardData(root) {
     views: Array.isArray(config.views) ? config.views : [],
     effortDays: effortDays(root, all, config),
     hasChecks: Object.keys(configuredChecks(config)).length > 0,
+    activity: (() => { const a = loadActivity(root); return a ? { busy: !!a.busy, current: a.current || null, recent: (a.recent || []).slice(0, 6), since: a.since || '', idleSince: a.idleSince || '' } : null; })(),
+    instructions: pendingInstructions(root).map((x) => ({ task: x.task, text: x.text, at: x.at })),
+    knowledgeProposals: loadKnowledge(root).filter((e) => e.status === 'vorschlag').length,
     queueSettings: { auto_next: false, skip_blocked: true, ask_before: true, ...(config.queue_settings || {}) },
     version: runningVersion(),
     project: path.basename(root),

@@ -16,6 +16,14 @@ import { listTemplates, templateFromTask, normalizeTemplate, SLUG_RE } from './t
 import { taskTime, estimates } from './timelog.mjs';
 import { detectChecks, configuredChecks, NAME_RE } from './checks.mjs';
 import { reportSettings, localReport, listReports, weekRange, reportName } from './weekly.mjs';
+import { designDetail, loadDesign, VARIANT_RE } from './design.mjs';
+import { taskUsage, projectUsage } from './usage.mjs';
+import { loadKnowledge } from './knowledge.mjs';
+import { rules, upcoming, describe as describeRule, RULE_ID_RE } from './recurring.mjs';
+import { addDays as addDaysIso } from './sprint.mjs';
+import { syncSettings, syncState, DEFAULT_SYNC, prsFor } from './ghsync.mjs';
+import { findSimilar, similarity } from './similar.mjs';
+import { snapshot, relabel, dropSnapshot, undo as undoFn, undoList } from './undo.mjs';
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), 'works.mjs');
 const ID_RE = /^[A-Za-z]{1,8}-?\d{1,6}$/;
@@ -211,9 +219,13 @@ export function taskDetail(root, taskId) {
     comments: loadComments(t),
     unreadForClaude: unreadForClaude(root, t).length,
     time: taskTime(root, t),
+    usage: taskUsage(root, config, t.id),
+    design: designDetail(root, t, relFromWorks),
+    prs: prsFor(root, t.id),
   };
 }
 
+export function undoInfo(root) { return undoList(root).slice(0, 20).map((e) => ({ key: e.key, label: e.label, at: e.at })); }
 export function templatesList(root) { return listTemplates(root); }
 export function templateDraft(root, taskId) { return templateFromTask(findTaskSafe(root, taskId)); }
 export function estimatesInfo(root) { return estimates(root, loadTasks(root), loadConfig(root)); }
@@ -515,8 +527,12 @@ const actions = {
     if (!pairs.length) bad('Keine Felder angegeben.');
     return { message: await must(root, ['sprint', 'set', ...pairs]) };
   },
-  async sprintClose(root) {
-    return { message: await must(root, ['sprint', 'close']) };
+  async sprintClose(root, b) {
+    const args = ['sprint', 'close'];
+    const r = b && b.retro && typeof b.retro === 'object' ? b.retro : {};
+    for (const k of ['good', 'bad', 'change']) { const v = str(r[k], k, { max: 500 }); if (v) args.push(`--${k}=${v}`); }
+    const cap = parseInt(b && b.nextCapacity, 10); if (cap > 0 && cap <= 1000) args.push(`--next-capacity=${cap}`);
+    return { message: await must(root, args) };
   },
 
   // ---------- Kommentare ----------
@@ -753,3 +769,184 @@ export async function saveAsset(root, { taskId, contentType, data, desc, kind, n
 }
 
 export { STATUS_LABEL };
+
+// ---------- Runde 3: Entwürfe, Wissen, Wiederkehrend, GitHub, Aufräumen, Rückgängig ----------
+
+export function knowledgeList(root) { return loadKnowledge(root); }
+export function recurringInfo(root) {
+  const config = loadConfig(root);
+  return { rules: rules(config).map((r) => ({ ...r, text: describeRule(r), next: upcoming(r, 3, r.last ? addDaysIso(r.last, 1) : undefined) })), templates: listTemplates(root).map((t) => ({ slug: t.slug, name: t.name })) };
+}
+export function usageInfo(root) { return projectUsage(root, loadConfig(root), loadTasks(root)); }
+export function githubInfo(root) {
+  const config = loadConfig(root);
+  return { settings: syncSettings(config), state: syncState(root) };
+}
+export function similarTo(root, title, text) {
+  return findSimilar({ id: '', title, text, tags: [] }, loadTasks(root, { archive: false }), { min: 0.5 }).map((x) => ({ id: x.t.id, title: x.t.title, status: x.t.status, priority: x.t.priority, score: Math.round(x.score * 100) }));
+}
+
+export function cleanupInfo(root) {
+  const config = loadConfig(root);
+  const all = loadTasks(root, { archive: false });
+  const open = all.filter((t) => OPEN_STATUSES.includes(t.status));
+  const now = new Date().toLocaleDateString('sv-SE');
+  const age = (d) => (d ? Math.round((new Date(now + 'T00:00:00') - new Date(String(d) + 'T00:00:00')) / 86400000) : 0);
+  const lastLogDate = (t) => { const m = (getSection(t._body, 'Verlauf') || '').match(/^- (\d{4}-\d{2}-\d{2}):/gm); return m ? m[m.length - 1].slice(2, 12) : t.updated; };
+  const ref = (t, why) => ({ id: t.id, title: t.title, status: t.status, priority: t.priority, why });
+  const stuck = [];
+  for (const t of open) {
+    if (t.status === 'in-arbeit' && age(lastLogDate(t)) >= 7) stuck.push(ref(t, `seit ${age(lastLogDate(t))} Tagen ohne Eintrag im Verlauf`));
+    if (t.status === 'review' && age(lastLogDate(t)) >= 3) stuck.push({ ...ref(t, `seit ${age(lastLogDate(t))} Tagen in Review`), review: true });
+  }
+  const incomplete = open.filter((t) => t.incomplete || !checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '').total || !stripComments(getSection(t._body, 'Beschreibung') || getSection(t._body, 'Ziel') || '').trim())
+    .map((t) => ref(t, [t.incomplete ? 'als unvollständig markiert' : '', !checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '').total ? 'keine Akzeptanzkriterien' : '', !stripComments(getSection(t._body, 'Beschreibung') || getSection(t._body, 'Ziel') || '').trim() ? 'keine Beschreibung' : ''].filter(Boolean).join(', ')));
+  const noEffort = open.filter((t) => !t.effort).map((t) => t.id);
+  const ignore = new Set((config.cleanup_ignore || []).map((p) => [...p].sort().join('|')));
+  const dups = [];
+  for (let i = 0; i < open.length; i++) for (let j = i + 1; j < open.length; j++) {
+    const a = open[i]; const b = open[j];
+    if (ignore.has([a.id, b.id].sort().join('|')) || (a.related || []).includes(b.id)) continue;
+    const sc = similarity({ title: a.title, tags: a.tags, text: getSection(a._body, 'Beschreibung') || '' }, { title: b.title, tags: b.tags, text: getSection(b._body, 'Beschreibung') || '' });
+    if (sc >= 0.6) dups.push({ a: ref(a, ''), b: ref(b, ''), score: Math.round(sc * 100) });
+  }
+  const old = open.filter((t) => t.status === 'backlog' && age(t.created) >= 60 && age(lastLogDate(t)) >= 60).map((t) => ref(t, `seit ${age(t.created)} Tagen im Backlog`));
+  const design = open.map((t) => ({ t, d: loadDesign(t) })).filter((x) => x.d && x.d.variants.length && !x.d.chosen)
+    .map((x) => ref(x.t, `${x.d.variants.length} Entwürfe, noch keine Wahl`));
+  const count = stuck.length + incomplete.length + dups.length + old.length + design.length + (noEffort.length ? 1 : 0);
+  const penalty = stuck.length * 8 + incomplete.length * 4 + dups.length * 6 + old.length * 2 + design.length * 3 + noEffort.length;
+  const score = Math.max(0, Math.round(100 - (penalty / Math.max(5, open.length)) * 10));
+  return { count, score, stuck, incomplete, noEffort, dups: dups.sort((x, y) => y.score - x.score).slice(0, 10), old, design };
+}
+
+const LABEL = {
+  create: 'Aufgabe angelegt', createFromTemplate: 'Aufgabe aus Vorlage', set: 'Felder geändert', move: 'Status geändert', section: 'Text geändert',
+  check: 'Häkchen', item: 'Punkt ergänzt', itemRemove: 'Punkt entfernt', link: 'Verknüpfung', archive: 'Archiviert', bulk: 'Mehrere Aufgaben',
+  queueAdd: 'Eingereiht', queueRemove: 'Aus der Warteschlange', queueOrder: 'Warteschlange sortiert', comment: 'Kommentar', designChoose: 'Entwurf gewählt',
+  review: 'Abnahme', merge: 'Zusammengeführt', toIdeas: 'In Ideen verschoben', sprintAdd: 'Eingeplant', sprintRemove: 'Aus dem Sprint',
+};
+const NO_UNDO = new Set(['undo', 'checksRun', 'githubSync', 'reportRun', 'reportWebhook', 'instruct', 'recurRun', 'requestHandoff']);
+const CONFIG_ACTIONS = /^(queue|sprint|view|milestone|recur|checksSave|reportSettings|effortMode|githubSettings|dismissDuplicate)/;
+
+// Schreibaktion mit Sicherung für Rückgängig.
+export async function runActionWithUndo(root, body) {
+  if (!body || typeof body !== 'object' || NO_UNDO.has(body.action)) return runAction(root, body);
+  const ids = [body.id, body.target, body.keep, body.drop, ...(Array.isArray(body.ids) ? body.ids : [])].filter((x) => typeof x === 'string' && ID_RE.test(x)).map((x) => x.toUpperCase());
+  const extra = /^idea/.test(body.action) || body.action === 'toIdeas' ? ['ideas.md'] : /^know/.test(body.action) ? ['wissen.md'] : [];
+  const key = snapshot(root, { label: LABEL[body.action] || body.action, ids, config: CONFIG_ACTIONS.test(body.action) || ['create', 'createFromTemplate', 'bulk'].includes(body.action), extra });
+  try {
+    const r = await runAction(root, body);
+    relabel(root, key, r && r.message ? r.message.replace(/\.$/, '') : LABEL[body.action] || body.action);
+    return { ...r, undo: key };
+  } catch (e) { dropSnapshot(root, key); throw e; }
+}
+
+Object.assign(actions, {
+  async undo(root, b) {
+    const key = typeof b.key === 'string' && /^[a-z0-9-]{4,40}$/.test(b.key) ? b.key : undefined;
+    let e;
+    await new Promise((resolve, reject) => { queue = queue.then(() => { try { e = undoFn(root, key); resolve(); } catch (err) { reject(new ApiError(422, err.message)); } }); });
+    return { message: `Rückgängig: ${e.label}` };
+  },
+  async designChoose(root, b) {
+    const tid = id(b.id);
+    if (typeof b.name !== 'string' || !VARIANT_RE.test(b.name)) bad('Ungültige Variante.');
+    const reason = str(b.reason, 'Grund', { max: 300 });
+    await must(root, ['design', 'choose', tid, b.name, ...(reason ? [`--reason=${reason}`] : [])]);
+    return { message: `Variante ${b.name} gewählt. Claude setzt sie um.` };
+  },
+  async instruct(root, b) {
+    const tid = id(b.id);
+    const text = str(b.text, 'Anweisung', { max: 4000, required: true });
+    await withTextFile(root, text, () => must(root, ['instruct', tid, `--text=${text}`]));
+    return { message: 'Anweisung gesendet. Claude liest sie, sobald es passt.' };
+  },
+  async knowAdd(root, b) {
+    const args = ['know', 'add', `--title=${str(b.title, 'Titel', { max: 140, required: true })}`, `--area=${str(b.area, 'Bereich', { max: 60 }) || 'Allgemein'}`];
+    const text = str(b.text, 'Text', { max: 4000 });
+    await withTextFile(root, text, (f) => must(root, [...args, `--file=${f}`]));
+    return { message: 'Eintrag gespeichert.' };
+  },
+  async knowEdit(root, b) {
+    if (typeof b.kid !== 'string' || !/^[a-f0-9]{6}$/.test(b.kid)) bad('Ungültiger Eintrag.');
+    const f = b.fields || {};
+    const args = ['know', 'edit', b.kid];
+    if ('title' in f) args.push(`--title=${str(f.title, 'Titel', { max: 140, required: true })}`);
+    if ('area' in f) args.push(`--area=${str(f.area, 'Bereich', { max: 60, required: true })}`);
+    if (f.ok) args.push('--ok');
+    if ('text' in f) { const text = str(f.text, 'Text', { max: 4000 }); await withTextFile(root, text, (file) => must(root, [...args, `--file=${file}`])); } else await must(root, args);
+    return { message: 'Gespeichert.' };
+  },
+  async knowAccept(root, b) { if (!/^[a-f0-9]{6}$/.test(b.kid || '')) bad('Ungültiger Eintrag.'); await must(root, ['know', 'accept', b.kid]); return { message: 'Ins Projektwissen übernommen.' }; },
+  async knowRemove(root, b) { if (!/^[a-f0-9]{6}$/.test(b.kid || '')) bad('Ungültiger Eintrag.'); await must(root, ['know', 'remove', b.kid]); return { message: 'Eintrag entfernt.' }; },
+  async knowFlag(root, b) { if (!/^[a-f0-9]{6}$/.test(b.kid || '')) bad('Ungültiger Eintrag.'); await must(root, ['know', 'flag', b.kid]); return { message: 'Als veraltet markiert.' }; },
+  async recurSave(root, b) {
+    const r = b.rule && typeof b.rule === 'object' ? b.rule : bad('Regel fehlt.');
+    const args = [];
+    args.push(`--title=${str(r.title, 'Titel', { max: 150, required: true })}`);
+    const kind = oneOf(r.kind, 'Rhythmus', ['daily', 'weekly', 'monthly', 'days'], { required: true });
+    args.push(`--every=${kind}${r.interval ? `:${Math.min(365, Math.max(1, parseInt(r.interval, 10) || 1))}` : ''}`);
+    for (const k of ['weekday', 'nth', 'day', 'due_days']) if (r[k] !== undefined && r[k] !== '' && r[k] !== null) args.push(`--${k}=${Math.max(0, parseInt(r[k], 10) || 0)}`);
+    if (r.template) { if (!SLUG_RE.test(r.template)) bad('Ungültige Vorlage.'); args.push(`--template=${r.template}`); }
+    if (r.type) args.push(`--type=${oneOf(r.type, 'Typ', TYPES)}`);
+    if (r.priority) args.push(`--priority=${oneOf(r.priority, 'Priorität', PRIORITIES)}`);
+    if (r.status) args.push(`--status=${oneOf(r.status, 'Spalte', ['backlog', 'geplant'])}`);
+    args.push(`--queue=${!!r.queue}`, `--sprint=${!!r.sprint}`, `--active=${r.active !== false}`);
+    if (b.rid) { if (!RULE_ID_RE.test(b.rid)) bad('Ungültige Regel.'); await must(root, ['recur', 'set', b.rid, ...args]); } else await must(root, ['recur', 'add', ...args]);
+    return { message: 'Regel gespeichert.' };
+  },
+  async recurRemove(root, b) { if (!RULE_ID_RE.test(b.rid || '')) bad('Ungültige Regel.'); await must(root, ['recur', 'remove', b.rid]); return { message: 'Regel entfernt.' }; },
+  async recurRun(root) { const m = await must(root, ['recur', 'run']); return { message: m.split('\n')[0] || 'Nichts fällig.' }; },
+  async githubSync(root) { const m = await must(root, ['github', 'sync'], { timeout: 90000 }); return { message: m.split('\n').pop() }; },
+  async githubSettings(root, b) {
+    const pairs = Object.entries(b).filter(([k]) => k in DEFAULT_SYNC && typeof DEFAULT_SYNC[k] === 'boolean').map(([k, v]) => `${k}=${!!v}`);
+    if (typeof b.labels === 'string') pairs.push(`labels=${list(b.labels, 'Labels', /^[\p{L}\p{N} _.:-]+$/u).join(',')}`);
+    if (!pairs.length) bad('Keine Einstellung.');
+    await must(root, ['github', 'set', ...pairs]);
+    return { message: 'Gespeichert.' };
+  },
+  async review(root, b) {
+    const tid = id(b.id);
+    const text = str(b.text, 'Begründung', { max: 4000, required: true });
+    const t = findTaskSafe(root, tid);
+    if (t.status !== 'review') bad('Die Aufgabe ist nicht in Review.');
+    const nums = (Array.isArray(b.uncheck) ? b.uncheck : []).map((n) => parseInt(n, 10)).filter((n) => n > 0).slice(0, 50);
+    for (const n of nums) await must(root, ['check', tid, String(n), '--section=Akzeptanzkriterien', '--undo']);
+    await withTextFile(root, `Abnahme: zurückgegeben.\n\n${text}`, (f) => must(root, ['comment', tid, `--file=${f}`, '--as=Nutzer']));
+    await must(root, ['set', tid, 'status=in-arbeit', `--reason=Abnahme zurückgegeben: ${text.split('\n')[0].slice(0, 120)}`]);
+    return { message: `${tid} geht zurück an Claude.` };
+  },
+  async requestHandoff(root, b) {
+    const tid = id(b.id);
+    await must(root, ['comment', tid, '--as=Nutzer', '--text=Bitte die Übergabe aktualisieren: Stand, nächster Schritt und was blockiert. Hängt die Aufgabe fest, sag mir, was fehlt.']);
+    return { message: 'Claude wird um eine Übergabe gebeten.' };
+  },
+  async dismissDuplicate(root, b) {
+    const a = id(b.a); const c = id(b.b);
+    await saveConfigField(root, (config) => { config.cleanup_ignore = [...(config.cleanup_ignore || []), [a, c]].slice(-200); });
+    return { message: 'Als kein Duplikat gemerkt.' };
+  },
+  async merge(root, b) {
+    const keep = id(b.keep); const drop = id(b.drop);
+    if (keep === drop) bad('Zwei verschiedene Aufgaben wählen.');
+    const d = findTaskSafe(root, drop);
+    const desc = stripComments(getSection(d._body, 'Beschreibung') || getSection(d._body, 'Ziel') || '').trim();
+    const crit = checkboxes(getSection(d._body, 'Akzeptanzkriterien') || '').items.filter((i) => !i.done).map((i) => `- ${i.text}`).join('\n');
+    await withTextFile(root, `Zusammengeführt mit ${drop} „${d.title}“.${desc ? `\n\nBeschreibung von ${drop}:\n${desc}` : ''}${crit ? `\n\nOffene Kriterien von ${drop}:\n${crit}` : ''}`, (f) => must(root, ['comment', keep, `--file=${f}`, '--as=Nutzer']));
+    await must(root, ['link', keep, 'related', drop]);
+    await must(root, ['drop', drop, `--reason=Zusammengeführt in ${keep}`]);
+    return { message: `${drop} in ${keep} zusammengeführt.` };
+  },
+  async toIdeas(root, b) {
+    const ids = (Array.isArray(b.ids) ? b.ids : []).slice(0, 50).map(id);
+    for (const tid of ids) {
+      const t = findTaskSafe(root, tid);
+      await must(root, ['idea', `--text=${t.title} (war ${tid})`, ...(t.tags && t.tags.length ? [`--tags=${t.tags.join(',')}`] : [])]);
+      await must(root, ['drop', tid, '--reason=In die Ideen verschoben']);
+    }
+    return { message: `${ids.length} Aufgabe${ids.length === 1 ? '' : 'n'} in die Ideen verschoben.` };
+  },
+});
+
+// Befehl im Hintergrund über dieselbe Warteschlange wie das Board, ohne auf das Ergebnis zu warten.
+export function background(root, args, timeout = 60000) { cli(root, args, { timeout }).catch(() => {}); }

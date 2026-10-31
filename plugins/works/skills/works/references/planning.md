@@ -21,6 +21,14 @@ Für Claude: Sprint-Aufgaben kommen in `works next` direkt nach der Warteschlang
 
 Im Board: Ansicht Sprint mit Kapazitätsbalken, Burndown mit Ideallinie, Liste der Aufgaben und Vorschlägen mit dem Hinweis, ob sie noch passen. Vorschläge per Ziehen oder + einplanen.
 
+### Rückblick
+
+Im Board öffnet "Sprint abschließen" den Rückblick: Kennzahlen (geschafft, Ziel, dazugekommen, vorheriger Sprint), Auffälligkeiten aus den Daten (schneller oder langsamer als geschätzt, nachträglich dazugekommen, offen geblieben, Verbrauch) und drei Fragen an den Nutzer. Die Antworten stehen danach unter `sprints[].retro`. Kapazität für den nächsten Sprint ist mit dem Mittel der geschafften Punkte vorbelegt. "Abschließen und nächsten planen" startet gleich den nächsten Sprint und übernimmt offene Aufgaben.
+
+Im CLI: `works sprint close --good ".." --bad ".." --change ".." --next-capacity 16`.
+
+Für Claude: Beim Planen des nächsten Sprints `retro.change` des letzten Sprints lesen und umsetzen, zum Beispiel weniger Punkte einplanen oder große Aufgaben vorher teilen.
+
 ## Kommentare
 
 Ein Gespräch zwischen Nutzer und Claude pro Aufgabe, gespeichert in `comments.md` neben der task.md. Offene Fragen bleiben ein eigener Bereich mit Häkchen; Kommentare sind für alles andere: Hinweise, Rückfragen, Antworten, Aufträge.
@@ -78,7 +86,53 @@ works time --mode measured     Zeitleiste und Sprint rechnen mit gemessenen Daue
 works time --mode fixed        zurück zu festen Werten (S 2, M 5, L 10, XL 15 Tage, änderbar unter effort_days)
 ```
 
+### Tokens und Kosten
+
+Der Stop Hook liest nach jeder Antwort die neuen Einträge im Transkript und rechnet Eingabe, Ausgabe, Cache-Schreiben und Cache-Lesen der aktiven Aufgabe zu. Daraus schätzt works die Kosten nach `config.prices` (Standard sind die öffentlichen API-Preise je Million Tokens, siehe config.md).
+
+`works time W-0034` zeigt Tokens und geschätzte Kosten der Aufgabe, `works time` den Verbrauch der letzten 30 Tage je Typ und die teuersten Aufgaben. Im Board: Tab Zeit einer Aufgabe und Werkzeuge, Verbrauch. Verbrauch ohne aktive Aufgabe wird gesondert ausgewiesen. Es sind Schätzungen, keine Abrechnung; bei einem Abo zeigen sie, wofür das Kontingent verbraucht wurde.
+
 Abschalten: `"time_tracking": false` in `config.json`.
+
+## Projektwissen
+
+`.works/wissen.md` sammelt, was jede Session über das Projekt wissen muss: Fallen, Regeln, Eigenheiten, Zugänge ohne Geheimnisse. Bereiche sind `##`-Überschriften, Einträge `###` mit einer Kommentarzeile für ID, Autor, Quelle, Datum und Status (ok, vorschlag, veraltet). Die Datei gehört ins Git.
+
+```
+works know                     alles nach Bereich
+works know search prisma       vor Arbeit in einem Bereich lesen
+works know add --area "Datenbank" --title "Nur migrate deploy" --text "migrate dev löscht Daten"
+works know propose --area ".." --title ".." --text ".." --source W-0013    Vorschlag von Claude
+works know accept <kid> | flag <kid> | edit <kid> --text ".." | remove <kid>
+```
+
+Für Claude: Vorschläge machen, wenn etwas Zeit gekostet hat oder schiefgehen kann, nicht für Allgemeinwissen. Ein Eintrag ist kurz und konkret. Widerspricht ein Eintrag dem Code, mit `works know flag` markieren und den Nutzer fragen. Im Board unter Werkzeuge, Projektwissen: Vorschläge übernehmen, bearbeiten, ablehnen, suchen.
+
+## Wiederkehrende Aufgaben
+
+```
+works recur add --title "Abhängigkeiten aktualisieren ({Monat})" --every monthly --nth 1 --weekday 1 --type chore --due_days 7
+works recur add --title "Backup testen" --every daily --queue
+works recur add --title "Logs prüfen" --every days:3 --template wartung
+works recur                    Regeln mit den nächsten Terminen
+works recur set R1 active=false
+works recur run                fällige Regeln sofort anlegen
+works recur remove R1
+```
+
+Angelegt wird beim Sitzungsstart und, solange das Board läuft, jede Minute. Ist die vorige Aufgabe einer Regel noch offen, entsteht keine zweite. Mit `--queue` kommt die neue Aufgabe in die Warteschlange, mit `--sprint` in den laufenden Sprint. Die Termine erscheinen auch im Kalenderexport mit `works ical --recurring`.
+
+## Aufräumen
+
+Im Board unter Werkzeuge, Aufräumen. Bewertet den Backlog mit einer Zahl von 0 bis 100 und listet:
+
+- Hängt fest: lange ohne Bewegung in Arbeit oder Review. Aktionen: Übergabe anfordern (Kommentar an Claude), abnehmen, zurück ins Backlog
+- Entwürfe ohne Wahl: Gestaltungsaufgaben, bei denen Claude auf den Nutzer wartet
+- Unvollständig: ohne Beschreibung oder Kriterien, dazu Aufgaben ohne Aufwand
+- Vermutlich doppelt: ähnliche offene Aufgaben nach Titel, Tags und Beschreibung. Zusammenführen verwirft eine und übernimmt ihre Beschreibung und offenen Kriterien als Kommentar in die andere
+- Alt und unberührt: über 60 Tage im Backlog. Aktion: zu Idee machen
+
+Schon beim Anlegen prüft works auf ähnliche offene Aufgaben: `works new` gibt einen Hinweis aus, das Board warnt im Dialog und bietet an, das Anliegen als Kommentar an die vorhandene Aufgabe zu hängen. Für Claude: Meldet `works new` eine ähnliche Aufgabe, kurz prüfen und den Nutzer fragen, ob es dieselbe ist.
 
 ## Automatische Prüfungen
 

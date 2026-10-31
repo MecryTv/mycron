@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { findRoot, loadConfig, loadState, saveState, loadTasks, run } from '../scripts/lib.mjs';
 import { recordEvent } from '../scripts/timelog.mjs';
+import { setIdle, takeInstructions, instructionText } from '../scripts/live.mjs';
+import { collectUsage, recordUsage } from '../scripts/usage.mjs';
 
 let input = {};
 try {
@@ -12,13 +14,26 @@ try {
 } catch { input = {}; }
 
 function main() {
-  if (input.stop_hook_active) return;
   const root = findRoot(input.cwd || process.cwd());
   if (!root) return;
   const config = loadConfig(root);
   const state = loadState(root);
   // Zeiterfassung: Ende der Anfrage. Läuft auch bei abgeschalteter Erinnerung.
-  if (config.time_tracking !== false) { try { recordEvent(root, 'stop', state.active || '', input.session_id); } catch { /* nicht kritisch */ } }
+  if (config.time_tracking !== false) {
+    try { recordEvent(root, 'stop', state.active || '', input.session_id); } catch { /* nicht kritisch */ }
+    // Token-Verbrauch seit dem letzten Stop der aktiven Aufgabe zurechnen.
+    try { recordUsage(root, state.active || '', input.session_id, collectUsage(root, input.transcript_path, input.session_id)); } catch { /* nicht kritisch */ }
+  }
+  // Anweisungen aus dem Board, die während der Antwort nicht mehr ankamen: Claude macht damit weiter.
+  if (config.live_activity !== false && !input.stop_hook_active) {
+    const items = takeInstructions(root);
+    if (items.length) {
+      process.stdout.write(JSON.stringify({ decision: 'block', reason: instructionText(items) }) + '\n');
+      return;
+    }
+  }
+  if (config.live_activity !== false) { try { setIdle(root); } catch { /* nicht kritisch */ } }
+  if (input.stop_hook_active) return;
   if (config.hooks && config.hooks.stop_reminder === false) return;
   if (!state.active) return;
   const task = loadTasks(root, { archive: false }).find((t) => t.id === state.active);

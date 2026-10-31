@@ -173,7 +173,7 @@ export async function stopProcess(pid, timeoutMs = 10000) {
 
 // Startet den Board-Server losgelöst im Hintergrund. takeover: Port übernehmen, sobald er frei ist.
 export function startDetached(root, { cli = newestCli(), port = 4747, host = '127.0.0.1', takeover = true } = {}) {
-  ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json']);
+  ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json']);
   const log = fs.openSync(path.join(worksDir(root), 'server.log'), 'a');
   const args = [cli, 'board', '--serve', `--port=${port}`, `--host=${host}`];
   if (takeover) args.push('--takeover');

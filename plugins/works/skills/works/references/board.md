@@ -115,6 +115,12 @@ Beim Tippen von Großbuchstaben mit der rechten Shift-Taste öffnet sich nichts,
 | Ideen | Notieren, als Aufgabe übernehmen (Typ und Priorität wählen), verwerfen | `works idea`, `promote`, `idea-drop` |
 | Meilensteine | Im Meilenstein-Filter anlegen, gewählten Meilenstein bearbeiten, oder über die Schnellsuche | `works milestone add`, `milestone set` |
 | Nächste Aufgabe | Vorschläge mit Begründung, direkt starten | `works next`, `works start` |
+| Entwürfe wählen | Tab Entwürfe einer Gestaltungsaufgabe: Designrichtung, Varianten als Vorschau, "Groß ansehen", "Diese nehmen" mit optionalem Grund | `works design choose` |
+| Abnehmen | In Review "Abnehmen": gewählter Entwurf oder Vorher neben dem Ergebnis, Kriterien gegenprüfen. "Annehmen" öffnet die Definition of Done, "Zurück an Claude" verlangt einen Text | Kommentar an Claude, abgewählte Kriterien wieder offen, Status In Arbeit |
+| Anweisung an Claude | Auf der aktiven Karte oder in der Übersicht einer Aufgabe in Arbeit | `works instruct`, Claude bekommt sie über den PostToolUse oder Stop Hook |
+| Rückgängig | Meldung nach jeder Änderung mit "Rückgängig", `Strg+Z` außerhalb von Textfeldern, Liste unter Werkzeuge, Letzte Änderungen | `works undo` |
+| Projektwissen, Aufräumen | Werkzeuge, oben | `works know`, siehe planning.md |
+| Wiederkehrend, GitHub, Kalender, Verbrauch | Abschnitte unter Werkzeuge | `works recur`, `works github`, `kalender.ics`, `works time` |
 
 Verschieben im Detail:
 
@@ -143,6 +149,24 @@ Die Version ist ein Hash über alle Skripte und Board-Dateien. Sie ändert sich 
 
 Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen das automatische Neuladen noch nicht. Sie brauchen nach dem Update einmal F5.
 
+## Claude arbeitet gerade
+
+Solange Claude an einer Aufgabe arbeitet, zeigt der Kopf "Claude arbeitet an W-0003, seit 6 min" (Klick springt zur Karte). Die aktive Karte zeigt den aktuellen Schritt und die letzten drei, zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test", dazu den Knopf "Anweisung an Claude". Die Daten kommen aus dem PostToolUse Hook (`.works/activity.json`, lokal). Nach zehn Minuten ohne Werkzeugaufruf verschwindet die Anzeige.
+
+Anweisungen landen in `.works/instructions.json` und als Kommentar an der Aufgabe. Claude bekommt sie beim nächsten Werkzeugaufruf als Kontext, spätestens am Ende der Antwort, und liest sie, wenn es sinnvoll ist. Bis dahin zeigt das Board "wartet".
+
+## Rückgängig
+
+Vor jeder Änderung aus dem Board sichert works die betroffenen Dateien in `.works/.undo/` (lokal, die letzten 50). Rückgängig stellt sie wieder her, holt archivierte Ordner zurück und entfernt Aufgaben, die erst durch die Änderung entstanden sind (sie landen in `.undo/entfernt/`). Änderungen von Claude oder aus dem Terminal laufen nicht über diesen Weg; dafür gibt es Git. `works undo --list` und `works undo <key>` machen dasselbe im Terminal.
+
+## Kalender
+
+`http://127.0.0.1:4747/kalender.ics` liefert Fälligkeiten, Meilensteine und Sprints als Kalender zum Abonnieren, mit `?recurring=1` auch kommende wiederkehrende Aufgaben. Im geteilten Modus gibt es dieselbe Adresse mit Leseschlüssel (`?key=`). Kalender im Internet wie Google Kalender erreichen den Rechner nicht; dafür `works ical --out termine.ics` und die Datei importieren.
+
+## Alle Projekte
+
+`works hub` startet auf Port 4740 eine Übersicht über alle Projekte, in denen works eingerichtet ist oder eine Sitzung lief (`~/.works/projects.json`). Je Projekt: offene Aufgaben, P1, Review, Überfälliges, Sprint oder nächster Meilenstein, was Claude gerade tut und ob das Board läuft. Oben stehen alle P1 über alle Projekte. "Board starten" startet das Board eines Projekts. `works hub --list` gibt dasselbe als Text aus. Die Übersicht ist nur auf diesem Rechner erreichbar.
+
 ## Für Claude wichtig
 
 - Sagt der Nutzer, das Board sehe alt aus oder verhalte sich falsch, zuerst `works board --status`, dann `works board --restart` und den Nutzer bitten, einen Tab, der noch eine sehr alte Version zeigt, einmal neu zu laden.
@@ -151,6 +175,8 @@ Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen d
 - Offene Fragen, die der Nutzer im Board notiert, sind oft an Claude gerichtet. Beim Start einer solchen Aufgabe zuerst darauf eingehen.
 - Die Warteschlange ist ein Auftrag des Nutzers. Beim Abarbeiten immer die oberste startbare Aufgabe nehmen und die Einstellungen `auto_next` und `ask_before` beachten.
 - Beim Teilen den Leselink nennen, den Bearbeitungslink nur, wenn der Nutzer ausdrücklich danach fragt.
+- Gibt der Nutzer eine Aufgabe in der Abnahme zurück, den Kommentar wie eine Vorgabe behandeln, umsetzen und mit `works comment` antworten.
+- Eine Anweisung während der Arbeit nicht ignorieren, auch wenn sie nicht sofort passt. Spätestens nach dem aktuellen Schritt aufgreifen und kurz antworten.
 - Bilder, die über das Board kommen, haben eine Beschreibung vom Nutzer. Fehlt sie, das Bild bei Bedarf mit Read ansehen und die Beschreibung ergänzen.
 
 ## Live-Aktualisierung
@@ -168,9 +194,12 @@ Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen d
 - Beim Teilen (`--share`) bekommen nur lokale Anfragen ohne Proxy-Header automatisch volle Rechte. Alle anderen brauchen den Lese- oder Bearbeitungsschlüssel aus dem Link; er wird danach als HttpOnly-Cookie mitgeschickt. Lesende erhalten ein eigenes Token, mit dem der Server nur GET-Anfragen annimmt. Export und Freigabe-Einstellungen sind dem Besitzer vorbehalten. Prüfungen ausführen oder ändern und den Discord-Webhook setzen geht nur bei lokalen Anfragen, auch nicht mit dem Bearbeitungslink.
 - Jede API-Anfrage braucht ein zufälliges Token, das bei jedem Serverstart neu erzeugt und nur in die ausgelieferte Seite eingebettet wird. Fremde Webseiten können es nicht lesen und deshalb nichts ändern. Ein abweichender Origin wird zusätzlich abgelehnt.
 - Alle Eingaben werden geprüft (IDs, Werte, Längen, Bildtypen bis 20 MB) und als einzelne Argumente ohne Shell an das CLI übergeben.
-- Ausgeliefert werden nur Board, Daten und Dateien unter `tasks/`, `archive/` und `reports/` sowie WORKS.md und ideas.md. config.json, state.json und share.json bleiben gesperrt.
+- Ausgeliefert werden nur Board, Daten und Dateien unter `tasks/`, `archive/` und `reports/` sowie WORKS.md und ideas.md. config.json, state.json, share.json, activity.json, instructions.json, github.json und `.undo/` bleiben gesperrt.
 - Git wird ohne Shell mit festen Argumenten und Zeitlimit aufgerufen, Diffs nur für Dateien, die zur Aufgabe gehören, und gekürzt auf 400 Zeilen.
 - Temporäre Dateien liegen kurz in `.works/.tmp/` und werden sofort wieder gelöscht.
+- HTML-Mockups aus `design/` laufen in einem iframe mit `sandbox="allow-scripts"` und eigener Content-Security-Policy. Sie haben keinen Zugriff auf das Board, seine Tokens oder Cookies und dürfen nicht in fremde Seiten eingebettet werden.
+- GitHub-Abgleich und seine Einstellungen gehen nur bei lokalen Anfragen, weil sie über das gh CLI mit den Rechten des Nutzers handeln. Die Kalenderadresse braucht im geteilten Modus den Leseschlüssel.
+- Die Projektübersicht `works hub` bindet nur an 127.0.0.1, prüft den Hostnamen und startet Boards nur mit einem Token aus der eigenen Seite.
 
 ## Meilensteine
 

@@ -2,45 +2,46 @@
 
 Jede Integration ist optional. Ist ein Skill nicht installiert, den Schritt auslassen oder von Hand erledigen.
 
-## Superpowers: Brainstorming
+## Gestaltung mit UI UX Pro Max und Superpowers Brainstorming
 
-Der Brainstorming-Skill erarbeitet mit dem Nutzer ein Design und schreibt das Ergebnis in ein eigenes Dokument (je nach Version unter `docs/superpowers/specs/` oder `docs/plans/`). works übernimmt dieses Dokument, statt den Skill umzubauen. So bricht nichts, wenn Superpowers aktualisiert wird.
+Bei Gestaltungsaufgaben (Typ design oder Tag ui, design, ux) arbeitet Claude die Entwürfe selbst aus, sobald einer der beiden Skills installiert ist. Der Nutzer muss nicht darum bitten. `works start` sucht unter `~/.claude/skills` und `~/.claude/plugins` nach Ordnern namens `ui-ux-pro-max` und `brainstorm*` und nennt die gefundenen Skills in der Ausgabe.
 
-Ablauf:
-
-1. Vor dem Brainstorming die zugehörige Aufgabe anlegen oder auswählen und dem Brainstorming-Skill die Aufgaben-ID und den Inhalt von Ziel und Kontext mitgeben.
-2. Brainstorming wie gewohnt durchführen.
-3. Danach das erzeugte Dokument anhängen:
-   ```
-   works attach-doc W-0012 docs/superpowers/specs/2026-10-29-login-design.md --label "Brainstorm Login"
-   ```
-   Der Modus kommt aus `config.json` unter `brainstorm.mode`:
-   - `link` (Standard): Das Dokument bleibt, wo es ist, decisions.md verlinkt es.
-   - `copy`: Kopie nach `tasks/<ID>/docs/`, das Original bleibt.
-   - `move`: Verschieben nach `tasks/<ID>/docs/`. Alles liegt an einem Ort, der Docs-Ordner des Projekts bleibt sauber.
-   Mit `--mode` lässt sich das pro Aufruf überschreiben.
-4. In `decisions.md` den Abschnitt "Brainstorm-Zusammenfassung" in eigenen Worten füllen und jede getroffene Entscheidung als E-Block mit verworfenen Alternativen eintragen (`works decisions <ID> --add ...` oder per Edit).
-5. Akzeptanzkriterien und Umsetzungsplan der task.md aus dem Ergebnis ableiten.
-6. Ergibt das Brainstorming mehrere unabhängige Arbeitspakete, für jedes eine eigene Aufgabe anlegen und mit `blocked_by` oder `related` verknüpfen.
-
-Erzeugt Superpowers zusätzlich einen Implementierungsplan, diesen ebenfalls anhängen und die Schritte in den Umsetzungsplan übernehmen.
-
-## UI UX Pro Max
-
-Der Skill liefert Empfehlungen zu Stil, Farbpalette, Typografie, Komponenten und UX-Regeln, je nach Version auch eine gespeicherte Design-System-Datei.
+Alles landet im Aufgabenordner unter `design/`, Index in `design/design.json`. Das Board zeigt es im Tab Entwürfe: Farben und Schrift, die Varianten als Vorschau (HTML-Mockups laufen in einem abgeschotteten iframe), das Brainstorming und die Wahl des Nutzers.
 
 Ablauf:
 
-1. Bei UI-Aufgaben (Typ design oder Tag ui) vor der Umsetzung UI UX Pro Max mit Produktart, Zielgruppe und Stilwunsch aus der Aufgabe befragen.
-2. Die Empfehlungen in `decisions.md` unter "UI und UX" übertragen:
-   - Stil: gewählte Richtung und Begründung
-   - Farbpalette: Tabelle mit Rolle, Wert und Verwendung
-   - Typografie: Schriften, Größen, Gewichte
-   - Layout und Abstände, Komponenten, Barrierefreiheit
-   - Verworfene Varianten: alle vorgeschlagenen, aber nicht gewählten Richtungen mit Grund
-3. Jede bewusste Wahl zusätzlich als E-Block mit `--source "UI UX Pro Max"` festhalten.
-4. Schreibt der Skill eine eigene Datei (zum Beispiel ein Design-System-Dokument), diese mit `works attach-doc` verlinken. Gilt das Design-System projektweit, nur verlinken, nicht verschieben.
-5. Generierte Mockups oder Vorschaubilder mit `works asset --kind mockup` ablegen.
+1. Brainstorming (Superpowers) mit der Aufgaben-ID, der Beschreibung und den Kriterien starten. Fragen an den Nutzer wie gewohnt stellen. Das Ergebnis anhängen:
+   ```
+   works design brainstorm W-0006 --file docs/superpowers/specs/2026-10-31-bracket-design.md
+   ```
+2. UI UX Pro Max mit Produktart, Zielgruppe und Stilwunsch aus der Aufgabe befragen. Die Designrichtung anhängen:
+   ```
+   works design direction W-0006 --file richtung.md --colors "Grund #0F1420,Akzent #3DD6B5,Live #FF5A5F" --fonts "Space Grotesk,Inter"
+   ```
+   `--file` ist ein Markdown-Text mit Stil, Regeln und Begründung, `--colors` die Palette als `Name #hex` mit Komma getrennt.
+3. Zwei bis drei Varianten als eigenständige HTML-Datei (alles inline, keine externen Skripte) oder als Bild bauen und einzeln anhängen:
+   ```
+   works design add W-0006 --name A --title "Klassisches Bracket" --file /tmp/a.html --note "Alle Runden nebeneinander"
+   works design add W-0006 --name B --title "Runden als Tabs" --file /tmp/b.html
+   ```
+   Namen sind kurz (A, B, C). Die Datei wird als `design/A-klassisches-bracket.html` kopiert.
+4. Dem Nutzer sagen, dass die Entwürfe im Board unter Entwürfe liegen, und auf seine Wahl warten. Er wählt im Board mit "Diese nehmen" oder im Gespräch, dann `works design choose W-0006 B --reason "..."`. Die Wahl landet in decisions.md unter "Gewählter Entwurf". Die Sitzungsübersicht meldet Aufgaben mit Entwürfen ohne Wahl.
+5. Erst danach umsetzen. Die gewählte Variante ist die Vorgabe. Abweichungen mit dem Nutzer klären.
+6. Vor dem Review einen Screenshot des Ergebnisses mit `works asset W-0006 shot.png --kind nachher --desc "..."` ablegen. Das Board stellt ihn in der Abnahme neben den gewählten Entwurf.
+
+Zusätzlich bleiben die bisherigen Wege gültig: Entscheidungen als E-Block in `decisions.md` mit `--source "UI UX Pro Max"`, verworfene Varianten mit Grund. Projektweite Design-Systeme nur mit `works attach-doc` verlinken, nicht in eine Aufgabe kopieren.
+
+Ist keiner der beiden Skills installiert, die Gestaltung wie bisher mit dem Nutzer klären und trotzdem mindestens einen Entwurf mit `works design add` zeigen, wenn es um sichtbare Oberflächen geht.
+
+## Superpowers Brainstorming ohne Gestaltung
+
+Für Brainstormings zu Architektur oder Abläufen das erzeugte Dokument mit `attach-doc` übernehmen, statt den Skill umzubauen:
+
+```
+works attach-doc W-0012 docs/superpowers/specs/2026-10-29-login-design.md --label "Brainstorm Login"
+```
+
+Der Modus kommt aus `config.json` unter `brainstorm.mode`: `link` (Standard, verlinkt), `copy` (Kopie nach `tasks/<ID>/docs/`) oder `move`. Mit `--mode` pro Aufruf überschreibbar. Danach in `decisions.md` die Brainstorm-Zusammenfassung schreiben, Entscheidungen als E-Block festhalten und Kriterien und Umsetzungsplan ableiten. Ergeben sich mehrere Arbeitspakete, je eine Aufgabe anlegen und verknüpfen. Einen Implementierungsplan von Superpowers ebenfalls anhängen.
 
 ## git-workflow
 
@@ -63,9 +64,20 @@ Meldet `works done`, dass decisions.md Entscheidungen enthält, dem Nutzer anbie
 
 ## GitHub
 
-- Import: `works gh-import` (siehe workflow.md)
-- Export: `works gh-export <ID>` legt ein Issue mit Ziel und Akzeptanzkriterien an und vermerkt es im Frontmatter. Nur nach ausdrücklicher Zustimmung, weil es außerhalb des Projekts sichtbar wird.
-- Label-Zuordnung in `config.json` unter `github`.
+Der Abgleich läuft automatisch über das gh CLI, sobald das Projekt ein GitHub-Repository ist und gh angemeldet ist: beim Sitzungsstart im Hintergrund und alle `interval_min` Minuten, solange das Board läuft. Der erste Lauf merkt sich nur den Stand und ändert nichts. Änderungen tragen `[GitHub]` im Verlauf.
+
+| Ereignis | Folge |
+|---|---|
+| PR mit der ID im Titel oder Branch wird geöffnet | Aufgabe in Arbeit geht nach Review |
+| CI eines PR wird grün oder rot | Prüfung `ci` an der Aufgabe, rot blockiert den Abschluss |
+| Review mit Änderungswünschen | Text als Kommentar an Claude, Aufgabe zurück nach In Arbeit |
+| PR wird gemergt | `works done --confirm` ohne erneute Prüfungen. Ist die Definition of Done offen, bleibt die Aufgabe in Review und bekommt einen Kommentar mit den offenen Punkten |
+| Neues Issue nach dem ersten Lauf | Neue Aufgabe, unvollständig markiert, Typ und Priorität aus den Labels |
+| Aufgabe aus einem Issue ist erledigt | Issue wird mit Hinweis auf die ID geschlossen |
+
+Befehle: `works github status` zeigt Repository, letzten Lauf und Ereignisse, `works github sync` gleicht sofort ab, `works github set issues=false labels=bug,works` ändert Einstellungen. Im Board unter Werkzeuge, GitHub. Einstellungen in `config.json` unter `github_sync`, siehe config.md.
+
+Weiterhin verfügbar: `works gh-import` für einen einmaligen Import alter Issues und `works gh-export <ID>` (nur nach Zustimmung). Label-Zuordnung in `config.json` unter `github`.
 
 ## Playwright und Browser-Werkzeuge
 

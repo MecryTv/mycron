@@ -124,5 +124,11 @@ export function checkItems(root, config, task) {
       items.push({ ok: st === 'ok' || st === 'ack', text: `Prüfung ${c.name}`, detail: label + (r && r.note && st !== 'ok' ? `: ${r.note.split('\n')[0].slice(0, 160)}` : '') });
     }
   }
+  // CI aus GitHub zählt mit, auch wenn sie nicht in config.checks steht.
+  if (data && data.results.ci && !list.some((c) => c.name === 'ci')) {
+    const r = data.results.ci;
+    items.push({ ok: r.status === 'ok' || r.status === 'ack', text: 'Prüfung ci', detail: r.status === 'ok' ? 'GitHub CI grün' : (r.note || 'GitHub CI fehlgeschlagen').slice(0, 160) });
+    list.push({ name: 'ci', cmd: 'GitHub CI', skill: true });
+  }
   return { items, state: { stale, at: data ? data.at : null, results: data ? data.results : {}, list } };
 }

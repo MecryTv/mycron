@@ -77,7 +77,10 @@
   async function run(fn, success) {
     try {
       const r = await fn();
-      if (success) ok(typeof success === 'function' ? success(r) : success);
+      if (success) {
+        const msg = typeof success === 'function' ? success(r) : success;
+        if (r && r.undo) undoToast(msg, r.undo); else ok(msg);
+      }
       return r;
     } catch (e) { fail(e); return null; } finally {
       setTimeout(() => { if (updateWaiting && !dirty) { updateWaiting = false; reloadForUpdate(); } }, 600);
@@ -171,6 +174,14 @@
 
   function renderHeader() {
     $('#project').innerHTML = esc(meta.project) + ' <span class="dim">Aufgaben</span>';
+    const pill = $('#busy');
+    const a = meta.activity;
+    const fresh = a && a.busy && a.current && Date.now() - Date.parse(a.current.at) < 10 * 60000;
+    pill.hidden = !fresh;
+    if (fresh) { const mins = Math.max(1, Math.round((Date.now() - Date.parse(a.since || a.current.at)) / 60000)); pill.textContent = 'Claude arbeitet' + (a.current.task ? ' an ' + a.current.task : '') + ', seit ' + mins + ' min'; pill.onclick = () => { if (a.current.task) focusCard(a.current.task); }; }
+    const tc = $('#toolsCount');
+    const n = (meta.knowledgeProposals || 0);
+    tc.hidden = !n; tc.textContent = n;
     document.title = 'Works ' + meta.project;
   }
 
@@ -350,6 +361,7 @@
       const closed = !OPEN.includes(t.status);
       meta2.push('<span class="' + (t.overdue ? 'warn' : d <= 3 && !closed ? 'note' : '') + '">' + (t.overdue ? 'Überfällig seit ' : 'Fällig ') + fmtDate(t.due) + '</span>');
     }
+    if (t.design && t.design.variants) meta2.push('<span class="' + (t.design.chosen ? '' : 'note') + '" title="Entwürfe aus UI UX Pro Max">' + (t.design.chosen ? 'Entwurf ' + esc(t.design.chosen) + ' gewählt' : t.design.variants + ' Entwürfe zur Wahl') + '</span>');
     if (t.questions.length) meta2.push('<span class="note">' + t.questions.length + (t.questions.length === 1 ? ' offene Frage' : ' offene Fragen') + '</span>');
     if (t.incomplete && OPEN.includes(t.status)) meta2.push('<span>Unvollständig</span>');
     const tags = [];
@@ -361,6 +373,7 @@
       '<div class="card-top"><span class="id">' + esc(t.id) + '</span><span>' + esc(meta.typeLabel[t.type] || t.type) + '</span>' + (t.effort ? '<span class="effort" title="Aufwand">' + esc(t.effort) + '</span>' : '') + '<span class="prio">' + esc(t.priority) + '</span></div>' +
       '<div class="title">' + esc(t.title) + '</div>' +
       (t.thumb ? '<img loading="lazy" src="' + esc(t.thumb) + '" alt="' + esc(t.thumbAlt) + '">' : '') +
+      liveBlock(t) +
       (meta2.length ? '<div class="card-meta">' + meta2.join('') + '</div>' : '') +
       (tags.length ? '<div class="card-meta">' + tags.join('') + '</div>' : '') +
       '</article>';
@@ -557,7 +570,8 @@
         description: String(fd.get('description') || ''), criteria: String(fd.get('criteria') || '').split('\n').map((s) => s.replace(/^\s*[-*]\s*(\[ \]\s*)?/, '').trim()).filter(Boolean),
       };
       return act('create', payload);
-    });
+    }, (f) => bindDuplicateCheck(f));
+    if (r && r.merged) { ok(r.message); return; }
     if (r) { ok(r.message); pendingOpen = r.id; }
   }
 
@@ -689,16 +703,17 @@
     h.push('<div class="p-head"><div class="p-bar"><span class="id">' + esc(t.id) + '</span><span class="st" style="--c:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span>' +
       (d.archived ? '<span class="tag">Archiviert</span>' : '') + (queued >= 0 ? '<span class="tag q-tag">Warteschlange Platz ' + (queued + 1) + '</span>' : '') + '<span class="spacer"></span>' +
       (OPEN.includes(t.status) && !['in-arbeit', 'review'].includes(t.status) ? '<button class="btn small ghost" data-act="queue">' + (queued >= 0 ? 'Aus Warteschlange' : 'Einreihen') + '</button>' : '') +
-      (OPEN.includes(t.status) ? '<button class="btn small" data-act="dod">Abschließen</button>' : '') +
+      (t.status === 'review' ? '<button class="btn small primary" data-act="review">Abnehmen</button>' : OPEN.includes(t.status) ? '<button class="btn small" data-act="dod">Abschließen</button>' : '') +
       '<button class="btn small ghost" data-close aria-label="Panel schließen">Schließen</button></div>' +
       '<textarea class="p-title" rows="1" maxlength="160" aria-label="Titel" data-title' + (EDIT ? '' : ' readonly') + '>' + esc(t.title) + '</textarea>' +
-      '<div class="p-tabs" role="tablist">' + [['overview', 'Übersicht'], ['comments', 'Kommentare' + ((d.comments || []).length ? ' <span class="count">' + d.comments.length + '</span>' : '')], ['time', 'Zeit']].concat(LIVE ? [['code', 'Code und Commits']] : []).map((x) => '<button role="tab" data-tab="' + x[0] + '" aria-selected="' + (detailTab === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' +
+      '<div class="p-tabs" role="tablist">' + [['overview', 'Übersicht']].concat(d.design || /^(design)$/.test(t.type) || (t.tags || []).includes('ui') ? [['design', 'Entwürfe' + (d.design && d.design.variants.length ? ' <span class="count">' + d.design.variants.length + '</span>' : '')]] : []).concat([['comments', 'Kommentare' + ((d.comments || []).length ? ' <span class="count">' + d.comments.length + '</span>' : '')], ['time', 'Zeit']]).concat(LIVE ? [['code', 'Code und Commits']] : []).map((x) => '<button role="tab" data-tab="' + x[0] + '" aria-selected="' + (detailTab === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' +
       '</div>');
-    if (detailTab === 'comments' || detailTab === 'time') {
-      h.push(detailTab === 'comments' ? commentsHtml(d) : timeHtml(d));
+    if (detailTab === 'comments' || detailTab === 'time' || detailTab === 'design') {
+      h.push(detailTab === 'comments' ? commentsHtml(d) : detailTab === 'design' ? designHtml(d) : timeHtml(d));
       $('#panelBody').innerHTML = h.join('');
       bindHead();
       if (detailTab === 'comments') bindComments(t.id);
+      if (detailTab === 'design') bindDesign(t.id);
       return;
     }
     if (detailTab === 'code' && LIVE) {
@@ -725,6 +740,7 @@
     if (t.incomplete && !closed) alerts.push('<div class="alert info"><span>Schnell erfasst, Details fehlen noch. Ergänze Beschreibung und Akzeptanzkriterien, dann <button class="btn link" data-act="complete">als vollständig markieren</button>.</span></div>');
     if (staleDetail) alerts.push('<div class="alert info">Die Aufgabe wurde inzwischen geändert. <button class="btn link" data-act="reload">Neu laden</button></div>');
     h.push(alerts.join(''));
+    if (t.status === 'in-arbeit' && EDIT) h.push(instructBox(t.id));
 
     const descBlock = sectionBlock('Beschreibung', desc ? desc.content : '', true, 'Alles Relevante zur Aufgabe, Claude liest das als Vorgabe');
     // Ältere Aufgaben ohne Beschreibung: das gefüllte Ziel zuerst, darunter die leere Beschreibung zum Ergänzen.
@@ -798,6 +814,7 @@
     $$('[data-goto]', root).forEach((a) => a.onclick = (e) => { e.preventDefault(); openTask(a.dataset.goto); });
     $$('[data-act="queue"]', root).forEach((b) => b.onclick = () => toggleQueue(detail.task.id));
     $$('[data-act="dod"]', root).forEach((b) => b.onclick = () => openDod(detail.task.id));
+    $$('[data-act="review"]', root).forEach((b) => b.onclick = () => openReview(detail.task.id));
   }
 
   function sectionBlock(name, content, editable, hint) {
@@ -837,7 +854,7 @@
       };
     });
 
-    $$('[data-act]', root).forEach((b) => { if (b.dataset.act === 'queue' || b.dataset.act === 'dod') return; b.onclick = async () => {
+    $$('[data-act]', root).forEach((b) => { if (['queue', 'dod', 'review'].includes(b.dataset.act)) return; b.onclick = async () => {
       const a = b.dataset.act;
       if (a === 'drop') return requestMove(id, 'verworfen');
       if (a === 'reopen') return requestMove(id, 'backlog');
@@ -989,6 +1006,10 @@
         '<div class="block"><div class="block-head"><h3>Vorschläge</h3></div>' + (n.candidates.length ? n.candidates.map((c, i) => '<div class="cand"><div class="t">' + (i === 0 ? 'Empfohlen: ' : '') + esc(c.id + ' ' + c.title) + '</div><div class="why">' + esc(c.reasons.join(', ')) + '</div><div class="row"><button class="btn small primary" data-start="' + esc(c.id) + '">Starten</button><button class="btn small" data-goto="' + esc(c.id) + '">Ansehen</button></div></div>').join('') : '<p class="md empty-md">Nichts Startbares im Backlog.</p>') + '</div>';
       $$('[data-start]', body).forEach((b) => b.onclick = async () => { await requestMove(b.dataset.start, 'in-arbeit'); renderSide(); });
       $$('[data-goto]', body).forEach((b) => b.onclick = () => { closeSide(); openTask(b.dataset.goto); });
+    } else if (side === 'knowledge') {
+      return renderKnowledge(body, head);
+    } else if (side === 'cleanup') {
+      return renderCleanup(body, head);
     } else if (side === 'tools') {
       return renderTools(body, head);
     } else if (side === 'activity') {
@@ -1553,7 +1574,7 @@
       '<div class="code-cards">' +
         '<div><small>Branch</small><strong class="mono">' + (c.branch ? esc(c.branch) : '<span class="muted">keiner mit ' + esc(id) + ' im Namen</span>') + '</strong></div>' +
         '<div><small>Gegenüber ' + esc(c.base || 'Hauptbranch') + '</small><strong>' + (c.ahead === null ? '<span class="muted">nicht vergleichbar</span>' : c.ahead + (c.ahead === 1 ? ' Commit' : ' Commits') + ' voraus' + (c.behind ? ', ' + c.behind + ' zurück' : '')) + '</strong></div>' +
-        '<div><small>Pull Request</small><strong>' + pr + '</strong></div>' +
+        '<div><small>Pull Request</small><strong>' + ((detail.prs || []).length ? detail.prs.slice(0, 3).map((p) => (/^https?:/.test(p.url || '') ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">#' + p.number + '</a>' : '#' + p.number) + ' ' + esc({ OPEN: 'offen', MERGED: 'gemergt', CLOSED: 'geschlossen' }[p.state] || p.state) + (p.ci ? ', CI ' + (p.ci === 'ok' ? 'grün' : p.ci === 'fail' ? 'rot' : 'läuft') : '')).join('<br>') : pr) + '</strong></div>' +
       '</div>' +
       '<div class="block"><div class="block-head"><h3>Commits</h3><span class="meta">mit ' + esc(id) + ' in der Nachricht</span></div>' +
         (c.commits.length ? '<ol class="commits">' + c.commits.map((k) => '<li><span class="mono hash">' + esc(k.short) + '</span><span class="subj">' + esc(k.subject) + '</span><time class="muted num" datetime="' + esc(k.date) + '">' + esc(new Date(k.date).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time></li>').join('') + '</ol>'
@@ -1733,7 +1754,9 @@
     return '<div class="time-box">' +
       '<div class="code-cards"><div><small>Claude aktiv</small><strong>' + (tm.totalMs ? fmtMs(tm.totalMs) : '–') + '</strong><span class="muted">' + tm.sessions.length + (tm.sessions.length === 1 ? ' Sitzung' : ' Sitzungen') + '</span></div>' +
       '<div><small>Seit dem Start</small><strong>' + (since === null ? 'nicht gestartet' : since + (since === 1 ? ' Tag' : ' Tage')) + '</strong><span class="muted">' + (est ? 'geschätzt ' + est + ' Tage bei ' + esc(t.effort) : 'ohne Schätzung') + '</span></div>' +
-      '<div><small>Offene Fragen</small><strong>' + d.openQuestions + '</strong><span class="muted">' + (d.openQuestions ? 'wartet auf dich' : 'nichts offen') + '</span></div></div>' +
+      '<div><small>Tokens</small><strong>' + (d.usage && d.usage.tokens ? fmtTok(d.usage.tokens) : '–') + '</strong><span class="muted">' + (d.usage && d.usage.tokens ? 'davon ' + fmtTok(d.usage.cr + d.usage.cw) + ' Cache' : 'noch nichts erfasst') + '</span></div>' +
+      '<div><small>Geschätzte Kosten</small><strong>' + (d.usage && d.usage.tokens ? fmtMoney(d.usage.cost, d.usage.currency) : '–') + '</strong><span class="muted">nach den Preisen in config.json</span></div></div>' +
+      (d.usage && d.usage.days && d.usage.days.length ? '<div class="block"><div class="block-head"><h3>Verbrauch je Tag</h3></div><div class="est-grid">' + d.usage.days.slice(0, 10).map((x) => { const max = Math.max(...d.usage.days.map((y) => y.cost)) || 1; return '<span class="muted num">' + esc(fmtDate(x.day).slice(0, 6)) + '</span><div class="est-track"><span class="est-bar" style="width:' + (x.cost / max * 100).toFixed(1) + '%"></span></div><span class="num">' + fmtTok(x.in + x.out + x.cw + x.cr) + ', ' + fmtMoney(x.cost, d.usage.currency) + '</span>'; }).join('') + '</div></div>' : '') +
       (sd.length ? '<div class="block"><div class="block-head"><h3>Tage je Status</h3></div><div class="pg-bar">' + sd.map(([k, v]) => '<span style="flex-grow:' + v + ';background:' + statusVar(k) + '" title="' + esc(L(k)) + ': ' + v + ' Tage"></span>').join('') + '</div><div class="pg-legend">' + sd.map(([k, v]) => '<span class="pg-k"><i style="background:' + statusVar(k) + '"></i>' + esc(L(k)) + ' <b class="num">' + v + '</b></span>').join('') + '</div></div>' : '') +
       '<div class="block"><div class="block-head"><h3>Sitzungen</h3><span class="meta">Pausen über 20 Minuten trennen</span></div>' +
       (tm.sessions.length ? '<ol class="commits">' + tm.sessions.map((s) => '<li><time class="muted num">' + esc(new Date(s.start).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time><span class="subj">' + esc(s.label || s.turns + (s.turns === 1 ? ' Anfrage' : ' Anfragen')) + '</span><span class="num">' + fmtMs(s.ms) + '</span></li>').join('') + '</ol>'
@@ -1827,10 +1850,7 @@
       el.ondragleave = () => drop.classList.remove('over');
       el.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); const idd = e.dataTransfer.getData('text/plain'); qDrag = null; if (idd) run(() => act('sprintAdd', { id: idd }), idd + ' eingeplant'); };
     });
-    $('#spClose', box).onclick = async () => {
-      const open = list.filter((t) => OPEN.includes(t.status));
-      if (await confirmBox({ title: sp.id + ' abschließen', lead: st.done + ' von ' + st.planned + ' Punkten sind geschafft.' + (open.length ? ' ' + open.length + ' offene Aufgabe' + (open.length === 1 ? '' : 'n') + ' lassen sich in den nächsten Sprint übernehmen.' : ''), confirm: 'Abschließen' })) run(() => act('sprintClose', {}), (x) => x.message);
-    };
+    $('#spClose', box).onclick = () => openRetro(sp, st, list);
     $('#spEdit', box).onclick = async () => {
       const r = await showDialog('<h2>' + esc(sp.id) + ' bearbeiten</h2><label class="field"><span>Titel</span><input class="input" name="title" required maxlength="120" value="' + esc(sp.title) + '"></label><label class="field"><span>Ziel</span><input class="input" name="goal" maxlength="300" value="' + esc(sp.goal || '') + '"></label><div class="grid"><label class="field span2"><span>Ende</span><input type="date" name="end" value="' + esc(sp.end) + '"></label><label class="field span2"><span>Kapazität</span><input type="number" class="input" name="capacity" min="1" max="1000" value="' + st.capacity + '"></label></div>' + foot('Speichern'),
         (fd) => act('sprintSet', { fields: { title: fd.get('title'), goal: fd.get('goal'), end: fd.get('end'), capacity: fd.get('capacity') } }));
@@ -2041,6 +2061,7 @@
       else if (s.any && o.status !== t.status) ev.push({ id: t.id, title: t.id + ': ' + L(o.status) + ' → ' + L(t.status), body: t.title });
       if (s.question && t.questions.length > o.questions.length) ev.push({ id: t.id, title: 'Frage zu ' + t.id, body: t.questions[t.questions.length - 1] });
       if (s.question && t.comments > o.comments && t.lastCommentBy === 'Claude') ev.push({ id: t.id, title: 'Claude hat ' + t.id + ' kommentiert', body: t.title });
+      if (s.question && t.design && t.design.variants > ((o.design && o.design.variants) || 0)) ev.push({ id: t.id, title: 'Neue Entwürfe für ' + t.id, body: t.title });
       if (s.p1 && o.priority !== 'P1' && t.priority === 'P1') ev.push({ id: t.id, title: t.id + ' ist jetzt P1', body: t.title });
       if (s.unblocked && o.blocked && !t.blocked && OPEN.includes(t.status)) ev.push({ id: t.id, title: t.id + ' ist jetzt startbar', body: t.title });
     }
@@ -2104,6 +2125,7 @@
         (!rows.length ? '<p class="sublabel">Vorschlag aus deinem Projekt. Erst mit Speichern aktiv.</p>' : '') +
         '<div class="row-btns"><button class="btn small" id="ckAdd">Prüfung hinzufügen</button><button class="btn small primary" id="ckSave">Speichern</button></div></div></details>');
     }
+    h.push(await toolsExtra());
     h.push('<details class="sec"><summary>Benachrichtigungen <span class="meta">' + (notifySet.on ? 'an' : 'aus') + '</span></summary><div class="body" id="ntSet">' +
       '<p class="md">Meldet sich, wenn der Tab im Hintergrund ist. Gilt nur in diesem Browser.</p>' +
       [['on', 'Benachrichtigungen an'], ['review', 'Aufgabe kommt in Review'], ['question', 'Frage oder Kommentar von Claude'], ['p1', 'Neue Aufgabe mit P1'], ['unblocked', 'Blockade aufgelöst'], ['queueEmpty', 'Warteschlange leer gelaufen'], ['any', 'Jede Statusänderung'], ['sound', 'Ton abspielen'], ['title', 'Zähler im Tab-Titel']].map(([k, l]) => '<label class="switch small"><span><b>' + l + '</b></span><input type="checkbox" data-n="' + k + '"' + (notifySet[k] ? ' checked' : '') + '><i aria-hidden="true"></i></label>').join('') +
@@ -2116,6 +2138,7 @@
       if (c.dataset.n === 'on' && c.checked && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
     });
     $('#ntTest', body).onclick = testNotification;
+    bindToolsExtra(body);
     if (!EDIT) return;
     $$('#repSet [data-k]', body).forEach((el) => el.onchange = () => {
       const k = el.dataset.k;
@@ -2173,6 +2196,7 @@
         const t = tpls.find((x) => x.slug === sel);
         $('#tpPane', f).innerHTML = pane(t);
         $$('[data-tp]', f).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tp === sel)));
+        bindDuplicateCheck($('#tpPane', f));
         titleTouched = false;
         const ttl = $('[data-ttl]', f);
         ttl.oninput = () => { titleTouched = true; };
@@ -2235,6 +2259,384 @@
     if (r) { ok(r.message); if (side === 'tools') renderSide(); }
   }
 
+  // ---------- Runde 3: Hilfen ----------
+
+  const fmtTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' Mio' : n >= 1e3 ? Math.round(n / 1e3) + ' k' : String(n || 0));
+  const fmtMoney = (v, cur) => (v > 0 && v < 0.1 ? v.toFixed(3) : (v || 0).toFixed(2)).replace('.', ',') + ' ' + (!cur || cur === 'USD' ? '$' : cur);
+  const timeOf = (iso) => { try { return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+
+  function undoToast(msg, key) {
+    const box = $('#toasts');
+    const el = document.createElement('div');
+    el.className = 'toast undo';
+    el.innerHTML = '<div class="row"><div class="what">' + esc(msg) + '</div><button class="btn small" type="button">Rückgängig</button></div><span class="ut"><i></i></span>';
+    $('button', el).onclick = async (e) => { e.stopPropagation(); el.remove(); await run(() => act('undo', { key }), (x) => x.message); };
+    el.onclick = () => el.remove();
+    box.prepend(el);
+    while (box.children.length > 4) box.lastChild.remove();
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, 8000);
+  }
+
+  // ---------- Claude arbeitet gerade ----------
+
+  function liveBlock(t) {
+    const a = meta.activity;
+    if (!a || !a.busy || !a.current || a.current.task !== t.id || t.status !== 'in-arbeit') return '';
+    if (Date.now() - Date.parse(a.current.at) > 10 * 60000) return '';
+    const plan = t.plan || null;
+    const recent = (a.recent || []).filter((r) => r.task === t.id).slice(1, 4);
+    const pend = (meta.instructions || []).filter((x) => x.task === t.id).length;
+    return '<div class="live-box"><span class="lb-head"><i class="lb-dot" aria-hidden="true"></i>' + esc(a.current.verb) + (a.current.what ? ' <code>' + esc(a.current.what) + '</code>' : '') + '</span>' +
+      (recent.length ? '<ol class="lb-list">' + recent.map((r) => '<li><span class="muted num">' + esc(timeOf(r.at)) + '</span> ' + esc(r.verb) + ' <span class="mono">' + esc(r.what) + '</span>' + (r.ok === false ? ' <span class="late">Fehler</span>' : '') + '</li>').join('') + '</ol>' : '') +
+      (EDIT ? '<button class="btn small" data-instr="' + esc(t.id) + '">Anweisung an Claude' + (pend ? ' (' + pend + ' wartet)' : '') + '</button>' : '') + '</div>';
+  }
+
+  function instructBox(id) {
+    const pend = (meta.instructions || []).filter((x) => x.task === id);
+    return '<div class="block instr"><div class="block-head"><h3>Anweisung an Claude</h3><span class="meta">Claude liest sie, sobald es sinnvoll ist, meist nach dem aktuellen Schritt</span></div>' +
+      (pend.length ? '<ul class="instr-list">' + pend.map((x) => '<li><span class="muted num">' + esc(x.at.slice(11, 16)) + '</span> ' + esc(x.text) + ' <span class="tag">wartet</span></li>').join('') + '</ul>' : '') +
+      '<div class="add-row"><input class="input" data-instr-in="' + esc(id) + '" maxlength="4000" placeholder="Zum Beispiel: Bitte auch Threads in Forenkanälen mitsichern"><button class="btn small primary" data-instr-send="' + esc(id) + '">Senden</button></div></div>';
+  }
+
+  async function sendInstruction(id, text) {
+    if (!text.trim()) return false;
+    return !!(await run(() => act('instruct', { id, text }), (x) => x.message));
+  }
+
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-instr]');
+    if (b) {
+      e.preventDefault(); e.stopPropagation();
+      const text = await askText({ title: 'Anweisung an Claude', lead: b.dataset.instr + ': Claude liest sie, sobald es sinnvoll ist, meist nach dem aktuellen Schritt. Sie bleibt als Kommentar an der Aufgabe.', label: 'Anweisung', confirm: 'Senden', required: true, multiline: true });
+      if (text) sendInstruction(b.dataset.instr, text);
+      return;
+    }
+    const s = e.target.closest('[data-instr-send]');
+    if (s) {
+      const inp = $('[data-instr-in="' + CSS.escape(s.dataset.instrSend) + '"]');
+      if (inp && await sendInstruction(s.dataset.instrSend, inp.value)) inp.value = '';
+    }
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    const inp = e.target.closest && e.target.closest('[data-instr-in]');
+    if (inp && e.key === 'Enter') { e.preventDefault(); sendInstruction(inp.dataset.instrIn, inp.value).then((okk) => { if (okk) inp.value = ''; }); }
+  });
+
+  // ---------- Entwürfe ----------
+
+  function designHtml(d) {
+    const g = d.design;
+    if (!g) {
+      return '<div class="q-empty"><strong>Noch keine Entwürfe.</strong><span>Bei Gestaltungsaufgaben nutzt Claude UI UX Pro Max und das Superpowers Brainstorming, wenn sie installiert sind, und hängt Designrichtung, Varianten und Ergebnisse hier an. Du wählst dann eine Variante, bevor Claude umsetzt.</span></div>';
+    }
+    const badge = (src) => (src ? '<span class="src-badge ' + (/brain|superpower/i.test(src) ? 'bs' : 'ux') + '">' + esc(/brain|superpower/i.test(src) ? 'Superpowers' : /ui-?ux/i.test(src) ? 'UI UX Pro Max' : src) + '</span>' : '');
+    const h = [];
+    if (g.direction) {
+      const dir = g.direction;
+      h.push('<div class="block"><div class="block-head"><h3>Designrichtung</h3>' + badge(dir.source) + '<span class="meta">' + esc(dir.at || '') + '</span></div>' +
+        '<div class="dz-dir">' + (dir.colors.length ? '<div class="dz-card"><small>Farben</small><div class="sw">' + dir.colors.map((c) => '<span title="' + esc((c.name ? c.name + ' ' : '') + c.hex) + '"><i style="background:' + esc(c.hex) + '"></i>' + esc(c.name || c.hex) + '</span>').join('') + '</div></div>' : '') +
+        (dir.fonts.length ? '<div class="dz-card"><small>Schrift</small><strong>' + esc(dir.fonts[0]) + '</strong>' + (dir.fonts[1] ? '<span class="muted">' + esc(dir.fonts.slice(1).join(', ')) + ' für Fließtext</span>' : '') + '</div>' : '') + '</div>' +
+        (dir.text ? '<details class="sec"' + (dir.colors.length ? '' : ' open') + '><summary>Stil und Regeln</summary><div class="body"><div class="md">' + md(dir.text) + '</div></div></details>' : '') + '</div>');
+    }
+    if (g.variants.length) {
+      h.push('<div class="block"><div class="block-head"><h3>Varianten</h3><span class="meta">' + g.variants.length + (g.chosen ? ', gewählt: ' + esc(g.chosen.name) : ', noch keine gewählt') + '</span></div><div class="dz-grid">' +
+        g.variants.map((v) => {
+          const chosen = g.chosen && g.chosen.name === v.name;
+          const prev = v.kind === 'html' ? (LIVE ? '<div class="dz-frame dz-wrap"><iframe src="' + esc(v.src) + '" sandbox="allow-scripts" loading="lazy" tabindex="-1" title="Mockup ' + esc(v.name) + '"></iframe></div>' : '<div class="dz-frame dz-none">HTML-Mockup, nur im Live-Board</div>') : v.kind === 'image' ? '<img class="dz-frame" src="' + esc(v.src) + '" alt="Mockup ' + esc(v.name + ' ' + v.title) + '" loading="lazy">' : '<div class="dz-frame dz-none">' + esc(v.file) + '</div>';
+          return '<figure class="dz-var' + (chosen ? ' chosen' : '') + '">' + prev + '<figcaption><strong>' + esc(v.name + ' ' + v.title) + '</strong>' + (v.note ? '<span class="muted">' + esc(v.note) + '</span>' : '') + '</figcaption><div class="row-btns">' +
+            (v.src && LIVE ? '<a class="btn small ghost" href="' + esc(v.src) + '" target="_blank" rel="noopener">Groß ansehen</a>' : '') +
+            (chosen ? '<span class="tag q-tag">Gewählt ' + esc((g.chosen.at || '').slice(0, 10)) + '</span>' : EDIT ? '<button class="btn small" data-dzpick="' + esc(v.name) + '">Diese nehmen</button>' : '') + '</div></figure>';
+        }).join('') + '</div>' + (g.chosen && g.chosen.reason ? '<p class="sublabel">Grund: ' + esc(g.chosen.reason) + '</p>' : '') + '</div>');
+    }
+    for (const b of g.brainstorm) {
+      h.push('<div class="block"><div class="block-head"><h3>' + esc(b.title || 'Brainstorming') + '</h3>' + badge(b.source) + '<span class="meta">' + esc(b.at || '') + '</span></div><div class="md dz-bs">' + md(String(b.text || '').replace(/^#\s+[^\n]*\n+/, '')) + '</div></div>');
+    }
+    return '<div class="dz">' + h.join('') + '</div>';
+  }
+
+  function bindDesign(id) {
+    scaleFrames();
+    $$('[data-dzpick]').forEach((b) => b.onclick = async () => {
+      const reason = await askText({ title: 'Variante ' + b.dataset.dzpick + ' nehmen', lead: 'Claude setzt danach diese Variante um. Die Wahl landet in decisions.md.', label: 'Grund, optional', confirm: 'Diese nehmen' });
+      if (reason === null) return;
+      run(() => act('designChoose', { id, name: b.dataset.dzpick, reason }), (x) => x.message);
+    });
+  }
+
+  // HTML-Mockups in Desktopbreite rendern und verkleinert zeigen.
+  const FRAME_W = 1024;
+  const frameRO = 'ResizeObserver' in window ? new ResizeObserver((list) => list.forEach((e) => fitFrame(e.target))) : null;
+  function fitFrame(w) { const f = w.firstElementChild; if (!f) return; const k = w.clientWidth / FRAME_W; f.style.transform = 'scale(' + k + ')'; f.style.height = (w.clientHeight / k) + 'px'; }
+  function scaleFrames(root) { $$('.dz-wrap', root).forEach((w) => { fitFrame(w); if (frameRO) frameRO.observe(w); }); }
+
+  // ---------- Abnahme im Review ----------
+
+  async function openReview(id) {
+    let d;
+    try { d = detail && detail.task.id === id ? detail : await api('GET', 'api/task?id=' + encodeURIComponent(id)); } catch (e) { return fail(e); }
+    const crit = (d.checklists.find((c) => c.name === 'Akzeptanzkriterien') || { items: [] }).items;
+    const imgs = d.assets.filter((a) => a.image);
+    const byKind = (k) => imgs.filter((a) => a.kind === k).pop();
+    const after = byKind('nachher') || byKind('ist') || imgs[imgs.length - 1];
+    const before = byKind('vorher');
+    const chosen = d.design && d.design.chosen ? d.design.variants.find((v) => v.name === d.design.chosen.name) : null;
+    const modes = [];
+    if (chosen) modes.push({ id: 'mock', label: 'Entwurf ' + chosen.name + ' gegen Ergebnis', left: { label: 'Entwurf ' + chosen.name + ' aus UI UX Pro Max', v: chosen }, right: after });
+    if (before && after) modes.push({ id: 'ba', label: 'Vorher gegen Nachher', left: { label: 'Vorher', a: before }, right: after });
+    if (!modes.length && after) modes.push({ id: 'one', label: 'Ergebnis', left: null, right: after });
+    const pane = (x) => (!x ? '' : x.v ? '<figure class="rv-fig"><figcaption>' + esc(x.label) + '</figcaption>' + (x.v.kind === 'html' ? '<div class="rv-img dz-wrap"><iframe src="' + esc(x.v.src) + '" sandbox="allow-scripts" tabindex="-1" title="Entwurf"></iframe></div>' : '<img class="rv-img" src="' + esc(x.v.src) + '" alt="Entwurf">') + '</figure>'
+      : '<figure class="rv-fig"><figcaption>' + esc(x.label) + '</figcaption><img class="rv-img" src="' + esc(x.a.src) + '" alt="' + esc(x.a.desc || x.a.alt) + '"></figure>');
+    const compare = (m) => '<div class="rv-cmp">' + (m.left ? pane(m.left) : '') + (m.right ? pane({ label: 'Ergebnis' + (m.right.desc ? ': ' + m.right.desc : ''), a: m.right }) : '<div class="q-empty">Noch kein Screenshot vom Ergebnis. Claude legt ihn mit works asset --kind nachher ab.</div>') + '</div>';
+    const html = '<h2>' + esc(id) + ' abnehmen</h2><p class="lead">' + esc(d.task.title) + '</p>' +
+      (modes.length > 1 ? '<div class="row-btns" id="rvModes">' + modes.map((m, i) => '<button type="button" class="sv-chip" data-rvm="' + i + '" aria-pressed="' + (i === 0) + '">' + esc(m.label) + '</button>').join('') + '</div>' : '') +
+      '<div id="rvCmp">' + (modes.length ? compare(modes[0]) : '<div class="q-empty">Keine Bilder. Prüfe das Ergebnis direkt in der Anwendung.</div>') + '</div>' +
+      '<div class="rv-bottom"><div class="field"><span>Gegenprüfen</span><ul class="dod">' + (crit.length ? crit.map((c) => '<li><label><input type="checkbox" class="rvc" data-n="' + c.n + '"' + (c.done ? ' checked' : '') + '><span>' + esc(c.text) + (c.done ? ' <span class="sublabel">Claude: erfüllt</span>' : '') + '</span></label></li>').join('') : '<li>Keine Kriterien.</li>') + '</ul></div>' +
+      '<label class="field"><span>Was fehlt oder stört? Pflicht beim Zurückgeben</span><textarea class="input" name="text" rows="4" placeholder="Beschreibe, was nicht passt. Claude bekommt den Text als Kommentar."></textarea></label></div>' +
+      '<p class="err" role="alert"></p><div class="foot"><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn warn" value="reject">Zurück an Claude</button><button class="btn ok" value="accept">Annehmen und abschließen</button></div>';
+    const r = await showDialog(html, async (fd, sub) => {
+      if (sub === 'accept') return 'accept';
+      const text = String(fd.get('text') || '').trim();
+      if (!text) throw new Error('Bitte kurz beschreiben, was fehlt.');
+      const uncheck = $$('.rvc', form).filter((c) => !c.checked && crit.find((x) => x.n === +c.dataset.n && x.done)).map((c) => +c.dataset.n);
+      return act('review', { id, text, uncheck });
+    }, (f) => {
+      $$('[data-rvm]', f).forEach((b) => b.onclick = () => { $('#rvCmp', f).innerHTML = compare(modes[+b.dataset.rvm]); $$('[data-rvm]', f).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); scaleFrames(f); });
+      scaleFrames(f);
+    });
+    if (r === 'accept') return openDod(id);
+    if (r) ok(r.message);
+  }
+
+  // ---------- Projektwissen ----------
+
+  async function renderKnowledge(body, head) {
+    let list = [];
+    try { list = await api('GET', 'api/knowledge'); } catch (e) { return fail(e); }
+    const q = (store.get('works-know-q', '') || '').toLowerCase();
+    const props = list.filter((e) => e.status === 'vorschlag');
+    const shown = list.filter((e) => e.status !== 'vorschlag' && (!q || (e.title + ' ' + e.text + ' ' + e.area).toLowerCase().includes(q)));
+    const areas = [...new Set(shown.map((e) => e.area))];
+    const entry = (e) => '<article class="kn"><div class="kn-h"><strong>' + esc(e.title) + '</strong>' + (e.status === 'veraltet' ? '<span class="tag">veraltet?</span>' : '') + '</div><div class="md">' + md(e.text) + '</div><div class="kn-meta">' + esc([e.by ? 'von ' + (e.by === 'Nutzer' ? 'dir' : e.by) : '', e.source ? 'aus ' + e.source : '', e.date ? fmtDate(e.date) : ''].filter(Boolean).join(', ')) +
+      (EDIT ? '<span class="spacer"></span><button class="btn link" data-knedit="' + esc(e.id) + '">Bearbeiten</button>' + (e.status !== 'veraltet' ? '<button class="btn link" data-knflag="' + esc(e.id) + '">veraltet</button>' : '<button class="btn link" data-knok="' + esc(e.id) + '">aktuell</button>') + '<button class="btn link danger" data-knrm="' + esc(e.id) + '">Löschen</button>' : '') + '</div></article>';
+    body.innerHTML = head('Projektwissen') +
+      '<p class="md">Was Claude in diesem Projekt wissen muss. Claude liest die passenden Einträge vor der Arbeit und schlägt neue vor, wenn es etwas Wichtiges herausfindet. Liegt in .works/wissen.md.</p>' +
+      (props.length ? '<div class="block"><div class="block-head"><h3>Vorschläge von Claude</h3><span class="meta">' + props.length + '</span></div>' + props.map((e) => '<article class="kn prop"><div class="kn-h"><strong>' + esc(e.title) + '</strong><span class="muted">' + esc(e.area) + '</span></div><div class="md">' + md(e.text) + '</div><div class="kn-meta">' + esc([e.source ? 'gelernt in ' + e.source : '', e.date ? fmtDate(e.date) : ''].filter(Boolean).join(', ')) + (EDIT ? '<span class="spacer"></span><button class="btn small primary" data-knacc="' + esc(e.id) + '">Übernehmen</button><button class="btn small" data-knedit="' + esc(e.id) + '">Bearbeiten</button><button class="btn small ghost" data-knrm="' + esc(e.id) + '">Ablehnen</button>' : '') + '</div></article>').join('') + '</div>' : '') +
+      '<div class="add-row"><input class="input" id="knQ" placeholder="Im Wissen suchen" value="' + esc(q) + '">' + (EDIT ? '<button class="btn small primary" id="knAdd">Eintrag hinzufügen</button>' : '') + '</div>' +
+      (areas.length ? areas.map((a) => '<details class="sec" open><summary>' + esc(a) + ' <span class="meta">' + shown.filter((e) => e.area === a).length + '</span></summary><div class="body">' + shown.filter((e) => e.area === a).map(entry).join('') + '</div></details>').join('') : '<p class="md empty-md">' + (q ? 'Nichts gefunden.' : 'Noch kein Projektwissen.') + '</p>');
+    $$('[data-sclose]', body).forEach((b) => b.onclick = closeSide);
+    const qi = $('#knQ', body);
+    qi.oninput = () => { store.set('works-know-q', qi.value); clearTimeout(qi._t); qi._t = setTimeout(() => { renderKnowledge(body, head).then(() => { const n = $('#knQ', body); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }); }, 250); };
+    if (!EDIT) return;
+    const areasAll = [...new Set(list.map((e) => e.area))];
+    const edit = async (e) => {
+      const r = await showDialog('<h2>' + (e ? 'Eintrag bearbeiten' : 'Eintrag hinzufügen') + '</h2><div class="grid"><label class="field span2"><span>Bereich</span><input class="input" name="area" list="knAreas" maxlength="60" value="' + esc(e ? e.area : '') + '" placeholder="Zum Beispiel Discord und Bot"><datalist id="knAreas">' + areasAll.map((a) => '<option value="' + esc(a) + '">').join('') + '</datalist></label><label class="field span2"><span>Titel</span><input class="input" name="title" required maxlength="140" value="' + esc(e ? e.title : '') + '" autofocus></label></div><label class="field"><span>Text, Markdown möglich</span><textarea class="input" name="text" rows="6">' + esc(e ? e.text : '') + '</textarea></label>' + foot('Speichern'),
+        (fd) => (e ? act('knowEdit', { kid: e.id, fields: { area: String(fd.get('area') || 'Allgemein'), title: String(fd.get('title')), text: String(fd.get('text') || ''), ok: e.status === 'vorschlag' } }) : act('knowAdd', { area: String(fd.get('area') || 'Allgemein'), title: String(fd.get('title')), text: String(fd.get('text') || '') })));
+      if (r) { ok(r.message); renderKnowledge(body, head); }
+    };
+    const again = () => renderKnowledge(body, head);
+    const addBtn = $('#knAdd', body); if (addBtn) addBtn.onclick = () => edit(null);
+    $$('[data-knedit]', body).forEach((b) => b.onclick = () => edit(list.find((e) => e.id === b.dataset.knedit)));
+    $$('[data-knacc]', body).forEach((b) => b.onclick = async () => { if (await run(() => act('knowAccept', { kid: b.dataset.knacc }), (x) => x.message)) again(); });
+    $$('[data-knflag]', body).forEach((b) => b.onclick = async () => { if (await run(() => act('knowFlag', { kid: b.dataset.knflag }), (x) => x.message)) again(); });
+    $$('[data-knok]', body).forEach((b) => b.onclick = async () => { if (await run(() => act('knowEdit', { kid: b.dataset.knok, fields: { ok: true } }), (x) => x.message)) again(); });
+    $$('[data-knrm]', body).forEach((b) => b.onclick = async () => { if (await run(() => act('knowRemove', { kid: b.dataset.knrm }), (x) => x.message)) again(); });
+  }
+
+  // ---------- Aufräumen ----------
+
+  async function renderCleanup(body, head) {
+    let c;
+    try { c = await api('GET', 'api/cleanup'); } catch (e) { return fail(e); }
+    const row = (x, btns) => '<div class="cl-row"><span class="st" style="--c:' + statusVar(x.status) + '"></span><div class="q-t"><button class="q-title" data-open="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</button><span class="q-meta">' + esc(x.why) + '</span></div>' + (EDIT ? btns : '') + '</div>';
+    const sec = (title, sub, items) => (items.length ? '<div class="block"><div class="block-head"><h3>' + esc(title) + '</h3><span class="meta">' + esc(sub) + '</span></div>' + items.join('') + '</div>' : '');
+    body.innerHTML = head('Aufräumen') +
+      '<div class="cl-score"><div><small>Zustand des Backlogs</small><strong class="num ' + (c.score >= 85 ? 'good' : c.score >= 60 ? '' : 'late') + '">' + c.score + '</strong><span class="muted">von 100</span></div><span class="md">' + (c.count ? c.count + ' Dinge brauchen Pflege. Erledigtes verschwindet aus der Liste.' : 'Alles in Ordnung.') + '</span></div>' +
+      sec('Hängt fest', 'lange ohne Bewegung', c.stuck.map((x) => row(x, x.review ? '<button class="btn small primary" data-clreview="' + esc(x.id) + '">Jetzt abnehmen</button>' : '<button class="btn small" data-clhand="' + esc(x.id) + '">Übergabe anfordern</button><button class="btn small ghost" data-clback="' + esc(x.id) + '">Zurück ins Backlog</button>'))) +
+      sec('Entwürfe ohne Wahl', 'Claude wartet mit dem Umsetzen', c.design.map((x) => row(x, '<button class="btn small primary" data-cldesign="' + esc(x.id) + '">Entwürfe ansehen</button>'))) +
+      sec('Unvollständig', 'Claude kann so nicht sauber starten', c.incomplete.map((x) => row(x, '<button class="btn small" data-open="' + esc(x.id) + '">Ergänzen</button>')).concat(c.noEffort.length ? ['<div class="cl-row"><span class="st"></span><div class="q-t"><strong>' + c.noEffort.length + ' Aufgaben ohne Aufwand</strong><span class="q-meta">' + esc(c.noEffort.slice(0, 8).join(', ')) + ' zählen in Sprint und Zeitleiste als M</span></div>' + (EDIT ? '<button class="btn small" data-cltable>In der Tabelle schätzen</button>' : '') + '</div>'] : [])) +
+      sec('Vermutlich doppelt', 'ähnliche Titel, Tags und Beschreibung', c.dups.map((p) => '<div class="cl-row"><span class="st"></span><div class="q-t"><span><button class="q-title" data-open="' + esc(p.a.id) + '">' + esc(p.a.id + ' ' + p.a.title) + '</button> und <button class="q-title" data-open="' + esc(p.b.id) + '">' + esc(p.b.id + ' ' + p.b.title) + '</button></span><span class="q-meta">' + p.score + ' Prozent Übereinstimmung</span></div>' + (EDIT ? '<button class="btn small primary" data-clmerge="' + esc(p.a.id) + '|' + esc(p.b.id) + '">Zusammenführen</button><button class="btn small ghost" data-cldis="' + esc(p.a.id) + '|' + esc(p.b.id) + '">Kein Duplikat</button>' : '') + '</div>')) +
+      sec('Alt und unberührt', 'über 60 Tage im Backlog', c.old.map((x) => row(x, '<button class="btn small" data-clidea="' + esc(x.id) + '">Zu Idee machen</button>'))) +
+      (c.old.length > 1 && EDIT ? '<div class="row-btns"><button class="btn small" data-clideaall>Alle ' + c.old.length + ' zu Ideen machen</button></div>' : '');
+    $$('[data-sclose]', body).forEach((b) => b.onclick = closeSide);
+    $$('[data-open]', body).forEach((b) => b.onclick = () => { closeSide(); openTask(b.dataset.open); });
+    const again = () => renderCleanup(body, head);
+    const go = async (fn, msg) => { if (await run(fn, msg)) again(); };
+    $$('[data-clreview]', body).forEach((b) => b.onclick = () => { closeSide(); openReview(b.dataset.clreview); });
+    $$('[data-cldesign]', body).forEach((b) => b.onclick = () => { closeSide(); detailTab = 'design'; openTask(b.dataset.cldesign).then(() => { detailTab = 'design'; renderDetail(); }); });
+    $$('[data-clhand]', body).forEach((b) => b.onclick = () => go(() => act('requestHandoff', { id: b.dataset.clhand }), (x) => x.message));
+    $$('[data-clback]', body).forEach((b) => b.onclick = () => go(() => act('move', { id: b.dataset.clback, to: 'backlog', reason: 'Hing fest, zurück ins Backlog' }), b.dataset.clback + ' zurück ins Backlog'));
+    $$('[data-cltable]', body).forEach((b) => b.onclick = () => { closeSide(); tableSort.key = 'effort'; tableSort.dir = -1; setView('table'); });
+    $$('[data-clmerge]', body).forEach((b) => b.onclick = async () => {
+      const [a, c2] = b.dataset.clmerge.split('|');
+      const keep = await showDialog('<h2>Zusammenführen</h2><p class="lead">Welche Aufgabe bleibt? Die andere wird verworfen, ihre Beschreibung und offenen Kriterien landen als Kommentar in der bleibenden.</p>' + segCtl('keep', [{ id: a, label: a + ' behalten' }, { id: c2, label: c2 + ' behalten' }], a) + foot('Zusammenführen'), (fd) => fd.get('keep'));
+      if (keep) go(() => act('merge', { keep, drop: keep === a ? c2 : a }), (x) => x.message);
+    });
+    $$('[data-cldis]', body).forEach((b) => b.onclick = () => { const [a, c2] = b.dataset.cldis.split('|'); go(() => act('dismissDuplicate', { a, b: c2 }), (x) => x.message); });
+    $$('[data-clidea]', body).forEach((b) => b.onclick = () => go(() => act('toIdeas', { ids: [b.dataset.clidea] }), (x) => x.message));
+    $$('[data-clideaall]', body).forEach((b) => b.onclick = async () => { if (await confirmBox({ title: c.old.length + ' Aufgaben zu Ideen machen', lead: 'Sie werden verworfen und als Idee notiert. Mit Rückgängig lässt sich das zurückholen.', confirm: 'Zu Ideen machen' })) go(() => act('toIdeas', { ids: c.old.map((x) => x.id) }), (x) => x.message); });
+  }
+
+  // ---------- Duplikate beim Anlegen ----------
+
+  function bindDuplicateCheck(f) {
+    const ti = $('input[name="title"]', f);
+    if (!ti || !LIVE) return;
+    const box = document.createElement('div');
+    box.className = 'dup';
+    box.hidden = true;
+    ti.closest('label').after(box);
+    let dismissed = '';
+    const check = async () => {
+      const title = ti.value.trim();
+      if (title.length < 6) { box.hidden = true; return; }
+      let list = [];
+      try { list = await api('GET', 'api/similar?title=' + encodeURIComponent(title) + '&text=' + encodeURIComponent(String((($('textarea[name="description"], textarea[name="text"]', f) || {}).value) || '').slice(0, 800))); } catch (e) { return; }
+      list = list.filter((x) => x.id !== dismissed);
+      if (!list.length) { box.hidden = true; return; }
+      const x = list[0];
+      box.hidden = false;
+      box.innerHTML = '<strong>Klingt wie eine offene Aufgabe</strong><button type="button" class="btn link" data-dupopen="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</button><span class="sublabel">' + esc(L(x.status) + ', ' + x.priority + ', ' + x.score + ' Prozent ähnlich') + '</span><div class="row-btns"><button type="button" class="btn small primary" data-dupcomment="' + esc(x.id) + '">Als Kommentar zu ' + esc(x.id) + '</button><button type="button" class="btn small ghost" data-dupignore>Trotzdem anlegen</button></div>';
+      $('[data-dupignore]', box).onclick = () => { dismissed = x.id; box.hidden = true; };
+      $('[data-dupopen]', box).onclick = () => { $('button[value="cancel"]', form).click(); openTask(x.id); };
+      $('[data-dupcomment]', box).onclick = async () => {
+        const desc = String((($('textarea[name="description"], textarea[name="text"]', f) || {}).value) || '').trim();
+        const r = await run(() => act('comment', { id: x.id, text: 'Ergänzung statt neuer Aufgabe „' + title + '“' + (desc ? ':\n\n' + desc : '.') }), 'Als Kommentar zu ' + x.id + ' gespeichert');
+        if (r) $('button[value="cancel"]', form).click();
+      };
+    };
+    let tmr = null;
+    ti.addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(check, 350); });
+  }
+
+  // ---------- Sprint-Rückblick ----------
+
+  async function openRetro(sp, st, list) {
+    const byId = byIdNow();
+    const open = list.filter((t) => OPEN.includes(t.status));
+    const set = meta.sprintSettings || { points: { S: 1, M: 2, L: 4, XL: 8 } };
+    const pts = (t) => set.points[t.effort] ?? set.points.M;
+    const eff = meta.effortDays || { S: 2, M: 5, L: 10, XL: 15 };
+    const ins = [];
+    const done = list.filter((t) => t.status === 'erledigt');
+    const fast = done.filter((t) => t.effort && t.started && t.completed && Math.round((new Date(t.completed) - new Date(t.started)) / 86400000) < (eff[t.effort] || 5));
+    if (fast.length) ins.push(['good', fast.length + (fast.length === 1 ? ' Aufgabe war' : ' Aufgaben waren') + ' schneller fertig als geschätzt.']);
+    for (const t of done.filter((x) => x.effort && x.started && x.completed)) {
+      const days = Math.max(1, Math.round((new Date(t.completed) - new Date(t.started)) / 86400000));
+      if (days > (eff[t.effort] || 5) * 1.3) ins.push(['bad', t.id + ' war als ' + t.effort + ' geschätzt und hat ' + days + ' Tage gebraucht.']);
+    }
+    const added = list.filter((t) => t.created && t.created > sp.start);
+    if (added.length) ins.push(['warn', added.length + (added.length === 1 ? ' Aufgabe kam' : ' Aufgaben kamen') + ' nach dem Start dazu: ' + added.map((t) => t.id).join(', ') + '.']);
+    if (open.length) ins.push(['info', 'Offen geblieben: ' + open.map((t) => t.id).join(', ') + ', zusammen ' + open.reduce((a, t) => a + pts(t), 0) + ' Punkte.']);
+    const unread = list.filter((t) => t.status === 'review');
+    if (unread.length) ins.push(['warn', unread.map((t) => t.id).join(', ') + ' ' + (unread.length === 1 ? 'liegt' : 'liegen') + ' noch in Review.']);
+    let usage = null;
+    try { usage = await api('GET', 'api/usage'); } catch (e) { usage = null; }
+    if (usage && usage.total.tokens) ins.push(['info', 'Verbrauch der letzten ' + usage.days + ' Tage: ' + fmtTok(usage.total.tokens) + ' Tokens, geschätzt ' + fmtMoney(usage.total.cost, usage.currency) + '.']);
+    const icon = { good: ['good', '+'], bad: ['late', '!'], warn: ['warn-t', '!'], info: ['muted', '·'] };
+    const goal = st.done >= st.planned ? 'erreicht' : st.done >= st.planned * 0.7 ? 'teilweise' : 'nicht erreicht';
+    const seen = [st.done, meta.lastSprint && meta.lastSprint.result ? meta.lastSprint.result.done : 0].filter((n) => n > 0);
+    const nextCap = seen.length ? Math.max(1, Math.round(seen.reduce((a, n) => a + n, 0) / seen.length)) : (st.capacity || set.capacity || 20);
+    const html = '<h2>Rückblick auf ' + esc(sp.id + ' ' + sp.title) + '</h2><p class="lead">' + esc(fmtDate(sp.start)) + ' bis ' + esc(fmtDate(sp.end)) + '</p>' +
+      '<div class="code-cards"><div><small>Geschafft</small><strong>' + st.done + ' von ' + st.planned + '</strong><span class="muted">Punkten</span></div><div><small>Ziel</small><strong class="' + (goal === 'erreicht' ? 'good' : goal === 'teilweise' ? 'warn-t' : 'late') + '">' + goal + '</strong><span class="muted">' + esc(sp.goal || 'ohne Ziel') + '</span></div><div><small>Dazugekommen</small><strong>' + added.length + '</strong><span class="muted">nach dem Start</span></div>' + (meta.lastSprint && meta.lastSprint.result ? '<div><small>Vorheriger Sprint</small><strong>' + meta.lastSprint.result.done + '</strong><span class="muted">Punkte geschafft</span></div>' : '') + '</div>' +
+      '<div class="block"><div class="block-head"><h3>Was die Daten sagen</h3></div><ul class="retro">' + (ins.length ? ins.map(([k, txt]) => '<li><span class="' + icon[k][0] + '">' + icon[k][1] + '</span><span>' + esc(txt) + '</span></li>').join('') : '<li><span class="muted">·</span><span>Keine Auffälligkeiten.</span></li>') + '</ul></div>' +
+      '<div class="block"><div class="block-head"><h3>Drei Fragen an dich</h3><span class="meta">optional, Claude nutzt die Antworten für den nächsten Sprint</span></div>' +
+      '<label class="field"><span>Was lief gut?</span><input class="input" name="good" maxlength="500"></label><label class="field"><span>Was hat gebremst?</span><input class="input" name="bad" maxlength="500"></label><label class="field"><span>Was ändern wir im nächsten Sprint?</span><input class="input" name="change" maxlength="500"></label></div>' +
+      '<div class="row-btns">' + (open.length ? '<label class="toggle"><input type="checkbox" name="carry" checked> ' + esc(open.map((t) => t.id).join(', ')) + ' übernehmen</label>' : '') + '<label class="toggle">Kapazität für den nächsten Sprint <input class="input" type="number" name="cap" min="1" max="1000" value="' + nextCap + '" style="width:90px;height:30px"></label></div>' +
+      '<p class="err" role="alert"></p><div class="foot"><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn" value="close">Nur abschließen</button><button class="btn primary" value="plan">Abschließen und nächsten planen</button></div>';
+    let carry = true;
+    const r = await showDialog(html, async (fd, sub) => {
+      carry = fd.get('carry') === 'on';
+      const res = await act('sprintClose', { retro: { good: fd.get('good'), bad: fd.get('bad'), change: fd.get('change') }, nextCapacity: fd.get('cap') });
+      return { ...res, plan: sub === 'plan' };
+    });
+    if (!r) return;
+    ok(r.message);
+    if (r.plan) {
+      await run(() => act('sprintStart', { title: 'Sprint ' + ((parseInt(String(sp.id).slice(1), 10) || 0) + 1), goal: '', capacity: undefined, carry }), (x) => x.message);
+      setView('sprint');
+    }
+  }
+
+  // ---------- Werkzeuge: Wiederkehrend, GitHub, Kalender, Verbrauch, Rückgängig ----------
+
+  async function toolsExtra() {
+    const [rec, gh, usage, undos, share] = await Promise.all([
+      api('GET', 'api/recurring').catch(() => null), api('GET', 'api/github').catch(() => null), api('GET', 'api/usage').catch(() => null),
+      EDIT ? api('GET', 'api/undo').catch(() => []) : Promise.resolve([]), EDIT ? api('GET', 'api/share').catch(() => null) : Promise.resolve(null),
+    ]);
+    const h = [];
+    h.push('<div class="row-btns tools-top"><button class="btn small" data-openside="knowledge">Projektwissen' + (meta.knowledgeProposals ? ' (' + meta.knowledgeProposals + ' neu)' : '') + '</button><button class="btn small" data-openside="cleanup">Aufräumen</button></div>');
+    if (rec) {
+      h.push('<details class="sec"><summary>Wiederkehrende Aufgaben <span class="meta">' + rec.rules.length + '</span></summary><div class="body">' +
+        '<p class="md">works legt sie zum Termin selbst an, beim Sitzungsstart oder solange das Board läuft. Ist die vorige noch offen, wird keine zweite angelegt.</p>' +
+        (rec.rules.length ? rec.rules.map((r) => '<div class="tpl-row"><div class="q-t"><strong>' + esc(r.title) + '</strong><span class="q-meta">' + esc(r.text + (r.active === false ? ', pausiert' : ', nächste ' + fmtDate(r.next[0]))) + (r.lastTask ? ', zuletzt ' + esc(r.lastTask) : '') + '</span></div>' + (EDIT ? '<button class="btn small ghost" data-recedit="' + esc(r.id) + '">Bearbeiten</button>' : '') + '</div>').join('') : '<p class="md empty-md">Noch keine Regeln.</p>') +
+        (EDIT ? '<div class="row-btns"><button class="btn small primary" id="recNew">Neue Regel</button><button class="btn small" id="recRun">Jetzt prüfen</button></div>' : '') + '</div></details>');
+    }
+    if (gh) {
+      const s = gh.settings; const st = gh.state;
+      const sw = (k, l) => '<label class="switch small"><span><b>' + esc(l) + '</b></span><input type="checkbox" data-gh="' + k + '"' + (s[k] ? ' checked' : '') + (EDIT ? '' : ' disabled') + '><i aria-hidden="true"></i></label>';
+      h.push('<details class="sec"><summary>GitHub <span class="meta">' + (st && st.repo ? esc(st.repo) : 'nicht verbunden') + '</span></summary><div class="body">' +
+        '<p class="md">Abgleich über das gh CLI beim Sitzungsstart und alle ' + s.interval_min + ' Minuten, solange das Board läuft.' + (st && st.last ? ' Zuletzt ' + esc(new Date(st.last).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })) + '.' : '') + '</p>' +
+        sw('enabled', 'Automatisch abgleichen') + sw('pr_review', 'PR geöffnet: Aufgabe nach Review') + sw('merge_done', 'PR gemergt: Aufgabe abschließen') + sw('ci_checks', 'CI-Checks als Prüfung') + sw('review_comments', 'Änderungswünsche als Kommentar an Claude') + sw('issues', 'Neue Issues als Aufgabe') + sw('close_issues', 'Erledigte Aufgabe schließt ihr Issue') +
+        '<label class="field"><span>Nur Issues mit diesen Labels, leer für alle</span><input class="input" id="ghLabels" value="' + esc((s.labels || []).join(', ')) + '"' + (EDIT ? '' : ' disabled') + '></label>' +
+        (st && st.events && st.events.length ? '<ol class="commits">' + st.events.slice(0, 8).map((e) => '<li><time class="muted num">' + esc(new Date(e.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time><span class="subj">' + esc(e.text) + '</span></li>').join('') + '</ol>' : '') +
+        (EDIT ? '<div class="row-btns"><button class="btn small" id="ghSync">Jetzt abgleichen</button></div>' : '') + '</div></details>');
+    }
+    if (LIVE) {
+      const local = location.origin + '/kalender.ics';
+      const viewKey = share && share.shared && share.links[0] ? share.links[0].view.replace(/\/\?view=/, '/kalender.ics?key=') : '';
+      h.push('<details class="sec"><summary>Kalender</summary><div class="body"><p class="md">Fälligkeiten, Meilensteine und Sprints zum Abonnieren in Google Kalender, Outlook oder Apple Kalender.</p>' +
+        '<div class="share-link"><span>Auf diesem Rechner</span><input class="input mono" readonly value="' + esc(local) + '"><button type="button" class="btn small" data-copy2="' + esc(local) + '">Kopieren</button></div>' +
+        (viewKey ? '<div class="share-link"><span>Im Netzwerk, mit Leseschlüssel</span><input class="input mono" readonly value="' + esc(viewKey) + '"><button type="button" class="btn small" data-copy2="' + esc(viewKey) + '">Kopieren</button></div>' : '') +
+        '<div class="row-btns"><a class="btn small" href="kalender.ics?recurring=1" download="termine.ics">Als Datei laden</a></div><p class="sublabel">Kalender im Internet brauchen die Datei, sie kommen nicht an deinen Rechner heran.</p></div></details>');
+    }
+    if (usage) {
+      h.push('<details class="sec"><summary>Verbrauch <span class="meta">' + (usage.total.tokens ? fmtMoney(usage.total.cost, usage.currency) + ' in ' + usage.days + ' Tagen' : 'noch nichts erfasst') + '</span></summary><div class="body">' +
+        (usage.total.tokens ? '<div class="code-cards"><div><small>Tokens</small><strong>' + fmtTok(usage.total.tokens) + '</strong><span class="muted">davon ' + fmtTok(usage.total.cr + usage.total.cw) + ' Cache</span></div><div><small>Geschätzte Kosten</small><strong>' + fmtMoney(usage.total.cost, usage.currency) + '</strong><span class="muted">' + (usage.untrackedCost > 0 ? fmtMoney(usage.untrackedCost, usage.currency) + ' ohne aktive Aufgabe' : 'alles Aufgaben zugeordnet') + '</span></div></div>' +
+          '<div class="est-grid">' + usage.byType.map((b) => '<strong>' + esc(meta.typeLabel[b.type] || b.type) + '</strong><div class="est-track"><span class="est-bar" style="width:' + (b.cost / (usage.byType[0].cost || 1) * 100).toFixed(1) + '%"></span></div><span class="num">' + fmtMoney(b.cost, usage.currency) + ', ' + b.tasks + ' Aufg.</span>').join('') + '</div>' +
+          (usage.top.length ? '<p class="sublabel">Am teuersten: ' + usage.top.slice(0, 4).map((x) => esc(x.id) + ' ' + fmtMoney(x.cost, usage.currency)).join(', ') + '</p>' : '') : '<p class="md empty-md">Der Stop Hook rechnet den Verbrauch jeder Antwort der aktiven Aufgabe zu.</p>') +
+        '<p class="sublabel">Schätzung nach den Preisen in config.json unter prices (US-Dollar je Million Tokens). Bitte mit deinem Tarif abgleichen.</p></div></details>');
+    }
+    if (EDIT && undos.length) {
+      h.push('<details class="sec"><summary>Letzte Änderungen <span class="meta">Strg+Z macht die letzte rückgängig</span></summary><div class="body">' + undos.slice(0, 10).map((u) => '<div class="tpl-row"><span class="muted num">' + esc(timeOf(u.at)) + '</span><span class="q-t">' + esc(u.label) + '</span><button class="btn small ghost" data-undo="' + esc(u.key) + '">Zurück</button></div>').join('') + '</div></details>');
+    }
+    return h.join('');
+  }
+
+  function bindToolsExtra(body) {
+    $$('[data-openside]', body).forEach((b) => b.onclick = () => { side = null; openSide(b.dataset.openside); });
+    $$('[data-copy2]', body).forEach((b) => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy2); } catch (e) { b.previousElementSibling.select(); document.execCommand('copy'); } b.textContent = 'Kopiert'; setTimeout(() => { b.textContent = 'Kopieren'; }, 1500); });
+    if (!EDIT) return;
+    $$('[data-undo]', body).forEach((b) => b.onclick = async () => { if (await run(() => act('undo', { key: b.dataset.undo }), (x) => x.message)) renderSide(); });
+    $$('[data-gh]', body).forEach((c) => c.onchange = () => run(() => act('githubSettings', { [c.dataset.gh]: c.checked }), 'Gespeichert'));
+    const gl = $('#ghLabels', body); if (gl) gl.onchange = () => run(() => act('githubSettings', { labels: gl.value }), 'Gespeichert');
+    const gs = $('#ghSync', body); if (gs) gs.onclick = async () => { gs.disabled = true; gs.textContent = 'Gleicht ab …'; await run(() => act('githubSync', {}), (x) => x.message || 'Abgeglichen'); renderSide(); };
+    const rn = $('#recRun', body); if (rn) rn.onclick = () => run(() => act('recurRun', {}), (x) => x.message);
+    const rr = $('#recNew', body); if (rr) rr.onclick = () => editRule(null);
+    $$('[data-recedit]', body).forEach((b) => b.onclick = () => editRule(b.dataset.recedit));
+  }
+
+  async function editRule(rid) {
+    let info;
+    try { info = await api('GET', 'api/recurring'); } catch (e) { return fail(e); }
+    const r = rid ? info.rules.find((x) => x.id === rid) : { title: '', kind: 'weekly', weekday: 1, nth: 1, interval: 1, status: 'geplant', active: true, priority: 'P3', type: 'chore' };
+    const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+    const opt = (list, cur) => list.map((o) => '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(cur ?? '') ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
+    const html = '<h2>' + (rid ? 'Regel bearbeiten' : 'Neue wiederkehrende Aufgabe') + '</h2>' +
+      '<label class="field"><span>Titel, {Datum} und {Monat} werden ersetzt</span><input class="input" name="title" required maxlength="150" value="' + esc(r.title) + '" placeholder="Abhängigkeiten aktualisieren ({Monat})" autofocus></label>' +
+      '<div class="grid"><label class="field span2"><span>Grundlage</span><select name="template"><option value="">Ohne Vorlage</option>' + info.templates.map((t) => '<option value="' + esc(t.slug) + '"' + (r.template === t.slug ? ' selected' : '') + '>Vorlage ' + esc(t.name) + '</option>').join('') + '</select></label>' +
+      '<label class="field"><span>Typ</span><select name="type">' + opt(Object.entries(meta.typeLabel), r.type) + '</select></label><label class="field"><span>Priorität</span><select name="priority">' + opt(PRIOS.map((p) => [p, p]), r.priority) + '</select></label></div>' +
+      '<div class="field"><span>Rhythmus</span>' + segCtl('kind', [{ id: 'daily', label: 'Täglich' }, { id: 'weekly', label: 'Wöchentlich' }, { id: 'monthly', label: 'Monatlich' }, { id: 'days', label: 'Alle N Tage' }], r.kind) + '</div>' +
+      '<div class="grid"><label class="field"><span>Alle wie viele</span><input class="input" type="number" name="interval" min="1" max="365" value="' + esc(r.interval || 1) + '"></label><label class="field"><span>Wochentag</span><select name="weekday">' + opt(days.map((d, i) => [i + 1, d]), r.weekday || 1) + '</select></label><label class="field"><span>Im Monat</span><select name="nth">' + opt([[1, 'erster'], [2, 'zweiter'], [3, 'dritter'], [4, 'vierter'], [5, 'letzter']], r.nth || 1) + '</select></label><label class="field"><span>Fällig nach Tagen</span><input class="input" type="number" name="due_days" min="0" max="365" value="' + esc(r.due_days || '') + '"></label></div>' +
+      '<div class="row-btns"><label class="toggle"><input type="checkbox" name="queue"' + (r.queue ? ' checked' : '') + '> In die Warteschlange</label><label class="toggle"><input type="checkbox" name="sprint"' + (r.sprint ? ' checked' : '') + '> In den laufenden Sprint</label><label class="toggle"><input type="checkbox" name="active"' + (r.active !== false ? ' checked' : '') + '> Aktiv</label></div>' +
+      foot(rid ? 'Speichern' : 'Regel anlegen', { extra: rid ? '<button type="button" class="btn danger" id="recDel" style="margin-right:auto">Löschen</button>' : '' });
+    const res = await showDialog(html, (fd) => {
+      const rule = { title: fd.get('title'), template: fd.get('template'), type: fd.get('type'), priority: fd.get('priority'), kind: fd.get('kind'), interval: fd.get('kind') === 'days' || fd.get('kind') === 'weekly' ? fd.get('interval') : '', weekday: fd.get('weekday'), nth: fd.get('kind') === 'monthly' ? fd.get('nth') : '', due_days: fd.get('due_days'), queue: fd.get('queue') === 'on', sprint: fd.get('sprint') === 'on', active: fd.get('active') === 'on', status: 'geplant' };
+      return act('recurSave', { rule, rid: rid || '' });
+    }, (f) => { const d = $('#recDel', f); if (d) d.onclick = async () => { if (await run(() => act('recurRemove', { rid }), 'Regel gelöscht')) { $('button[value="cancel"]', f).click(); if (side === 'tools') renderSide(); } }; });
+    if (res) { ok(res.message); if (side === 'tools') renderSide(); }
+  }
+
   // ---------- Schnellsuche (rechte Shift-Taste oder Strg+K) ----------
 
   const pal = $('#palette');
@@ -2249,6 +2651,9 @@
     VIEWS.forEach((v, i) => c.push({ label: VIEW_LABEL[v] + ' anzeigen', hint: String(i + 1), run: () => setView(v) }));
     (meta.views || []).forEach((v) => c.push({ label: 'Ansicht „' + v.name + '“', run: () => applySavedView(v) }));
     if (LIVE) c.push({ label: 'Wochenbericht, Vorlagen, Prüfungen, Benachrichtigungen', run: () => openSide('tools') });
+    if (LIVE) c.push({ label: 'Projektwissen', run: () => openSide('knowledge') });
+    if (LIVE) c.push({ label: 'Aufräumen', run: () => openSide('cleanup') });
+    if (EDIT) c.push({ label: 'Letzte Änderung rückgängig', hint: 'Strg+Z', run: () => run(() => act('undo', {}), (x) => x.message) });
     if (LIVE) {
       c.push({ label: 'Nächste Aufgabe vorschlagen', run: () => openSide('next') });
       c.push({ label: 'Ideen öffnen', run: () => openSide('ideas') });
@@ -2416,6 +2821,7 @@
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
     if (e.key === 'Escape' && !pal.hidden) return;
     if (e.key === 'Escape' && !dlg.open) { if (!panel.hidden) closePanel(); else if (!sidePanel.hidden) closeSide(); return; }
+    if (EDIT && !typing && !dlg.open && (e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey) && !e.shiftKey) { e.preventDefault(); run(() => act('undo', {}), (x) => x.message); return; }
     if (typing || dlg.open || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === '/') { e.preventDefault(); if (state.view === 'queue') setView('board'); $('#q').focus(); }
     if (EDIT && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); newTask(); }

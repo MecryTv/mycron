@@ -1,6 +1,6 @@
 ---
 name: works
-description: Projektbezogene Aufgabenverwaltung in einem .works/ Ordner mit Prioritäten P1 bis P4, ausführlichen Task-Dateien, Bildern, Designentscheidungen, Abhängigkeiten, Meilensteinen, Session-Übergaben und Definition of Done. Diesen Skill nutzen, sobald im Projekt ein .works/ Ordner existiert oder der Nutzer Aufgaben, Todos, Bugs, Features, Ideen, Backlog, Prioritäten, Fortschritt oder "was steht an" anspricht, etwas notiert haben will ("notier dir das", "mach daraus eine Aufgabe"), Screenshots zu einer Aufgabe ablegen will, eine Aufgabe startet, abschließt oder wieder aufnimmt, nach der nächsten Aufgabe fragt, einen Bericht oder Changelog möchte, oder wenn ein Brainstorming oder UI UX Pro Max Ergebnis zu einer Aufgabe festgehalten werden soll. Auch bei /works mit Unterbefehl als Argument.
+description: Projektbezogene Aufgabenverwaltung in einem .works/ Ordner mit Prioritäten P1 bis P4, ausführlichen Task-Dateien, Bildern, Designentscheidungen, Abhängigkeiten, Meilensteinen, Session-Übergaben und Definition of Done. Diesen Skill nutzen, sobald im Projekt ein .works/ Ordner existiert oder der Nutzer Aufgaben, Todos, Bugs, Features, Ideen, Backlog, Prioritäten, Fortschritt oder "was steht an" anspricht, etwas notiert haben will ("notier dir das", "mach daraus eine Aufgabe"), Screenshots zu einer Aufgabe ablegen will, eine Aufgabe startet, abschließt oder wieder aufnimmt, nach der nächsten Aufgabe fragt, einen Bericht oder Changelog möchte, wenn an einer Gestaltungsaufgabe gearbeitet wird (dann UI UX Pro Max und Brainstorming nutzen und die Entwürfe an die Aufgabe hängen), wenn Projektwissen, wiederkehrende Aufgaben, Kosten pro Aufgabe oder der GitHub-Abgleich angesprochen werden. Auch bei /works mit Unterbefehl als Argument.
 ---
 
 # works
@@ -17,8 +17,9 @@ Verwaltet alle Aufgaben eines Projekts in `.works/`. Jede Aufgabe hat einen eige
   inbox/              Ablage für Screenshots, die noch zugeordnet werden
   reports/            gespeicherte Berichte
   templates/          Vorlagen für neue Aufgaben (JSON)
-  time.jsonl          Zeiterfassung aus den Hooks
-  tasks/W-0012-slug/  task.md, decisions.md, comments.md, checks.json, assets/, docs/
+  time.jsonl          Zeiterfassung und Tokenverbrauch aus den Hooks
+  wissen.md           Projektwissen: Fakten und Regeln, die Claude vor der Arbeit liest
+  tasks/W-0012-slug/  task.md, decisions.md, comments.md, checks.json, assets/, docs/, design/
   archive/            erledigte und verworfene Aufgaben
 ```
 
@@ -50,6 +51,10 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 12. Die Warteschlange des Nutzers (`works queue`, im Board unter Warteschlange) hat Vorrang vor allen eigenen Vorschlägen. `works next` und `works status` zeigen sie zuerst. Sagt der Nutzer "arbeite die Warteschlange ab" oder ist `auto_next` an, nach `works done` mit dem Eintrag weitermachen, den die Ausgabe nennt. Bei `ask_before` vorher kurz nachfragen. Blockierte Einträge überspringen, solange `skip_blocked` an ist. Die Reihenfolge nur auf Wunsch des Nutzers ändern.
 13. Kommentare vom Nutzer (`works comments`) sind Vorgaben wie die Beschreibung. Neue Kommentare zuerst lesen und mit `works comment <ID> "..."` kurz beantworten: was umgesetzt ist, was offen bleibt, welche Entscheidung nötig ist.
 14. Prüfungen (`config.checks`) erst nach Rückfrage einrichten. Bei `works done` laufen sie automatisch; Einträge `skill:code-audit` selbst ausführen und mit `works checks record` eintragen. Einen Fund nur auf Wunsch des Nutzers als bekannt markieren.
+15. Gestaltungsaufgaben (Typ design oder Tags ui, design, ux): Sind UI UX Pro Max und Superpowers Brainstorming installiert, beide von dir aus nutzen, ohne dass der Nutzer darum bittet. `works start` meldet, welche der beiden Skills gefunden wurden. Ergebnisse immer an die Aufgabe hängen, damit der Nutzer sie im Board unter Entwürfe sieht: `works design direction` für Farben, Schrift und Stil, `works design add` für jede Variante als HTML-Mockup oder Bild, `works design brainstorm` für das Brainstorming-Dokument. Danach auf die Wahl des Nutzers warten (Board oder `works design choose`) und erst dann umsetzen. Ablauf in `references/integrations.md`.
+16. Anweisungen aus dem Board kommen während der Arbeit als Hook-Kontext. Lesen, berücksichtigen, sobald es sinnvoll ist (meist nach dem aktuellen Schritt, nicht mitten in einer Änderung), und mit `works comment <ID> "..."` kurz antworten.
+17. Projektwissen (`wissen.md`, `works know`): Die Sitzungsübersicht nennt die Bereiche. Vor Arbeit in einem Bereich `works know search <Begriff>` lesen. Findest du etwas, das spätere Sessions wissen müssen (eine Falle, eine Regel, eine Eigenheit), mit `works know propose --area ".." --title ".." --text ".." --source <ID>` vorschlagen. Der Nutzer übernimmt Vorschläge im Board. Einträge des Nutzers gelten wie die Beschreibung.
+18. Prüfung im Review: Der Nutzer nimmt Aufgaben im Board ab. Gibt er sie mit Text zurück, steht der Text als Kommentar an der Aufgabe und abgehakte Kriterien sind wieder offen. Bei UI-Aufgaben vor dem Review einen Nachher-Screenshot mit `--kind nachher` ablegen, damit der Vergleich mit dem gewählten Entwurf funktioniert.
 
 ## Wann was tun
 
@@ -63,7 +68,8 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Lose Idee | `works idea "..."`, später `works promote I-001` | `references/workflow.md` |
 | "Was steht an?", "Was als Nächstes?" | `works next`, Empfehlung mit Begründung nennen | `references/workflow.md` |
 | Screenshot oder Bild zu einer Aufgabe | Pfad erfragen oder Inbox prüfen, `works asset` mit `--kind` und `--desc` | `references/assets.md` |
-| Brainstorming oder UI UX Pro Max zu einer Aufgabe | Ergebnis mit `works attach-doc` anhängen und in `decisions.md` zusammenfassen | `references/integrations.md` |
+| Gestaltungsaufgabe, UI, Layout, neue Seite | UI UX Pro Max und Brainstorming nutzen, falls vorhanden, Ergebnisse mit `works design` anhängen, Wahl des Nutzers abwarten | `references/integrations.md` |
+| Brainstorming ohne Gestaltung | Dokument mit `works attach-doc` anhängen und in `decisions.md` zusammenfassen | `references/integrations.md` |
 | Aufgabe hängt von anderer ab | `works link A blocked-by B` | `references/workflow.md` |
 | Arbeit beginnt | `works start <ID>`, Branchname aus der Ausgabe an den git-workflow Skill geben | `references/integrations.md` |
 | Arbeitsphase endet, Kontext wird knapp, Nutzer macht Pause | `works handoff <ID> --text "..."` | `references/workflow.md` |
@@ -82,14 +88,21 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Wie lange hat das gedauert, passen die Schätzungen | `works time <ID>`, `works time` | `references/planning.md` |
 | Board mit jemandem teilen | Im selben Netzwerk `works board --restart --share`, Leselink aus der Ausgabe nennen. Für Leute außerhalb `works export` und die Datei schicken. Bearbeitungslink nur auf Nachfrage (`works share --owner`) | `references/board.md` |
 | Board ausprobieren, Demo, "zeig mir, wie das aussieht" | `works demo --simulate --open` außerhalb echter Projekte. Legt ein Beispielprojekt im Temp-Ordner an und spielt Änderungen vor | `references/board.md` |
+| "Merk dir für das Projekt", wichtige Eigenheit gefunden | `works know add` (Nutzer) oder `works know propose` (eigene Erkenntnis) | `references/planning.md` |
+| Wiederkehrende Arbeit, "jeden Montag", "monatlich" | `works recur add --title ".." --every weekly --weekday 1`, legt die Aufgaben selbst an | `references/planning.md` |
+| PR, CI, GitHub Issues | Abgleich läuft automatisch, Stand mit `works github status`, sofort mit `works github sync` | `references/integrations.md` |
+| Was kostet das, Tokens, Verbrauch | `works time <ID>` oder `works time`, Kosten sind Schätzungen nach `config.prices` | `references/planning.md` |
+| Etwas im Board versehentlich geändert | `works undo --list`, dann `works undo <key>` | `references/board.md` |
+| Termine im Kalender | `works ical --out termine.ics` oder die Abo-URL aus dem Board | `references/board.md` |
+| Mehrere Projekte im Blick | `works hub` startet die Übersicht auf Port 4740 | `references/board.md` |
 | Struktur prüfen, Fehler vermuten | `works doctor`, bei Bedarf `--fix` | `references/cli.md` |
 | Hooks einrichten | Bei Plugin-Installation nur `works install-hooks --git`, sonst nach Rückfrage `works install-hooks` | `references/hooks.md` |
 
 ## Ablauf einer typischen Aufgabe
 
 1. Erfassen: `works new --type feature --title "..." --priority P2 --effort M --tags ui`
-2. Ausfüllen: Ziel, Kontext, Akzeptanzkriterien, Umsetzungsplan in der task.md
-3. Klären: Offene Punkte mit dem Nutzer besprechen, bei Bedarf Brainstorming, Ergebnis in `decisions.md`
+2. Ausfüllen: Beschreibung, Akzeptanzkriterien, Umsetzungsplan in der task.md, ähnliche offene Aufgaben prüfen (`works new` meldet sie)
+3. Klären: Offene Punkte mit dem Nutzer besprechen, bei Gestaltung Entwürfe anhängen und die Wahl abwarten, Ergebnis in `decisions.md`
 4. Starten: `works start W-0012`, Branch anlegen, Ist-Zustand als Screenshot mit `--kind vorher`
 5. Umsetzen: Häkchen im Umsetzungsplan setzen, relevante Schritte mit `works log` festhalten
 6. Übergeben: Bei jeder Unterbrechung `works handoff`
@@ -105,9 +118,9 @@ Nur die Datei laden, die für den aktuellen Schritt gebraucht wird.
 - `references/workflow.md`: Abläufe für Erfassen, Planen, Arbeiten, Übergabe, Abschluss
 - `references/assets.md`: Bilder speichern, Inbox, Screenshots, Benennung, Komprimierung
 - `references/integrations.md`: Superpowers Brainstorming, UI UX Pro Max, git-workflow, code-audit, responsive-website-check, second-brain-sync, GitHub
-- `references/hooks.md`: SessionStart, Stop und pre-commit Hook
-- `references/board.md`: Kanban-Board, Ansichten, Bearbeiten im Board, Teilen, Live-Aktualisierung und Sicherheit
-- `references/planning.md`: Sprint, Kommentare, gespeicherte Ansichten, Vorlagen, Zeiterfassung, Prüfungen, Wochenbericht
+- `references/hooks.md`: SessionStart, Stop, UserPromptSubmit, PostToolUse und pre-commit Hook
+- `references/board.md`: Kanban-Board, Ansichten, Bearbeiten im Board, Abnahme, Rückgängig, Kalender, Projektübersicht, Teilen und Sicherheit
+- `references/planning.md`: Sprint und Rückblick, Kommentare, Ansichten, Vorlagen, Zeit und Kosten, Prüfungen, Wochenbericht, Projektwissen, Wiederkehrendes, Aufräumen
 - `references/cli.md`: alle Befehle und Optionen
 - `references/config.md`: Felder der config.json
 - `references/templates/`: Vorlagen für alle Aufgabentypen und decisions.md

@@ -10,6 +10,11 @@ import { sessionSummary, generateIndex } from '../scripts/views.mjs';
 import { refreshBoardIfPresent } from '../scripts/board.mjs';
 import { refreshServers, ensureGitignore } from '../scripts/server-control.mjs';
 import { reportDue, reportName } from '../scripts/weekly.mjs';
+import { registerProject } from '../scripts/hub.mjs';
+import { syncSettings, syncState } from '../scripts/ghsync.mjs';
+import { spawn, spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 let input = {};
 try {
@@ -21,7 +26,7 @@ async function main() {
   if (!root) return;
   const config = loadConfig(root);
   if (config.hooks && config.hooks.session_start === false) return;
-  ensureGitignore(root, ['.tmp/']);
+  ensureGitignore(root, ['.tmp/', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json']);
   // Einmalige Reparatur: Beschreibungen, die wegen eines Fehlers älterer Versionen im falschen Abschnitt stehen.
   const repairNotes = [];
   const migrations = Array.isArray(config.migrations) ? config.migrations : [];
@@ -33,11 +38,26 @@ async function main() {
       saveConfig(root, config);
     } catch (e) { repairNotes.push(`Reparatur übersprungen: ${e.message}`); }
   }
+  registerProject(root);
+  const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'works.mjs');
+  // Fällige wiederkehrende Aufgaben anlegen.
+  let recurNote = '';
+  if (Array.isArray(config.recurring) && config.recurring.length) {
+    const r = spawnSync(process.execPath, [CLI, 'recur', 'run'], { cwd: root, encoding: 'utf8', timeout: 20000, env: { ...process.env, WORKS_ACTOR: 'Wiederkehrend' } });
+    recurNote = (r.stdout || '').split('\n').filter((l) => l.startsWith('Wiederkehrend angelegt')).join('; ');
+  }
+  // GitHub-Abgleich im Hintergrund, damit der Start nicht wartet.
+  const gs = syncSettings(config);
+  const last = (syncState(root) || {}).last;
+  if (gs.enabled && (!last || Date.now() - Date.parse(last) > gs.interval_min * 60000)) {
+    try { spawn(process.execPath, [CLI, 'github', 'sync', '--quiet'], { cwd: root, detached: true, stdio: 'ignore' }).unref(); } catch { /* gh fehlt */ }
+  }
   generateIndex(root);
   refreshBoardIfPresent(root);
   let notes = [];
   try { notes = await refreshServers(root); } catch (e) { notes = [`Board-Server konnte nicht aktualisiert werden: ${e.message}`]; }
   process.stdout.write(sessionSummary(root) + '\n');
+  if (recurNote) process.stdout.write(`[works] ${recurNote}\n`);
   if (repairNotes.length) process.stdout.write(`[works] ${repairNotes.join('. ')}.\n`);
   const due = reportDue(root, config);
   if (due) process.stdout.write(`[works] Wochenbericht ${reportName(due)} ist fällig. Wenn es passt, die Woche in zwei bis vier Sätzen zusammenfassen und works report --week --summary "..." ausführen. Der Nutzer hat das so eingestellt.\n`);

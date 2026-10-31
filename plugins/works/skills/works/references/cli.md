@@ -101,6 +101,43 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `report [--days 7] [--write]` | Bericht, mit `--write` nach `.works/reports/` |
 | `doctor [--fix] [--strict] [--quiet]` | Konsistenzprüfung. `--fix` korrigiert next_id, einseitige Abhängigkeiten und ungültige aktive Aufgabe. `--strict` wertet Warnungen als Fehler |
 
+## Entwürfe
+
+| Befehl | Wirkung |
+|---|---|
+| `design [show] <ID> [--json]` | Designrichtung, Varianten, Brainstorming und Wahl anzeigen |
+| `design direction <ID> [--file pfad] [--text ..] [--colors "Name #hex,.."] [--fonts "A,B"] [--source ui-ux-pro-max]` | Designrichtung speichern |
+| `design add <ID> --name A --title ".." --file pfad [--note ..] [--source ..]` | Variante als HTML, Bild oder Datei anhängen |
+| `design brainstorm <ID> --file pfad [--title ..] [--source superpowers]` | Brainstorming-Dokument anhängen |
+| `design choose <ID> <Name> [--reason ..]` | Variante wählen, landet in decisions.md |
+| `design remove <ID> <Name>` | Variante entfernen |
+
+## Projektwissen, Anweisungen, Wiederkehrendes
+
+| Befehl | Wirkung |
+|---|---|
+| `know [list] [--json]`, `know search <Text>` | Projektwissen lesen |
+| `know add --area ".." --title ".." --text ".." [--file pfad]` | Eintrag anlegen |
+| `know propose --area ".." --title ".." --text ".." [--source W-0013]` | Vorschlag, den der Nutzer übernimmt |
+| `know accept\|flag\|remove\|reject <kid>`, `know edit <kid> [--title] [--text] [--area] [--ok]` | Einträge pflegen |
+| `instruct <ID> "Text"` | Anweisung für die laufende Arbeit, zusätzlich als Kommentar |
+| `recur [list]` | Regeln mit den nächsten drei Terminen |
+| `recur add --title ".." --every daily\|weekly\|monthly\|days:N [--weekday 1-7] [--nth 1-5] [--day 1-31] [--interval N] [--start JJJJ-MM-TT] [--template slug] [--type ..] [--priority ..] [--effort ..] [--tags ..] [--description ..] [--status geplant\|backlog] [--due_days N] [--queue] [--sprint]` | Regel anlegen |
+| `recur set R1 feld=wert ...`, `recur remove R1`, `recur run` | Regel ändern, löschen, fällige sofort anlegen |
+| `sprint close [--good ..] [--bad ..] [--change ..] [--next-capacity N]` | Sprint mit Rückblick abschließen |
+
+## GitHub, Kalender, Rückgängig, Übersicht
+
+| Befehl | Wirkung |
+|---|---|
+| `github [sync] [--quiet]` | Abgleich mit PRs, CI, Reviews und Issues |
+| `github status` | Repository, letzter Lauf, letzte Ereignisse, Einstellungen |
+| `github set enabled=false issues=false labels=bug,works interval_min=5` | Einstellungen unter `github_sync` |
+| `ical [--out datei.ics] [--recurring]` | Kalender mit Fälligkeiten, Meilensteinen, Sprints, optional kommende wiederkehrende Aufgaben |
+| `undo --list`, `undo [<key>]` | Änderungen aus dem Board zurücknehmen, ohne Key die letzte |
+| `hub [--port 4740]`, `hub --list` | Übersicht über alle Projekte im Browser oder als Text |
+| `time [<ID>]` | zusätzlich Tokens und geschätzte Kosten |
+
 ## Was doctor prüft
 
 Fehler: ungültiges oder fehlendes Frontmatter, fehlende Pflichtfelder, ungültige Werte, Ordnername passt nicht zur ID, doppelte IDs, offene Aufgaben im Archiv, Verweise auf unbekannte Aufgaben, Zyklen, zu kleine next_id, fehlende Bilder und verlinkte Dateien.

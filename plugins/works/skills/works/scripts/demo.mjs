@@ -163,7 +163,30 @@ export function seedDemo(root) {
   for (const [a, b] of [[-26 * 60, -25 * 60 + 40], [-25 * 60 + 50, -24 * 60 + 30], [-5 * 60, -3 * 60 - 20], [-60, -15]]) {
     events.push({ t: new Date(now + a * 60000).toISOString(), ev: 'start', task: tasks.maint, s: 'demo' }, { t: new Date(now + b * 60000).toISOString(), ev: 'stop', task: tasks.maint, s: 'demo' });
   }
+  // Verbrauch: Tokens je Antwort, damit Zeit-Tab und Werkzeuge Kosten zeigen.
+  for (const [h, task, inp, out, cw, cr] of [[-25, tasks.maint, 1800, 9200, 42000, 310000], [-24, tasks.maint, 900, 6100, 18000, 420000], [-4, tasks.maint, 1200, 7800, 26000, 380000], [-1, tasks.maint, 700, 4300, 9000, 260000], [-30, tasks.roles, 2100, 14800, 51000, 690000], [-28, tasks.bracket, 1500, 11200, 38000, 240000]]) {
+    events.push({ t: new Date(now + h * 3600000).toISOString(), ev: 'usage', task, s: 'demo', model: 'claude-opus-5-5', in: inp, out, cw, cr });
+  }
   fs.writeFileSync(path.join(root, '.works', 'time.jsonl'), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
+  // Entwürfe wie aus UI UX Pro Max und Superpowers Brainstorming.
+  const dz = path.join(root, '.works', '.tmp', 'design');
+  fs.mkdirSync(dz, { recursive: true });
+  const page = (body) => `<!doctype html><html lang="de"><head><meta charset="utf-8"><style>body{margin:0;background:#0f1420;color:#eef2f8;font:15px system-ui,sans-serif;padding:28px}h1{color:#3dd6b5;font-size:24px;margin:0 0 18px}.m{width:190px;border-radius:8px;background:#1a2233;border:1px solid #2a3550}.m div{padding:8px 12px;display:flex;justify-content:space-between}.m div+div{border-top:1px solid #2a3550}.w{color:#3dd6b5;font-weight:600}.live{border-color:#ff5a5f}.tabs{display:flex;gap:8px;margin-bottom:16px}.tabs span{padding:6px 14px;border-radius:99px;background:#1a2233}.tabs .on{background:#3dd6b5;color:#0f1420;font-weight:600}.list{display:grid;gap:10px;max-width:420px}.list .m{width:auto}</style></head><body>${body}</body></html>`;
+  const match = (a, b, sa, sb, live) => `<div class="m${live ? ' live' : ''}"><div class="${sa > sb ? 'w' : ''}">${a}<span>${sa}</span></div><div class="${sb > sa ? 'w' : ''}">${b}<span>${sb}</span></div></div>`;
+  fs.writeFileSync(path.join(dz, 'a.html'), page(`<h1>Turnier Bracket</h1><div style="display:flex;gap:36px;align-items:center"><div style="display:grid;gap:14px">${match('Team Nova', 'Pixel FC', 2, 0)}${match('Blitz', 'Orion', 1, 2)}${match('Kraken', 'Vortex', 1, 1, true)}${match('Echo', 'Zenit', 2, 0)}</div><div style="display:grid;gap:60px">${match('Team Nova', 'Orion', '-', '-')}${match('offen', 'Echo', '-', '-')}</div><div>${match('Finale', 'offen', '', '')}</div></div>`));
+  fs.writeFileSync(path.join(dz, 'b.html'), page(`<h1>Runden als Tabs</h1><div class="tabs"><span class="on">Achtelfinale</span><span>Viertelfinale</span><span>Halbfinale</span><span>Finale</span></div><div class="list">${match('Team Nova', 'Pixel FC', 2, 0)}${match('Blitz', 'Orion', 1, 2)}${match('Kraken', 'Vortex', 1, 1, true)}${match('Echo', 'Zenit', 2, 0)}</div>`));
+  fs.writeFileSync(path.join(dz, 'richtung.md'), '## Stil\n\nDunkles Esports-Layout mit hohem Kontrast. Live-Spiele bekommen einen roten Rand, Sieger die Akzentfarbe.\n\n## Regeln\n\n- Tippflächen mindestens 44 px hoch\n- Kein seitliches Scrollen unter 400 px Breite\n- Teamnamen nie abschneiden, lieber zweizeilig\n');
+  fs.writeFileSync(path.join(dz, 'brainstorm.md'), '# Brainstorming Bracket mobil\n\nFrage: Wie zeigen wir 16 Teams auf einem Handy?\n\n- Zoombarer Baum: verworfen, auf kleinen Displays zu fummelig\n- Runden als Tabs: gut lesbar, Zusammenhang zwischen Runden geht verloren\n- Klassisches Bracket mit horizontalem Wischen: vertraut, braucht Hinweis auf weitere Runden\n\nOffen: Soll das eigene Team automatisch angesprungen werden?\n');
+  w(root, ['design', 'brainstorm', tasks.bracket, `--file=${path.join(dz, 'brainstorm.md')}`, '--title=Brainstorming Bracket mobil']);
+  w(root, ['design', 'direction', tasks.bracket, `--file=${path.join(dz, 'richtung.md')}`, '--colors=Grund #0F1420,Fläche #1A2233,Akzent #3DD6B5,Live #FF5A5F', '--fonts=Space Grotesk,Inter']);
+  w(root, ['design', 'add', tasks.bracket, '--name=A', '--title=Klassisches Bracket', `--file=${path.join(dz, 'a.html')}`, '--note=Alle Runden nebeneinander, horizontal wischen']);
+  w(root, ['design', 'add', tasks.bracket, '--name=B', '--title=Runden als Tabs', `--file=${path.join(dz, 'b.html')}`, '--note=Eine Runde pro Tab, große Tippflächen']);
+  // Projektwissen, ein Vorschlag von Claude, eine wiederkehrende Aufgabe.
+  w(root, ['know', 'add', '--area=Discord und Bot', '--title=Rollen-Änderungen sind begrenzt', '--text=Discord erlaubt etwa 10 Rollen-Änderungen pro 10 Sekunden je Server. Immer über rateQueue in src/lib/queue.ts setzen.']);
+  w(root, ['know', 'add', '--area=Webseite', '--title=Deploy nur über main', '--text=Vercel baut jeden Push auf main. Vorschau-Deploys laufen über Pull Requests.']);
+  w(root, ['know', 'propose', '--area=Datenbank', '--title=Prisma nur mit migrate deploy', '--text=`prisma migrate dev` setzt die Datenbank zurück. Auf dem Server nur `migrate deploy` verwenden.', `--source=${tasks['old-' + Object.values(tasks).filter((x) => x).slice(-2, -1)[0]] || ''}`]);
+  w(root, ['recur', 'add', '--title=Abhängigkeiten aktualisieren ({Monat})', '--every=monthly', '--nth=1', '--weekday=1', '--type=chore', '--priority=P3', '--due_days=7']);
+  w(root, ['recur', 'add', '--title=Backups stichprobenartig prüfen', '--every=weekly', '--weekday=5', '--type=chore', '--priority=P3']);
   backdate(root);
   fs.rmSync(path.join(root, '.works', '.tmp'), { recursive: true, force: true });
   return tasks;

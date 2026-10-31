@@ -37,6 +37,42 @@ Liegt unter `.works/config.json`. Fehlende Felder werden mit Standardwerten erg�
 | `report.enabled`, `report.weekday`, `report.time` | `false`, `5`, `"16:00"` | Wochenbericht automatisch fällig, Wochentag 1 bis 7 und Uhrzeit |
 | `report.destinations` | `{ "file": true, "discord": false }` | Ziele des Wochenberichts. Die Discord-URL steht nur in `report.local.json` |
 | `report.include` | alle `true` | Abschnitte: `done`, `attention`, `next`, `milestones` |
+| `live_activity` | `true` | Board zeigt, was Claude gerade tut, und Anweisungen kommen schon während der Antwort an |
+| `recurring` | `[]` | Regeln für wiederkehrende Aufgaben, siehe unten |
+| `github_sync` | siehe unten | Automatischer Abgleich mit GitHub |
+| `prices` | siehe unten | Preise für die Kostenschätzung |
+| `cleanup_ignore` | `[]` | Paare wie `["W-0016", "W-0017"]`, die Aufräumen nicht mehr als Duplikat meldet |
+| `sprints[].retro` | | Antworten aus dem Sprint-Rückblick: `good`, `bad`, `change` |
+
+## Wiederkehrende Aufgaben
+
+```json
+"recurring": [
+  { "id": "R1", "title": "Abhängigkeiten aktualisieren ({Monat})", "kind": "monthly", "nth": 1, "weekday": 1,
+    "template": "", "type": "chore", "priority": "P3", "status": "geplant", "due_days": 7, "queue": false, "sprint": false, "active": true }
+]
+```
+
+`kind` ist `daily`, `weekly` (mit `weekday` 1 Montag bis 7 Sonntag und `interval` in Wochen), `monthly` (`nth` 1 bis 5 für den n-ten Wochentag, 5 heißt letzter, oder `day` für einen festen Tag) oder `days` (mit `interval`). `{Datum}` und `{Monat}` im Titel werden ersetzt. Ist die zuletzt angelegte Aufgabe einer Regel noch offen, wird keine zweite angelegt. `last` und `lastTask` pflegt works selbst. Am einfachsten über `works recur` oder das Board unter Werkzeuge.
+
+## GitHub-Abgleich
+
+```json
+"github_sync": { "enabled": true, "pr_review": true, "merge_done": true, "ci_checks": true, "review_comments": true,
+  "issues": true, "labels": [], "close_issues": true, "interval_min": 2 }
+```
+
+`labels` begrenzt den Import neuer Issues auf diese Labels, leer heißt alle. Der Stand des Abgleichs liegt lokal in `.works/github.json`.
+
+## Preise
+
+```json
+"prices": { "currency": "USD", "models": { "opus": { "input": 5, "output": 25 }, "sonnet": { "input": 3, "output": 15 },
+  "haiku": { "input": 1, "output": 5 }, "default": { "input": 3, "output": 15 } },
+  "cache_write_factor": 1.25, "cache_read_factor": 0.1 }
+```
+
+Dollar je Million Tokens. Das Modell wird über den Namen im Transkript zugeordnet (enthält er opus, sonnet oder haiku). Cache-Schreiben kostet den Faktor mal Eingabepreis, Cache-Lesen ebenso. Die Werte sind Schätzungen; bei einem Abo oder anderen Konditionen eigene Werte eintragen.
 
 ## Definition of Done
 

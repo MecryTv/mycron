@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import { findRoot, loadConfig, loadState } from '../scripts/lib.mjs';
 import { recordEvent } from '../scripts/timelog.mjs';
+import { setBusy, takeInstructions, instructionText } from '../scripts/live.mjs';
 
 let input = {};
 try {
@@ -16,6 +17,11 @@ try {
     const config = loadConfig(root);
     const state = loadState(root);
     if (config.time_tracking !== false && state.active) recordEvent(root, 'start', state.active, input.session_id);
+    if (config.live_activity !== false) {
+      setBusy(root, state.active || '');
+      const items = takeInstructions(root);
+      if (items.length) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: instructionText(items) } }) + '\n');
+    }
   }
 } catch (e) { process.stderr.write(`works prompt-submit: ${e.message}\n`); }
 process.exit(0);

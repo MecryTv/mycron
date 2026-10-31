@@ -28,6 +28,16 @@ import { listTemplates, findTemplate, saveTemplate, deleteTemplate, templateFrom
 import { taskTime, estimates, fmtDuration } from './timelog.mjs';
 import { configuredChecks, checksFor, detectChecks, runChecks, recordCheck, ackCheck, loadResults, NAME_RE } from './checks.mjs';
 import { writeWeekly, reportSettings, setWebhook } from './weekly.mjs';
+import { setDirection, addVariant, addBrainstorm, chooseVariant, removeVariant, loadDesign, parseColors, needsDesign, detectDesignSkills } from './design.mjs';
+import { addInstruction } from './live.mjs';
+import { loadKnowledge, addKnowledge, updateKnowledge, removeKnowledge } from './knowledge.mjs';
+import { rules, KINDS, dueRules, fillTitle, describe, upcoming } from './recurring.mjs';
+import { serveHub, projectList, registerProject } from './hub.mjs';
+import { syncGithub, syncSettings, syncState, DEFAULT_SYNC } from './ghsync.mjs';
+import { buildIcal } from './ical.mjs';
+import { undo, undoList } from './undo.mjs';
+import { findSimilar } from './similar.mjs';
+import { taskUsage, projectUsage, fmtTokens, fmtCost } from './usage.mjs';
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
 import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion } from './server-control.mjs';
@@ -61,6 +71,7 @@ function normPriority(p) {
 // ---------- init ----------
 
 function cmdInit() {
+  setTimeout(() => { try { const r = findRoot(); if (r) registerProject(r); } catch { /* egal */ } }, 0);
   const root = path.resolve(flags.path || process.cwd());
   const wd = path.join(root, '.works');
   if (exists(path.join(wd, 'config.json')) && !flags.force) {
@@ -79,7 +90,7 @@ function cmdInit() {
     if (!exists(keep)) fs.writeFileSync(keep, '');
   }
   const mode = flags.gitignore || 'default';
-  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'share.json', 'inbox/*', '!inbox/.gitkeep'];
+  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'inbox/*', '!inbox/.gitkeep'];
   if (mode === 'assets') ignore.push('tasks/*/assets/', 'archive/*/assets/');
   if (mode === 'all') ignore.splice(1, ignore.length - 1, '*', '!.gitignore');
   if (mode !== 'none') fs.writeFileSync(path.join(wd, '.gitignore'), ignore.join('\n') + '\n');
@@ -184,6 +195,8 @@ function cmdNew() {
   const task = flags.template && flags.template !== true ? newFromTemplate(root, config) : createTask(root, config, { ...flags, title });
   refresh(root);
   out(`Angelegt: ${task.id} ${task.title}`);
+  const sim = findSimilar({ id: task.id, title: task.title, tags: task.tags, text: getSection(task._body, 'Beschreibung') || '' }, loadTasks(root, { archive: false }), { min: 0.55 });
+  if (sim.length) out(`Hinweis: ähnliche offene Aufgabe ${sim.map((x) => `${x.t.id} ${x.t.title} (${Math.round(x.score * 100)} %)`).join(', ')}. Falls doppelt, dem Nutzer vorschlagen, sie zusammenzuführen.`);
   out(`Datei: ${task._file}`);
   if (exists(path.join(task._dir, 'decisions.md'))) out(`Entscheidungen: ${path.join(task._dir, 'decisions.md')}`);
   out('Nächster Schritt: Abschnitte der task.md ausfüllen (Platzhalterkommentare ersetzen).');
@@ -441,6 +454,14 @@ function cmdStart() {
   }
   refresh(root);
   printContext(root, t);
+  if (needsDesign(t)) {
+    const d = loadDesign(t);
+    const sk = detectDesignSkills();
+    const names = [sk.uiux ? 'UI UX Pro Max' : '', sk.brainstorm ? 'Superpowers Brainstorming' : ''].filter(Boolean);
+    if (d && d.chosen) out(`\nEntwurf ${d.chosen.name} ist gewählt (works design ${t.id}). Danach umsetzen.`);
+    else if (d && d.variants.length) out(`\nEs gibt ${d.variants.length} Entwürfe, aber noch keine Wahl. Den Nutzer im Board unter Entwürfe wählen lassen oder nachfragen, bevor umgesetzt wird.`);
+    else out(`\nGestaltungsaufgabe: ${names.length ? `${names.join(' und ')} ${names.length > 1 ? 'sind' : 'ist'} installiert. Jetzt nutzen` : 'Falls UI UX Pro Max oder Superpowers Brainstorming verfügbar sind, jetzt nutzen'} und die Ergebnisse anhängen: works design brainstorm, works design direction, works design add (siehe references/integrations.md). Vor dem Umsetzen die Wahl des Nutzers abwarten.`);
+  }
 }
 
 function cmdHandoff() {
@@ -1670,6 +1691,7 @@ function cmdInstallHooks() {
     add('SessionStart', 'session-start.mjs', 'startup|resume|clear|compact');
     add('Stop', 'stop-reminder.mjs');
     add('UserPromptSubmit', 'prompt-submit.mjs');
+    add('PostToolUse', 'post-tool.mjs');
     if (!flags['dry-run']) writeJson(file, settings);
     out(`Claude Code Einstellungen: ${file}${flags['dry-run'] ? ' (Probelauf, nichts geschrieben)' : ''}`);
   }
@@ -1724,7 +1746,7 @@ Ansehen
   export [--out datei.html] [--no-images] [--open-only]  Schnappschuss als eine HTML-Datei
   board --status | --stop | --restart
   queue [list|add <ID> [--pos N]|remove <ID>|move <ID> <N>|order A,B,C|clear|set auto_next=true ...]
-  sprint [start --title ..|add A,B|remove A|set capacity=24|close|list]
+  sprint [start --title ..|add A,B|remove A|set capacity=24|close [--good ..] [--bad ..] [--change ..] [--next-capacity N]|list]
   comments [<ID>]                  comment <ID> "Text" [--as Nutzer|Claude]
   views | views delete "Name"      list --view "Name"
   template list|show <slug>|save --from <ID> [--name ..] [--scope user]|delete <slug>
@@ -1752,10 +1774,23 @@ Assets und Entscheidungen
   inbox [--json]                   compress [<ID>]
   decisions <ID> [--add "Titel" --decision ".." --why ".." --rejected "A: Grund,B: Grund" --source ".."]
   attach-doc <ID> <pfad> [--mode link|copy|move] [--label ".."]
+  design [show] <ID> [--json]      design direction <ID> --file richtung.md --colors "Grund #0F1420,Akzent #3DD6B5" --fonts "A,B"
+  design add <ID> --name A --title ".." --file mockup.html [--note ..]    design brainstorm <ID> --file bs.md
+  design choose <ID> <Name> [--reason ..]                   design remove <ID> <Name>
 
 Auswertung
   commits <ID> [--write]           changelog [--since ..] [--milestone M1] [--version 1.2.0] [--write]
   report [--days 7] [--write]      doctor [--fix] [--strict] [--quiet]
+  undo [--list] [<key>]            Änderung aus dem Board zurücknehmen
+  ical [--out datei.ics] [--recurring]                     Termine als Kalenderdatei
+
+Projektwissen, Wiederkehrendes, GitHub, Übersicht
+  know [list|search ..|add|propose] --area ".." --title ".." --text ".."   know accept|flag|edit|remove <kid>
+  recur [list|add --title ".." --every daily|weekly|monthly|days:N [--weekday 1-7] [--nth 1-5] [--day 1-31]
+        [--template slug] [--due_days N] [--queue] [--sprint]|set R1 feld=wert|remove R1|run]
+  instruct <ID> "Text"             Anweisung, die Claude während der Arbeit liest
+  github [sync|status|set feld=wert ...] [--quiet]           Abgleich mit PRs, CI und Issues über gh
+  hub [--list] [--port 4740]       Übersicht über alle Projekte mit .works
 
 Typen: ${TYPES.join(', ')}
 Status: ${STATUSES.join(', ')}
@@ -1821,6 +1856,9 @@ function cmdSprint() {
     s.closed = today();
     s.result = { planned: st.planned, done: st.done };
     s.carry = s.tasks.filter((id) => byId.has(id) && OPEN_STATUSES.includes(byId.get(id).status));
+    const retro = Object.fromEntries(['good', 'bad', 'change'].map((k) => [k, flags[k] && flags[k] !== true ? String(flags[k]).slice(0, 500) : '']).filter(([, v]) => v));
+    if (Object.keys(retro).length) s.retro = retro;
+    if (flags['next-capacity']) config.sprint_settings = { ...(config.sprint_settings || {}), capacity: Math.max(1, parseInt(flags['next-capacity'], 10) || 20) };
     save();
     out(`${s.id} abgeschlossen: ${st.done} von ${st.planned} Punkten geschafft.${s.carry.length ? ` Offen geblieben: ${s.carry.join(', ')}. Mit works sprint start --carry übernehmen.` : ''}`);
   } else if (sub === 'list') {
@@ -1996,6 +2034,8 @@ function cmdTime() {
     const tt = taskTime(root, t);
     if (flags.json) { out(JSON.stringify(tt, null, 2)); return; }
     out(`${t.id} ${t.title}\nClaude aktiv: ${fmtDuration(tt.totalMs)} in ${tt.sessions.length} Sitzung(en)${tt.started ? `, gestartet am ${tt.started}` : ''}`);
+    const u = taskUsage(root, config, t.id);
+    if (u.tokens) out(`Verbrauch: ${fmtTokens(u.tokens)} Tokens (Eingabe ${fmtTokens(u.in)}, Ausgabe ${fmtTokens(u.out)}, Cache ${fmtTokens(u.cw + u.cr)}), geschätzt ${fmtCost(u.cost, u.currency)}`);
     out(`Tage je Status: ${Object.entries(tt.statusDays).map(([k, v]) => `${STATUS_LABEL[k] || k} ${v}`).join(', ') || 'keine'}`);
     for (const s of tt.sessions) out(`  ${new Date(s.start).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}  ${fmtDuration(s.ms).padEnd(12)} ${s.label}`);
     return;
@@ -2004,6 +2044,12 @@ function cmdTime() {
   if (flags.json) { out(JSON.stringify(e, null, 2)); return; }
   out(`Schätzung gegen tatsächliche Dauer (Kalendertage vom Start bis zum Abschluss), Modus: ${e.mode === 'measured' ? 'gemessen' : 'fest'}`);
   for (const s of e.sizes) out(`  ${s.effort.padEnd(3)} geschätzt ${String(s.estimate).padStart(2)} Tage, gemessen ${s.avg === null ? 'noch keine Daten' : `${s.avg} Tage aus ${s.n} Aufgabe(n)`}`);
+  const pu = projectUsage(root, config, tasks);
+  if (pu.total.tokens) {
+    out(`\nVerbrauch der letzten ${pu.days} Tage: ${fmtTokens(pu.total.tokens)} Tokens, geschätzt ${fmtCost(pu.total.cost, pu.currency)} (Preise in config.json unter prices)`);
+    for (const b of pu.byType) out(`  ${(TYPE_LABEL[b.type] || b.type).padEnd(16)} ${fmtTokens(b.tokens).padStart(9)}  ${fmtCost(b.cost, pu.currency)}  ${b.tasks} Aufgabe(n)`);
+    if (pu.top.length) out(`Am teuersten: ${pu.top.slice(0, 3).map((x) => `${x.id} ${fmtCost(x.cost, pu.currency)}`).join(', ')}`);
+  }
   if (e.worst.length) out(`Am längsten über der Schätzung: ${e.worst.map((w) => `${w.id} (${w.effort}, ${w.days} Tage)`).join(', ')}`);
 }
 
@@ -2068,6 +2114,239 @@ function printChecks(data) {
   }
 }
 
+// ---------- Entwürfe (UI UX Pro Max, Brainstorming) ----------
+
+function cmdDesign() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const sub = ['direction', 'add', 'brainstorm', 'choose', 'remove', 'show'].includes(pos[0]) ? pos.shift() : 'show';
+  if (!pos[0]) fail('Aufgaben-ID fehlt. Beispiel: works design add W-0006 --name=A --file=mockup.html');
+  const t = findTask(root, config, pos.shift());
+  const file = flags.file && flags.file !== true ? path.resolve(String(flags.file)) : '';
+  const str = (k) => (flags[k] && flags[k] !== true ? String(flags[k]) : '');
+  try {
+    if (sub === 'direction') {
+      setDirection(t, { file, text: str('text'), source: str('source') || 'ui-ux-pro-max', colors: parseColors(str('colors')), fonts: listFlag(str('fonts')), notes: str('notes') });
+      addHistory(t, `Designrichtung angehängt${str('source') ? ` (${str('source')})` : ''}`); saveTask(t);
+      out(`Designrichtung für ${t.id} gespeichert.`);
+    } else if (sub === 'add') {
+      const v = addVariant(t, { name: str('name') || pos.shift(), title: str('title'), file, source: str('source') || 'ui-ux-pro-max', note: str('note') });
+      addHistory(t, `Entwurf ${v.name} „${v.title}“ angehängt`); saveTask(t);
+      out(`Variante ${v.name} gespeichert: design/${v.file}. Der Nutzer wählt im Board unter Entwürfe, oder: works design choose ${t.id} ${v.name}`);
+    } else if (sub === 'brainstorm') {
+      addBrainstorm(t, { file, text: str('text'), source: str('source') || 'superpowers', title: str('title') });
+      addHistory(t, 'Brainstorming angehängt'); saveTask(t);
+      out(`Brainstorming an ${t.id} angehängt.`);
+    } else if (sub === 'choose') {
+      const name = pos.shift();
+      const r = chooseVariant(t, name, str('reason'));
+      addHistory(t, `Entwurf ${name} „${r.variant.title}“ gewählt${str('reason') ? `. Grund: ${str('reason')}` : ''}`); saveTask(t);
+      out(`Variante ${name} für ${t.id} gewählt und in decisions.md festgehalten.`);
+    } else if (sub === 'remove') {
+      removeVariant(t, pos.shift()); out('Variante entfernt.');
+    } else {
+      const d = loadDesign(t);
+      if (!d) { out(`${t.id} hat noch keine Entwürfe.${needsDesign(t) ? ' Das ist eine Gestaltungsaufgabe: UI UX Pro Max und Brainstorming nutzen, falls vorhanden, und mit works design anhängen.' : ''}`); return; }
+      if (flags.json) { out(JSON.stringify(d, null, 2)); return; }
+      if (d.direction) out(`Richtung (${d.direction.source}): ${d.direction.colors.map((c) => `${c.name ? c.name + ' ' : ''}${c.hex}`).join(', ')}${d.direction.fonts.length ? `, Schrift ${d.direction.fonts.join(', ')}` : ''}. Datei design/${d.direction.file}`);
+      for (const v of d.variants) out(`Variante ${v.name}: ${v.title} (design/${v.file})${d.chosen && d.chosen.name === v.name ? '  GEWÄHLT' : ''}`);
+      for (const b of d.brainstorm) out(`Brainstorming: design/${b.file} (${b.source})`);
+      out(d.chosen ? `Gewählt: ${d.chosen.name}${d.chosen.reason ? `, ${d.chosen.reason}` : ''}. Danach umsetzen.` : d.variants.length ? 'Noch keine Variante gewählt. Vor dem Umsetzen auf die Wahl des Nutzers warten oder nachfragen.' : '');
+    }
+  } catch (e) { fail(e.message); }
+  refresh(root);
+}
+
+// ---------- Anweisungen und Aktivität ----------
+
+function cmdInstruct() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const t = findTask(root, config, pos.shift());
+  const text = flags.text && flags.text !== true ? String(flags.text) : pos.join(' ');
+  if (!text.trim()) fail('Text fehlt.');
+  addInstruction(root, t.id, text);
+  addComment(t, 'Nutzer', `Anweisung während der Arbeit: ${text}`);
+  refresh(root);
+  out('Anweisung gespeichert. Claude bekommt sie beim nächsten Werkzeugaufruf oder spätestens am Ende der Antwort.');
+}
+
+// ---------- Projektwissen ----------
+
+function cmdKnow() {
+  const root = requireRoot();
+  const sub = pos.shift() || 'list';
+  const str = (k) => (flags[k] && flags[k] !== true ? String(flags[k]) : '');
+  try {
+    if (sub === 'add' || sub === 'propose') {
+      const text = str('file') ? fs.readFileSync(str('file'), 'utf8') : str('text');
+      const e = addKnowledge(root, { area: str('area'), title: str('title') || pos.join(' '), text, by: process.env.WORKS_ACTOR === 'Board' ? 'Nutzer' : 'Claude', source: str('source'), proposal: sub === 'propose' });
+      out(sub === 'propose' ? `Vorschlag ${e.id} gespeichert. Der Nutzer übernimmt ihn im Board unter Wissen.` : `Eintrag ${e.id} gespeichert.`);
+    } else if (sub === 'accept') { updateKnowledge(root, pos[0], { status: 'ok' }); out('Übernommen.'); }
+    else if (sub === 'flag') { updateKnowledge(root, pos[0], { status: 'veraltet' }); out('Als möglicherweise veraltet markiert.'); }
+    else if (sub === 'edit') {
+      const patch = {};
+      if (str('title')) patch.title = str('title');
+      if (str('text') || str('file')) patch.text = str('file') ? fs.readFileSync(str('file'), 'utf8') : str('text');
+      if (str('area')) patch.area = str('area');
+      if (flags.ok) patch.status = 'ok';
+      updateKnowledge(root, pos[0], patch); out('Gespeichert.');
+    } else if (sub === 'remove' || sub === 'reject') { removeKnowledge(root, pos[0]); out('Entfernt.'); }
+    else {
+      const q = (sub === 'search' ? pos.join(' ') : '').toLowerCase();
+      const list = loadKnowledge(root).filter((e) => !q || `${e.title} ${e.text} ${e.area}`.toLowerCase().includes(q));
+      if (flags.json) { out(JSON.stringify(list, null, 2)); return; }
+      if (!list.length) { out(q ? 'Nichts gefunden.' : 'Noch kein Projektwissen. Mit works know add --area ".." --title ".." --text ".." anlegen, Vorschläge mit works know propose.'); return; }
+      let area = '';
+      for (const e of list) {
+        if (e.area !== area) { area = e.area; out(`\n## ${area}`); }
+        out(`[${e.id}] ${e.title}${e.status !== 'ok' ? ` (${e.status})` : ''}\n${e.text}`);
+      }
+    }
+  } catch (e) { fail(e.message); }
+  refresh(root);
+}
+
+// ---------- Wiederkehrende Aufgaben ----------
+
+function recurRule(input, old = {}) {
+  const r = { ...old };
+  const g = (k) => (input[k] !== undefined && input[k] !== true ? String(input[k]) : undefined);
+  if (g('title') !== undefined) r.title = g('title').slice(0, 150);
+  if (g('every') !== undefined) {
+    const e = g('every');
+    const m = e.match(/^(daily|weekly|monthly|days)(?::(\d+))?$/);
+    if (!m) fail('--every: daily, weekly, monthly oder days:N');
+    r.kind = m[1]; if (m[2]) r.interval = parseInt(m[2], 10);
+  }
+  for (const k of ['interval', 'weekday', 'nth', 'day', 'due_days']) if (g(k) !== undefined) r[k] = parseInt(g(k), 10) || undefined;
+  if (g('start') !== undefined) r.start = g('start');
+  if (g('template') !== undefined) r.template = g('template');
+  for (const k of ['type', 'priority', 'effort', 'tags', 'description']) if (g(k) !== undefined) r[k] = g(k);
+  if (g('status') !== undefined) r.status = ['backlog', 'geplant'].includes(g('status')) ? g('status') : 'geplant';
+  if (input.queue !== undefined) r.queue = input.queue === true || input.queue === 'true';
+  if (input.sprint !== undefined) r.sprint = input.sprint === true || input.sprint === 'true';
+  if (input.active !== undefined) r.active = !(input.active === 'false' || input.active === false);
+  if (!r.title) fail('--title fehlt.');
+  if (!KINDS.includes(r.kind)) fail('--every fehlt: daily, weekly, monthly oder days:N');
+  return r;
+}
+
+function runRecurringNow(root, { quiet = false } = {}) {
+  const config = loadConfig(root);
+  const due = dueRules(config, loadTasks(root));
+  const made = [];
+  for (const { rule, date, blockedBy } of due) {
+    const r = config.recurring.find((x) => x.id === rule.id);
+    if (blockedBy) {
+      r.last = date;
+      const prev = loadTasks(root).find((t) => t.id === blockedBy);
+      if (prev) { addHistory(prev, `Wiederkehrender Termin ${date} übersprungen, diese Aufgabe ist noch offen`); saveTask(prev); }
+      continue;
+    }
+    const opts = { title: fillTitle(r.title, date), type: r.type || 'chore', priority: r.priority || 'P3', status: r.status || 'geplant', source: `wiederkehrend:${r.id}` };
+    if (r.effort) opts.effort = r.effort;
+    if (r.tags) opts.tags = r.tags;
+    if (r.description) opts.description = r.description;
+    if (r.due_days) opts.due = addDays(date, r.due_days);
+    let task;
+    if (r.template && findTemplate(root, r.template)) {
+      const a = applyTemplate(findTemplate(root, r.template), { text: r.description || '', title: opts.title, criteria: null });
+      task = createTask(root, config, { ...opts, type: r.type || a.type, priority: r.priority || a.priority, effort: r.effort || a.effort || undefined, tags: [...new Set([...a.tags, ...listFlag(r.tags)])].join(','), description: a.description, criteriaList: a.criteria });
+    } else task = createTask(root, config, opts);
+    r.last = date; r.lastTask = task.id;
+    if (r.queue) config.queue = [...queueOf(config), task.id];
+    const sp = activeSprint(config);
+    if (r.sprint && sp) sp.tasks = [...new Set([...(sp.tasks || []), task.id])];
+    made.push(task);
+    if (!quiet) out(`Wiederkehrend angelegt: ${task.id} ${task.title} (Regel ${r.id}, Termin ${date})`);
+  }
+  if (due.length) { saveConfig(root, config); refresh(root); }
+  return made;
+}
+
+function cmdRecur() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  config.recurring = rules(config);
+  const sub = pos.shift() || 'list';
+  if (sub === 'add') {
+    const max = Math.max(0, ...config.recurring.map((r) => parseInt(String(r.id).slice(1), 10) || 0));
+    const r = recurRule(flags, { id: `R${max + 1}`, active: true, status: 'geplant', start: today() });
+    config.recurring.push(r); saveConfig(root, config); refresh(root);
+    out(`${r.id} ${r.title}: ${describe(r)}, nächste Termine ${upcoming(r, 3).join(', ')}`);
+  } else if (sub === 'set') {
+    const id = String(pos.shift() || '').toUpperCase();
+    const i = config.recurring.findIndex((r) => r.id === id);
+    if (i === -1) fail(`Regel ${id} nicht gefunden.`);
+    config.recurring[i] = recurRule(flags, config.recurring[i]);
+    saveConfig(root, config); refresh(root);
+    out(`${id} gespeichert: ${describe(config.recurring[i])}`);
+  } else if (sub === 'remove') {
+    const id = String(pos.shift() || '').toUpperCase();
+    config.recurring = config.recurring.filter((r) => r.id !== id);
+    saveConfig(root, config); refresh(root);
+    out(`${id} entfernt.`);
+  } else if (sub === 'run') {
+    const made = runRecurringNow(root);
+    if (!made.length) out('Heute ist nichts fällig.');
+  } else {
+    if (!config.recurring.length) { out('Keine wiederkehrenden Aufgaben. Anlegen: works recur add --title ".." --every monthly --weekday 1 --nth 1'); return; }
+    for (const r of config.recurring) out(`${r.id} ${r.active === false ? '(pausiert) ' : ''}${r.title}: ${describe(r)}, nächste ${upcoming(r, 1, r.last ? addDays(r.last, 1) : today())[0]}${r.lastTask ? `, zuletzt ${r.lastTask}` : ''}`);
+  }
+}
+
+// ---------- Projekte, GitHub, Kalender, Rückgängig ----------
+
+async function cmdHub() {
+  if (flags.list) { for (const p of projectList()) out(`${p.name}  ${p.path}`); return; }
+  serveHub({ port: parseInt(flags.port || 4740, 10) });
+  return new Promise(() => {});
+}
+
+function cmdGithub() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const sub = pos.shift() || 'sync';
+  if (sub === 'set') {
+    const s = syncSettings(config);
+    for (const pair of pos) {
+      const i = pair.indexOf('='); const k = pair.slice(0, i); const v = pair.slice(i + 1);
+      if (k === 'labels') s.labels = listFlag(v);
+      else if (k in DEFAULT_SYNC && typeof DEFAULT_SYNC[k] === 'boolean') s[k] = ['true', '1', 'ja', 'an'].includes(v.toLowerCase());
+      else fail(`Unbekannte Einstellung ${k}. Erlaubt: ${Object.keys(DEFAULT_SYNC).join(', ')}`);
+    }
+    config.github_sync = s; saveConfig(root, config);
+    out(`GitHub-Abgleich: ${s.enabled ? 'an' : 'aus'}`);
+    return;
+  }
+  if (sub === 'status') {
+    const st = syncState(root);
+    if (!st) { out('Noch kein Abgleich. works github sync'); return; }
+    out(`${st.repo}, zuletzt ${st.last}`);
+    for (const e of (st.events || []).slice(0, 15)) out(`  ${e.at.slice(0, 16).replace('T', ' ')}  ${e.text}`);
+    return;
+  }
+  const r = syncGithub(root, { log: flags.quiet ? () => {} : (t) => out(t) });
+  if (r.skipped) { if (!flags.quiet) out(`GitHub-Abgleich übersprungen: ${r.skipped}.`); return; }
+  if (!flags.quiet) out(r.first ? `Erster Abgleich mit ${r.repo}: Stand gemerkt, ab jetzt werden Änderungen übernommen.` : r.events.length ? `${r.events.length} Änderung(en) aus ${r.repo} übernommen.` : `Nichts Neues aus ${r.repo}.`);
+}
+
+function cmdIcal() {
+  const root = requireRoot();
+  const text = buildIcal(root, { recurring: !!flags.recurring });
+  const file = path.resolve(flags.out && flags.out !== true ? String(flags.out) : path.join(worksDir(root), 'reports', 'termine.ics'));
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, text);
+  out(`Kalender gespeichert: ${file}. Läuft das Board, gibt es ihn auch zum Abonnieren unter /kalender.ics.`);
+}
+
+function cmdUndo() {
+  const root = requireRoot();
+  if (flags.list) { const l = undoList(root); if (!l.length) out('Nichts zum Rückgängigmachen.'); for (const e of l.slice(0, 20)) out(`${e.key}  ${e.at.slice(0, 16).replace('T', ' ')}  ${e.label}`); return; }
+  try { const e = undo(root, pos[0]); refresh(root); out(`Rückgängig gemacht: ${e.label}`); } catch (e) { fail(e.message); }
+}
+
 // ---------- Dispatcher ----------
 
 const commands = {
@@ -2083,6 +2362,8 @@ const commands = {
   'idea-drop': cmdIdeaDrop, demo: cmdDemo, queue: cmdQueue, share: cmdShare, export: cmdExport,
   sprint: cmdSprint, comment: cmdComment, comments: cmdComments, views: cmdViews, template: cmdTemplate,
   templates: cmdTemplate, time: cmdTime, checks: cmdChecks,
+  design: cmdDesign, instruct: cmdInstruct, know: cmdKnow, wissen: cmdKnow, recur: cmdRecur, hub: cmdHub,
+  github: cmdGithub, gh: cmdGithub, ical: cmdIcal, undo: cmdUndo,
 };
 
 const fn = commands[cmd];

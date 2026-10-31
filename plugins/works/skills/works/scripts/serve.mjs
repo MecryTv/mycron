@@ -7,7 +7,12 @@ import crypto from 'node:crypto';
 import { worksDir, run } from './lib.mjs';
 import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
-import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo } from './api.mjs';
+import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background } from './api.mjs';
+import { buildIcal } from './ical.mjs';
+import { registerProject } from './hub.mjs';
+import { syncSettings, syncState } from './ghsync.mjs';
+import { dueRules } from './recurring.mjs';
+import { loadConfig, loadTasks } from './lib.mjs';
 import { shareKeys, rotateKeys, shareLinks, lanAddresses } from './share.mjs';
 import { buildSnapshot, snapshotName } from './export.mjs';
 import { runningVersion, writeServer, clearServer, newestCli, cliVersion, OWN_CLI, startDetached, ensureGitignore } from './server-control.mjs';
@@ -33,7 +38,7 @@ function statPart(file) {
 // Fingerabdruck aller Dateien, die das Board beeinflussen. Generierte Dateien (WORKS.md, board.html) zählen nicht.
 export function signature(root) {
   const wd = worksDir(root);
-  const parts = ['config.json', 'state.json', 'ideas.md'].map((f) => statPart(path.join(wd, f)));
+  const parts = ['config.json', 'state.json', 'ideas.md', 'wissen.md', 'activity.json', 'instructions.json', 'github.json'].map((f) => statPart(path.join(wd, f)));
   for (const sub of ['tasks', 'archive']) {
     const base = path.join(wd, sub);
     let dirs = [];
@@ -42,6 +47,7 @@ export function signature(root) {
       const dir = path.join(base, d);
       parts.push(`${sub}/${d}`, statPart(path.join(dir, 'task.md')), statPart(path.join(dir, 'decisions.md')), statPart(path.join(dir, 'comments.md')), statPart(path.join(dir, 'checks.json')));
       try { parts.push(fs.readdirSync(path.join(dir, 'assets')).sort().join(',')); } catch { /* keine Assets */ }
+      parts.push(statPart(path.join(dir, 'design', 'design.json')));
     }
   }
   try { parts.push(fs.readdirSync(path.join(wd, 'templates')).map((f) => f + statPart(path.join(wd, 'templates', f))).join(',')); } catch { /* keine Vorlagen */ }
@@ -113,6 +119,20 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     broadcast();
   };
   const timer = setInterval(tick, POLL_MS);
+  // Hintergrundaufgaben: wiederkehrende Aufgaben anlegen und GitHub abgleichen, solange das Board läuft.
+  let lastGh = 0;
+  const chores = setInterval(() => {
+    if (stopping) return;
+    try {
+      const config = loadConfig(root);
+      if (Array.isArray(config.recurring) && config.recurring.length && dueRules(config, loadTasks(root)).length) background(root, ['recur', 'run']);
+      const gs = syncSettings(config);
+      const st = syncState(root);
+      if (gs.enabled && Date.now() - lastGh > gs.interval_min * 60000 && (!st || Date.now() - Date.parse(st.last || 0) > gs.interval_min * 60000)) { lastGh = Date.now(); background(root, ['github', 'sync', '--quiet'], 90000); }
+    } catch { /* beim nächsten Mal */ }
+  }, 60000);
+  chores.unref();
+  registerProject(root);
   const keepalive = setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, KEEPALIVE_MS);
 
   // Selbstprüfung: Ist inzwischen eine neuere Version installiert, übergibt der Server an sie.
@@ -228,6 +248,13 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     try {
       if (req.method === 'GET') {
         if (p === '/api/templates') return json(res, 200, templatesList(root));
+        if (p === '/api/knowledge') return json(res, 200, knowledgeList(root));
+        if (p === '/api/recurring') return json(res, 200, recurringInfo(root));
+        if (p === '/api/usage') return json(res, 200, usageInfo(root));
+        if (p === '/api/github') return json(res, 200, githubInfo(root));
+        if (p === '/api/cleanup') return json(res, 200, cleanupInfo(root));
+        if (p === '/api/similar') return json(res, 200, similarTo(root, String(q.get('title') || '').slice(0, 200), String(q.get('text') || '').slice(0, 2000)));
+        if (p === '/api/undo') return json(res, 200, level === 'edit' ? undoInfo(root) : []);
         if (p === '/api/estimates') return json(res, 200, estimatesInfo(root));
         if (p === '/api/reports') return json(res, 200, reportsInfo(root));
         if (p === '/api/code') return json(res, 200, await codeOf(root, String(q.get('id') || '').toUpperCase()));
@@ -258,8 +285,8 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         try { body = JSON.parse((await readBody(req, MAX_JSON)).toString('utf8')); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, 'Ungültiges JSON.'); }
         // Befehle ausführen oder ändern und den Webhook setzen geht nur direkt am eigenen Rechner,
         // nicht über einen geteilten Bearbeitungslink.
-        if (['checksRun', 'checksSave', 'reportWebhook'].includes(body && body.action) && !isLocal(req)) throw new ApiError(403, 'Das geht nur direkt am Rechner, auf dem das Board läuft.');
-        const result = await runAction(root, body);
+        if (['checksRun', 'checksSave', 'reportWebhook', 'githubSync', 'githubSettings'].includes(body && body.action) && !isLocal(req)) throw new ApiError(403, 'Das geht nur direkt am Rechner, auf dem das Board läuft.');
+        const result = await runActionWithUndo(root, body);
         tick();
         return json(res, 200, { ok: true, ...result });
       }
@@ -302,6 +329,12 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     if (pathname.startsWith('/api/')) { handleApi(req, res, url); return; }
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'text/plain', 'Nur GET');
 
+    // Kalender zum Abonnieren: lokal oder mit Schlüssel im Link, weil Kalender-Apps keine Cookies senden.
+    if (pathname === '/kalender.ics') {
+      const k = url.searchParams.get('key');
+      if (!accessOf(req, null) && !(k && keyLevel(k))) return send(res, 403, 'text/plain', 'Kein Zugriff');
+      try { return send(res, 200, 'text/calendar; charset=utf-8', buildIcal(root, { recurring: url.searchParams.get('recurring') === '1' })); } catch (e) { return send(res, 500, 'text/plain', e.message); }
+    }
     const access = accessOf(req, pathname === '/' || pathname === '/index.html' ? url : null);
     if (!access) {
       return send(res, 403, 'text/html; charset=utf-8', '<!doctype html><meta charset="utf-8"><title>Kein Zugriff</title><body style="font:16px system-ui;padding:40px;max-width:560px;margin:auto;color:#222"><h1 style="font-size:22px">Kein Zugriff auf dieses Board</h1><p>Der Link ist ungültig oder wurde erneuert. Bitte den Besitzer des Boards um einen neuen Link.</p></body>');
@@ -334,12 +367,15 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     fs.stat(abs, (err, st) => {
       if (err || !st.isFile()) return send(res, 404, 'text/plain', 'Nicht gefunden');
       const ext = path.extname(abs).toLowerCase();
+      // Mockups aus UI UX Pro Max dürfen im Board eingebettet werden, laufen aber in einer Sandbox ohne Zugriff auf das Board.
+      const mockup = ext === '.html' && /^(tasks|archive)\/[^/]+\/design\/[^/]+\.html$/.test(rel);
       res.writeHead(200, {
         'Content-Type': MIME[ext] || 'application/octet-stream',
         'Content-Length': st.size, ...SECURITY_HEADERS,
+        ...(mockup ? { 'X-Frame-Options': 'SAMEORIGIN', 'Content-Security-Policy': "sandbox allow-scripts; default-src 'none'; img-src data: blob: https:; style-src 'unsafe-inline' https:; font-src https: data:; script-src 'unsafe-inline' https:; frame-ancestors 'self'" } : {}),
         ...(ext === '.svg' ? { 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'" } : {}),
         // HTML läuft immer in einer Sandbox ohne Zugriff auf das Board. Nur generierte Berichte dürfen ein kleines Skript ausführen.
-        ...(ext === '.html' ? { 'Content-Security-Policy': rel.startsWith('reports/') ? "sandbox allow-scripts; default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:" : "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:" } : {}),
+        ...(ext === '.html' && !mockup ? { 'Content-Security-Policy': rel.startsWith('reports/') ? "sandbox allow-scripts; default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:" : "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:" } : {}),
       });
       if (req.method === 'HEAD') return res.end();
       fs.createReadStream(abs).pipe(res);
@@ -358,7 +394,7 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     });
     server.listen(p, host, () => {
       boundPort = p;
-      ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json']);
+      ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json']);
       writeServer(root, { pid: process.pid, port: p, host, version: runningVersion(), cli: OWN_CLI, started: new Date().toISOString() });
       const url = `http://${host === '0.0.0.0' || host === '::' ? 'localhost' : host}:${p}/`;
       process.stdout.write(`Live-Board läuft: ${url}\nBeobachte ${wd}\nBeenden mit Strg+C.\n`);

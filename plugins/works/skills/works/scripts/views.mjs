@@ -10,6 +10,8 @@ import {
 import { activeSprint, sprintSummaryLine } from './sprint.mjs';
 import { unreadForClaude } from './comments.mjs';
 import { checkItems } from './checks.mjs';
+import { knowledgeSummary, loadKnowledge } from './knowledge.mjs';
+import { designSummary } from './design.mjs';
 
 export function byIdMap(tasks) {
   return new Map(tasks.map((t) => [t.id, t]));
@@ -272,6 +274,12 @@ export function sessionSummary(root, { maxHandoff = 1500 } = {}) {
     lines.push(`Warteschlange des Nutzers (hat Vorrang vor works next): ${queued.slice(0, 6).map((t, i) => `${i + 1}. ${t.id} ${t.title}`).join('; ')}${queued.length > 6 ? ` und ${queued.length - 6} weitere` : ''}.`
       + (qs.auto_next ? ` Nach einem Abschluss die nächste startbare Aufgabe daraus beginnen${qs.ask_before ? ', vorher kurz beim Nutzer nachfragen' : ''}.` : ''));
   }
+  const know = knowledgeSummary(root);
+  if (know) lines.push(know);
+  const proposals = loadKnowledge(root).filter((e) => e.status === 'vorschlag').length;
+  if (proposals) lines.push(`${proposals === 1 ? 'Ein Vorschlag' : `${proposals} Vorschläge`} für das Projektwissen ${proposals === 1 ? 'wartet' : 'warten'} auf den Nutzer.`);
+  const designOpen = open.filter((t) => { const d = designSummary(t); return d && d.variants && !d.chosen; });
+  if (designOpen.length) lines.push(`Entwürfe ohne Wahl des Nutzers: ${designOpen.map((t) => t.id).join(', ')}. Erst nach der Wahl umsetzen.`);
   const sprintLine = sprintSummaryLine(config, all);
   if (sprintLine) lines.push(sprintLine);
   const unread = open.map((t) => ({ t, n: unreadForClaude(root, t).length })).filter((x) => x.n);
