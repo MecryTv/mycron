@@ -7,7 +7,9 @@ import crypto from 'node:crypto';
 import { worksDir, run } from './lib.mjs';
 import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
-import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf } from './api.mjs';
+import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf } from './api.mjs';
+import { shareKeys, rotateKeys, shareLinks, lanAddresses } from './share.mjs';
+import { buildSnapshot, snapshotName } from './export.mjs';
 import { runningVersion, writeServer, clearServer, newestCli, cliVersion, OWN_CLI, startDetached, ensureGitignore } from './server-control.mjs';
 
 const MIME = {
@@ -81,8 +83,12 @@ function safeEqual(a, b) {
 export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false, fixedPort = false, takeover = false } = {}) {
   const wd = worksDir(root);
   const clients = new Set();
-  // Zufälliges Token pro Serverstart. Nur Seiten, die dieser Server ausgeliefert hat, kennen es.
+  // Zufällige Tokens pro Serverstart. Nur Seiten, die dieser Server ausgeliefert hat, kennen sie.
+  // token erlaubt Lesen und Schreiben, viewToken nur Lesen (geteilter Link).
   const token = crypto.randomBytes(24).toString('hex');
+  const viewToken = crypto.randomBytes(24).toString('hex');
+  const shared = host === '0.0.0.0' || host === '::';
+  let keys = shared ? shareKeys(root) : shareKeys(root, { create: false });
   // Öffentliche Kennung dieses Serverstarts. Ändert sie sich, laden offene Tabs neu und erhalten das neue Token.
   const serverId = crypto.randomBytes(6).toString('hex');
   const withServer = (d) => { d.meta.server = serverId; return d; };
@@ -130,16 +136,16 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   }, UPDATE_CHECK_MS);
   updateTimer.unref();
 
-  async function handOver(cli, v) {
+  async function handOver(cli, v, newHost = host) {
     handingOver = true;
     await drain(15000);
-    process.stdout.write(`Neue Version ${v} gefunden, übergebe an ${cli}\n`);
+    process.stdout.write(v ? `Neue Version ${v} gefunden, übergebe an ${cli}\n` : `Starte neu mit Host ${newHost}\n`);
     clearInterval(timer); clearInterval(keepalive); clearInterval(updateTimer);
     for (const res of clients) { res.write('event: restart\ndata: 1\n\n'); res.end(); }
     clients.clear();
     clearServer(root, process.pid);
     server.close();
-    startDetached(root, { cli, port: boundPort, host, takeover: true });
+    startDetached(root, { cli, port: boundPort, host: newHost, takeover: true });
     setTimeout(() => process.exit(0), 300).unref();
   }
 
@@ -150,26 +156,88 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     const name = String(h || '').toLowerCase().replace(/:\d+$/, '');
     return ['127.0.0.1', 'localhost', '[::1]', host.toLowerCase()].includes(name);
   };
-  // Schreibzugriffe nur von dieser Seite: Token im Header plus passender Origin, falls der Browser ihn mitsendet.
-  const apiAllowed = (req) => {
-    if (!safeEqual(req.headers['x-works-token'], token)) return false;
+  // Zugriffsstufe der Anfrage: edit, view oder null.
+  // Lokal (Loopback ohne Proxy-Header) darf alles. Von außen braucht es den Schlüssel aus dem Link,
+  // der nach dem ersten Aufruf als Cookie mitgeht, damit Live-Updates und Bilder funktionieren.
+  const PROXY_HEADERS = ['x-forwarded-for', 'forwarded', 'x-real-ip', 'cf-connecting-ip', 'true-client-ip', 'x-forwarded-host'];
+  // Beim Teilen nimmt der Server jeden Hostnamen an. Volle lokale Rechte gibt es dann nur für bekannte
+  // Hostnamen, sonst könnte eine fremde Webseite per DNS-Rebinding als lokal durchgehen.
+  const knownHost = (h) => {
+    const name = String(h || '').toLowerCase().replace(/:\d+$/, '');
+    return ['127.0.0.1', 'localhost', '[::1]'].includes(name) || lanAddresses().some((a) => a.address === name);
+  };
+  const isLocal = (req) => {
+    const a = String(req.socket.remoteAddress || '');
+    const loop = a === '127.0.0.1' || a === '::1' || a === '::ffff:127.0.0.1';
+    return loop && knownHost(req.headers.host) && !PROXY_HEADERS.some((h) => req.headers[h]);
+  };
+  const cookieKey = (req) => {
+    const m = String(req.headers.cookie || '').match(/(?:^|;\s*)works_key=([\w-]+)/);
+    return m ? m[1] : '';
+  };
+  const keyLevel = (k) => {
+    if (!k || !keys) return null;
+    if (safeEqual(k, keys.owner)) return 'edit';
+    if (safeEqual(k, keys.view)) return 'view';
+    return null;
+  };
+  const accessOf = (req, url) => {
+    const viewParam = url && url.searchParams.get('view');
+    const keyParam = url && url.searchParams.get('key');
+    if (viewParam !== null && viewParam !== undefined && url.searchParams.has('view')) {
+      if (isLocal(req)) return { level: 'view', set: keyLevel(viewParam) === 'view' ? viewParam : '' };
+      return keyLevel(viewParam) === 'view' ? { level: 'view', set: viewParam } : null;
+    }
+    if (keyParam) return keyLevel(keyParam) === 'edit' ? { level: 'edit', set: keyParam } : null;
+    if (isLocal(req)) return { level: 'edit' };
+    if (!shared) return null;
+    const level = keyLevel(cookieKey(req));
+    return level ? { level } : null;
+  };
+
+  // API: Token im Header plus passender Origin, falls der Browser ihn mitsendet.
+  const apiLevel = (req) => {
     const origin = req.headers.origin;
-    if (origin && origin !== `http://${req.headers.host}`) return false;
-    return true;
+    if (origin && origin !== `http://${req.headers.host}`) return null;
+    const t = req.headers['x-works-token'];
+    if (safeEqual(t, token)) return 'edit';
+    if (safeEqual(t, viewToken)) return 'view';
+    return null;
   };
 
   async function handleApi(req, res, url) {
-    if (!apiAllowed(req)) return json(res, 403, { error: 'Zugriff verweigert. Board neu laden.' });
+    const level = apiLevel(req);
+    if (!level) return json(res, 403, { error: 'Zugriff verweigert. Board neu laden.' });
+    if (level === 'view' && req.method !== 'GET') return json(res, 403, { error: 'Dieser Link ist nur zum Ansehen.' });
     if (stopping && req.method !== 'GET') return json(res, 503, { error: 'Das Board startet gerade neu. Bitte in ein paar Sekunden erneut versuchen.' });
     inflight++;
-    try { return await handleApiInner(req, res, url); } finally { inflight--; }
+    try { return await handleApiInner(req, res, url, level); } finally { inflight--; }
   }
 
-  async function handleApiInner(req, res, url) {
+  function shareInfo() {
+    return {
+      shared, port: boundPort, host,
+      links: shared ? shareLinks(root, boundPort) : [],
+    };
+  }
+
+  async function handleApiInner(req, res, url, level) {
     const p = url.pathname;
     const q = url.searchParams;
     try {
       if (req.method === 'GET') {
+        if (p === '/api/code') return json(res, 200, await codeOf(root, String(q.get('id') || '').toUpperCase()));
+        if (p === '/api/diff') return json(res, 200, await diffOf(root, String(q.get('id') || '').toUpperCase(), q.get('file'), q.get('uncommitted') === '1'));
+        if (level !== 'edit' && ['/api/share', '/api/export'].includes(p)) return json(res, 403, { error: 'Nur für den Besitzer des Boards.' });
+        if (p === '/api/share') return json(res, 200, shareInfo());
+        if (p === '/api/export') {
+          const snap = buildSnapshot(root, { images: q.get('images') !== '0', closed: q.get('closed') !== '0' });
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8', ...SECURITY_HEADERS,
+            'Content-Disposition': `attachment; filename="${snapshotName(root)}"`,
+          });
+          return res.end(snap.html);
+        }
         if (p === '/api/meta') return json(res, 200, metaInfo(root));
         if (p === '/api/task') return json(res, 200, taskDetail(root, String(q.get('id') || '').toUpperCase()));
         if (p === '/api/dod') return json(res, 200, dodOf(root, String(q.get('id') || '').toUpperCase()));
@@ -185,6 +253,20 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         const result = await runAction(root, body);
         tick();
         return json(res, 200, { ok: true, ...result });
+      }
+      if (p === '/api/share') {
+        let body = {};
+        try { body = JSON.parse((await readBody(req, MAX_JSON)).toString('utf8') || '{}'); } catch { throw new ApiError(400, 'Ungültiges JSON.'); }
+        if (body.op === 'rotate') { keys = rotateKeys(root); return json(res, 200, { ok: true, message: 'Neue Links erzeugt. Die alten funktionieren nicht mehr.', ...shareInfo() }); }
+        if (body.op === 'enable' || body.op === 'disable') {
+          const want = body.op === 'enable' ? '0.0.0.0' : '127.0.0.1';
+          if ((want === '0.0.0.0') === shared) return json(res, 200, { ok: true, message: 'Keine Änderung.', ...shareInfo() });
+          if (want === '0.0.0.0') shareKeys(root);
+          json(res, 200, { ok: true, restarting: true, message: body.op === 'enable' ? 'Board wird im Netzwerk freigegeben und startet neu.' : 'Freigabe beendet, das Board startet neu.' });
+          setTimeout(() => handOver(OWN_CLI, '', want), 100);
+          return;
+        }
+        throw new ApiError(400, 'Unbekannte Aktion.');
       }
       if (p === '/api/asset') {
         const data = await readBody(req, MAX_UPLOAD);
@@ -211,8 +293,18 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     if (pathname.startsWith('/api/')) { handleApi(req, res, url); return; }
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'text/plain', 'Nur GET');
 
+    const access = accessOf(req, pathname === '/' || pathname === '/index.html' ? url : null);
+    if (!access) {
+      return send(res, 403, 'text/html; charset=utf-8', '<!doctype html><meta charset="utf-8"><title>Kein Zugriff</title><body style="font:16px system-ui;padding:40px;max-width:560px;margin:auto;color:#222"><h1 style="font-size:22px">Kein Zugriff auf dieses Board</h1><p>Der Link ist ungültig oder wurde erneuert. Bitte den Besitzer des Boards um einen neuen Link.</p></body>');
+    }
     if (pathname === '/' || pathname === '/index.html') {
-      try { return send(res, 200, 'text/html; charset=utf-8', renderBoard(withServer(boardData(root)), { live: true, token })); } catch (e) { return send(res, 500, 'text/plain; charset=utf-8', `Fehler beim Erzeugen: ${e.message}`); }
+      const headers = {};
+      if (access.set) headers['Set-Cookie'] = `works_key=${access.set}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000`;
+      try {
+        const html = renderBoard(withServer(boardData(root)), { live: true, token: access.level === 'edit' ? token : viewToken, mode: access.level });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...SECURITY_HEADERS, ...headers });
+        return res.end(html);
+      } catch (e) { return send(res, 500, 'text/plain; charset=utf-8', `Fehler beim Erzeugen: ${e.message}`); }
     }
     if (pathname === '/data.json') {
       try { return json(res, 200, withServer(boardData(root))); } catch (e) { return json(res, 500, { error: e.message }); }
@@ -255,10 +347,17 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     });
     server.listen(p, host, () => {
       boundPort = p;
-      ensureGitignore(root, ['server.json', 'server.log', '.tmp/']);
+      ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json']);
       writeServer(root, { pid: process.pid, port: p, host, version: runningVersion(), cli: OWN_CLI, started: new Date().toISOString() });
       const url = `http://${host === '0.0.0.0' || host === '::' ? 'localhost' : host}:${p}/`;
       process.stdout.write(`Live-Board läuft: ${url}\nBeobachte ${wd}\nBeenden mit Strg+C.\n`);
+      if (shared) {
+        const links = shareLinks(root, p);
+        if (links.length) {
+          process.stdout.write('Im Netzwerk geteilt. Link zum Ansehen:\n');
+          for (const l of links) process.stdout.write(`  ${l.view}\n`);
+        } else process.stdout.write('Im Netzwerk freigegeben, aber keine Netzwerkadresse gefunden.\n');
+      }
       if (open) {
         const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
         run(opener, [url], { detached: true, stdio: 'ignore' });

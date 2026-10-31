@@ -15,6 +15,12 @@
     <h1 id="project"></h1>
     <span class="live" id="live" hidden></span>
   </div>
+  <nav class="views" id="views" aria-label="Ansicht">
+    <button data-view="board" aria-pressed="true">Board</button>
+    <button data-view="queue" aria-pressed="false">Warteschlange <span class="count" id="queueCount" hidden></span></button>
+    <button data-view="timeline" aria-pressed="false">Zeitleiste</button>
+    <button data-view="table" aria-pressed="false">Tabelle</button>
+  </nav>
   <label class="search">
     <span class="sr">Aufgaben durchsuchen</span>
     <input id="q" type="search" placeholder="Suchen nach Titel, ID oder Tag" autocomplete="off">
@@ -24,8 +30,9 @@
     <button class="btn ghost" id="btnNext" data-live>Nächste Aufgabe</button>
     <button class="btn ghost" id="btnIdeas" data-live>Ideen <span class="count" id="ideaCount" hidden></span></button>
     <button class="btn ghost" id="btnActivity" data-live>Aktivität <span class="count" id="actCount" hidden></span></button>
+    <button class="btn ghost" id="btnShare" data-edit>Teilen</button>
     <button class="btn ghost icon" id="btnTheme" title="Farbschema wechseln" aria-label="Farbschema wechseln"></button>
-    <button class="btn primary" id="btnNew" data-live>Neue Aufgabe <kbd>N</kbd></button>
+    <button class="btn primary" id="btnNew" data-edit>Neue Aufgabe <kbd>N</kbd></button>
   </nav>
 </header>
 
@@ -33,24 +40,28 @@
   Nur Ansicht. Zum Bearbeiten das Board mit <code>works board --serve</code> öffnen oder Claude bitten, das Board zu starten.
 </div>
 
-<section class="overview" aria-label="Überblick">
+<section class="overview" aria-label="Überblick" data-only="board">
   <div class="flow" id="flow" role="list"></div>
   <div class="signals" id="signals"></div>
 </section>
 
-<section class="filters" aria-label="Filter">
+<section class="filters" aria-label="Filter" data-only="board timeline table">
   <div class="prio-filter" id="prioFilter" role="group" aria-label="Priorität"></div>
   <select id="typeFilter" aria-label="Typ"><option value="">Alle Typen</option></select>
   <select id="tagFilter" aria-label="Tag"><option value="">Alle Tags</option></select>
   <select id="msFilter" aria-label="Meilenstein"><option value="">Alle Meilensteine</option></select>
-  <button class="btn small ghost" id="msEdit" hidden data-live>Meilenstein bearbeiten</button>
+  <button class="btn small ghost" id="msEdit" hidden data-edit>Meilenstein bearbeiten</button>
   <label class="toggle"><input type="checkbox" id="showClosed"> Archiv und Verworfene</label>
   <button class="btn link" id="resetFilters" hidden>Filter zurücksetzen</button>
 </section>
 
-<section class="progress" id="progress" aria-label="Fortschritt"></section>
+<section class="progress" id="progress" aria-label="Fortschritt" data-only="board"></section>
 
-<main class="board" id="board" tabindex="-1"></main>
+<main class="board" id="board" tabindex="-1" data-only="board"></main>
+<main class="view queue-view" id="viewQueue" tabindex="-1" data-only="queue" hidden></main>
+<main class="view tl-view" id="viewTimeline" tabindex="-1" data-only="timeline" hidden></main>
+<main class="view table-view" id="viewTable" tabindex="-1" data-only="table" hidden></main>
+<div class="bulk" id="bulk" hidden role="toolbar" aria-label="Mehrere Aufgaben bearbeiten"></div>
 
 <aside class="panel" id="panel" aria-label="Aufgabendetails" hidden>
   <div class="panel-inner" id="panelBody"></div>

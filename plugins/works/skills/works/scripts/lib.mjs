@@ -96,7 +96,29 @@ export const DEFAULT_CONFIG = {
     days: 7,
   },
   handoff_stale_days: 3,
+  // Reihenfolge, in der Claude Aufgaben abarbeiten soll (IDs), und wie danach weitergemacht wird.
+  queue: [],
+  queue_settings: {
+    auto_next: false,
+    skip_blocked: true,
+    ask_before: true,
+  },
 };
+
+export function queueOf(config) {
+  return Array.isArray(config.queue) ? config.queue.filter((x) => typeof x === 'string') : [];
+}
+
+// Entfernt erledigte, verworfene oder unbekannte Aufgaben aus der Warteschlange. Gibt true zurück, wenn sich etwas geändert hat.
+export function pruneQueue(root, config, tasks) {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const before = queueOf(config);
+  const after = before.filter((id, i) => before.indexOf(id) === i && byId.has(id) && !['erledigt', 'verworfen'].includes(byId.get(id).status));
+  if (after.length === before.length) return false;
+  config.queue = after;
+  saveConfig(root, config);
+  return true;
+}
 
 // ---------- Allgemein ----------
 

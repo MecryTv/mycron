@@ -49,12 +49,30 @@ Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Se
 
 ## Aufbau der Oberfläche
 
-- Kopfzeile: Projekt, Verbindungsstatus, Suche (Taste `/`), Nächste Aufgabe, Ideen, Aktivität, Farbschema (System, Hell, Dunkel) und Neue Aufgabe (Taste `N`).
+- Kopfzeile: Projekt, Verbindungsstatus, Ansicht (Board, Warteschlange, Zeitleiste, Tabelle, Tasten `1` bis `4`), Suche (Taste `/`), Nächste Aufgabe, Ideen, Aktivität, Teilen, Farbschema (System, Hell, Dunkel) und Neue Aufgabe (Taste `N`).
 - Flussleiste: Verteilung aller Aufgaben auf die Status. Ein Klick springt zur Spalte.
 - Hinweise darunter: offene P1, blockierte, überfällige, Aufgaben mit offenen Fragen und unvollständig erfasste. Ein Klick filtert.
 - Filter: Priorität, Typ, Tag, Meilenstein, Archiv und Verworfene. Im Meilenstein-Filter lassen sich auch Meilensteine anlegen; ist einer gewählt, erscheint "Meilenstein bearbeiten".
 - Fortschritt: Anteil erledigter Aufgaben in Prozent, Balken für erledigt, in Arbeit und Review sowie noch offen, erfüllte Akzeptanzkriterien, Bilanz der letzten 7 Tage, eine Prognose aus dem Tempo der letzten 4 Wochen und ein Verlaufsdiagramm über 8 Wochen (angelegte gegen erledigte Aufgaben). Die Anzeige folgt den Filtern: Ist ein Meilenstein gewählt, zeigt sie dessen Fortschritt samt Zieldatum. Verworfene Aufgaben zählen nicht mit, erledigte im Archiv schon.
 - Spalten mit Karten. Karten zeigen ID, Typ, Aufwand, Priorität, Titel, letztes Bild, Fortschritt der Akzeptanzkriterien, Blockaden, Fälligkeit, offene Fragen, Meilenstein und Tags.
+
+## Ansichten
+
+- **Board**: Spalten mit Karten wie oben.
+- **Warteschlange**: die Reihenfolge, in der Claude arbeiten soll. Aufgaben einreihen (Auswahlfeld, Detailpanel oder Tabelle), per Ziehen oder Pfeilen sortieren, mit × entfernen. Oben steht, was gerade läuft. Rechts die Einstellungen: nach dem Abschluss weitermachen (`auto_next`), vorher nachfragen (`ask_before`), blockierte überspringen (`skip_blocked`), dazu was Claude als Nächstes nimmt und der Aufwand in der Schlange. Erledigte und verworfene fallen automatisch heraus. Im CLI: `works queue`.
+- **Zeitleiste**: Wochen mit Kalenderwoche, gruppiert nach Meilenstein. Volle Balken laufen oder sind erledigt, gestrichelt farbig sind geplant mit Fälligkeit, gestrichelt grau sind aus dem Aufwand geschätzt (S 2, M 5, L 10, XL 15 Tage, blockierte beginnen nach ihrer Abhängigkeit). Linie für heute, gestrichelte grüne Linie für das Ziel eines Meilensteins, Überfälliges rot. Das rechte Ende eines Balkens ziehen setzt die Fälligkeit.
+- **Tabelle**: alle gefilterten Aufgaben mit sortierbaren Spalten. Priorität, Aufwand und Fälligkeit direkt in der Zeile ändern. Mehrere auswählen (Shift wählt einen Bereich), dann in der Leiste unten Priorität, Status, Meilenstein, Aufwand oder Tags setzen, einreihen, verwerfen oder archivieren. Abschließen geht bewusst nur einzeln über die Definition of Done.
+
+Im Detailpanel zeigt der Reiter **Code und Commits** den Branch der Aufgabe (aus dem Feld `branch` oder der ID im Branchnamen), wie weit er dem Hauptbranch voraus ist, einen Pull Request (wenn `gh` angemeldet ist), alle Commits mit der ID in der Nachricht und die geänderten Dateien. Ein Klick auf eine Datei zeigt den Diff. Arbeitet man gerade auf dem Branch, stehen noch nicht committete Änderungen extra.
+
+## Teilen
+
+- **Im Netzwerk, live und nur lesen**: Im Board auf Teilen, dann "Im Netzwerk freigeben", oder `works board --restart --share`. Der Server hört dann auf allen Adressen und gibt einen Link wie `http://192.168.1.20:4747/?view=SCHLÜSSEL` aus. Wer ihn öffnet, sieht Board, Zeitleiste, Tabelle, Details und Code live, kann aber nichts ändern. Ohne Schlüssel gibt es keinen Zugriff.
+- **Eigene andere Geräte**: Der Bearbeitungslink (`?key=…`, im Teilen-Dialog unter "Link mit Bearbeitungsrechten" oder `works share --owner`) erlaubt alles. Nicht weitergeben.
+- **Links erneuern**: `works share --rotate` oder im Dialog. Alte Links funktionieren danach nicht mehr. Die Schlüssel liegen in `.works/share.json` und sind von Git ausgenommen.
+- **Freigabe beenden**: `works board --restart --private` oder im Dialog.
+- **Schnappschuss**: `works export` oder im Dialog. Eine HTML-Datei mit allen Aufgaben, Details und eingebetteten Bildern, öffnet sich ohne Server und ohne Internet. Ideal für Leute außerhalb des Netzwerks.
+- Ein Hosting im Internet ist noch nicht eingebaut. Den Port nicht einfach ins Internet weiterleiten; Tunnel und Reverse Proxys werden als fremde Zugriffe behandelt und brauchen ebenfalls einen Schlüssel.
 
 ## Schnellsuche
 
@@ -121,6 +139,8 @@ Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen d
 - Vor jedem Edit an einer task.md die Datei neu lesen. Der Nutzer kann sie inzwischen im Board geändert haben.
 - Aufgaben mit `source: board` und `incomplete: true` hat der Nutzer schnell angelegt. Bei passender Gelegenheit Ziel und Akzeptanzkriterien mit ihm klären.
 - Offene Fragen, die der Nutzer im Board notiert, sind oft an Claude gerichtet. Beim Start einer solchen Aufgabe zuerst darauf eingehen.
+- Die Warteschlange ist ein Auftrag des Nutzers. Beim Abarbeiten immer die oberste startbare Aufgabe nehmen und die Einstellungen `auto_next` und `ask_before` beachten.
+- Beim Teilen den Leselink nennen, den Bearbeitungslink nur, wenn der Nutzer ausdrücklich danach fragt.
 - Bilder, die über das Board kommen, haben eine Beschreibung vom Nutzer. Fehlt sie, das Bild bei Bedarf mit Read ansehen und die Beschreibung ergänzen.
 
 ## Live-Aktualisierung
@@ -135,9 +155,11 @@ Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen d
 ## Sicherheit
 
 - Der Server bindet standardmäßig nur an 127.0.0.1 und nimmt nur Anfragen mit lokalem Hostnamen an. Das verhindert DNS-Rebinding.
+- Beim Teilen (`--share`) bekommen nur lokale Anfragen ohne Proxy-Header automatisch volle Rechte. Alle anderen brauchen den Lese- oder Bearbeitungsschlüssel aus dem Link; er wird danach als HttpOnly-Cookie mitgeschickt. Lesende erhalten ein eigenes Token, mit dem der Server nur GET-Anfragen annimmt. Export und Freigabe-Einstellungen sind dem Besitzer vorbehalten.
 - Jede API-Anfrage braucht ein zufälliges Token, das bei jedem Serverstart neu erzeugt und nur in die ausgelieferte Seite eingebettet wird. Fremde Webseiten können es nicht lesen und deshalb nichts ändern. Ein abweichender Origin wird zusätzlich abgelehnt.
 - Alle Eingaben werden geprüft (IDs, Werte, Längen, Bildtypen bis 20 MB) und als einzelne Argumente ohne Shell an das CLI übergeben.
-- Ausgeliefert werden nur Board, Daten und Dateien unter `tasks/`, `archive/` und `reports/` sowie WORKS.md und ideas.md. config.json und state.json bleiben gesperrt.
+- Ausgeliefert werden nur Board, Daten und Dateien unter `tasks/`, `archive/` und `reports/` sowie WORKS.md und ideas.md. config.json, state.json und share.json bleiben gesperrt.
+- Git wird ohne Shell mit festen Argumenten und Zeitlimit aufgerufen, Diffs nur für Dateien, die zur Aufgabe gehören, und gekürzt auf 400 Zeilen.
 - Temporäre Dateien liegen kurz in `.works/.tmp/` und werden sofort wieder gelöscht.
 
 ## Meilensteine

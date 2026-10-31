@@ -38,6 +38,12 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `board [--open]` | `.works/board.html` erzeugen und optional im Browser öffnen. Danach wird die Datei nach jeder Änderung automatisch neu erzeugt |
 | `board --serve [--detach] [--port 4747] [--host 127.0.0.1] [--open]` | Live-Board auf einem lokalen Server, mit `--detach` im Hintergrund. Läuft schon ein aktueller Server, wird nur seine URL ausgegeben, ein veralteter wird ersetzt. Ist der Standardport belegt, wird der nächste freie genommen. Siehe board.md |
 | `board --status` / `--restart` / `--stop` | Server abfragen, mit aktueller Version neu starten oder beenden |
+| `board --restart --share` / `--private` | Im lokalen Netz teilen (Leselink mit Schlüssel) oder wieder nur lokal |
+| `share [--owner] [--rotate]` | Links zum Teilen anzeigen, mit `--owner` auch den Bearbeitungslink, mit `--rotate` neue Schlüssel |
+| `export [--out datei.html] [--no-images] [--open-only]` | Schnappschuss als eine HTML-Datei mit Details und eingebetteten Bildern, Standard in `.works/reports/` |
+| `queue` | Warteschlange des Nutzers anzeigen (`--json` für Maschinen) |
+| `queue add <ID> [--pos N]` / `remove <ID>` / `move <ID> <N>` / `order A,B,C` / `clear` | Warteschlange bearbeiten |
+| `queue set auto_next=true ask_before=true skip_blocked=true` | Ablauf nach dem Abschluss einstellen |
 | `demo [--simulate] [--delay 6] [--open] [--port ..] [--path ordner]` | Beispielprojekt anlegen (Standard: Temp-Ordner `works-demo`) und Live-Board starten. `--simulate` spielt zehn typische Änderungen von Claude vor. Überschreibt nie ein echtes `.works` |
 | `demo --remove [--path ordner]` | Demo-Server beenden und Demo-Ordner löschen |
 | `milestone list` | Meilensteine mit Fortschritt |

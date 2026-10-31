@@ -242,6 +242,19 @@ export function nextList(root) {
   };
 }
 
+export async function codeOf(root, taskId) {
+  const { codeInfo } = await import('./git.mjs');
+  return codeInfo(root, findTaskSafe(root, taskId));
+}
+
+export async function diffOf(root, taskId, file, uncommitted) {
+  const { fileDiff } = await import('./git.mjs');
+  if (typeof file !== 'string' || !file || file.length > 500 || file.includes('\0')) bad('Ungültige Datei.');
+  const r = await fileDiff(root, findTaskSafe(root, taskId), file, { uncommitted });
+  if (r.error) throw new ApiError(404, r.error);
+  return r;
+}
+
 export function dodOf(root, taskId) {
   const config = loadConfig(root);
   return dodCheck(root, config, findTaskSafe(root, taskId));
@@ -452,6 +465,74 @@ const actions = {
     if (!pairs.length) bad('Keine Felder angegeben.');
     await must(root, ['milestone', 'set', b.mid.toUpperCase(), ...pairs]);
     return { message: 'Meilenstein gespeichert.' };
+  },
+
+  // ---------- Warteschlange ----------
+  async queueAdd(root, b) {
+    const tid = id(b.id);
+    const p = parseInt(b.pos, 10);
+    await must(root, ['queue', 'add', tid, ...(p > 0 ? [`--pos=${p}`] : [])]);
+    return { message: `${tid} eingereiht.` };
+  },
+  async queueRemove(root, b) {
+    const tid = id(b.id);
+    await must(root, ['queue', 'remove', tid]);
+    return { message: `${tid} aus der Warteschlange genommen.` };
+  },
+  async queueOrder(root, b) {
+    const ids = Array.isArray(b.ids) ? b.ids.slice(0, 200).map(id) : bad('Reihenfolge fehlt.');
+    await must(root, ids.length ? ['queue', 'order', ids.join(',')] : ['queue', 'clear']);
+    return { message: ids.length ? 'Reihenfolge gespeichert.' : 'Warteschlange geleert.' };
+  },
+  async queueSettings(root, b) {
+    const pairs = ['auto_next', 'skip_blocked', 'ask_before'].filter((k) => k in b).map((k) => `${k}=${b[k] ? 'true' : 'false'}`);
+    if (!pairs.length) bad('Keine Einstellung angegeben.');
+    await must(root, ['queue', 'set', ...pairs]);
+    return { message: 'Einstellung gespeichert.' };
+  },
+
+  // ---------- Mehrere Aufgaben auf einmal ----------
+  // Jede Aufgabe läuft als eigener CLI-Aufruf. Fehler einzelner Aufgaben brechen den Rest nicht ab.
+  async bulk(root, b) {
+    const ids = Array.isArray(b.ids) ? [...new Set(b.ids.slice(0, 200).map(id))] : bad('Keine Aufgaben gewählt.');
+    if (!ids.length) bad('Keine Aufgaben gewählt.');
+    const op = oneOf(b.op, 'Aktion', ['priority', 'status', 'milestone', 'effort', 'tagAdd', 'tagRemove', 'queueAdd', 'queueRemove', 'drop', 'archive'], { required: true });
+    const reason = str(b.reason, 'Begründung', { max: 300 });
+    const all = new Map(loadTasks(root).map((t) => [t.id, t]));
+    const okIds = []; const errors = [];
+    for (const tid of ids) {
+      const t = all.get(tid);
+      try {
+        if (!t) throw new ApiError(404, 'nicht gefunden');
+        if (op === 'priority') await actions.set(root, { id: tid, fields: { priority: b.value }, reason });
+        else if (op === 'effort') await actions.set(root, { id: tid, fields: { effort: b.value } });
+        else if (op === 'milestone') await actions.set(root, { id: tid, fields: { milestone: b.value || '' } });
+        else if (op === 'tagAdd' || op === 'tagRemove') {
+          const tag = list(b.value, 'Tag', TAG_RE)[0] || bad('Tag fehlt.');
+          const cur = t.tags || [];
+          const next = op === 'tagAdd' ? [...new Set([...cur, tag])] : cur.filter((x) => x !== tag);
+          if (next.length !== cur.length) await actions.set(root, { id: tid, fields: { tags: next } });
+        } else if (op === 'status') {
+          const to = oneOf(b.value, 'Status', ['backlog', 'geplant', 'in-arbeit', 'review'], { required: true });
+          await actions.move(root, { id: tid, to, reason });
+        } else if (op === 'queueAdd') await must(root, ['queue', 'add', tid]);
+        else if (op === 'queueRemove') await must(root, ['queue', 'remove', tid]);
+        else if (op === 'drop') {
+          if (!reason) bad('Zum Verwerfen ist eine Begründung nötig.');
+          if (OPEN_STATUSES.includes(t.status)) await actions.move(root, { id: tid, to: 'verworfen', reason });
+        } else if (op === 'archive') {
+          if (OPEN_STATUSES.includes(t.status)) throw new ApiError(422, 'ist noch offen');
+          if (!t._archived) await must(root, ['archive', tid]);
+        }
+        okIds.push(tid);
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 400 && !okIds.length && !errors.length) throw e; // Eingabefehler gelten für alle
+        errors.push({ id: tid, error: e.message });
+      }
+    }
+    const message = `${okIds.length} von ${ids.length} Aufgaben geändert.` + (errors.length ? ` Nicht geändert: ${errors.map((x) => `${x.id} (${x.error})`).join(', ')}` : '');
+    if (!okIds.length) throw new ApiError(422, message);
+    return { message, done: okIds, errors };
   },
 };
 

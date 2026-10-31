@@ -45,6 +45,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 9. Schreibstil in Aufgaben: sachlich, konkret, ohne Floskeln. Akzeptanzkriterien müssen mit ja oder nein prüfbar sein.
 10. Der Nutzer kann Aufgaben auch im Live-Board anlegen, verschieben und bearbeiten. Solche Verlaufseinträge enden mit `[Board]`. Vor jedem Edit an einer task.md die Datei neu lesen, statt einen älteren Stand aus dem Kontext zu überschreiben. Neue Aufgaben mit `source: board` und `incomplete: true` beim nächsten passenden Moment mit dem Nutzer vervollständigen.
 11. Der Abschnitt `## Beschreibung` ist die zentrale Stelle mit allem Relevanten zu einer Aufgabe: was passieren soll, warum, Hintergrund, Details und Hinweise des Nutzers. Vor der Arbeit an einer Aufgabe zuerst und vollständig lesen und als verbindliche Vorgabe behandeln, zusammen mit den Akzeptanzkriterien. Beim Anlegen neuer Aufgaben alle relevanten Infos in die Beschreibung schreiben (`works new --description "..."`), nicht verteilt auf andere Abschnitte. Ein Abschnitt Ziel ist optional und nur bei älteren Aufgaben gefüllt. Widerspricht etwas darin dem Plan oder dem Code, beim Nutzer nachfragen statt es zu übergehen. Den Abschnitt nicht umschreiben; eigene Erkenntnisse gehören in andere Abschnitte oder den Verlauf.
+12. Die Warteschlange des Nutzers (`works queue`, im Board unter Warteschlange) hat Vorrang vor allen eigenen Vorschlägen. `works next` und `works status` zeigen sie zuerst. Sagt der Nutzer "arbeite die Warteschlange ab" oder ist `auto_next` an, nach `works done` mit dem Eintrag weitermachen, den die Ausgabe nennt. Bei `ask_before` vorher kurz nachfragen. Blockierte Einträge überspringen, solange `skip_blocked` an ist. Die Reihenfolge nur auf Wunsch des Nutzers ändern.
 
 ## Wann was tun
 
@@ -69,6 +70,8 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Bericht, Changelog | `works report`, `works changelog` | `references/cli.md` |
 | Übersicht im Browser, Board, "ich will selbst Aufgaben anlegen" | `works board --serve --detach` und die URL nennen. Läuft schon ein aktueller Server, wird nur seine URL ausgegeben. Dort kann der Nutzer alles selbst bearbeiten. Für eine reine Ansicht `works board` | `references/board.md` |
 | Board zeigt altes Design, Board neu starten | `works board --restart` | `references/board.md` |
+| "Arbeite die Warteschlange ab", Reihenfolge vorgeben | `works queue` lesen, oberste startbare Aufgabe starten, nach `done` mit der nächsten weitermachen | `references/board.md` |
+| Board mit jemandem teilen | Im selben Netzwerk `works board --restart --share`, Leselink aus der Ausgabe nennen. Für Leute außerhalb `works export` und die Datei schicken. Bearbeitungslink nur auf Nachfrage (`works share --owner`) | `references/board.md` |
 | Board ausprobieren, Demo, "zeig mir, wie das aussieht" | `works demo --simulate --open` außerhalb echter Projekte. Legt ein Beispielprojekt im Temp-Ordner an und spielt Änderungen vor | `references/board.md` |
 | Struktur prüfen, Fehler vermuten | `works doctor`, bei Bedarf `--fix` | `references/cli.md` |
 | Hooks einrichten | Bei Plugin-Installation nur `works install-hooks --git`, sonst nach Rückfrage `works install-hooks` | `references/hooks.md` |

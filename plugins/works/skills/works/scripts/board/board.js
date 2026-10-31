@@ -2,6 +2,10 @@
 (() => {
   const BOOT = window.WORKS;
   const LIVE = !!BOOT.live;
+  // edit: Live mit Bearbeiten, view: Live nur lesen (geteilter Link), static: board.html, snapshot: Export
+  const MODE = BOOT.mode || (LIVE ? 'edit' : 'static');
+  const EDIT = MODE === 'edit';
+  const DETAILS = BOOT.details || null;
   const TOKEN = BOOT.token || '';
   let data = BOOT.data;
   let meta = data.meta;
@@ -14,7 +18,8 @@
   const HIGHLIGHT_MS = 10000;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const state = { q: '', prios: new Set(PRIOS), type: '', tag: '', ms: '', closed: false, signal: '' };
+  const VIEWS = ['board', 'queue', 'timeline', 'table'];
+  const state = { q: '', prios: new Set(PRIOS), type: '', tag: '', ms: '', closed: false, signal: '', view: 'board' };
   const PAGE_VERSION = meta.version || '';
   const PAGE_SERVER = meta.server || '';
   const outdated = (m) => !!m && ((m.version && PAGE_VERSION && m.version !== PAGE_VERSION) || (m.server && PAGE_SERVER && m.server !== PAGE_SERVER));
@@ -302,11 +307,11 @@
 
   function renderMsFilter() {
     const sel2 = $('#msFilter');
-    const opts = '<option value="">Alle Meilensteine</option>' + meta.milestones.map((m) => '<option value="' + esc(m.id) + '">' + esc(m.id + ' ' + m.title) + ' (' + m.done + '/' + m.total + ')</option>').join('') + (LIVE ? '<option value="__new">Meilenstein anlegen …</option>' : '');
+    const opts = '<option value="">Alle Meilensteine</option>' + meta.milestones.map((m) => '<option value="' + esc(m.id) + '">' + esc(m.id + ' ' + m.title) + ' (' + m.done + '/' + m.total + ')</option>').join('') + (EDIT ? '<option value="__new">Meilenstein anlegen …</option>' : '');
     sel2.innerHTML = opts;
     sel2.value = meta.milestones.some((m) => m.id === state.ms) ? state.ms : '';
-    sel2.hidden = !meta.milestones.length && !LIVE;
-    $('#msEdit').hidden = !LIVE || !state.ms;
+    sel2.hidden = !meta.milestones.length && !EDIT;
+    $('#msEdit').hidden = !EDIT || !state.ms;
   }
 
   // ---------- Spalten und Karten ----------
@@ -349,7 +354,7 @@
     if (t.milestone) tags.push('<span class="tag ms-tag">' + esc(t.milestone) + '</span>');
     t.tags.slice(0, 3).forEach((x) => tags.push('<span class="tag">#' + esc(x) + '</span>'));
     if (t.tags.length > 3) tags.push('<span class="tag">+' + (t.tags.length - 3) + '</span>');
-    return '<article class="card' + (ch ? ' changed' + (ch.fresh ? ' pulse' : '') : '') + (OPEN.includes(t.status) ? '' : ' closed') + '" data-id="' + esc(t.id) + '" data-prio="' + esc(t.priority) + '" tabindex="0" role="button" aria-label="' + esc(t.id + ' ' + t.title) + '"' + (LIVE ? ' draggable="true"' : '') + (ch ? ' style="--cc:' + changeColor(ch) + '"' : '') + '>' +
+    return '<article class="card' + (ch ? ' changed' + (ch.fresh ? ' pulse' : '') : '') + (OPEN.includes(t.status) ? '' : ' closed') + '" data-id="' + esc(t.id) + '" data-prio="' + esc(t.priority) + '" tabindex="0" role="button" aria-label="' + esc(t.id + ' ' + t.title) + '"' + (EDIT ? ' draggable="true"' : '') + (ch ? ' style="--cc:' + changeColor(ch) + '"' : '') + '>' +
       (ch && ch.kind !== 'updated' ? '<span class="change">' + esc(changeLabel(ch)) + '</span>' : '') +
       '<div class="card-top"><span class="id">' + esc(t.id) + '</span><span>' + esc(meta.typeLabel[t.type] || t.type) + '</span>' + (t.effort ? '<span class="effort" title="Aufwand">' + esc(t.effort) + '</span>' : '') + '<span class="prio">' + esc(t.priority) + '</span></div>' +
       '<div class="title">' + esc(t.title) + '</div>' +
@@ -371,10 +376,10 @@
     const anyMatch = tasks.some(match);
     board.innerHTML = cols.map((c) => {
       const list = sortList(c, tasks.filter((t) => t.status === c && match(t)));
-      const canAdd = LIVE && (c === 'backlog' || c === 'geplant');
+      const canAdd = EDIT && (c === 'backlog' || c === 'geplant');
       let note = '';
       if (c === 'in-arbeit' && list.length > 1) note = '<div class="col-note">Mehr als eine Aufgabe in Arbeit. Übergaben aktuell halten.</div>';
-      const empty = filtersActive() && !anyMatch ? 'Keine Treffer für die Filter' : c === 'backlog' && LIVE ? 'Leer. Mit + eine Aufgabe anlegen.' : 'Leer';
+      const empty = filtersActive() && !anyMatch ? 'Keine Treffer für die Filter' : c === 'backlog' && EDIT ? 'Leer. Mit + eine Aufgabe anlegen.' : 'Leer';
       return '<section class="col' + (arrived && arrived.has(c) ? ' arrive' : '') + '" data-col="' + c + '" style="--c:' + statusVar(c) + '" aria-label="' + esc(L(c)) + '">' +
         '<div class="col-head"><span class="dot"></span><h2>' + esc(L(c)) + '</h2><span class="n">' + list.length + '</span>' +
         (canAdd ? '<button class="add" data-quick="' + c + '" title="Aufgabe in ' + esc(L(c)) + ' anlegen" aria-label="Aufgabe in ' + esc(L(c)) + ' anlegen">+</button>' : '') + '</div>' + note +
@@ -399,13 +404,19 @@
         renderBoard();
       };
     }
-    if (LIVE) setupDnD(board);
+    if (EDIT) setupDnD(board);
     for (const c of changes.values()) c.fresh = false;
   }
   let pendingOpen = null;
 
   function renderAll(arrived) {
-    renderHeader(); renderOverview(); renderFilters(); renderMsFilter(); renderProgress(); renderBoard(arrived);
+    renderHeader(); renderViews();
+    if (state.view === 'board') { renderOverview(); renderProgress(); }
+    if (state.view !== 'queue') { renderFilters(); renderMsFilter(); }
+    renderBoard(arrived);
+    if (state.view === 'queue') renderQueue();
+    if (state.view === 'timeline') renderTimeline();
+    if (state.view === 'table') renderTable();
   }
 
   // ---------- Drag and Drop ----------
@@ -594,9 +605,11 @@
   const scrim = $('#scrim');
   let dirty = false;
   let staleDetail = false;
+  let detailTab = 'overview';
 
   async function openTask(id) {
-    if (!LIVE) return openStatic(id);
+    if (!LIVE && !DETAILS) return openStatic(id);
+    if (openId !== id) detailTab = 'overview';
     openId = id; dirty = false; staleDetail = false;
     closeSide();
     panel.hidden = false; scrim.hidden = false;
@@ -622,7 +635,10 @@
   async function loadDetail() {
     if (!openId) return;
     try {
-      detail = await api('GET', 'api/task?id=' + encodeURIComponent(openId));
+      if (DETAILS) {
+        detail = DETAILS[openId];
+        if (!detail) throw new Error('Für diese Aufgabe sind im Schnappschuss keine Details enthalten.');
+      } else detail = await api('GET', 'api/task?id=' + encodeURIComponent(openId));
       renderDetail();
     } catch (e) {
       $('#panelBody').innerHTML = '<div class="alert bad">' + esc(e.message) + '</div><button class="btn" data-close>Schließen</button>';
@@ -656,11 +672,22 @@
     const handoff = d.sections.find((s) => s.name === 'Übergabe');
     const h = [];
 
+    const queued = (meta.queue || []).indexOf(t.id);
     h.push('<div class="p-head"><div class="p-bar"><span class="id">' + esc(t.id) + '</span><span class="st" style="--c:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span>' +
-      (d.archived ? '<span class="tag">Archiviert</span>' : '') + '<span class="spacer"></span>' +
+      (d.archived ? '<span class="tag">Archiviert</span>' : '') + (queued >= 0 ? '<span class="tag q-tag">Warteschlange Platz ' + (queued + 1) + '</span>' : '') + '<span class="spacer"></span>' +
+      (OPEN.includes(t.status) && !['in-arbeit', 'review'].includes(t.status) ? '<button class="btn small ghost" data-act="queue">' + (queued >= 0 ? 'Aus Warteschlange' : 'Einreihen') + '</button>' : '') +
       (OPEN.includes(t.status) ? '<button class="btn small" data-act="dod">Abschließen</button>' : '') +
       '<button class="btn small ghost" data-close aria-label="Panel schließen">Schließen</button></div>' +
-      '<textarea class="p-title" rows="1" maxlength="160" aria-label="Titel" data-title>' + esc(t.title) + '</textarea></div>');
+      '<textarea class="p-title" rows="1" maxlength="160" aria-label="Titel" data-title' + (EDIT ? '' : ' readonly') + '>' + esc(t.title) + '</textarea>' +
+      (LIVE ? '<div class="p-tabs" role="tablist"><button role="tab" data-tab="overview" aria-selected="' + (detailTab === 'overview') + '">Übersicht</button><button role="tab" data-tab="code" aria-selected="' + (detailTab === 'code') + '">Code und Commits</button></div>' : '') +
+      '</div>');
+    if (detailTab === 'code' && LIVE) {
+      h.push('<div id="codeBox" class="code-box"><p class="md">Lädt Git-Daten …</p></div>');
+      $('#panelBody').innerHTML = h.join('');
+      bindHead();
+      loadCode(t.id);
+      return;
+    }
 
     h.push('<div class="fields">' +
       '<label class="field"><span>Status</span>' + sel('status', COLS.map((c) => ({ id: c, label: L(c) })), t.status) + '</label>' +
@@ -685,6 +712,7 @@
     else { h.push(descBlock); if (legacy) h.push(sectionBlock(legacy.name, legacy.content, true)); }
 
     for (const c of d.checklists) {
+      if (!EDIT && !c.items.length) continue;
       const done = c.items.filter((i) => i.done).length;
       h.push('<div class="block" data-list="' + esc(c.name) + '"><div class="block-head"><h3>' + esc(c.name) + '</h3><span class="meta">' + done + ' von ' + c.items.length + '</span></div>' +
         (c.items.length ? '<ul class="checklist">' + c.items.map((i) => '<li class="' + (i.done ? 'done' : '') + '"><input type="checkbox" data-check="' + i.n + '"' + (i.done ? ' checked' : '') + ' aria-label="' + esc(i.text) + '"><span class="txt">' + inline(i.text) + '</span><button class="rm" data-rm="' + i.n + '" title="Punkt entfernen" aria-label="Punkt entfernen">×</button></li>').join('') + '</ul>' : '') +
@@ -728,6 +756,27 @@
 
     $('#panelBody').innerHTML = h.join('');
     bindDetail();
+    if (!EDIT) {
+      // Felder im Nur-Lesen-Modus als Text zeigen statt als gesperrte Eingaben.
+      $$('#panelBody .fields select, #panelBody .fields input').forEach((el) => {
+        const v = el.tagName === 'SELECT' ? (el.options[el.selectedIndex] || {}).text : el.type === 'date' ? fmtDate(el.value) : el.value;
+        const span = document.createElement('span');
+        span.className = 'ro-val';
+        span.textContent = v && v !== 'Offen' && v !== 'Keiner' ? v : '–';
+        el.replaceWith(span);
+      });
+      $$('#panelBody input, #panelBody select, #panelBody textarea:not([data-title])').forEach((el) => { el.disabled = true; });
+    }
+  }
+
+  // Kopf des Panels: Schließen, Tabs, Sprünge. Gilt für Übersicht und Code.
+  function bindHead() {
+    const root = $('#panelBody');
+    $$('[data-close]', root).forEach((b) => b.onclick = closePanel);
+    $$('[data-tab]', root).forEach((b) => b.onclick = () => { if (detailTab === b.dataset.tab) return; detailTab = b.dataset.tab; renderDetail(); });
+    $$('[data-goto]', root).forEach((a) => a.onclick = (e) => { e.preventDefault(); openTask(a.dataset.goto); });
+    $$('[data-act="queue"]', root).forEach((b) => b.onclick = () => toggleQueue(detail.task.id));
+    $$('[data-act="dod"]', root).forEach((b) => b.onclick = () => openDod(detail.task.id));
   }
 
   function sectionBlock(name, content, editable, hint) {
@@ -742,8 +791,7 @@
     const root = $('#panelBody');
     const t = detail.task;
     const id = t.id;
-    $$('[data-close]', root).forEach((b) => b.onclick = closePanel);
-    $$('[data-goto]', root).forEach((a) => a.onclick = (e) => { e.preventDefault(); openTask(a.dataset.goto); });
+    bindHead();
 
     const title = $('[data-title]', root);
     const fit = () => { title.style.height = 'auto'; title.style.height = title.scrollHeight + 'px'; };
@@ -751,6 +799,7 @@
     title.oninput = () => { fit(); dirty = true; };
     title.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); title.blur(); } if (e.key === 'Escape') { title.value = t.title; dirty = false; title.blur(); } };
     title.onblur = async () => {
+      if (!EDIT) return;
       const v = title.value.trim();
       dirty = false;
       if (!v || v === t.title) { title.value = t.title; fit(); return; }
@@ -767,15 +816,14 @@
       };
     });
 
-    $$('[data-act]', root).forEach((b) => b.onclick = async () => {
+    $$('[data-act]', root).forEach((b) => { if (b.dataset.act === 'queue' || b.dataset.act === 'dod') return; b.onclick = async () => {
       const a = b.dataset.act;
-      if (a === 'dod') return openDod(id);
       if (a === 'drop') return requestMove(id, 'verworfen');
       if (a === 'reopen') return requestMove(id, 'backlog');
       if (a === 'reload') { staleDetail = false; return loadDetail(); }
       if (a === 'archive') return run(() => act('archive', { id }), id + ' archiviert');
       if (a === 'complete') return run(() => act('set', { id, fields: { incomplete: false } }), 'Als vollständig markiert');
-    });
+    }; });
 
     $$('[data-edit]', root).forEach((b) => b.onclick = () => {
       const name = b.dataset.edit;
@@ -862,7 +910,7 @@
   }
   let pasteTarget = null;
   document.addEventListener('paste', (e) => {
-    if (!LIVE || panel.hidden || !pasteTarget) return;
+    if (!EDIT || panel.hidden || !pasteTarget) return;
     const item = [...(e.clipboardData || {}).items || []].find((i) => i.kind === 'file' && i.type.startsWith('image/'));
     if (!item) return;
     e.preventDefault();
@@ -997,7 +1045,7 @@
     if (dirty) { setLive(true, 'Neue Version verfügbar, wird nach dem Speichern geladen'); updateWaiting = true; return; }
     try {
       sessionStorage.setItem(UI_KEY, JSON.stringify({
-        q: state.q, prios: [...state.prios], type: state.type, tag: state.tag, ms: state.ms, closed: state.closed, signal: state.signal,
+        q: state.q, prios: [...state.prios], type: state.type, tag: state.tag, ms: state.ms, closed: state.closed, signal: state.signal, view: state.view,
         openId, side, scrollX: $('#board').scrollLeft, scrollY: window.scrollY,
       }));
     } catch (e) { /* privat */ }
@@ -1008,7 +1056,7 @@
 
   async function reload() {
     // Während eine Karte gezogen wird, nicht neu zeichnen, sonst springt das Board unter dem Mauszeiger.
-    if (dragId) { reloadPending = true; return; }
+    if (dragId || qDrag || tlDrag) { reloadPending = true; return; }
     try {
       const res = await fetch('data.json', { cache: 'no-store' });
       const next = await res.json();
@@ -1052,6 +1100,528 @@
     el.hidden = false; el.classList.toggle('off', !okState); el.textContent = text;
   }
 
+  // ---------- Ansichten ----------
+
+  function setView(v) {
+    if (!VIEWS.includes(v)) return;
+    state.view = v;
+    store.set('works-view-' + meta.project, v);
+    if (v !== 'table') { selected.clear(); }
+    renderAll();
+    const main = $('[data-only="' + v + '"].view, #board[data-only="' + v + '"]');
+    if (main) window.scrollTo({ top: 0 });
+  }
+
+  function renderViews() {
+    $$('[data-only]').forEach((el) => { el.hidden = !el.dataset.only.split(' ').includes(state.view); });
+    $$('#views [data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === state.view)));
+    const qc = $('#queueCount');
+    const n = (meta.queue || []).length;
+    qc.hidden = !n; qc.textContent = n;
+    if (state.view !== 'table') $('#bulk').hidden = true;
+  }
+
+  const byIdNow = () => new Map(tasks.map((t) => [t.id, t]));
+
+  async function toggleQueue(id) {
+    const inQ = (meta.queue || []).includes(id);
+    await run(() => act(inQ ? 'queueRemove' : 'queueAdd', { id }), inQ ? id + ' aus der Warteschlange genommen' : id + ' eingereiht');
+  }
+
+  // ---------- Warteschlange ----------
+
+  let qDrag = null;
+
+  function renderQueue() {
+    const box = $('#viewQueue');
+    const byId = byIdNow();
+    const ids = (meta.queue || []).filter((id) => byId.has(id));
+    const q = ids.map((id) => byId.get(id));
+    const s = meta.queueSettings || {};
+    const running = tasks.filter((t) => t.status === 'in-arbeit' || t.status === 'review');
+    const unlocks = (t) => tasks.filter((x) => OPEN.includes(x.status) && (x.blockedBy || []).includes(t.id)).length;
+    const startable = (t) => ['backlog', 'geplant'].includes(t.status) && (s.skip_blocked === false || !t.blocked);
+    const next = q.find(startable);
+    const skipped = next ? q.slice(0, q.indexOf(next)).filter((t) => t.blocked) : [];
+    const effort = {};
+    q.forEach((t) => { const e = t.effort || 'ohne Schätzung'; effort[e] = (effort[e] || 0) + 1; });
+    const effortText = ['XL', 'L', 'M', 'S', 'ohne Schätzung'].filter((e) => effort[e]).map((e) => effort[e] + ' ' + e).join(', ') || 'leer';
+    const candidates = tasks.filter((t) => ['backlog', 'geplant'].includes(t.status) && !t.archived && !ids.includes(t.id))
+      .sort((a, b) => PRIOS.indexOf(a.priority) - PRIOS.indexOf(b.priority) || a.id.localeCompare(b.id, 'de', { numeric: true }));
+
+    const item = (t, i) => {
+      const bits = [meta.typeLabel[t.type] || t.type];
+      if (t.effort) bits.push('Aufwand ' + t.effort);
+      if (t.milestone) bits.push('Meilenstein ' + t.milestone);
+      if (t.due) bits.push('fällig ' + fmtDate(t.due));
+      let hint = '';
+      if (t.blocked) hint = '<span class="q-hint bad">wartet auf ' + esc(t.blockers.join(', ')) + '</span>';
+      else if (unlocks(t)) hint = '<span class="q-hint good">gibt ' + unlocks(t) + ' frei</span>';
+      else if (t.status === 'in-arbeit' || t.status === 'review') hint = '<span class="q-hint" style="color:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span>';
+      else if (t.status === 'geplant') hint = '<span class="q-hint">geplant</span>';
+      return '<li class="q-item' + (t === next ? ' is-next' : '') + (t.blocked ? ' is-blocked' : '') + '" data-id="' + esc(t.id) + '"' + (EDIT ? ' draggable="true"' : '') + '>' +
+        (EDIT ? '<span class="grip" aria-hidden="true">⋮⋮</span>' : '') +
+        '<span class="q-pos num">' + (i + 1) + '</span>' +
+        '<div class="q-t"><button class="q-title" data-open="' + esc(t.id) + '"><span class="id num">' + esc(t.id) + '</span> ' + esc(t.title) + '</button><span class="q-meta">' + esc(bits.join(', ')) + '</span></div>' +
+        hint + '<span class="q-prio" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span>' +
+        (EDIT ? '<span class="q-ctl"><button class="btn small ghost icon" data-up="' + i + '" aria-label="Nach oben"' + (i === 0 ? ' disabled' : '') + '>↑</button><button class="btn small ghost icon" data-down="' + i + '" aria-label="Nach unten"' + (i === q.length - 1 ? ' disabled' : '') + '>↓</button><button class="btn small ghost icon" data-unq="' + esc(t.id) + '" aria-label="Aus der Warteschlange nehmen" title="Aus der Warteschlange nehmen">×</button></span>' : '') +
+        '</li>';
+    };
+    const toggle = (key, label, sub, on, disabled) => '<label class="switch' + (disabled ? ' off' : '') + '"><span><b>' + esc(label) + '</b><small>' + esc(sub) + '</small></span><input type="checkbox" data-qset="' + key + '"' + (on ? ' checked' : '') + (disabled || !EDIT ? ' disabled' : '') + '><i aria-hidden="true"></i></label>';
+
+    box.innerHTML = '<div class="q-wrap">' +
+      '<section class="q-main">' +
+        '<div class="q-head"><h2>Warteschlange für Claude</h2><p>Claude arbeitet diese Aufgaben in genau dieser Reihenfolge ab, vor allen anderen Vorschlägen.' + (EDIT ? ' Zum Umsortieren ziehen oder die Pfeile nutzen.' : '') + '</p></div>' +
+        running.map((t) => '<button class="q-running" data-open="' + esc(t.id) + '" style="--c:' + statusVar(t.status) + '"><span class="q-run-ic" aria-hidden="true">▶</span><span class="q-t"><small>' + (t.status === 'review' ? 'Im Review' : 'Läuft gerade') + '</small><strong>' + esc(t.id + ' ' + t.title) + '</strong></span>' + (t.crit[1] ? '<span class="q-meta num">' + t.crit[0] + ' von ' + t.crit[1] + ' Kriterien</span>' : '') + '</button>').join('') +
+        (q.length ? '<ol class="q-list" id="qList">' + q.map(item).join('') + '</ol>'
+          : '<div class="q-empty"><strong>Die Warteschlange ist leer.</strong><span>' + (EDIT ? 'Unten Aufgaben einreihen, im Detailpanel auf Einreihen klicken oder in der Tabelle mehrere auswählen.' : 'Der Besitzer des Boards hat noch nichts eingereiht.') + ' Ohne Warteschlange wählt Claude selbst nach Priorität, Fristen und Abhängigkeiten.</span></div>') +
+        (EDIT ? '<div class="q-add"><select class="input" id="qAddSel" aria-label="Aufgabe zum Einreihen"><option value="">Aufgabe einreihen …</option>' + candidates.map((t) => '<option value="' + esc(t.id) + '">' + esc(t.priority + '  ' + t.id + '  ' + t.title) + '</option>').join('') + '</select><button class="btn" id="qAddBtn">Einreihen</button>' + (q.length ? '<button class="btn ghost" id="qClear">Leeren</button>' : '') + '</div>' : '') +
+      '</section>' +
+      '<aside class="q-side">' +
+        '<h3>Ablauf</h3>' +
+        toggle('auto_next', 'Nach dem Abschluss weitermachen', 'Claude startet danach die nächste Aufgabe der Schlange.', !!s.auto_next) +
+        toggle('ask_before', 'Vor jedem Start nachfragen', 'Claude fragt kurz, bevor es die nächste beginnt.', s.ask_before !== false, !s.auto_next) +
+        toggle('skip_blocked', 'Blockierte überspringen', 'Wartende Aufgaben bleiben stehen, bis ihre Abhängigkeit erledigt ist.', s.skip_blocked !== false) +
+        '<div class="q-card"><small>Als Nächstes für Claude</small>' + (next ? '<button class="q-title" data-open="' + esc(next.id) + '"><strong>' + esc(next.id + ' ' + next.title) + '</strong></button>' + (skipped.length ? '<span>' + esc(skipped.map((x) => x.id).join(', ')) + (skipped.length === 1 ? ' wird' : ' werden') + ' übersprungen, bis die Abhängigkeit erledigt ist.</span>' : '') : '<span>' + (q.length ? 'Nichts startbar. Alle Einträge warten auf andere Aufgaben.' : 'Claude wählt selbst mit works next.') + '</span>') + '</div>' +
+        '<div class="q-card row"><span>Aufwand in der Schlange</span><strong class="num">' + esc(effortText) + '</strong></div>' +
+        '<div class="q-card"><small>So nutzt du sie</small><span>Sag Claude zum Beispiel <q>Arbeite die Warteschlange ab</q>. Claude sieht die Reihenfolge beim Sitzungsstart und in <code>works next</code>. Fertige Aufgaben fallen automatisch heraus.</span></div>' +
+      '</aside></div>';
+
+    $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
+    if (!EDIT) return;
+    const save = (order, msg) => {
+      meta.queue = order;
+      renderQueue(); renderViews();
+      run(() => act('queueOrder', { ids: order }), msg);
+    };
+    $$('[data-up]', box).forEach((b) => b.onclick = () => { const i = +b.dataset.up; const o = ids.slice(); [o[i - 1], o[i]] = [o[i], o[i - 1]]; save(o, 'Reihenfolge gespeichert'); });
+    $$('[data-down]', box).forEach((b) => b.onclick = () => { const i = +b.dataset.down; const o = ids.slice(); [o[i + 1], o[i]] = [o[i], o[i + 1]]; save(o, 'Reihenfolge gespeichert'); });
+    $$('[data-unq]', box).forEach((b) => b.onclick = () => save(ids.filter((x) => x !== b.dataset.unq), b.dataset.unq + ' aus der Warteschlange genommen'));
+    const addBtn = $('#qAddBtn', box);
+    if (addBtn) addBtn.onclick = () => { const v = $('#qAddSel', box).value; if (v) save(ids.concat(v), v + ' eingereiht'); };
+    const clr = $('#qClear', box);
+    if (clr) clr.onclick = async () => { if (await confirmBox({ title: 'Warteschlange leeren', lead: 'Alle ' + ids.length + ' Einträge werden entfernt. Die Aufgaben selbst bleiben unverändert.', confirm: 'Leeren', danger: true })) save([], 'Warteschlange geleert'); };
+    $$('[data-qset]', box).forEach((c) => c.onchange = () => {
+      meta.queueSettings = { ...s, [c.dataset.qset]: c.checked };
+      renderQueue();
+      run(() => act('queueSettings', { [c.dataset.qset]: c.checked }), 'Einstellung gespeichert');
+    });
+    const list = $('#qList', box);
+    if (!list) return;
+    $$('.q-item', list).forEach((li) => {
+      li.ondragstart = (e) => { qDrag = li.dataset.id; li.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', qDrag); };
+      li.ondragend = () => { qDrag = null; li.classList.remove('dragging'); $$('.q-item', list).forEach((x) => x.classList.remove('before', 'after')); if (reloadPending) { reloadPending = false; reload(); } };
+      li.ondragover = (e) => {
+        if (!qDrag || qDrag === li.dataset.id) return;
+        e.preventDefault();
+        const r = li.getBoundingClientRect();
+        const after = e.clientY > r.top + r.height / 2;
+        $$('.q-item', list).forEach((x) => x.classList.remove('before', 'after'));
+        li.classList.add(after ? 'after' : 'before');
+      };
+      li.ondrop = (e) => {
+        e.preventDefault();
+        if (!qDrag || qDrag === li.dataset.id) return;
+        const after = li.classList.contains('after');
+        const o = ids.filter((x) => x !== qDrag);
+        o.splice(o.indexOf(li.dataset.id) + (after ? 1 : 0), 0, qDrag);
+        qDrag = null;
+        save(o, 'Reihenfolge gespeichert');
+      };
+    });
+  }
+
+  // ---------- Zeitleiste ----------
+
+  const EFFORT_DAYS = { S: 2, M: 5, L: 10, XL: 15 };
+  const dayDiff = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+  const minIso = (a, b) => (a < b ? a : b);
+  const maxIso = (a, b) => (a > b ? a : b);
+  function weekStart(iso) { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toLocaleDateString('sv-SE'); }
+  function isoWeek(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+    const w1 = new Date(d.getFullYear(), 0, 4);
+    return 1 + Math.round(((d - w1) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7);
+  }
+
+  // Zeitraum je Aufgabe: echte Daten, wo es sie gibt, sonst eine Schätzung aus dem Aufwand.
+  function spansFor(list) {
+    const now = today();
+    const byId = byIdNow();
+    const memo = new Map();
+    const span = (t, depth = 0) => {
+      if (memo.has(t.id)) return memo.get(t.id);
+      const dur = EFFORT_DAYS[t.effort] || 5;
+      let r;
+      if (t.status === 'erledigt') {
+        const end = t.completed || t.updated || now;
+        const start = minIso(t.started || t.created || end, end);
+        r = { start, end, kind: 'done' };
+      } else if (t.status === 'in-arbeit' || t.status === 'review') {
+        const start = t.started || t.created || now;
+        let end = t.due || addDays(maxIso(start, now), Math.max(1, dur - Math.max(0, dayDiff(start, now))));
+        r = { start: minIso(start, end), end, kind: t.overdue ? 'late' : 'run' };
+      } else {
+        let start = now;
+        if (t.blocked && depth < 8) {
+          for (const b of t.blockers) { const o = byId.get(b); if (o) start = maxIso(start, addDays(span(o, depth + 1).end, 1)); }
+        }
+        if (t.due) {
+          const s0 = addDays(t.due, -dur);
+          r = { start: t.overdue ? s0 : minIso(maxIso(s0, now), t.due), end: t.due, kind: t.overdue ? 'late' : 'plan', fixed: true };
+        } else r = { start, end: addDays(start, dur), kind: 'est' };
+      }
+      if (r.end < r.start) r.end = r.start;
+      memo.set(t.id, r);
+      return r;
+    };
+    return new Map(list.map((t) => [t.id, span(t)]));
+  }
+
+  let tlDrag = null;
+
+  function renderTimeline() {
+    const box = $('#viewTimeline');
+    const now = today();
+    const list = tasks.filter((t) => match(t) && t.status !== 'verworfen');
+    const spans = spansFor(list);
+    const start = addDays(weekStart(now), -7);
+    let last = addDays(weekStart(now), 7 * 8 - 1);
+    for (const sp of spans.values()) last = maxIso(last, sp.end);
+    for (const m of meta.milestones) if (m.due) last = maxIso(last, m.due);
+    last = minIso(last, addDays(start, 7 * 26 - 1));
+    const weeks = Math.ceil((dayDiff(start, last) + 1) / 7);
+    const total = weeks * 7;
+    const frac = (iso) => Math.max(0, Math.min(1, dayDiff(start, iso) / total));
+    const pct = (x) => (x * 100).toFixed(3) + '%';
+    const visible = list.filter((t) => spans.get(t.id).end >= start);
+    const hiddenOld = list.length - visible.length;
+
+    const groups = meta.milestones.map((m) => ({ m, items: visible.filter((t) => t.milestone === m.id) })).filter((g) => g.items.length);
+    const rest = visible.filter((t) => !t.milestone || !meta.milestones.some((m) => m.id === t.milestone));
+    if (rest.length) groups.push({ m: null, items: rest });
+    const order = { late: 0, run: 1, plan: 2, est: 3, done: 4 };
+    const weekHead = Array.from({ length: weeks }, (_, i) => {
+      const ws = addDays(start, i * 7);
+      const cur = ws === weekStart(now);
+      return '<div class="tl-wk' + (cur ? ' cur' : '') + '"><b>KW ' + isoWeek(ws) + '</b><span>' + esc(fmtDate(ws).slice(0, 6)) + '</span></div>';
+    }).join('');
+
+    const bar = (t) => {
+      const sp = spans.get(t.id);
+      const l = frac(sp.start);
+      const r = frac(addDays(sp.end, 1));
+      const days = dayDiff(sp.start, sp.end) + 1;
+      const label = days <= 3 ? (sp.kind === 'est' ? t.effort || '' : '') : sp.kind === 'done' ? 'Erledigt' : sp.kind === 'late' ? 'Überfällig' : sp.kind === 'est' ? 'geschätzt' + (t.effort ? ', ' + t.effort : '') : t.status === 'in-arbeit' || t.status === 'review' ? L(t.status) + (t.crit[1] ? ', ' + t.crit[0] + ' von ' + t.crit[1] : '') : L(t.status);
+      const tip = t.id + ' ' + t.title + '\n' + fmtDate(sp.start) + ' bis ' + fmtDate(sp.end) + (sp.kind === 'est' ? ' (geschätzt aus Aufwand ' + (t.effort || 'M') + ')' : '') + (t.blocked ? '\nWartet auf ' + t.blockers.join(', ') : '');
+      const canDrag = EDIT && OPEN.includes(t.status);
+      return '<div class="tl-bar k-' + sp.kind + '" data-bar="' + esc(t.id) + '" style="left:' + pct(l) + ';width:max(' + pct(r - l) + ',6px);--c:' + statusVar(t.status) + '" title="' + esc(tip) + '"><span>' + esc(label) + '</span>' +
+        (canDrag ? '<i class="tl-handle" data-due="' + esc(t.id) + '" title="Ziehen ändert die Fälligkeit"></i>' : '') + '</div>' +
+        (t.blocked ? '<span class="tl-wait" style="left:calc(' + pct(r) + ' + 8px)">wartet auf ' + esc(t.blockers.join(', ')) + '</span>' : '');
+    };
+
+    const group = (g) => {
+      const items = g.items.slice().sort((a, b) => order[spans.get(a.id).kind] - order[spans.get(b.id).kind] || spans.get(a.id).start.localeCompare(spans.get(b.id).start));
+      const m = g.m;
+      const done = m ? m.done : 0;
+      const line = m && m.due && m.due >= start && m.due <= last ? '<div class="tl-ms" style="left:calc(var(--lab) + (100% - var(--lab)) * ' + frac(addDays(m.due, 1)).toFixed(4) + ')" title="Ziel ' + esc(m.id) + ': ' + esc(fmtDate(m.due)) + '"></div>' : '';
+      return '<div class="tl-group">' + line +
+        '<div class="tl-ghead"><strong>' + esc(m ? m.id + ' ' + m.title : 'Ohne Meilenstein') + '</strong><span>' + (m ? (m.due ? 'Ziel ' + esc(fmtDate(m.due)) + ', ' : '') + done + ' von ' + m.total + ' erledigt' : items.length + (items.length === 1 ? ' Aufgabe' : ' Aufgaben')) + '</span></div>' +
+        items.map((t) => '<div class="tl-row' + (t.status === 'erledigt' ? ' is-done' : '') + '"><button class="tl-label" data-open="' + esc(t.id) + '"><span class="pdot" style="--pc:' + prioVar(t.priority) + '"></span><span class="id num">' + esc(t.id) + '</span><span class="tt">' + esc(t.title) + '</span></button><div class="tl-track">' + bar(t) + '</div></div>').join('') +
+        '</div>';
+    };
+
+    box.innerHTML = '<div class="tl-scroll"><div class="tl" style="--weeks:' + weeks + ';min-width:calc(var(--lab) + ' + weeks + ' * 84px)">' +
+      '<div class="tl-headrow"><div class="tl-corner">Aufgabe</div><div class="tl-weeks">' + weekHead + '</div></div>' +
+      '<div class="tl-body"><div class="tl-grid" aria-hidden="true">' + Array.from({ length: weeks }, (_, i) => '<i' + (addDays(start, i * 7) === weekStart(now) ? ' class="cur"' : '') + '></i>').join('') + '</div>' +
+      '<div class="tl-today" style="left:calc(var(--lab) + (100% - var(--lab)) * ' + frac(now).toFixed(4) + ')" title="Heute"></div>' +
+      (groups.length ? groups.map(group).join('') : '<div class="tl-empty">Keine Aufgaben für diese Filter.</div>') +
+      '</div></div></div>' +
+      '<div class="tl-legend"><span><i class="lg-today"></i>heute</span><span><i class="lg-ms"></i>Ziel eines Meilensteins</span><span><i class="lg-run"></i>läuft oder erledigt</span><span><i class="lg-plan"></i>geplant mit Fälligkeit</span><span><i class="lg-est"></i>geschätzt aus dem Aufwand</span>' +
+      (EDIT ? '<span>Rechtes Ende eines Balkens ziehen ändert die Fälligkeit.</span>' : '') +
+      (hiddenOld ? '<span>' + hiddenOld + ' ältere erledigte ausgeblendet</span>' : '') + '</div>';
+
+    $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
+    $$('[data-bar]', box).forEach((b) => b.onclick = (e) => { if (e.target.closest('.tl-handle') || tlDrag) return; openTask(b.dataset.bar); });
+    if (!EDIT) return;
+    $$('.tl-handle', box).forEach((h) => {
+      h.onpointerdown = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const barEl = h.parentElement;
+        const track = barEl.parentElement.getBoundingClientRect();
+        const left = barEl.getBoundingClientRect().left;
+        const id = h.dataset.due;
+        h.setPointerCapture(e.pointerId);
+        tlDrag = { id, due: null };
+        barEl.classList.add('resizing');
+        const sp = spans.get(id);
+        h.onpointermove = (ev) => {
+          const x = Math.max(left + 4, Math.min(track.right, ev.clientX));
+          const day = Math.round(((x - track.left) / track.width) * total) - 1;
+          const due = maxIso(addDays(start, day), sp.start);
+          tlDrag.due = due;
+          barEl.style.width = Math.max(6, ((dayDiff(start, due) + 1) / total) * track.width - (left - track.left)) + 'px';
+          barEl.firstChild.textContent = 'Fällig ' + fmtDate(due);
+        };
+        h.onpointerup = async () => {
+          h.onpointermove = null; h.onpointerup = null;
+          const due = tlDrag && tlDrag.due;
+          const t = tasks.find((x) => x.id === id);
+          setTimeout(() => { tlDrag = null; }, 0);
+          barEl.classList.remove('resizing');
+          if (!due || (t && t.due === due)) { renderTimeline(); return; }
+          await run(() => act('set', { id, fields: { due } }), id + ' fällig am ' + fmtDate(due));
+          if (reloadPending) { reloadPending = false; reload(); }
+        };
+      };
+    });
+  }
+
+  // ---------- Tabelle ----------
+
+  const selected = new Set();
+  let lastPick = null;
+  const tableSort = store.get('works-table-sort', { key: 'priority', dir: 1 });
+  const TABLE_COLS = [
+    { key: 'id', label: 'ID' },
+    { key: 'title', label: 'Titel' },
+    { key: 'status', label: 'Status' },
+    { key: 'priority', label: 'Prio' },
+    { key: 'type', label: 'Typ' },
+    { key: 'effort', label: 'Aufwand' },
+    { key: 'due', label: 'Fällig' },
+    { key: 'milestone', label: 'Meilenstein' },
+    { key: 'tags', label: 'Tags' },
+    { key: 'crit', label: 'Kriterien' },
+    { key: 'updated', label: 'Geändert' },
+  ];
+  function sortValue(t, k) {
+    if (k === 'priority') return PRIOS.indexOf(t.priority);
+    if (k === 'status') return COLS.indexOf(t.status);
+    if (k === 'effort') return t.effort ? ['S', 'M', 'L', 'XL'].indexOf(t.effort) : 9;
+    if (k === 'due') return t.due || '9999';
+    if (k === 'crit') return t.crit[1] ? t.crit[0] / t.crit[1] : -1;
+    if (k === 'tags') return t.tags.join(',');
+    if (k === 'type') return meta.typeLabel[t.type] || t.type;
+    return String(t[k] || '');
+  }
+  function tableRows() {
+    const k = tableSort.key; const dir = tableSort.dir;
+    return tasks.filter(match).sort((a, b) => {
+      const x = sortValue(a, k); const y = sortValue(b, k);
+      const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'de', { numeric: true });
+      return c * dir || a.id.localeCompare(b.id, 'de', { numeric: true });
+    });
+  }
+
+  function renderTable() {
+    const box = $('#viewTable');
+    const rows = tableRows();
+    const ids = rows.map((t) => t.id);
+    for (const id of [...selected]) if (!ids.includes(id)) selected.delete(id);
+    const all = rows.length && rows.every((t) => selected.has(t.id));
+    const optList = (vals, cur, labelFn) => vals.map((v) => '<option value="' + esc(v) + '"' + (v === (cur || '') ? ' selected' : '') + '>' + esc(labelFn ? labelFn(v) : v || 'offen') + '</option>').join('');
+    const cell = (t, k) => {
+      const open = OPEN.includes(t.status);
+      if (k === 'id') return '<td class="c-id num">' + esc(t.id) + '</td>';
+      if (k === 'title') return '<td class="c-title"><button class="tt" data-open="' + esc(t.id) + '">' + esc(t.title) + '</button>' + (t.blocked ? '<span class="warn">blockiert</span>' : '') + ((meta.queue || []).includes(t.id) ? '<span class="q-tag tag">Schlange ' + ((meta.queue || []).indexOf(t.id) + 1) + '</span>' : '') + '</td>';
+      if (k === 'status') return '<td><span class="st" style="--c:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span></td>';
+      if (k === 'priority') return '<td>' + (EDIT && open ? '<select class="cell" data-cell="priority" data-id="' + esc(t.id) + '" style="color:' + prioVar(t.priority) + '" aria-label="Priorität">' + optList(PRIOS, t.priority) + '</select>' : '<span style="color:' + prioVar(t.priority) + ';font-weight:650">' + esc(t.priority) + '</span>') + '</td>';
+      if (k === 'type') return '<td>' + esc(meta.typeLabel[t.type] || t.type) + '</td>';
+      if (k === 'effort') return '<td>' + (EDIT && open ? '<select class="cell" data-cell="effort" data-id="' + esc(t.id) + '" aria-label="Aufwand">' + optList(['', 'S', 'M', 'L', 'XL'], t.effort) + '</select>' : esc(t.effort || '')) + '</td>';
+      if (k === 'due') return '<td class="' + (t.overdue ? 'late' : '') + '">' + (EDIT && open ? '<input type="date" class="cell" data-cell="due" data-id="' + esc(t.id) + '" value="' + esc(t.due) + '" aria-label="Fälligkeit">' : esc(fmtDate(t.due))) + '</td>';
+      if (k === 'milestone') return '<td>' + esc(t.milestone) + '</td>';
+      if (k === 'tags') return '<td class="c-tags">' + t.tags.map((x) => '<span class="tag">#' + esc(x) + '</span>').join('') + '</td>';
+      if (k === 'crit') return '<td class="num">' + (t.crit[1] ? t.crit[0] + '/' + t.crit[1] : '') + '</td>';
+      if (k === 'updated') return '<td class="num muted">' + esc(fmtDate(t.updated)) + '</td>';
+      return '<td></td>';
+    };
+    box.innerHTML = '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+      (EDIT ? '<th class="c-sel"><input type="checkbox" id="selAll" aria-label="Alle auswählen"' + (all ? ' checked' : '') + '></th>' : '') +
+      TABLE_COLS.map((c) => '<th><button data-sort="' + c.key + '" aria-sort="' + (tableSort.key === c.key ? (tableSort.dir > 0 ? 'ascending' : 'descending') : 'none') + '">' + esc(c.label) + (tableSort.key === c.key ? '<span aria-hidden="true">' + (tableSort.dir > 0 ? ' ↑' : ' ↓') + '</span>' : '') + '</button></th>').join('') +
+      '</tr></thead><tbody>' +
+      (rows.length ? rows.map((t) => '<tr data-id="' + esc(t.id) + '" class="' + (selected.has(t.id) ? 'sel' : '') + (OPEN.includes(t.status) ? '' : ' closed') + '">' + (EDIT ? '<td class="c-sel"><input type="checkbox" data-sel="' + esc(t.id) + '"' + (selected.has(t.id) ? ' checked' : '') + ' aria-label="' + esc(t.id) + ' auswählen"></td>' : '') + TABLE_COLS.map((c) => cell(t, c.key)).join('') + '</tr>').join('')
+        : '<tr><td colspan="12" class="tbl-empty">Keine Aufgaben für diese Filter.</td></tr>') +
+      '</tbody></table></div>' +
+      '<p class="tbl-foot">' + rows.length + (rows.length === 1 ? ' Aufgabe' : ' Aufgaben') + (EDIT ? '. Mit Shift klicken wählt einen Bereich. Prio, Aufwand und Fälligkeit lassen sich direkt ändern.' : '') + '</p>';
+
+    $$('[data-sort]', box).forEach((b) => b.onclick = () => {
+      const k = b.dataset.sort;
+      if (tableSort.key === k) tableSort.dir *= -1; else { tableSort.key = k; tableSort.dir = 1; }
+      store.set('works-table-sort', tableSort);
+      renderTable();
+    });
+    $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
+    $$('tbody tr[data-id]', box).forEach((tr) => tr.ondblclick = (e) => { if (!e.target.closest('input,select,button')) openTask(tr.dataset.id); });
+    if (EDIT) {
+      $('#selAll', box).onchange = (e) => { rows.forEach((t) => (e.target.checked ? selected.add(t.id) : selected.delete(t.id))); renderTable(); };
+      $$('[data-sel]', box).forEach((c) => c.onclick = (e) => {
+        const id = c.dataset.sel;
+        if (e.shiftKey && lastPick && ids.includes(lastPick)) {
+          const [a, b] = [ids.indexOf(lastPick), ids.indexOf(id)].sort((x, y) => x - y);
+          ids.slice(a, b + 1).forEach((x) => (c.checked ? selected.add(x) : selected.delete(x)));
+        } else if (c.checked) selected.add(id); else selected.delete(id);
+        lastPick = id;
+        renderTable();
+      });
+      $$('[data-cell]', box).forEach((el) => el.onchange = () => run(() => act('set', { id: el.dataset.id, fields: { [el.dataset.cell]: el.value } }), el.dataset.id + ' gespeichert'));
+    }
+    renderBulk();
+  }
+
+  function renderBulk() {
+    const bar = $('#bulk');
+    if (!EDIT || state.view !== 'table' || !selected.size) { bar.hidden = true; return; }
+    bar.hidden = false;
+    const ids = [...selected];
+    const n = ids.length;
+    const sel = (op, label, opts) => '<select class="input" data-bulk="' + op + '" aria-label="' + esc(label) + '"><option value="">' + esc(label) + '</option>' + opts.map((o) => '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>').join('') + '</select>';
+    bar.innerHTML = '<strong class="num">' + n + ' ausgewählt</strong>' +
+      sel('priority', 'Priorität', PRIOS.map((p) => [p, p + ' ' + meta.prioLabel[p]])) +
+      sel('status', 'Status', ['backlog', 'geplant', 'in-arbeit', 'review'].map((s) => [s, L(s)])) +
+      sel('milestone', 'Meilenstein', [['__none', 'Keiner']].concat(meta.milestones.map((m) => [m.id, m.id + ' ' + m.title]))) +
+      sel('effort', 'Aufwand', ['S', 'M', 'L', 'XL'].map((e) => [e, e])) +
+      '<button class="btn small" data-bop="tagAdd">Tag +</button><button class="btn small" data-bop="tagRemove">Tag −</button>' +
+      '<button class="btn small" data-bop="queueAdd">Einreihen</button>' +
+      '<button class="btn small danger" data-bop="drop">Verwerfen</button><button class="btn small" data-bop="archive">Archivieren</button>' +
+      '<button class="btn small ghost" data-bop="clear">Auswahl aufheben</button>';
+    const go = async (op, value, reason) => {
+      const r = await run(() => act('bulk', { ids, op, value, reason }), (x) => x.message);
+      if (r && !(r.errors || []).length) selected.clear();
+      renderTable();
+    };
+    $$('[data-bulk]', bar).forEach((s) => s.onchange = () => {
+      const v = s.value; if (!v) return;
+      go(s.dataset.bulk, v === '__none' ? '' : v);
+    });
+    $$('[data-bop]', bar).forEach((b) => b.onclick = async () => {
+      const op = b.dataset.bop;
+      if (op === 'clear') { selected.clear(); renderTable(); return; }
+      if (op === 'tagAdd' || op === 'tagRemove') {
+        const tag = await askText({ title: op === 'tagAdd' ? 'Tag hinzufügen' : 'Tag entfernen', lead: n + (n === 1 ? ' Aufgabe' : ' Aufgaben'), label: 'Tag ohne #', confirm: op === 'tagAdd' ? 'Hinzufügen' : 'Entfernen', required: true });
+        if (tag) go(op, tag.replace(/^#/, ''));
+        return;
+      }
+      if (op === 'drop') {
+        const reason = await askText({ title: n + (n === 1 ? ' Aufgabe' : ' Aufgaben') + ' verwerfen', lead: 'Sie werden nicht umgesetzt und lassen sich später wiedereröffnen.', label: 'Grund', confirm: 'Verwerfen', required: true, danger: true });
+        if (reason) go(op, '', reason);
+        return;
+      }
+      go(op);
+    });
+  }
+
+  // ---------- Code und Commits im Detailpanel ----------
+
+  async function loadCode(id) {
+    const box = $('#codeBox');
+    let c;
+    try { c = await api('GET', 'api/code?id=' + encodeURIComponent(id)); } catch (e) { if (box) box.innerHTML = '<div class="alert bad">' + esc(e.message) + '</div>'; return; }
+    if (!box || !detail || detail.task.id !== id || detailTab !== 'code') return;
+    if (!c.git) { box.innerHTML = '<div class="alert info">Dieses Projekt ist kein Git-Repository. Der Code-Bereich zeigt Branch, Commits und Änderungen, sobald Git genutzt wird.</div>'; return; }
+    const safeUrl = (u) => (/^https?:\/\//.test(u || '') ? u : '');
+    const pr = c.pr && safeUrl(c.pr.url) ? '<a href="' + esc(c.pr.url) + '" target="_blank" rel="noopener">#' + esc(c.pr.number) + ' ' + esc({ OPEN: 'offen', MERGED: 'gemergt', CLOSED: 'geschlossen' }[c.pr.state] || c.pr.state) + '</a>' : '<span class="muted">keiner gefunden</span>';
+    const fileRow = (f, unc) => '<li><button class="file" data-file="' + esc(f.file) + '"' + (unc ? ' data-unc="1"' : '') + ' aria-expanded="false"><span class="fn">' + esc(f.file) + '</span>' + (f.untracked ? '<span class="muted">neu</span>' : f.binary ? '<span class="muted">binär</span>' : '<span class="add num">+' + f.add + '</span><span class="del num">−' + f.del + '</span>') + '</button><div class="diff" hidden></div></li>';
+    box.innerHTML =
+      '<div class="code-cards">' +
+        '<div><small>Branch</small><strong class="mono">' + (c.branch ? esc(c.branch) : '<span class="muted">keiner mit ' + esc(id) + ' im Namen</span>') + '</strong></div>' +
+        '<div><small>Gegenüber ' + esc(c.base || 'Hauptbranch') + '</small><strong>' + (c.ahead === null ? '<span class="muted">nicht vergleichbar</span>' : c.ahead + (c.ahead === 1 ? ' Commit' : ' Commits') + ' voraus' + (c.behind ? ', ' + c.behind + ' zurück' : '')) + '</strong></div>' +
+        '<div><small>Pull Request</small><strong>' + pr + '</strong></div>' +
+      '</div>' +
+      '<div class="block"><div class="block-head"><h3>Commits</h3><span class="meta">mit ' + esc(id) + ' in der Nachricht</span></div>' +
+        (c.commits.length ? '<ol class="commits">' + c.commits.map((k) => '<li><span class="mono hash">' + esc(k.short) + '</span><span class="subj">' + esc(k.subject) + '</span><time class="muted num" datetime="' + esc(k.date) + '">' + esc(new Date(k.date).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time></li>').join('') + '</ol>'
+          : '<p class="md empty-md">Noch keine Commits gefunden. Claude schreibt die Aufgaben-ID in jede Commit-Nachricht, zum Beispiel <code>feat(' + esc(id) + '): …</code>.</p>') + '</div>' +
+      (c.uncommitted.length ? '<div class="block"><div class="block-head"><h3>Noch nicht committet</h3><span class="meta">auf ' + esc(c.branch) + '</span></div><ul class="files">' + c.uncommitted.map((f) => fileRow(f, true)).join('') + '</ul></div>' : '') +
+      '<div class="block"><div class="block-head"><h3>Geänderte Dateien</h3><span class="meta">' + (c.source === 'branch' ? 'Branch gegenüber ' + esc(c.base) : c.source === 'commits' ? 'aus den Commits' : '') + '</span></div>' +
+        (c.files.length ? '<ul class="files">' + c.files.map((f) => fileRow(f, false)).join('') + '</ul>' : '<p class="md empty-md">Keine Änderungen gefunden.</p>') + '</div>';
+    $$('.file', box).forEach((b) => b.onclick = async () => {
+      const d = b.nextElementSibling;
+      const open = b.getAttribute('aria-expanded') === 'true';
+      b.setAttribute('aria-expanded', String(!open));
+      d.hidden = open;
+      if (open || d.dataset.loaded) return;
+      d.innerHTML = '<p class="muted">Lädt …</p>';
+      try {
+        const r = await api('GET', 'api/diff?id=' + encodeURIComponent(id) + '&file=' + encodeURIComponent(b.dataset.file) + (b.dataset.unc ? '&uncommitted=1' : ''));
+        d.dataset.loaded = '1';
+        d.innerHTML = diffHtml(r.diff) + (r.truncated ? '<p class="muted diff-more">Gekürzt. Vollständig mit git diff im Terminal.</p>' : '');
+      } catch (e) { d.innerHTML = '<p class="err">' + esc(e.message) + '</p>'; }
+    });
+  }
+
+  function diffHtml(text) {
+    const lines = String(text || '').split('\n');
+    const out = [];
+    for (const l of lines) {
+      if (/^(diff --git|index |--- |\+\+\+ |new file|deleted file|similarity|rename )/.test(l)) continue;
+      if (l.startsWith('\x1e')) { out.push('<div class="dl dc">' + esc(l.slice(1)) + '</div>'); continue; }
+      const cls = l.startsWith('@@') ? 'dh' : l.startsWith('+') ? 'da' : l.startsWith('-') ? 'dd' : '';
+      out.push('<div class="dl ' + cls + '">' + (esc(l) || ' ') + '</div>');
+    }
+    return '<div class="diff-body mono">' + (out.join('') || '<div class="dl">Keine Textänderung.</div>') + '</div>';
+  }
+
+  // ---------- Teilen und Export ----------
+
+  async function openShare() {
+    let info;
+    try { info = await api('GET', 'api/share'); } catch (e) { return fail(e); }
+    const copyRow = (label, url, warn) => '<div class="share-link' + (warn ? ' warn' : '') + '"><span>' + esc(label) + '</span><input class="input mono" readonly value="' + esc(url) + '"><button type="button" class="btn small" data-copy="' + esc(url) + '">Kopieren</button></div>';
+    const lan = info.shared
+      ? (info.links.length
+        ? info.links.map((l) => copyRow('Ansehen über ' + l.address, l.view)).join('') +
+          '<details class="sec"><summary>Link mit Bearbeitungsrechten <span class="meta">nur für dich auf anderen Geräten</span></summary><div class="body">' + info.links.map((l) => copyRow(l.address, l.edit, true)).join('') + '<p class="sublabel">Wer diesen Link hat, kann alles ändern. Nicht weitergeben.</p></div></details>' +
+          '<div class="row-btns"><button type="button" class="btn small" data-share="rotate">Links erneuern</button><button type="button" class="btn small danger" data-share="disable">Freigabe beenden</button></div>'
+        : '<div class="alert bad">Freigegeben, aber keine Netzwerkadresse gefunden. Ist der Rechner mit einem Netzwerk verbunden?</div><div class="row-btns"><button type="button" class="btn small danger" data-share="disable">Freigabe beenden</button></div>')
+      : '<p class="lead">Das Board läuft gerade nur auf diesem Rechner. Nach der Freigabe sehen andere im selben Netzwerk (WLAN, Büro, VPN) das Board live mit einem Link. Ändern können sie nichts.</p><div class="row-btns"><button type="button" class="btn primary small" data-share="enable">Im Netzwerk freigeben</button></div><p class="sublabel">Der Server startet dafür kurz neu und hört dann auf allen Netzwerkadressen. Die Links enthalten einen geheimen Schlüssel, ohne ihn gibt es keinen Zugriff.</p>';
+    const html = '<h2>Board teilen</h2>' +
+      '<div class="block"><div class="block-head"><h3>Live im Netzwerk</h3><span class="meta">' + (info.shared ? 'freigegeben' : 'nur dieser Rechner') + '</span></div>' + lan + '</div>' +
+      '<div class="block"><div class="block-head"><h3>Schnappschuss</h3><span class="meta">eine HTML-Datei</span></div>' +
+        '<p class="lead">Für Mail oder Chat: alle Aufgaben mit Details und Bildern in einer Datei. Öffnet sich ohne Server und ohne Internet, zeigt den Stand von jetzt.</p>' +
+        '<label class="toggle"><input type="checkbox" name="images" checked> Bilder einbetten</label>' +
+        '<label class="toggle"><input type="checkbox" name="closed" checked> Erledigte, Verworfene und Archiv mitnehmen</label>' +
+        '<div class="row-btns"><button type="button" class="btn small primary" id="snapGo">Schnappschuss herunterladen</button></div></div>' +
+      '<div class="block"><div class="block-head"><h3>Im Internet</h3></div><p class="lead">Für Leute außerhalb deines Netzwerks den Schnappschuss schicken. Ein eigener Server mit Login ist als nächster Schritt möglich.</p></div>' +
+      '<div class="foot"><button class="btn" value="cancel" formnovalidate>Schließen</button></div>';
+    showDialog(html, () => null, (f) => {
+      $$('[data-copy]', f).forEach((b) => b.onclick = async () => {
+        const inp = b.previousElementSibling;
+        try { await navigator.clipboard.writeText(b.dataset.copy); } catch (e) { inp.select(); document.execCommand('copy'); }
+        b.textContent = 'Kopiert';
+        setTimeout(() => { b.textContent = 'Kopieren'; }, 1500);
+      });
+      $$('[data-share]', f).forEach((b) => b.onclick = async () => {
+        const op = b.dataset.share;
+        if (op === 'rotate' && !confirm('Neue Links erzeugen? Die bisherigen Links funktionieren dann nicht mehr.')) return;
+        b.disabled = true;
+        try {
+          const r = await api('POST', 'api/share', { op });
+          ok(r.message);
+          if (r.restarting) { dlg.close(); setLive(true, 'Board startet neu'); return; }
+          dlg.close(); openShare();
+        } catch (e) { fail(e); b.disabled = false; }
+      });
+      $('#snapGo', f).onclick = async (e) => {
+        const b = e.currentTarget;
+        b.disabled = true; b.textContent = 'Wird erstellt …';
+        try {
+          const qs = 'images=' + (f.images.checked ? '1' : '0') + '&closed=' + (f.closed.checked ? '1' : '0');
+          const res = await fetch('api/export?' + qs, { headers: { 'X-Works-Token': TOKEN } });
+          if (!res.ok) throw new Error('Export fehlgeschlagen (' + res.status + ').');
+          const blob = await res.blob();
+          const name = ((res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'works-board.html';
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob); a.download = name;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+          ok('Schnappschuss gespeichert: ' + name + ' (' + (blob.size / 1024 / 1024).toFixed(1) + ' MB)');
+        } catch (ex) { fail(ex); }
+        b.disabled = false; b.textContent = 'Schnappschuss herunterladen';
+      };
+    });
+  }
+
   // ---------- Schnellsuche (rechte Shift-Taste oder Strg+K) ----------
 
   const pal = $('#palette');
@@ -1062,11 +1632,18 @@
 
   function paletteCommands() {
     const c = [];
+    if (EDIT) c.push({ label: 'Neue Aufgabe', hint: 'N', run: () => newTask() });
+    c.push({ label: 'Board anzeigen', hint: '1', run: () => setView('board') });
+    c.push({ label: 'Warteschlange anzeigen', hint: '2', run: () => setView('queue') });
+    c.push({ label: 'Zeitleiste anzeigen', hint: '3', run: () => setView('timeline') });
+    c.push({ label: 'Tabelle anzeigen', hint: '4', run: () => setView('table') });
     if (LIVE) {
-      c.push({ label: 'Neue Aufgabe', hint: 'N', run: () => newTask() });
       c.push({ label: 'Nächste Aufgabe vorschlagen', run: () => openSide('next') });
       c.push({ label: 'Ideen öffnen', run: () => openSide('ideas') });
       c.push({ label: 'Aktivität anzeigen', run: () => openSide('activity') });
+    }
+    if (EDIT) {
+      c.push({ label: 'Board teilen oder exportieren', run: () => openShare() });
       c.push({ label: 'Meilenstein anlegen', run: () => editMilestone(null) });
     }
     c.push({ label: 'Farbschema wechseln', run: () => $('#btnTheme').click() });
@@ -1116,7 +1693,7 @@
         .map((x) => ({ kind: 'task', t: x.t, q, run: () => focusCard(x.t.id) }));
       const cmds = paletteCommands().filter((c) => q && c.label.toLowerCase().includes(q)).slice(0, 4).map((c) => ({ ...c, q }));
       items = items.concat(cmds);
-      if (!q) items = items.concat(paletteCommands().slice(0, LIVE ? 4 : 2).map((c) => ({ ...c, q: '' })));
+      if (!q) items = items.concat(paletteCommands().slice(0, EDIT ? 5 : 4).map((c) => ({ ...c, q: '' })));
     }
     palItems = items;
     palSel = Math.min(palSel, Math.max(0, items.length - 1));
@@ -1212,7 +1789,7 @@
   };
   applyTheme();
 
-  $('#q').oninput = (e) => { state.q = e.target.value.toLowerCase().trim(); renderOverview(); renderFilters(); renderProgress(); renderBoard(); };
+  $('#q').oninput = (e) => { state.q = e.target.value.toLowerCase().trim(); renderAll(); };
   $('#typeFilter').onchange = (e) => { state.type = e.target.value; renderAll(); };
   $('#tagFilter').onchange = (e) => { state.tag = e.target.value; renderAll(); };
   $('#showClosed').onchange = (e) => { state.closed = e.target.checked; renderAll(); };
@@ -1228,15 +1805,26 @@
     if (e.key === 'Escape' && !pal.hidden) return;
     if (e.key === 'Escape' && !dlg.open) { if (!panel.hidden) closePanel(); else if (!sidePanel.hidden) closeSide(); return; }
     if (typing || dlg.open || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === '/') { e.preventDefault(); $('#q').focus(); }
-    if (LIVE && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); newTask(); }
+    if (e.key === '/') { e.preventDefault(); if (state.view === 'queue') setView('board'); $('#q').focus(); }
+    if (EDIT && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); newTask(); }
+    if (/^[1-4]$/.test(e.key) && panel.hidden && pal.hidden) { e.preventDefault(); setView(VIEWS[+e.key - 1]); }
   });
 
-  if (!LIVE) {
-    $$('[data-live]').forEach((el) => { el.hidden = true; });
-    $('#readonly').hidden = false;
-  } else {
+  document.body.classList.toggle('ro', !EDIT);
+  $$('[data-live]').forEach((el) => { if (!LIVE) el.hidden = true; });
+  $$('[data-edit]').forEach((el) => { if (!EDIT) el.hidden = true; });
+  if (!EDIT) {
+    const ro = $('#readonly');
+    ro.hidden = false;
+    if (MODE === 'view') ro.innerHTML = '<strong>Nur Ansehen.</strong> Du siehst das Board von ' + esc(meta.project) + ' live über einen geteilten Link. Änderungen erscheinen automatisch.';
+    else if (MODE === 'snapshot') ro.innerHTML = '<strong>Schnappschuss</strong> vom ' + esc(new Date(meta.snapshot || Date.now()).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })) + '. Nur zum Ansehen, Details per Klick auf eine Aufgabe.';
+  }
+  $$('#views [data-view]').forEach((b) => b.onclick = () => setView(b.dataset.view));
+  if (EDIT) {
     $('#btnNew').onclick = () => newTask(state.ms ? {} : {});
+    $('#btnShare').onclick = () => openShare();
+  }
+  if (LIVE) {
     $('#btnIdeas').onclick = () => openSide('ideas');
     $('#btnNext').onclick = () => openSide('next');
     $('#btnActivity').onclick = () => openSide('activity');
@@ -1261,6 +1849,9 @@
   // Ansicht nach einem Update-Neuladen wiederherstellen.
   let restored = null;
   try { restored = JSON.parse(sessionStorage.getItem(UI_KEY) || 'null'); sessionStorage.removeItem(UI_KEY); } catch (e) { restored = null; }
+  state.view = store.get('works-view-' + meta.project, 'board');
+  if (restored && restored.view) state.view = restored.view;
+  if (!VIEWS.includes(state.view)) state.view = 'board';
   if (restored) {
     Object.assign(state, { q: restored.q || '', type: restored.type || '', tag: restored.tag || '', ms: restored.ms || '', closed: !!restored.closed, signal: restored.signal || '' });
     if (Array.isArray(restored.prios) && restored.prios.length) state.prios = new Set(restored.prios);

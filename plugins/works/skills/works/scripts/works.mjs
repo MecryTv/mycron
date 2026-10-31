@@ -15,10 +15,13 @@ import {
   getSection, setSection, appendToSection, stripComments, checkboxes, hasContent, imageLinks,
   loadTasks, loadTask, findTask, saveTask, addHistory, relFromWorks, isBlocked, openBlockers,
   isOverdue, openQuestions, sortTasks, readTemplate, fillTemplate, parseArgs, listFlag,
+  queueOf, pruneQueue,
 } from './lib.mjs';
 import { generateIndex, nextCandidates, dodCheck, sessionSummary, byIdMap, milestoneProgress } from './views.mjs';
 import { generateBoard, refreshBoardIfPresent } from './board.mjs';
 import { serveBoard } from './serve.mjs';
+import { shareLinks, rotateKeys } from './share.mjs';
+import { buildSnapshot, snapshotName } from './export.mjs';
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
 import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion } from './server-control.mjs';
@@ -70,7 +73,7 @@ function cmdInit() {
     if (!exists(keep)) fs.writeFileSync(keep, '');
   }
   const mode = flags.gitignore || 'default';
-  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'inbox/*', '!inbox/.gitkeep'];
+  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'share.json', 'inbox/*', '!inbox/.gitkeep'];
   if (mode === 'assets') ignore.push('tasks/*/assets/', 'archive/*/assets/');
   if (mode === 'all') ignore.splice(1, ignore.length - 1, '*', '!.gitignore');
   if (mode !== 'none') fs.writeFileSync(path.join(wd, '.gitignore'), ignore.join('\n') + '\n');
@@ -611,6 +614,7 @@ function cmdDone() {
   if (st.active === t.id) { delete st.active; saveState(root, st); }
   refresh(root);
   out(`${t.id} ist erledigt.`);
+  afterClose(root, t);
   const unblocked = loadTasks(root).filter((o) => (o.blocked_by || []).includes(t.id) && OPEN_STATUSES.includes(o.status) && !isBlocked(o, byIdMap(loadTasks(root))));
   if (unblocked.length) out(`Jetzt frei: ${unblocked.map((o) => `${o.id} ${o.title}`).join('; ')}`);
   const dec = path.join(t._dir, 'decisions.md');
@@ -633,6 +637,7 @@ function cmdDrop() {
   if (st.active === t.id) { delete st.active; saveState(root, st); }
   refresh(root);
   out(`${t.id} verworfen.`);
+  afterClose(root, t);
 }
 
 function cmdReopen() {
@@ -683,6 +688,90 @@ function cmdArchive() {
 
 // ---------- next / status / index ----------
 
+// ---------- Warteschlange ----------
+
+function cmdQueue() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const sub = pos.shift() || 'list';
+  const tasks = loadTasks(root);
+  const byId = byIdMap(tasks);
+  let q = queueOf(config);
+  const save = () => { config.queue = q; saveConfig(root, config); refresh(root); };
+  const need = (raw) => {
+    const id = normalizeId(config, raw);
+    const t = byId.get(id);
+    if (!t) fail(`Aufgabe ${id} nicht gefunden.`);
+    return t;
+  };
+  if (sub === 'add') {
+    const t = need(pos.shift());
+    if (!OPEN_STATUSES.includes(t.status)) fail(`${t.id} ist ${STATUS_LABEL[t.status]} und kann nicht eingereiht werden.`);
+    q = q.filter((x) => x !== t.id);
+    const p = flags.pos && flags.pos !== true ? Math.max(1, parseInt(flags.pos, 10)) : q.length + 1;
+    q.splice(p - 1, 0, t.id);
+    save();
+    out(`${t.id} steht auf Platz ${q.indexOf(t.id) + 1} der Warteschlange.`);
+  } else if (sub === 'remove') {
+    const id = normalizeId(config, pos.shift());
+    q = q.filter((x) => x !== id);
+    save();
+    out(`${id} aus der Warteschlange entfernt.`);
+  } else if (sub === 'move') {
+    const t = need(pos.shift());
+    const p = Math.max(1, parseInt(pos.shift(), 10) || 1);
+    q = q.filter((x) => x !== t.id);
+    q.splice(p - 1, 0, t.id);
+    save();
+    out(`${t.id} steht jetzt auf Platz ${q.indexOf(t.id) + 1}.`);
+  } else if (sub === 'order') {
+    const ids = listFlag(pos.join(',')).map((x) => normalizeId(config, x));
+    for (const id of ids) if (!byId.has(id)) fail(`Aufgabe ${id} nicht gefunden.`);
+    q = [...new Set(ids)];
+    save();
+    out(`Warteschlange mit ${q.length} Aufgabe(n) gespeichert.`);
+  } else if (sub === 'clear') {
+    q = [];
+    save();
+    out('Warteschlange geleert.');
+  } else if (sub === 'set') {
+    config.queue_settings = config.queue_settings || {};
+    for (const pair of pos) {
+      const [k, v] = pair.split('=');
+      if (!['auto_next', 'skip_blocked', 'ask_before'].includes(k)) fail(`Unbekannte Einstellung ${k}. Erlaubt: auto_next, skip_blocked, ask_before`);
+      config.queue_settings[k] = ['true', '1', 'ja', 'an'].includes(String(v).toLowerCase());
+    }
+    saveConfig(root, config);
+    refresh(root);
+    out(`Einstellungen: ${Object.entries(config.queue_settings).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+  } else {
+    pruneQueue(root, config, tasks);
+    q = queueOf(config);
+    if (flags.json) { out(JSON.stringify({ queue: q, settings: config.queue_settings }, null, 2)); return; }
+    if (!q.length) { out('Die Warteschlange ist leer. Einreihen mit works queue add <ID>.'); return; }
+    q.forEach((id, i) => {
+      const t = byId.get(id);
+      const hint = isBlocked(t, byId) ? `, blockiert durch ${openBlockers(t, byId).join(', ')}` : '';
+      out(`${String(i + 1).padStart(2)}. ${t.id} ${t.priority} ${STATUS_LABEL[t.status]}: ${t.title}${hint}`);
+    });
+    const s = config.queue_settings || {};
+    out(`\nNach Abschluss automatisch weiter: ${s.auto_next ? 'ja' : 'nein'}${s.auto_next && s.ask_before ? ' (mit Rückfrage)' : ''}, Blockierte überspringen: ${s.skip_blocked === false ? 'nein' : 'ja'}`);
+  }
+}
+
+// Nach Abschluss oder Verwerfen: aus der Warteschlange nehmen und den nächsten Eintrag nennen.
+function afterClose(root, t) {
+  const config = loadConfig(root);
+  const tasks = loadTasks(root);
+  pruneQueue(root, config, tasks);
+  const byId = byIdMap(tasks);
+  const s = config.queue_settings || {};
+  const next = queueOf(config).map((id) => byId.get(id)).find((x) => x && ['backlog', 'geplant'].includes(x.status) && (s.skip_blocked === false || !isBlocked(x, byId)));
+  if (!next) return;
+  out(`Nächste Aufgabe in der Warteschlange: ${next.id} ${next.title}`);
+  if (s.auto_next) out(s.ask_before ? `Laut Einstellung als Nächstes ${next.id} starten, vorher kurz beim Nutzer nachfragen.` : `Laut Einstellung direkt mit works start ${next.id} weitermachen.`);
+}
+
 function cmdNext() {
   const root = requireRoot();
   const n = parseInt(flags.n || 3, 10);
@@ -724,6 +813,36 @@ async function waitForServer(root, oldPid, ms = 8000) {
   return null;
 }
 
+function printShare(root, info) {
+  if (!info || !['0.0.0.0', '::'].includes(info.host)) return;
+  const links = shareLinks(root, info.port);
+  if (!links.length) { out('Im Netzwerk freigegeben, aber keine Netzwerkadresse gefunden.'); return; }
+  out('Im Netzwerk geteilt. Link zum Ansehen (nur lesen):');
+  for (const l of links) out(`  ${l.view}`);
+  if (flags['owner-link']) { out('Link mit Bearbeitungsrechten, nicht weitergeben:'); for (const l of links) out(`  ${l.edit}`); }
+  out('Freigabe beenden: works board --restart --private. Links erneuern: works share --rotate');
+}
+
+function cmdShare() {
+  const root = requireRoot();
+  if (flags.rotate) { rotateKeys(root); out('Neue Links erzeugt. Die alten funktionieren nicht mehr. Offene geteilte Tabs brauchen den neuen Link.'); }
+  const info = readServer(root);
+  if (!info) { out('Kein Live-Board aktiv. Teilen mit: works board --serve --detach --share'); return; }
+  if (!['0.0.0.0', '::'].includes(info.host)) { out(`Das Board läuft nur lokal (${serverUrl(info)}). Im Netzwerk teilen mit: works board --restart --share`); return; }
+  flags['owner-link'] = flags['owner-link'] || flags.owner;
+  printShare(root, info);
+}
+
+function cmdExport() {
+  const root = requireRoot();
+  const snap = buildSnapshot(root, { images: !flags['no-images'], closed: !flags['open-only'] });
+  const file = path.resolve(flags.out && flags.out !== true ? String(flags.out) : path.join(worksDir(root), 'reports', snapshotName(root)));
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, snap.html);
+  out(`Schnappschuss gespeichert: ${file}`);
+  out(`${snap.tasks} Aufgaben, ${(snap.imageBytes / 1024 / 1024).toFixed(1)} MB Bilder eingebettet${snap.skipped ? `, ${snap.skipped} Bild(er) zu groß oder fehlend` : ''}. Öffnet sich ohne Server, nur zum Ansehen.`);
+}
+
 async function cmdBoard() {
   const root = requireRoot();
   const current = cliVersion(newestCli());
@@ -731,7 +850,7 @@ async function cmdBoard() {
   const legacy = info ? [] : findServerProcesses(root);
 
   if (flags.status) {
-    if (info) out(`Live-Board läuft: ${serverUrl(info)} (PID ${info.pid}, Version ${info.version}${info.version === current ? ', aktuell' : `, veraltet, aktuell ist ${current}`})`);
+    if (info) { out(`Live-Board läuft: ${serverUrl(info)} (PID ${info.pid}, Version ${info.version}${info.version === current ? ', aktuell' : `, veraltet, aktuell ist ${current}`})`); printShare(root, info); }
     for (const p of legacy) out(`Board-Server einer älteren works-Version läuft: PID ${p.pid}${p.port ? `, Port ${p.port}` : ''}. Mit works board --restart ersetzen.`);
     if (!info && !legacy.length) out('Kein Live-Board für dieses Projekt aktiv.');
     return;
@@ -745,10 +864,11 @@ async function cmdBoard() {
   }
 
   if (flags.serve || flags.restart) {
-    const host = flags.host && flags.host !== true ? String(flags.host) : (info && info.host) || '127.0.0.1';
+    const host = flags.share ? '0.0.0.0' : flags.private ? '127.0.0.1' : flags.host && flags.host !== true ? String(flags.host) : (info && info.host) || '127.0.0.1';
+    const hostChanged = info && info.host && info.host !== host;
     let port = parseInt(flags.port || (info && info.port) || (legacy[0] && legacy[0].port) || 4747, 10);
     // Läuft schon ein aktueller Server, keinen zweiten starten.
-    if (info && info.version === current && !flags.restart && !flags.takeover) {
+    if (info && info.version === current && !flags.restart && !flags.takeover && !hostChanged) {
       out(`Live-Board läuft bereits: ${serverUrl(info)}`);
       return;
     }
@@ -763,6 +883,7 @@ async function cmdBoard() {
       const started = await waitForServer(root, info ? info.pid : null);
       if (!started) fail(`Board-Server startet nicht (PID ${pid}). Details in .works/server.log`);
       out(`Live-Board läuft: ${serverUrl(started)}`);
+      printShare(root, started);
       out('Läuft im Hintergrund weiter. Beenden mit works board --stop.');
       if (flags.open) {
         const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
@@ -1553,7 +1674,12 @@ Ansehen
   list [--status ..] [--priority ..] [--type ..] [--tag ..] [--milestone M1] [--blocked] [--overdue] [--incomplete] [--all] [--json]
   show <ID> [--section "Name"]     next [--n 3]     status     index
   board [--open]                   board --serve [--detach] [--port 4747] [--host 127.0.0.1] [--open]
+                                   board --restart --share   im lokalen Netz teilen (Leselink mit Schlüssel)
+                                   board --restart --private wieder nur lokal
+  share [--rotate] [--owner]       Links zum Teilen anzeigen oder erneuern
+  export [--out datei.html] [--no-images] [--open-only]  Schnappschuss als eine HTML-Datei
   board --status | --stop | --restart
+  queue [list|add <ID> [--pos N]|remove <ID>|move <ID> <N>|order A,B,C|clear|set auto_next=true ...]
   demo [--simulate] [--delay 6] [--open] [--port 4747] [--path ordner] | demo --remove
   milestone list|add M1 --title ".." [--due ..]|set M1 status=erledigt
 
@@ -1595,7 +1721,7 @@ const commands = {
   promote: cmdPromote, milestone: cmdMilestone, scan: cmdScan, 'gh-import': cmdGhImport,
   'gh-export': cmdGhExport, commits: cmdCommits, changelog: cmdChangelog, report: cmdReport,
   'install-hooks': cmdInstallHooks, section: cmdSection, check: cmdCheck, item: cmdItem,
-  'idea-drop': cmdIdeaDrop, demo: cmdDemo,
+  'idea-drop': cmdIdeaDrop, demo: cmdDemo, queue: cmdQueue, share: cmdShare, export: cmdExport,
 };
 
 const fn = commands[cmd];

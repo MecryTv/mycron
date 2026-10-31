@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  loadTasks, loadConfig, worksDir, getSection, checkboxes, stripComments, imageLinks,
+  loadTasks, loadConfig, worksDir, queueOf, getSection, checkboxes, stripComments, imageLinks,
   isBlocked, openBlockers, isOverdue, openQuestions, relFromWorks, nowStamp, STATUS_LABEL,
   PRIO_LABEL, TYPE_LABEL, OPEN_STATUSES,
 } from './lib.mjs';
@@ -26,6 +26,12 @@ function lastLog(t) {
   return m ? m[2].slice(0, 200) : '';
 }
 
+// Erster Start laut Verlauf, für die Zeitleiste.
+function startedOf(t) {
+  const m = (getSection(t._body, 'Verlauf') || '').match(/^- (\d{4}-\d{2}-\d{2}): Gestartet/m);
+  return m ? m[1] : '';
+}
+
 export function boardData(root) {
   const config = loadConfig(root);
   const all = loadTasks(root);
@@ -39,14 +45,18 @@ export function boardData(root) {
       blocked: OPEN_STATUSES.includes(t.status) && isBlocked(t, byId), blockers: openBlockers(t, byId),
       overdue: !!isOverdue(t), incomplete: !!t.incomplete, questions: openQuestions(t).map((q) => q.text),
       crit: [crit.done, crit.total], excerpt: excerpt(t), archived: t._archived,
-      completed: t.completed || '', updated: t.updated || '', created: t.created || '', lastLog: lastLog(t),
+      completed: t.completed || '', updated: t.updated || '', created: t.created || '', started: startedOf(t), lastLog: lastLog(t),
+      blockedBy: t.blocked_by || [], risk: t.risk || '', branch: t.branch || '',
       file: relFromWorks(root, t._file),
       thumb: imgs.length ? relFromWorks(root, path.resolve(t._dir, imgs[imgs.length - 1].src)) : '',
       thumbAlt: imgs.length ? imgs[imgs.length - 1].alt : '',
     };
   });
+  const open = new Set(all.filter((t) => OPEN_STATUSES.includes(t.status)).map((t) => t.id));
   const meta = {
     generated: nowStamp(),
+    queue: queueOf(config).filter((id) => open.has(id)),
+    queueSettings: { auto_next: false, skip_blocked: true, ask_before: true, ...(config.queue_settings || {}) },
     version: runningVersion(),
     project: path.basename(root),
     statusLabel: STATUS_LABEL, prioLabel: PRIO_LABEL, typeLabel: TYPE_LABEL,
@@ -73,9 +83,10 @@ function boardAssets() {
 }
 
 // Setzt Vorlage, Stile, Skript und Daten zu einer eigenständigen HTML-Datei zusammen.
-export function renderBoard(data, { live = false, token = '' } = {}) {
+// mode: edit (Live mit Bearbeiten), view (Live nur lesen, geteilter Link), static (board.html), snapshot (Export).
+export function renderBoard(data, { live = false, token = '', mode = live ? 'edit' : 'static', details = null } = {}) {
   const a = boardAssets();
-  const boot = JSON.stringify({ data, live, token }).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const boot = JSON.stringify({ data, live, token, mode, details }).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   const title = `Works ${data.meta.project}`.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
   return a.template
     .replace('__TITLE__', () => title)

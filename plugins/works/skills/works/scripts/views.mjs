@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  loadTasks, loadConfig, loadState, worksDir, getSection, checkboxes, hasContent,
+  loadTasks, loadConfig, loadState, queueOf, worksDir, getSection, checkboxes, hasContent,
   imageLinks, OPEN_STATUSES, STATUSES, STATUS_LABEL, PRIO_LABEL, TYPE_LABEL,
   isBlocked, openBlockers, isOverdue, openQuestions, prioRank, effortRank, sortTasks,
   mdEscape, relFromWorks, nowStamp, today, daysBetween, idNumber, exists, stripComments,
@@ -170,6 +170,7 @@ export function generateIndex(root) {
 export function nextCandidates(root, n = 3) {
   const all = loadTasks(root, { archive: true });
   const byId = byIdMap(all);
+  const queue = queueOf(loadConfig(root));
   const active = all.filter((t) => ['in-arbeit', 'review'].includes(t.status));
   const candidates = all
     .filter((t) => ['backlog', 'geplant'].includes(t.status) && !isBlocked(t, byId))
@@ -188,7 +189,10 @@ export function nextCandidates(root, n = 3) {
       if (t.effort) reasons.push(`Aufwand ${t.effort}`);
       if (t.risk === 'hoch') { score -= 5; reasons.push('Risiko hoch'); }
       if (t.incomplete) { score -= 40; reasons.push('erst vervollständigen'); }
-      return { task: t, score, reasons };
+      // Die Warteschlange des Nutzers hat Vorrang vor der berechneten Reihenfolge.
+      const qi = queue.indexOf(t.id);
+      if (qi !== -1) { score += 100000 - qi * 100; reasons.unshift(`Warteschlange Platz ${qi + 1}`); }
+      return { task: t, score, reasons, queued: qi !== -1 };
     })
     .sort((a, b) => b.score - a.score || idNumber(a.task.id) - idNumber(b.task.id))
     .slice(0, n);
@@ -252,6 +256,12 @@ export function sessionSummary(root, { maxHandoff = 1500 } = {}) {
   if (p2.length) lines.push(`Offene P2 Hoch: ${p2.slice(0, 5).map((t) => `${t.id} ${t.title}`).join('; ')}${p2.length > 5 ? ` und ${p2.length - 5} weitere` : ''}`);
   const overdue = open.filter(isOverdue);
   if (overdue.length) lines.push(`Überfällig: ${overdue.map((t) => `${t.id} (${t.due})`).join(', ')}`);
+  const queued = queueOf(config).map((id) => byId.get(id)).filter((t) => t && OPEN_STATUSES.includes(t.status));
+  if (queued.length) {
+    const qs = config.queue_settings || {};
+    lines.push(`Warteschlange des Nutzers (hat Vorrang vor works next): ${queued.slice(0, 6).map((t, i) => `${i + 1}. ${t.id} ${t.title}`).join('; ')}${queued.length > 6 ? ` und ${queued.length - 6} weitere` : ''}.`
+      + (qs.auto_next ? ` Nach einem Abschluss die nächste startbare Aufgabe daraus beginnen${qs.ask_before ? ', vorher kurz beim Nutzer nachfragen' : ''}.` : ''));
+  }
   const active = state.active && byId.get(state.active);
   if (active && OPEN_STATUSES.includes(active.status)) {
     lines.push(`Aktive Aufgabe: ${active.id} ${active.title} (${STATUS_LABEL[active.status]}), Datei: .works/${relFromWorks(root, active._file)}`);
