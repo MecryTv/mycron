@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { worksDir, run } from './lib.mjs';
 import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
-import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf } from './api.mjs';
+import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo } from './api.mjs';
 import { shareKeys, rotateKeys, shareLinks, lanAddresses } from './share.mjs';
 import { buildSnapshot, snapshotName } from './export.mjs';
 import { runningVersion, writeServer, clearServer, newestCli, cliVersion, OWN_CLI, startDetached, ensureGitignore } from './server-control.mjs';
@@ -16,7 +16,7 @@ const MIME = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
   '.webp': 'image/webp', '.avif': 'image/avif', '.svg': 'image/svg+xml', '.pdf': 'application/pdf',
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
-  '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.json': 'application/json; charset=utf-8',
+  '.html': 'text/html; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.json': 'application/json; charset=utf-8',
 };
 // Nur diese Bereiche von .works/ werden als Dateien ausgeliefert.
 const PUBLIC_PREFIXES = ['tasks/', 'archive/', 'reports/', 'WORKS.md', 'ideas.md'];
@@ -40,10 +40,11 @@ export function signature(root) {
     try { dirs = fs.readdirSync(base).sort(); } catch { continue; }
     for (const d of dirs) {
       const dir = path.join(base, d);
-      parts.push(`${sub}/${d}`, statPart(path.join(dir, 'task.md')), statPart(path.join(dir, 'decisions.md')));
+      parts.push(`${sub}/${d}`, statPart(path.join(dir, 'task.md')), statPart(path.join(dir, 'decisions.md')), statPart(path.join(dir, 'comments.md')), statPart(path.join(dir, 'checks.json')));
       try { parts.push(fs.readdirSync(path.join(dir, 'assets')).sort().join(',')); } catch { /* keine Assets */ }
     }
   }
+  try { parts.push(fs.readdirSync(path.join(wd, 'templates')).map((f) => f + statPart(path.join(wd, 'templates', f))).join(',')); } catch { /* keine Vorlagen */ }
   return parts.join('|');
 }
 
@@ -226,10 +227,15 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     const q = url.searchParams;
     try {
       if (req.method === 'GET') {
+        if (p === '/api/templates') return json(res, 200, templatesList(root));
+        if (p === '/api/estimates') return json(res, 200, estimatesInfo(root));
+        if (p === '/api/reports') return json(res, 200, reportsInfo(root));
         if (p === '/api/code') return json(res, 200, await codeOf(root, String(q.get('id') || '').toUpperCase()));
         if (p === '/api/diff') return json(res, 200, await diffOf(root, String(q.get('id') || '').toUpperCase(), q.get('file'), q.get('uncommitted') === '1'));
-        if (level !== 'edit' && ['/api/share', '/api/export'].includes(p)) return json(res, 403, { error: 'Nur für den Besitzer des Boards.' });
+        if (level !== 'edit' && ['/api/share', '/api/export', '/api/checks', '/api/template-draft'].includes(p)) return json(res, 403, { error: 'Nur für den Besitzer des Boards.' });
         if (p === '/api/share') return json(res, 200, shareInfo());
+        if (p === '/api/checks') return json(res, 200, checksInfo(root));
+        if (p === '/api/template-draft') return json(res, 200, templateDraft(root, String(q.get('id') || '').toUpperCase()));
         if (p === '/api/export') {
           const snap = buildSnapshot(root, { images: q.get('images') !== '0', closed: q.get('closed') !== '0' });
           res.writeHead(200, {
@@ -250,6 +256,9 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: 'JSON erwartet.' });
         let body;
         try { body = JSON.parse((await readBody(req, MAX_JSON)).toString('utf8')); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, 'Ungültiges JSON.'); }
+        // Befehle ausführen oder ändern und den Webhook setzen geht nur direkt am eigenen Rechner,
+        // nicht über einen geteilten Bearbeitungslink.
+        if (['checksRun', 'checksSave', 'reportWebhook'].includes(body && body.action) && !isLocal(req)) throw new ApiError(403, 'Das geht nur direkt am Rechner, auf dem das Board läuft.');
         const result = await runAction(root, body);
         tick();
         return json(res, 200, { ok: true, ...result });
@@ -329,6 +338,8 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         'Content-Type': MIME[ext] || 'application/octet-stream',
         'Content-Length': st.size, ...SECURITY_HEADERS,
         ...(ext === '.svg' ? { 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'" } : {}),
+        // HTML läuft immer in einer Sandbox ohne Zugriff auf das Board. Nur generierte Berichte dürfen ein kleines Skript ausführen.
+        ...(ext === '.html' ? { 'Content-Security-Policy': rel.startsWith('reports/') ? "sandbox allow-scripts; default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:" : "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:" } : {}),
       });
       if (req.method === 'HEAD') return res.end();
       fs.createReadStream(abs).pipe(res);

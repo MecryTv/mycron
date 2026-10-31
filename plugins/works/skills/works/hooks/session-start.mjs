@@ -9,6 +9,7 @@ import { repairTasks } from '../scripts/sections.mjs';
 import { sessionSummary, generateIndex } from '../scripts/views.mjs';
 import { refreshBoardIfPresent } from '../scripts/board.mjs';
 import { refreshServers, ensureGitignore } from '../scripts/server-control.mjs';
+import { reportDue, reportName } from '../scripts/weekly.mjs';
 
 let input = {};
 try {
@@ -38,6 +39,8 @@ async function main() {
   try { notes = await refreshServers(root); } catch (e) { notes = [`Board-Server konnte nicht aktualisiert werden: ${e.message}`]; }
   process.stdout.write(sessionSummary(root) + '\n');
   if (repairNotes.length) process.stdout.write(`[works] ${repairNotes.join('. ')}.\n`);
+  const due = reportDue(root, config);
+  if (due) process.stdout.write(`[works] Wochenbericht ${reportName(due)} ist fällig. Wenn es passt, die Woche in zwei bis vier Sätzen zusammenfassen und works report --week --summary "..." ausführen. Der Nutzer hat das so eingestellt.\n`);
   if (notes.length) process.stdout.write(`[works] ${notes.join('. ')}. Offene Board-Tabs laden sich selbst neu.\n`);
 }
 

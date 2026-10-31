@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { findRoot, loadConfig, loadState, saveState, loadTasks, run } from '../scripts/lib.mjs';
+import { recordEvent } from '../scripts/timelog.mjs';
 
 let input = {};
 try {
@@ -15,8 +16,10 @@ function main() {
   const root = findRoot(input.cwd || process.cwd());
   if (!root) return;
   const config = loadConfig(root);
-  if (config.hooks && config.hooks.stop_reminder === false) return;
   const state = loadState(root);
+  // Zeiterfassung: Ende der Anfrage. Läuft auch bei abgeschalteter Erinnerung.
+  if (config.time_tracking !== false) { try { recordEvent(root, 'stop', state.active || '', input.session_id); } catch { /* nicht kritisch */ } }
+  if (config.hooks && config.hooks.stop_reminder === false) return;
   if (!state.active) return;
   const task = loadTasks(root, { archive: false }).find((t) => t.id === state.active);
   if (!task || task.status !== 'in-arbeit') return;

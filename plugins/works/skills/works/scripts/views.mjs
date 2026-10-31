@@ -7,6 +7,9 @@ import {
   isBlocked, openBlockers, isOverdue, openQuestions, prioRank, effortRank, sortTasks,
   mdEscape, relFromWorks, nowStamp, today, daysBetween, idNumber, exists, stripComments,
 } from './lib.mjs';
+import { activeSprint, sprintSummaryLine } from './sprint.mjs';
+import { unreadForClaude } from './comments.mjs';
+import { checkItems } from './checks.mjs';
 
 export function byIdMap(tasks) {
   return new Map(tasks.map((t) => [t.id, t]));
@@ -170,7 +173,10 @@ export function generateIndex(root) {
 export function nextCandidates(root, n = 3) {
   const all = loadTasks(root, { archive: true });
   const byId = byIdMap(all);
-  const queue = queueOf(loadConfig(root));
+  const config = loadConfig(root);
+  const queue = queueOf(config);
+  const sprint = activeSprint(config);
+  const inSprint = new Set(sprint ? sprint.tasks || [] : []);
   const active = all.filter((t) => ['in-arbeit', 'review'].includes(t.status));
   const candidates = all
     .filter((t) => ['backlog', 'geplant'].includes(t.status) && !isBlocked(t, byId))
@@ -190,6 +196,7 @@ export function nextCandidates(root, n = 3) {
       if (t.risk === 'hoch') { score -= 5; reasons.push('Risiko hoch'); }
       if (t.incomplete) { score -= 40; reasons.push('erst vervollständigen'); }
       // Die Warteschlange des Nutzers hat Vorrang vor der berechneten Reihenfolge.
+      if (inSprint.has(t.id)) { score += 1000; reasons.unshift(`im Sprint ${sprint.id}`); }
       const qi = queue.indexOf(t.id);
       if (qi !== -1) { score += 100000 - qi * 100; reasons.unshift(`Warteschlange Platz ${qi + 1}`); }
       return { task: t, score, reasons, queued: qi !== -1 };
@@ -235,9 +242,12 @@ export function dodCheck(root, config, task) {
   if (task.type === 'refactor') auto.push({ ok: hasContent(getSection(body, 'Rollback')), text: 'Rollback ist beschrieben', detail: '' });
   if (task.type === 'debt') auto.push({ ok: hasContent(getSection(body, 'Rückzahlung')), text: 'Rückzahlung ist beschrieben', detail: '' });
 
+  const chk = checkItems(root, config, task);
+  auto.push(...chk.items);
+
   const manual = [...(config.dod.global || []), ...((config.dod.by_type || {})[task.type] || [])];
   for (const tag of tags) manual.push(...((config.dod.by_tag || {})[tag] || []));
-  return { auto, manual: [...new Set(manual)], commands: config.dod.commands || [] };
+  return { auto, manual: [...new Set(manual)], commands: config.dod.commands || [], checks: chk.state };
 }
 
 // ---------- Session-Zusammenfassung ----------
@@ -262,6 +272,10 @@ export function sessionSummary(root, { maxHandoff = 1500 } = {}) {
     lines.push(`Warteschlange des Nutzers (hat Vorrang vor works next): ${queued.slice(0, 6).map((t, i) => `${i + 1}. ${t.id} ${t.title}`).join('; ')}${queued.length > 6 ? ` und ${queued.length - 6} weitere` : ''}.`
       + (qs.auto_next ? ` Nach einem Abschluss die nächste startbare Aufgabe daraus beginnen${qs.ask_before ? ', vorher kurz beim Nutzer nachfragen' : ''}.` : ''));
   }
+  const sprintLine = sprintSummaryLine(config, all);
+  if (sprintLine) lines.push(sprintLine);
+  const unread = open.map((t) => ({ t, n: unreadForClaude(root, t).length })).filter((x) => x.n);
+  if (unread.length) lines.push(`Neue Kommentare vom Nutzer: ${unread.map((x) => `${x.t.id} (${x.n})`).join(', ')}. Mit works comments <ID> lesen und mit works comment <ID> "..." antworten.`);
   const active = state.active && byId.get(state.active);
   if (active && OPEN_STATUSES.includes(active.status)) {
     lines.push(`Aktive Aufgabe: ${active.id} ${active.title} (${STATUS_LABEL[active.status]}), Datei: .works/${relFromWorks(root, active._file)}`);

@@ -9,6 +9,10 @@ import {
 } from './lib.mjs';
 import { byIdMap, milestoneProgress } from './views.mjs';
 import { runningVersion } from './server-control.mjs';
+import { activeSprint, lastClosedSprint, sprintStats, sprintSettings } from './sprint.mjs';
+import { loadComments } from './comments.mjs';
+import { effortDays } from './timelog.mjs';
+import { configuredChecks } from './checks.mjs';
 
 function excerpt(t) {
   for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Beschreibung', 'Abkürzung', 'Kontext und Problem', 'Problem', 'Herkunft']) {
@@ -39,7 +43,9 @@ export function boardData(root) {
   const data = all.map((t) => {
     const imgs = imageLinks(getSection(t._body, 'Assets') || '').filter((i) => !/^https?:/.test(i.src));
     const crit = checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '');
+    const com = loadComments(t);
     return {
+      comments: com.length, lastCommentBy: com.length ? com[com.length - 1].author : '', lastCommentAt: com.length ? com[com.length - 1].at : '',
       id: t.id, title: t.title, type: t.type, priority: t.priority, status: t.status,
       effort: t.effort || '', due: t.due || '', milestone: t.milestone || '', tags: t.tags || [],
       blocked: OPEN_STATUSES.includes(t.status) && isBlocked(t, byId), blockers: openBlockers(t, byId),
@@ -56,6 +62,12 @@ export function boardData(root) {
   const meta = {
     generated: nowStamp(),
     queue: queueOf(config).filter((id) => open.has(id)),
+    sprint: (() => { const sp = activeSprint(config); return sp ? { ...sp, stats: sprintStats(config, sp, all) } : null; })(),
+    lastSprint: (() => { const sp = lastClosedSprint(config); return sp ? { id: sp.id, title: sp.title, result: sp.result || null, carry: sp.carry || [] } : null; })(),
+    sprintSettings: sprintSettings(config),
+    views: Array.isArray(config.views) ? config.views : [],
+    effortDays: effortDays(root, all, config),
+    hasChecks: Object.keys(configuredChecks(config)).length > 0,
     queueSettings: { auto_next: false, skip_blocked: true, ask_before: true, ...(config.queue_settings || {}) },
     version: runningVersion(),
     project: path.basename(root),

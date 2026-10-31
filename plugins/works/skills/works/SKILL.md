@@ -16,7 +16,9 @@ Verwaltet alle Aufgaben eines Projekts in `.works/`. Jede Aufgabe hat einen eige
   board.html          generiertes Kanban-Board (lokal, wird nach jeder Änderung aktualisiert)
   inbox/              Ablage für Screenshots, die noch zugeordnet werden
   reports/            gespeicherte Berichte
-  tasks/W-0012-slug/  task.md, decisions.md, assets/, docs/
+  templates/          Vorlagen für neue Aufgaben (JSON)
+  time.jsonl          Zeiterfassung aus den Hooks
+  tasks/W-0012-slug/  task.md, decisions.md, comments.md, checks.json, assets/, docs/
   archive/            erledigte und verworfene Aufgaben
 ```
 
@@ -46,6 +48,8 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 10. Der Nutzer kann Aufgaben auch im Live-Board anlegen, verschieben und bearbeiten. Solche Verlaufseinträge enden mit `[Board]`. Vor jedem Edit an einer task.md die Datei neu lesen, statt einen älteren Stand aus dem Kontext zu überschreiben. Neue Aufgaben mit `source: board` und `incomplete: true` beim nächsten passenden Moment mit dem Nutzer vervollständigen.
 11. Der Abschnitt `## Beschreibung` ist die zentrale Stelle mit allem Relevanten zu einer Aufgabe: was passieren soll, warum, Hintergrund, Details und Hinweise des Nutzers. Vor der Arbeit an einer Aufgabe zuerst und vollständig lesen und als verbindliche Vorgabe behandeln, zusammen mit den Akzeptanzkriterien. Beim Anlegen neuer Aufgaben alle relevanten Infos in die Beschreibung schreiben (`works new --description "..."`), nicht verteilt auf andere Abschnitte. Ein Abschnitt Ziel ist optional und nur bei älteren Aufgaben gefüllt. Widerspricht etwas darin dem Plan oder dem Code, beim Nutzer nachfragen statt es zu übergehen. Den Abschnitt nicht umschreiben; eigene Erkenntnisse gehören in andere Abschnitte oder den Verlauf.
 12. Die Warteschlange des Nutzers (`works queue`, im Board unter Warteschlange) hat Vorrang vor allen eigenen Vorschlägen. `works next` und `works status` zeigen sie zuerst. Sagt der Nutzer "arbeite die Warteschlange ab" oder ist `auto_next` an, nach `works done` mit dem Eintrag weitermachen, den die Ausgabe nennt. Bei `ask_before` vorher kurz nachfragen. Blockierte Einträge überspringen, solange `skip_blocked` an ist. Die Reihenfolge nur auf Wunsch des Nutzers ändern.
+13. Kommentare vom Nutzer (`works comments`) sind Vorgaben wie die Beschreibung. Neue Kommentare zuerst lesen und mit `works comment <ID> "..."` kurz beantworten: was umgesetzt ist, was offen bleibt, welche Entscheidung nötig ist.
+14. Prüfungen (`config.checks`) erst nach Rückfrage einrichten. Bei `works done` laufen sie automatisch; Einträge `skill:code-audit` selbst ausführen und mit `works checks record` eintragen. Einen Fund nur auf Wunsch des Nutzers als bekannt markieren.
 
 ## Wann was tun
 
@@ -71,6 +75,11 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Übersicht im Browser, Board, "ich will selbst Aufgaben anlegen" | `works board --serve --detach` und die URL nennen. Läuft schon ein aktueller Server, wird nur seine URL ausgegeben. Dort kann der Nutzer alles selbst bearbeiten. Für eine reine Ansicht `works board` | `references/board.md` |
 | Board zeigt altes Design, Board neu starten | `works board --restart` | `references/board.md` |
 | "Arbeite die Warteschlange ab", Reihenfolge vorgeben | `works queue` lesen, oberste startbare Aufgabe starten, nach `done` mit der nächsten weitermachen | `references/board.md` |
+| Sprint planen, "was schaffen wir bis ..." | `works sprint start`, Aufgaben mit `works sprint add`, Kapazität im Blick behalten | `references/planning.md` |
+| Neue Kommentare gemeldet | `works comments <ID>` lesen, umsetzen, mit `works comment <ID> "..."` antworten | `references/planning.md` |
+| Aufgabe aus einer Vorlage, "wie immer bei Slash-Befehlen" | `works template list`, dann `works new --template ... --field ... --text "..."` | `references/planning.md` |
+| Wochenbericht fällig oder gewünscht | Woche zusammenfassen, `works report --week --summary "..."` | `references/planning.md` |
+| Wie lange hat das gedauert, passen die Schätzungen | `works time <ID>`, `works time` | `references/planning.md` |
 | Board mit jemandem teilen | Im selben Netzwerk `works board --restart --share`, Leselink aus der Ausgabe nennen. Für Leute außerhalb `works export` und die Datei schicken. Bearbeitungslink nur auf Nachfrage (`works share --owner`) | `references/board.md` |
 | Board ausprobieren, Demo, "zeig mir, wie das aussieht" | `works demo --simulate --open` außerhalb echter Projekte. Legt ein Beispielprojekt im Temp-Ordner an und spielt Änderungen vor | `references/board.md` |
 | Struktur prüfen, Fehler vermuten | `works doctor`, bei Bedarf `--fix` | `references/cli.md` |
@@ -97,7 +106,8 @@ Nur die Datei laden, die für den aktuellen Schritt gebraucht wird.
 - `references/assets.md`: Bilder speichern, Inbox, Screenshots, Benennung, Komprimierung
 - `references/integrations.md`: Superpowers Brainstorming, UI UX Pro Max, git-workflow, code-audit, responsive-website-check, second-brain-sync, GitHub
 - `references/hooks.md`: SessionStart, Stop und pre-commit Hook
-- `references/board.md`: Kanban-Board, Bearbeiten im Board, Live-Aktualisierung und Sicherheit
+- `references/board.md`: Kanban-Board, Ansichten, Bearbeiten im Board, Teilen, Live-Aktualisierung und Sicherheit
+- `references/planning.md`: Sprint, Kommentare, gespeicherte Ansichten, Vorlagen, Zeiterfassung, Prüfungen, Wochenbericht
 - `references/cli.md`: alle Befehle und Optionen
 - `references/config.md`: Felder der config.json
 - `references/templates/`: Vorlagen für alle Aufgabentypen und decisions.md

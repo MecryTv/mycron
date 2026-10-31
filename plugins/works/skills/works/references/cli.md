@@ -41,6 +41,14 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `board --restart --share` / `--private` | Im lokalen Netz teilen (Leselink mit Schlüssel) oder wieder nur lokal |
 | `share [--owner] [--rotate]` | Links zum Teilen anzeigen, mit `--owner` auch den Bearbeitungslink, mit `--rotate` neue Schlüssel |
 | `export [--out datei.html] [--no-images] [--open-only]` | Schnappschuss als eine HTML-Datei mit Details und eingebetteten Bildern, Standard in `.works/reports/` |
+| `sprint [start\|add\|remove\|set\|close\|list]` | Sprint planen und verfolgen, siehe planning.md |
+| `comments [<ID>]` / `comment <ID> "Text"` | Kommentare lesen (markiert als gelesen) und beantworten |
+| `views` / `list --view "Name"` / `views delete "Name"` | Gespeicherte Ansichten |
+| `template list\|show\|save\|delete` | Vorlagen verwalten |
+| `new --template <slug> --field K=V --text ".." [--criteria 2,3]` | Aufgabe aus einer Vorlage |
+| `time [<ID>] [--mode measured\|fixed] [--json]` | Zeiterfassung und Schätzgenauigkeit |
+| `checks [detect [--save]\|set\|remove\|run <ID>\|record\|ack]` | Automatische Prüfungen vor dem Abschluss |
+| `report --week [--summary ..] [--send]`, `report --settings ..`, `report --webhook URL` | Wochenbericht als Markdown und HTML, optional an Discord |
 | `queue` | Warteschlange des Nutzers anzeigen (`--json` für Maschinen) |
 | `queue add <ID> [--pos N]` / `remove <ID>` / `move <ID> <N>` / `order A,B,C` / `clear` | Warteschlange bearbeiten |
 | `queue set auto_next=true ask_before=true skip_blocked=true` | Ablauf nach dem Abschluss einstellen |
@@ -68,7 +76,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `handoff [<ID>]` | Übergabe anzeigen (ohne ID die aktive Aufgabe) |
 | `handoff <ID> --text ".." \| --file pfad` | Übergabe ersetzen |
 | `dod <ID> [--json]` | Definition of Done anzeigen und automatische Punkte prüfen |
-| `done <ID> [--run] [--confirm] [--force --reason ".."]` | Abschließen. Ohne `--confirm` nur prüfen. `--run` führt `dod.commands` aus |
+| `done <ID> [--run] [--confirm] [--force --reason ".."] [--no-checks]` | Abschließen. Ohne `--confirm` nur prüfen. Eingerichtete Prüfungen (`checks`) laufen automatisch, wenn es für den aktuellen Stand kein Ergebnis gibt. `--run` führt zusätzlich `dod.commands` aus |
 | `drop <ID> --reason ".."` | Verwerfen |
 | `reopen <ID> --reason ".." [--status backlog\|geplant\|in-arbeit\|review]` | Wiedereröffnen, holt aus dem Archiv zurück |
 | `archive [<ID> ...] [--all] [--older-than <Tage>]` | Erledigte und verworfene Aufgaben nach `archive/` verschieben |

@@ -37,7 +37,7 @@ Ist das Plugin installiert und der Skill zusätzlich als Ordner vorhanden, die H
 
 Datei: `hooks/session-start.mjs`, Matcher `startup|resume|clear|compact`.
 
-Erzeugt WORKS.md und eine vorhandene board.html neu, ersetzt Board-Server dieses Projekts, die noch mit einer älteren works-Version laufen, und gibt eine Kurzübersicht in den Kontext: Anzahl offener Aufgaben, offene P1 und P2, Überfälliges, die aktive Aufgabe samt Übergabe (gekürzt auf 1500 Zeichen) und offene Fragen, sowie einen Hinweis auf Dateien in der Inbox. Gerade nach `compact` stellt das den Arbeitsstand wieder her.
+Erzeugt WORKS.md und eine vorhandene board.html neu, ersetzt Board-Server dieses Projekts, die noch mit einer älteren works-Version laufen, und gibt eine Kurzübersicht in den Kontext: Anzahl offener Aufgaben, offene P1 und P2, Überfälliges, die aktive Aufgabe samt Übergabe (gekürzt auf 1500 Zeichen) und offene Fragen, sowie einen Hinweis auf Dateien in der Inbox. Dazu kommen der aktive Sprint, die Warteschlange, neue Kommentare vom Nutzer und ein Hinweis, wenn laut Einstellung ein Wochenbericht fällig ist. Gerade nach `compact` stellt das den Arbeitsstand wieder her.
 
 Abschalten pro Projekt: `"hooks": { "session_start": false }` in `.works/config.json`.
 
@@ -50,6 +50,12 @@ Läuft, wenn Claude eine Antwort beendet. Ist eine Aufgabe aktiv und in Arbeit, 
 Reagieren: kurz `works log` und `works handoff` ausführen, Häkchen setzen. Ist nichts Relevantes passiert, einfach fortfahren.
 
 Abschalten pro Projekt: `"hooks": { "stop_reminder": false }`.
+
+## UserPromptSubmit
+
+Datei: `hooks/prompt-submit.mjs`.
+
+Merkt sich für die Zeiterfassung, wann eine Anfrage an Claude beginnt, und schreibt eine Zeile in `.works/time.jsonl`. Der Stop Hook schreibt das Ende. Nur wenn eine Aufgabe mit `works start` aktiv ist. Schreibt nichts in den Kontext. Abschalten: `"time_tracking": false`.
 
 ## Git pre-commit
 

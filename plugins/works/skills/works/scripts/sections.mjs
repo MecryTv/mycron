@@ -63,7 +63,8 @@ export function conformToType(t, type, { preferFrom = null } = {}) {
   }
   const goal = GOAL_SECTION[type];
   let moved = null;
-  if (!filled(t._body, goal)) {
+  // Eine gefüllte Beschreibung ist der zentrale Abschnitt und muss nicht verschoben werden.
+  if (!filled(t._body, goal) && !filled(t._body, 'Beschreibung')) {
     const order = [preferFrom, ...DESCRIPTION_SOURCES].filter((n, i, a) => n && n !== goal && a.indexOf(n) === i);
     const from = order.find((n) => filled(t._body, n));
     if (from) {

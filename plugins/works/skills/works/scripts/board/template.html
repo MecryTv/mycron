@@ -17,8 +17,10 @@
   </div>
   <nav class="views" id="views" aria-label="Ansicht">
     <button data-view="board" aria-pressed="true">Board</button>
+    <button data-view="sprint" aria-pressed="false">Sprint</button>
     <button data-view="queue" aria-pressed="false">Warteschlange <span class="count" id="queueCount" hidden></span></button>
     <button data-view="timeline" aria-pressed="false">Zeitleiste</button>
+    <button data-view="graph" aria-pressed="false">Abhängigkeiten</button>
     <button data-view="table" aria-pressed="false">Tabelle</button>
   </nav>
   <label class="search">
@@ -31,6 +33,7 @@
     <button class="btn ghost" id="btnIdeas" data-live>Ideen <span class="count" id="ideaCount" hidden></span></button>
     <button class="btn ghost" id="btnActivity" data-live>Aktivität <span class="count" id="actCount" hidden></span></button>
     <button class="btn ghost" id="btnShare" data-edit>Teilen</button>
+    <button class="btn ghost icon" id="btnTools" data-live title="Berichte, Vorlagen, Prüfungen und Benachrichtigungen" aria-label="Werkzeuge und Einstellungen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="count" id="toolsCount" hidden></span></button>
     <button class="btn ghost icon" id="btnTheme" title="Farbschema wechseln" aria-label="Farbschema wechseln"></button>
     <button class="btn primary" id="btnNew" data-edit>Neue Aufgabe <kbd>N</kbd></button>
   </nav>
@@ -45,7 +48,7 @@
   <div class="signals" id="signals"></div>
 </section>
 
-<section class="filters" aria-label="Filter" data-only="board timeline table">
+<section class="filters" aria-label="Filter" data-only="board timeline graph table">
   <div class="prio-filter" id="prioFilter" role="group" aria-label="Priorität"></div>
   <select id="typeFilter" aria-label="Typ"><option value="">Alle Typen</option></select>
   <select id="tagFilter" aria-label="Tag"><option value="">Alle Tags</option></select>
@@ -55,9 +58,13 @@
   <button class="btn link" id="resetFilters" hidden>Filter zurücksetzen</button>
 </section>
 
+<section class="saved-views" id="savedViews" aria-label="Gespeicherte Ansichten" data-only="board timeline graph table"></section>
+
 <section class="progress" id="progress" aria-label="Fortschritt" data-only="board"></section>
 
 <main class="board" id="board" tabindex="-1" data-only="board"></main>
+<main class="view sprint-view" id="viewSprint" tabindex="-1" data-only="sprint" hidden></main>
+<main class="view graph-view" id="viewGraph" tabindex="-1" data-only="graph" hidden></main>
 <main class="view queue-view" id="viewQueue" tabindex="-1" data-only="queue" hidden></main>
 <main class="view tl-view" id="viewTimeline" tabindex="-1" data-only="timeline" hidden></main>
 <main class="view table-view" id="viewTable" tabindex="-1" data-only="table" hidden></main>

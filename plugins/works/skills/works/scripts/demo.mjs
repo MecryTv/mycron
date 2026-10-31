@@ -53,6 +53,8 @@ function mock(kind) {
     + `<rect x="700" y="500" width="180" height="40" rx="10" fill="${acc}"/></svg>`;
 }
 
+function addDays(iso, n) { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); }
+
 export function seedDemo(root) {
   fs.mkdirSync(root, { recursive: true });
   if (exists(path.join(root, '.works'))) fs.rmSync(path.join(root, '.works'), { recursive: true, force: true });
@@ -135,6 +137,33 @@ export function seedDemo(root) {
     w(root, ['done', id, '--confirm', '--force', '--reason=Demo']);
     tasks[`old-${id}`] = id;
   }
+  // Neuere Funktionen zum Ausprobieren: Sprint, Abhängigkeiten, Kommentare, Vorlage, Ansicht, Prüfungen, Zeit.
+  w(root, ['link', tasks.backup, 'blocks', tasks.apply]);
+  w(root, ['sprint', 'start', '--title=Backups und Rollen live', '--goal=Backups sichern Rollen und Rechte, Rollen-Listen sind fertig', `--start=${addDays(new Date().toLocaleDateString('sv-SE'), -3)}`]);
+  w(root, ['sprint', 'add', [tasks.roles, tasks.maint, tasks.backup, tasks.login].filter(Boolean).join(',')]);
+  w(root, ['comment', tasks.backup, '--as=Nutzer', '--text=Bitte Kanäle, die beim Laden schon existieren, nicht doppelt anlegen.']);
+  w(root, ['comment', tasks.backup, '--as=Claude', '--text=Verstanden. Vor dem Laden vergleiche ich die Kanäle nach Name und Kategorie. Sollen Kanal-Webhooks mitgesichert werden? Sie enthalten Tokens.']);
+  const tpl = path.join(root, '.works', '.tmp', 'tpl.json');
+  fs.mkdirSync(path.dirname(tpl), { recursive: true });
+  fs.writeFileSync(tpl, JSON.stringify({
+    name: 'Neuer Slash-Befehl', title: '/{Befehl}: ', type: 'feature', priority: 'P3', effort: 'S', tags: ['bot', 'command'],
+    fields: [{ key: 'Befehl', kind: 'text', required: true }, { key: 'Rechte', kind: 'choice', options: ['alle', 'Mods', 'Admins'], required: true }],
+    description: 'Der Befehl /{Befehl} wird in src/commands registriert. Berechtigung: {Rechte}.',
+    hints: 'Optionen mit Zod prüfen und Antworten nach 3 Sekunden deferren.',
+    criteria: [{ text: 'Befehl /{Befehl} ist registriert und wird beim Start deployt', mode: 'always' }, { text: 'Fehlende Rechte führen zu einer ephemeren Fehlermeldung', mode: 'always' }, { text: 'Befehl steht in der Hilfe', mode: 'default' }, { text: 'Rate Limit pro Nutzer', mode: 'optional' }],
+  }));
+  w(root, ['template', 'save', `--file=${tpl}`]);
+  const cfgFile = path.join(root, '.works', 'config.json');
+  const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+  cfg.views = [{ name: 'Dringend', filter: { prios: ['P1', 'P2'], type: '', tag: '', ms: '', signal: 'unblocked', q: '', closed: false }, view: 'board', sort: null }];
+  cfg.checks = { lint: 'node -e "console.log(\'lint ok\')"', test: 'node -e "console.log(\'12 Tests bestanden\')"', audit: 'skill:code-audit' };
+  fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2) + '\n');
+  const events = [];
+  const now = Date.now();
+  for (const [a, b] of [[-26 * 60, -25 * 60 + 40], [-25 * 60 + 50, -24 * 60 + 30], [-5 * 60, -3 * 60 - 20], [-60, -15]]) {
+    events.push({ t: new Date(now + a * 60000).toISOString(), ev: 'start', task: tasks.maint, s: 'demo' }, { t: new Date(now + b * 60000).toISOString(), ev: 'stop', task: tasks.maint, s: 'demo' });
+  }
+  fs.writeFileSync(path.join(root, '.works', 'time.jsonl'), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   backdate(root);
   fs.rmSync(path.join(root, '.works', '.tmp'), { recursive: true, force: true });
   return tasks;

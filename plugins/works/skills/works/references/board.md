@@ -49,7 +49,7 @@ Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Se
 
 ## Aufbau der Oberfläche
 
-- Kopfzeile: Projekt, Verbindungsstatus, Ansicht (Board, Warteschlange, Zeitleiste, Tabelle, Tasten `1` bis `4`), Suche (Taste `/`), Nächste Aufgabe, Ideen, Aktivität, Teilen, Farbschema (System, Hell, Dunkel) und Neue Aufgabe (Taste `N`).
+- Kopfzeile: Projekt, Verbindungsstatus, Ansicht (Board, Sprint, Warteschlange, Zeitleiste, Abhängigkeiten, Tabelle, Tasten `1` bis `6`), Werkzeuge, Suche (Taste `/`), Nächste Aufgabe, Ideen, Aktivität, Teilen, Farbschema (System, Hell, Dunkel) und Neue Aufgabe (Taste `N`).
 - Flussleiste: Verteilung aller Aufgaben auf die Status. Ein Klick springt zur Spalte.
 - Hinweise darunter: offene P1, blockierte, überfällige, Aufgaben mit offenen Fragen und unvollständig erfasste. Ein Klick filtert.
 - Filter: Priorität, Typ, Tag, Meilenstein, Archiv und Verworfene. Im Meilenstein-Filter lassen sich auch Meilensteine anlegen; ist einer gewählt, erscheint "Meilenstein bearbeiten".
@@ -59,9 +59,19 @@ Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Se
 ## Ansichten
 
 - **Board**: Spalten mit Karten wie oben.
+- **Sprint**: Zeitraum, Ziel, Kapazität in Punkten, Burndown und Vorschläge zum Einplanen. Siehe planning.md.
+- **Abhängigkeiten**: Graph von links nach rechts in Stufen. Der kritische Pfad (längste Kette offener Aufgaben nach Schätzung) ist orange, rechts stehen seine Dauer und die Aufgabe, die am meisten freigibt. Das + an einer Karte auf eine andere ziehen legt "blockiert" an.
 - **Warteschlange**: die Reihenfolge, in der Claude arbeiten soll. Aufgaben einreihen (Auswahlfeld, Detailpanel oder Tabelle), per Ziehen oder Pfeilen sortieren, mit × entfernen. Oben steht, was gerade läuft. Rechts die Einstellungen: nach dem Abschluss weitermachen (`auto_next`), vorher nachfragen (`ask_before`), blockierte überspringen (`skip_blocked`), dazu was Claude als Nächstes nimmt und der Aufwand in der Schlange. Erledigte und verworfene fallen automatisch heraus. Im CLI: `works queue`.
 - **Zeitleiste**: Wochen mit Kalenderwoche, gruppiert nach Meilenstein. Volle Balken laufen oder sind erledigt, gestrichelt farbig sind geplant mit Fälligkeit, gestrichelt grau sind aus dem Aufwand geschätzt (S 2, M 5, L 10, XL 15 Tage, blockierte beginnen nach ihrer Abhängigkeit). Linie für heute, gestrichelte grüne Linie für das Ziel eines Meilensteins, Überfälliges rot. Das rechte Ende eines Balkens ziehen setzt die Fälligkeit.
 - **Tabelle**: alle gefilterten Aufgaben mit sortierbaren Spalten. Priorität, Aufwand und Fälligkeit direkt in der Zeile ändern. Mehrere auswählen (Shift wählt einen Bereich), dann in der Leiste unten Priorität, Status, Meilenstein, Aufwand oder Tags setzen, einreihen, verwerfen oder archivieren. Abschließen geht bewusst nur einzeln über die Definition of Done.
+
+Das Detailpanel hat die Reiter **Übersicht**, **Kommentare** (Gespräch mit Claude, siehe planning.md), **Zeit** (aktive Zeit von Claude, Tage je Status, Sitzungen) und **Code und Commits**. Unten gibt es "Als Vorlage speichern".
+
+Über dem Fortschritt zeigt die Zeile **Ansichten** gespeicherte Filter als Chips; "Aktuelle Filter speichern" erscheint, sobald Filter gesetzt sind. Über der Zeitleiste zeigt "Wie gut passen die Schätzungen?" Schätzung gegen tatsächliche Dauer.
+
+Das Symbol mit den Reglern in der Kopfzeile öffnet die **Werkzeuge**: Wochenbericht (Zeitplan, Discord, Inhalt, Berichte ansehen), Vorlagen (anlegen, bearbeiten, nutzen), Prüfungen vor dem Abschluss und Benachrichtigungen im Browser (Review, Frage oder Kommentar von Claude, neue P1, Blockade aufgelöst, Warteschlange leer, Ton und Zähler im Tab-Titel).
+
+Neue Aufgaben: Gibt es Vorlagen, fragt der Dialog zuerst nach einer Vorlage oder "Leer". Mit Vorlage gibt es die Felder der Vorlage, das freie Feld "Was genau soll passieren?" und die Kriterien zum An- und Abwählen.
 
 Im Detailpanel zeigt der Reiter **Code und Commits** den Branch der Aufgabe (aus dem Feld `branch` oder der ID im Branchnamen), wie weit er dem Hauptbranch voraus ist, einen Pull Request (wenn `gh` angemeldet ist), alle Commits mit der ID in der Nachricht und die geänderten Dateien. Ein Klick auf eine Datei zeigt den Diff. Arbeitet man gerade auf dem Branch, stehen noch nicht committete Änderungen extra.
 
@@ -155,7 +165,7 @@ Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen d
 ## Sicherheit
 
 - Der Server bindet standardmäßig nur an 127.0.0.1 und nimmt nur Anfragen mit lokalem Hostnamen an. Das verhindert DNS-Rebinding.
-- Beim Teilen (`--share`) bekommen nur lokale Anfragen ohne Proxy-Header automatisch volle Rechte. Alle anderen brauchen den Lese- oder Bearbeitungsschlüssel aus dem Link; er wird danach als HttpOnly-Cookie mitgeschickt. Lesende erhalten ein eigenes Token, mit dem der Server nur GET-Anfragen annimmt. Export und Freigabe-Einstellungen sind dem Besitzer vorbehalten.
+- Beim Teilen (`--share`) bekommen nur lokale Anfragen ohne Proxy-Header automatisch volle Rechte. Alle anderen brauchen den Lese- oder Bearbeitungsschlüssel aus dem Link; er wird danach als HttpOnly-Cookie mitgeschickt. Lesende erhalten ein eigenes Token, mit dem der Server nur GET-Anfragen annimmt. Export und Freigabe-Einstellungen sind dem Besitzer vorbehalten. Prüfungen ausführen oder ändern und den Discord-Webhook setzen geht nur bei lokalen Anfragen, auch nicht mit dem Bearbeitungslink.
 - Jede API-Anfrage braucht ein zufälliges Token, das bei jedem Serverstart neu erzeugt und nur in die ausgelieferte Seite eingebettet wird. Fremde Webseiten können es nicht lesen und deshalb nichts ändern. Ein abweichender Origin wird zusätzlich abgelehnt.
 - Alle Eingaben werden geprüft (IDs, Werte, Längen, Bildtypen bis 20 MB) und als einzelne Argumente ohne Shell an das CLI übergeben.
 - Ausgeliefert werden nur Board, Daten und Dateien unter `tasks/`, `archive/` und `reports/` sowie WORKS.md und ideas.md. config.json, state.json und share.json bleiben gesperrt.

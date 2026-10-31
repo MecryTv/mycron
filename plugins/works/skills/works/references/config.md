@@ -25,6 +25,18 @@ Liegt unter `.works/config.json`. Fehlende Felder werden mit Standardwerten erg�
 | `hooks.stop_reminder` | `true` | Stop Hook in diesem Projekt aktiv |
 | `report.days` | `7` | Standardzeitraum f체r `works report` |
 | `handoff_stale_days` | `3` | Ab wann `doctor` eine laufende Aufgabe ohne Aktualisierung meldet |
+| `queue`, `queue_settings` | `[]`, siehe board.md | Warteschlange des Nutzers und Ablauf danach (`auto_next`, `ask_before`, `skip_blocked`) |
+| `sprints` | `[]` | Sprints mit `id`, `title`, `goal`, `start`, `end`, `capacity`, `status`, `tasks`, nach Abschluss `result` und `carry` |
+| `sprint_settings` | `{ "length_days": 14, "capacity": 20, "points": { "S": 1, "M": 2, "L": 4, "XL": 8 } }` | Standardl채nge, Kapazit채t und Punkte je Aufwand |
+| `views` | `[]` | Gespeicherte Ansichten aus dem Board: `name`, `filter`, `view`, `sort` |
+| `checks` | `{}` | Pr체fungen vor dem Abschluss, Name zu Befehl, `skill:code-audit` f체r Skills |
+| `checks_by_type` | `{}` | Welche Pr체fungen je Typ gelten, ohne Eintrag alle |
+| `time_tracking` | `true` | Zeiterfassung 체ber die Hooks |
+| `effort_mode` | `"fixed"` | `measured` l채sst Zeitleiste, Graph und Sprint mit gemessenen Dauern rechnen |
+| `effort_days` | `{ "S": 2, "M": 5, "L": 10, "XL": 15 }` | Feste Dauer je Aufwand in Kalendertagen |
+| `report.enabled`, `report.weekday`, `report.time` | `false`, `5`, `"16:00"` | Wochenbericht automatisch f채llig, Wochentag 1 bis 7 und Uhrzeit |
+| `report.destinations` | `{ "file": true, "discord": false }` | Ziele des Wochenberichts. Die Discord-URL steht nur in `report.local.json` |
+| `report.include` | alle `true` | Abschnitte: `done`, `attention`, `next`, `milestones` |
 
 ## Definition of Done
 

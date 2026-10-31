@@ -6,11 +6,16 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  loadTasks, loadConfig, worksDir, getSection, stripComments, imageLinks, checkboxes,
+  loadTasks, loadConfig, saveConfig, worksDir, getSection, stripComments, imageLinks, checkboxes,
   isBlocked, openBlockers, openQuestions, relFromWorks, exists,
   STATUSES, OPEN_STATUSES, STATUS_LABEL, PRIORITIES, PRIO_LABEL, TYPES, TYPE_LABEL, EFFORTS, RISKS,
 } from './lib.mjs';
 import { dodCheck, nextCandidates, byIdMap } from './views.mjs';
+import { loadComments, unreadForClaude } from './comments.mjs';
+import { listTemplates, templateFromTask, normalizeTemplate, SLUG_RE } from './templates.mjs';
+import { taskTime, estimates } from './timelog.mjs';
+import { detectChecks, configuredChecks, NAME_RE } from './checks.mjs';
+import { reportSettings, localReport, listReports, weekRange, reportName } from './weekly.mjs';
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), 'works.mjs');
 const ID_RE = /^[A-Za-z]{1,8}-?\d{1,6}$/;
@@ -77,10 +82,10 @@ const TAG_RE = /^[\p{L}\p{N}_.+-]+$/u;
 // ---------- CLI-Aufrufe, nacheinander ausgeführt ----------
 
 let queue = Promise.resolve();
-function cli(root, args) {
+function cli(root, args, { timeout = 30000 } = {}) {
   const job = queue.then(() => new Promise((resolve) => {
     execFile(process.execPath, [CLI, ...args], {
-      cwd: root, env: { ...process.env, WORKS_ACTOR: 'Board' }, timeout: 30000, maxBuffer: 4 * 1024 * 1024,
+      cwd: root, env: { ...process.env, WORKS_ACTOR: 'Board' }, timeout, maxBuffer: 4 * 1024 * 1024,
     }, (err, stdout, stderr) => {
       resolve({ ok: !err, code: err ? (err.code ?? 1) : 0, stdout: String(stdout), stderr: String(stderr) });
     });
@@ -89,8 +94,8 @@ function cli(root, args) {
   return job;
 }
 
-async function must(root, args) {
-  const r = await cli(root, args);
+async function must(root, args, opts) {
+  const r = await cli(root, args, opts);
   if (!r.ok) {
     // Fehler stehen auf stderr (erste Zeile zählt). Ohne stderr, etwa bei nicht erfüllter DoD, steht die Erklärung in der letzten Zeile von stdout.
     const errLines = r.stderr.split('\n').map((l) => l.replace(/^(Fehler|Hinweis):\s*/, '').trim()).filter(Boolean);
@@ -203,7 +208,23 @@ export function taskDetail(root, taskId) {
     openBlockers: openBlockers(t, byId),
     openQuestions: openQuestions(t).length,
     dod: dodCheck(root, config, t),
+    comments: loadComments(t),
+    unreadForClaude: unreadForClaude(root, t).length,
+    time: taskTime(root, t),
   };
+}
+
+export function templatesList(root) { return listTemplates(root); }
+export function templateDraft(root, taskId) { return templateFromTask(findTaskSafe(root, taskId)); }
+export function estimatesInfo(root) { return estimates(root, loadTasks(root), loadConfig(root)); }
+export function checksInfo(root) {
+  const config = loadConfig(root);
+  return { checks: configuredChecks(config), byType: config.checks_by_type || {}, detected: detectChecks(root) };
+}
+export function reportsInfo(root) {
+  const config = loadConfig(root);
+  const range = weekRange();
+  return { settings: reportSettings(config), webhook: !!localReport(root).discord_webhook, reports: listReports(root), current: reportName(range) };
 }
 
 export function ideasList(root) {
@@ -467,6 +488,157 @@ const actions = {
     return { message: 'Meilenstein gespeichert.' };
   },
 
+  // ---------- Sprint ----------
+  async sprintStart(root, b) {
+    const args = ['sprint', 'start', `--title=${str(b.title, 'Titel', { max: 120, required: true })}`];
+    const goal = str(b.goal, 'Ziel', { max: 300 }); if (goal) args.push(`--goal=${goal}`);
+    const start = date(b.start, 'Start'); if (start) args.push(`--start=${start}`);
+    const days = parseInt(b.days, 10); if (days > 0 && days <= 60) args.push(`--days=${days}`);
+    const cap = parseInt(b.capacity, 10); if (cap > 0 && cap <= 1000) args.push(`--capacity=${cap}`);
+    if (b.carry) args.push('--carry');
+    return { message: await must(root, args) };
+  },
+  async sprintAdd(root, b) {
+    const ids = (Array.isArray(b.ids) ? b.ids : [b.id]).slice(0, 100).map(id);
+    return { message: await must(root, ['sprint', 'add', ids.join(',')]) };
+  },
+  async sprintRemove(root, b) {
+    return { message: await must(root, ['sprint', 'remove', id(b.id)]) };
+  },
+  async sprintSet(root, b) {
+    const f = b.fields || {};
+    const pairs = [];
+    if ('title' in f) pairs.push(`title=${str(f.title, 'Titel', { max: 120, required: true })}`);
+    if ('goal' in f) pairs.push(`goal=${str(f.goal, 'Ziel', { max: 300 })}`);
+    if ('end' in f) pairs.push(`end=${date(f.end, 'Ende') || bad('Ende fehlt.')}`);
+    if ('capacity' in f) { const c = parseInt(f.capacity, 10); if (!(c > 0 && c <= 1000)) bad('Kapazität zwischen 1 und 1000.'); pairs.push(`capacity=${c}`); }
+    if (!pairs.length) bad('Keine Felder angegeben.');
+    return { message: await must(root, ['sprint', 'set', ...pairs]) };
+  },
+  async sprintClose(root) {
+    return { message: await must(root, ['sprint', 'close']) };
+  },
+
+  // ---------- Kommentare ----------
+  async comment(root, b) {
+    const tid = id(b.id);
+    const text = str(b.text, 'Kommentar', { max: 10000, required: true });
+    await withTextFile(root, text, (f) => must(root, ['comment', tid, `--file=${f}`, '--as=Nutzer']));
+    return { message: 'Kommentar gesendet. Claude liest ihn beim nächsten Start.' };
+  },
+
+  // ---------- Gespeicherte Ansichten ----------
+  async viewSave(root, b) {
+    const name = str(b.name, 'Name', { max: 40, required: true });
+    const f = b.filter && typeof b.filter === 'object' ? b.filter : {};
+    const filter = {
+      prios: list(f.prios, 'Priorität', /^P[1-4]$/),
+      type: oneOf(f.type, 'Typ', TYPES), tag: f.tag ? list([f.tag], 'Tag', TAG_RE)[0] : '',
+      ms: f.ms && MS_RE.test(f.ms) ? f.ms.toUpperCase() : '',
+      signal: oneOf(f.signal, 'Signal', ['blocked', 'unblocked', 'overdue', 'questions', 'incomplete']),
+      q: str(f.q, 'Suche', { max: 80 }), closed: !!f.closed,
+    };
+    const view = oneOf(b.view || 'board', 'Ansicht', ['board', 'sprint', 'queue', 'timeline', 'graph', 'table']);
+    const sort = b.sort && typeof b.sort === 'object' && /^[a-z]{1,12}$/.test(b.sort.key || '') ? { key: b.sort.key, dir: b.sort.dir === -1 ? -1 : 1 } : null;
+    await saveConfigField(root, (config) => {
+      const views = (Array.isArray(config.views) ? config.views : []).filter((v) => v.name !== name);
+      views.push({ name, filter, view, sort });
+      config.views = views.slice(-20);
+    });
+    return { message: `Ansicht ${name} gespeichert.` };
+  },
+  async viewDelete(root, b) {
+    const name = str(b.name, 'Name', { max: 40, required: true });
+    await must(root, ['views', 'delete', name]);
+    return { message: `Ansicht ${name} gelöscht.` };
+  },
+
+  // ---------- Vorlagen ----------
+  async templateSave(root, b) {
+    let tpl;
+    try { tpl = normalizeTemplate(b.template || {}); } catch (e) { bad(e.message); }
+    if (b.oldSlug && SLUG_RE.test(b.oldSlug) && b.oldSlug !== tpl.slug) await must(root, ['template', 'delete', b.oldSlug]);
+    const scope = b.scope === 'user' ? 'user' : 'project';
+    await withTextFile(root, JSON.stringify(tpl), (f) => must(root, ['template', 'save', `--file=${f}`, `--scope=${scope}`]));
+    return { slug: tpl.slug, message: `Vorlage ${tpl.name} gespeichert.` };
+  },
+  async templateDelete(root, b) {
+    if (typeof b.slug !== 'string' || !SLUG_RE.test(b.slug)) bad('Ungültige Vorlage.');
+    await must(root, ['template', 'delete', b.slug]);
+    return { message: 'Vorlage gelöscht.' };
+  },
+  async createFromTemplate(root, b) {
+    if (typeof b.slug !== 'string' || !SLUG_RE.test(b.slug)) bad('Ungültige Vorlage.');
+    const args = ['new', `--template=${b.slug}`, '--source=board'];
+    const values = b.values && typeof b.values === 'object' ? b.values : {};
+    for (const [k, v] of Object.entries(values).slice(0, 12)) {
+      if (!/^[\p{L}\p{N}_]{1,30}$/u.test(k)) bad('Ungültiges Feld.');
+      const val = str(v, k, { max: 300 }); if (val) args.push(`--field=${k}=${val}`);
+    }
+    const title = str(b.title, 'Titel', { max: 160 }); if (title) args.push(`--title=${title}`);
+    const pr = oneOf(b.priority, 'Priorität', PRIORITIES); if (pr) args.push(`--priority=${pr}`);
+    const status = oneOf(b.status || 'backlog', 'Status', ['backlog', 'geplant']); args.push(`--status=${status}`);
+    if (Array.isArray(b.criteria)) args.push(`--criteria=${b.criteria.map((n) => parseInt(n, 10)).filter((n) => n >= 0 && n < 100).join(',') || '999'}`);
+    const text = str(b.text, 'Beschreibung', { max: 50000 });
+    const run = (extra) => must(root, [...args, ...extra]);
+    const outText = text ? await withTextFile(root, text, (f) => run([`--text-file=${f}`])) : await run([]);
+    const newId = (outText.match(/Angelegt: (\S+)/) || [])[1];
+    return { id: newId, message: `${newId} aus Vorlage angelegt.` };
+  },
+
+  // ---------- Prüfungen ----------
+  async checksRun(root, b) {
+    const tid = id(b.id);
+    await must(root, ['checks', 'run', tid], { timeout: 11 * 60 * 1000 });
+    return { message: 'Prüfungen gelaufen.' };
+  },
+  async checksAck(root, b) {
+    const tid = id(b.id);
+    if (typeof b.name !== 'string' || !NAME_RE.test(b.name)) bad('Ungültige Prüfung.');
+    const reason = str(b.reason, 'Begründung', { max: 300 });
+    await must(root, ['checks', 'ack', tid, b.name, ...(reason ? [`--reason=${reason}`] : [])]);
+    return { message: 'Als bekannt markiert.' };
+  },
+  async checksSave(root, b) {
+    const c = b.checks && typeof b.checks === 'object' ? b.checks : bad('Prüfungen fehlen.');
+    const pairs = [];
+    const cur = configuredChecks(loadConfig(root));
+    for (const k of Object.keys(cur)) if (!(k in c)) pairs.push(`${k}=`);
+    for (const [k, v] of Object.entries(c).slice(0, 12)) {
+      if (!NAME_RE.test(k)) bad(`Ungültiger Name ${k}.`);
+      pairs.push(`${k}=${str(v, k, { max: 300 })}`);
+    }
+    if (!pairs.length) return { message: 'Keine Änderung.' };
+    await must(root, ['checks', 'set', ...pairs]);
+    return { message: 'Prüfungen gespeichert.' };
+  },
+
+  // ---------- Wochenbericht und Zeit ----------
+  async reportSettings(root, b) {
+    const pairs = [];
+    if ('enabled' in b) pairs.push(`enabled=${!!b.enabled}`);
+    if ('weekday' in b) { const w = parseInt(b.weekday, 10); if (!(w >= 1 && w <= 7)) bad('Ungültiger Wochentag.'); pairs.push(`weekday=${w}`); }
+    if ('time' in b) { if (!/^\d{2}:\d{2}$/.test(b.time || '')) bad('Uhrzeit im Format HH:MM.'); pairs.push(`time=${b.time}`); }
+    for (const k of ['discord', 'file', 'done', 'attention', 'next', 'milestones']) if (k in b) pairs.push(`${k}=${!!b[k]}`);
+    if (!pairs.length) bad('Keine Einstellung angegeben.');
+    await must(root, ['report', '--settings', ...pairs]);
+    return { message: 'Einstellung gespeichert.' };
+  },
+  async reportWebhook(root, b) {
+    const url = str(b.url, 'Webhook', { max: 300 });
+    await must(root, ['report', url ? `--webhook=${url}` : '--webhook']);
+    return { message: url ? 'Webhook gespeichert.' : 'Webhook entfernt.' };
+  },
+  async reportRun(root, b) {
+    const summary = str(b.summary, 'Zusammenfassung', { max: 3000 });
+    const msg = await must(root, ['report', '--week', ...(summary ? [`--summary=${summary}`] : [])]);
+    return { message: msg.split('\n').filter((l) => !l.startsWith('  ')).join(' ') };
+  },
+  async effortMode(root, b) {
+    const mode = oneOf(b.mode, 'Modus', ['measured', 'fixed'], { required: true });
+    return { message: await must(root, ['time', `--mode=${mode}`]) };
+  },
+
   // ---------- Warteschlange ----------
   async queueAdd(root, b) {
     const tid = id(b.id);
@@ -535,6 +707,17 @@ const actions = {
     return { message, done: okIds, errors };
   },
 };
+
+// Ändert config.json über eine Datei, die das CLI einliest, damit auch dieser Weg seriell läuft.
+async function saveConfigField(root, fn) {
+  const job = queue.then(() => {
+    const config = loadConfig(root);
+    fn(config);
+    saveConfig(root, config);
+  });
+  queue = job.catch(() => {});
+  return job;
+}
 
 export async function runAction(root, body) {
   if (!body || typeof body !== 'object') bad('Ungültige Anfrage.');

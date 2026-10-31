@@ -22,6 +22,12 @@ import { generateBoard, refreshBoardIfPresent } from './board.mjs';
 import { serveBoard } from './serve.mjs';
 import { shareLinks, rotateKeys } from './share.mjs';
 import { buildSnapshot, snapshotName } from './export.mjs';
+import { sprintSettings, sprintList, activeSprint, lastClosedSprint, nextSprintId, sprintStats, pointsOf, addDays } from './sprint.mjs';
+import { addComment, loadComments, unreadForClaude, markRead } from './comments.mjs';
+import { listTemplates, findTemplate, saveTemplate, deleteTemplate, templateFromTask, applyTemplate, countUse } from './templates.mjs';
+import { taskTime, estimates, fmtDuration } from './timelog.mjs';
+import { configuredChecks, checksFor, detectChecks, runChecks, recordCheck, ackCheck, loadResults, NAME_RE } from './checks.mjs';
+import { writeWeekly, reportSettings, setWebhook } from './weekly.mjs';
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
 import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion } from './server-control.mjs';
@@ -142,7 +148,7 @@ function createTask(root, config, opts) {
   const mainText = goalName === 'Beschreibung' ? [goalText, descText].filter(Boolean).join('\n\n') : goalText;
   if (mainText) task._body = setSection(task._body, goalName, mainText);
   if (descText && goalName !== 'Beschreibung') task._body = insertAfter(task._body, goalName, `## Beschreibung\n${descText}\n`);
-  const criteria = textOpt('criteria').split('\n').map((s) => s.replace(/^\s*[-*]\s*(\[ \]\s*)?/, '').trim()).filter(Boolean);
+  const criteria = (Array.isArray(opts.criteriaList) ? opts.criteriaList.join('\n') : textOpt('criteria')).split('\n').map((s) => s.replace(/^\s*[-*]\s*(\[ \]\s*)?/, '').trim()).filter(Boolean);
   if (criteria.length) {
     const sec = stripComments(getSection(task._body, 'Akzeptanzkriterien') || '').split('\n').filter((l) => l.trim() && !/^\s*[-*]\s+\[ \]\s*$/.test(l));
     task._body = setSection(task._body, 'Akzeptanzkriterien', [...sec, ...criteria.map((c) => `- [ ] ${c}`)].join('\n'));
@@ -175,7 +181,7 @@ function cmdNew() {
   const root = requireRoot();
   const config = loadConfig(root);
   const title = flags.title || pos.join(' ');
-  const task = createTask(root, config, { ...flags, title });
+  const task = flags.template && flags.template !== true ? newFromTemplate(root, config) : createTask(root, config, { ...flags, title });
   refresh(root);
   out(`Angelegt: ${task.id} ${task.title}`);
   out(`Datei: ${task._file}`);
@@ -198,6 +204,7 @@ function cmdList() {
   if (flags.blocked) list = list.filter((t) => isBlocked(t, byId));
   if (flags.overdue) list = list.filter(isOverdue);
   if (flags.incomplete) list = list.filter((t) => t.incomplete);
+  if (flags.view && flags.view !== true) list = applyView(loadConfig(root), list, byId, flags.view);
   list = sortTasks(list);
   if (flags.json) {
     out(JSON.stringify(list.map((t) => ({
@@ -578,11 +585,20 @@ function printDod(res) {
   if (res.commands.length) out(`Befehle (mit --run ausführen): ${res.commands.join(' ; ')}`);
 }
 
-function cmdDone() {
+async function cmdDone() {
   const root = requireRoot();
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
   if (t.status === 'erledigt') { out(`${t.id} ist bereits erledigt.`); return; }
+  // Eingerichtete Prüfungen laufen automatisch, wenn es für den aktuellen Stand noch kein Ergebnis gibt.
+  if (checksFor(config, t).length && !flags['no-checks']) {
+    const st = dodCheck(root, config, t).checks;
+    if (st && st.stale) {
+      out('Automatische Prüfungen:');
+      printChecks(await runChecks(root, config, t, { onStart: (c) => out(`> ${c.name}: ${c.cmd}`) }));
+      out('');
+    }
+  }
   const res = dodCheck(root, config, t);
   let cmdFail = [];
   if (flags.run && res.commands.length) {
@@ -1539,9 +1555,36 @@ function historyEntries(t) {
   return sec.split('\n').map((l) => l.match(/^- (\d{4}-\d{2}-\d{2}): (.*)$/)).filter(Boolean).map((m) => ({ date: m[1], text: m[2] }));
 }
 
-function cmdReport() {
+async function cmdReport() {
   const root = requireRoot();
   const config = loadConfig(root);
+  if (flags.webhook !== undefined) {
+    try { setWebhook(root, flags.webhook === true ? '' : String(flags.webhook)); } catch (e) { fail(e.message); }
+    out(flags.webhook === true ? 'Discord-Webhook entfernt.' : 'Discord-Webhook gespeichert (nur lokal in .works/report.local.json).');
+    return;
+  }
+  if (flags.settings) {
+    const r = reportSettings(config);
+    for (const pair of pos) {
+      const i = pair.indexOf('='); const k = pair.slice(0, i); const v = pair.slice(i + 1);
+      const yes = ['true', '1', 'ja', 'an'].includes(v.toLowerCase());
+      if (k === 'enabled') r.enabled = yes;
+      else if (k === 'weekday') r.weekday = Math.min(7, Math.max(1, parseInt(v, 10) || 5));
+      else if (k === 'time') { if (!/^\d{2}:\d{2}$/.test(v)) fail('time braucht HH:MM.'); r.time = v; } else if (k === 'discord' || k === 'file') r.destinations[k] = yes;
+      else if (['done', 'attention', 'next', 'milestones'].includes(k)) r.include[k] = yes;
+      else fail(`Unbekannte Einstellung ${k}.`);
+    }
+    config.report = r; saveConfig(root, config);
+    out(`Wochenbericht: ${r.enabled ? `an, ${['', 'montags', 'dienstags', 'mittwochs', 'donnerstags', 'freitags', 'samstags', 'sonntags'][r.weekday]} ab ${r.time}` : 'aus'}, Discord ${r.destinations.discord ? 'an' : 'aus'}`);
+    return;
+  }
+  if (flags.week) {
+    const summary = flags['summary-file'] && flags['summary-file'] !== true ? fs.readFileSync(String(flags['summary-file']), 'utf8') : flags.summary && flags.summary !== true ? String(flags.summary) : '';
+    const r = await writeWeekly(root, config, { summary, send: flags.send ? true : flags['no-send'] ? false : null });
+    out(`Wochenbericht ${r.name} gespeichert:\n  ${r.md}\n  ${r.html}`);
+    for (const n of r.notes) out(n);
+    return;
+  }
   const days = parseInt(flags.days || config.report.days || 7, 10);
   const end = today();
   const startD = new Date(); startD.setDate(startD.getDate() - days + 1);
@@ -1626,6 +1669,7 @@ function cmdInstallHooks() {
     };
     add('SessionStart', 'session-start.mjs', 'startup|resume|clear|compact');
     add('Stop', 'stop-reminder.mjs');
+    add('UserPromptSubmit', 'prompt-submit.mjs');
     if (!flags['dry-run']) writeJson(file, settings);
     out(`Claude Code Einstellungen: ${file}${flags['dry-run'] ? ' (Probelauf, nichts geschrieben)' : ''}`);
   }
@@ -1680,6 +1724,15 @@ Ansehen
   export [--out datei.html] [--no-images] [--open-only]  Schnappschuss als eine HTML-Datei
   board --status | --stop | --restart
   queue [list|add <ID> [--pos N]|remove <ID>|move <ID> <N>|order A,B,C|clear|set auto_next=true ...]
+  sprint [start --title ..|add A,B|remove A|set capacity=24|close|list]
+  comments [<ID>]                  comment <ID> "Text" [--as Nutzer|Claude]
+  views | views delete "Name"      list --view "Name"
+  template list|show <slug>|save --from <ID> [--name ..] [--scope user]|delete <slug>
+  new --template <slug> --field Name=Wert --text "Was passieren soll" [--criteria 2,3]
+  time [<ID>] [--mode measured|fixed]
+  checks [detect [--save]|set name="befehl"|remove name|run <ID>|record <ID> <name> --status ok|warn|fail|ack <ID> <name>]
+  report --week [--summary ".."] [--send|--no-send]    report --settings enabled=true weekday=5 time=16:00 discord=true
+  report --webhook https://discord.com/api/webhooks/..
   demo [--simulate] [--delay 6] [--open] [--port 4747] [--path ordner] | demo --remove
   milestone list|add M1 --title ".." [--due ..]|set M1 status=erledigt
 
@@ -1709,6 +1762,312 @@ Status: ${STATUSES.join(', ')}
 Prioritäten: ${PRIORITIES.map((p) => `${p} ${PRIO_LABEL[p]}`).join(', ')}`);
 }
 
+// ---------- Sprint ----------
+
+function cmdSprint() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const sub = pos.shift() || 'show';
+  const tasks = loadTasks(root);
+  const byId = byIdMap(tasks);
+  const set = sprintSettings(config);
+  config.sprints = sprintList(config);
+  const cur = activeSprint(config);
+  const save = () => { saveConfig(root, config); refresh(root); };
+  const need = () => { if (!cur) fail('Kein aktiver Sprint. Starten mit works sprint start --title ".." [--goal ".."]'); return cur; };
+  if (sub === 'start') {
+    if (cur) fail(`Sprint ${cur.id} läuft noch bis ${cur.end}. Erst mit works sprint close abschließen.`);
+    const days = parseInt(flags.days || set.length_days, 10);
+    const start = flags.start && flags.start !== true ? String(flags.start) : today();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) fail('--start braucht das Format JJJJ-MM-TT.');
+    const id = nextSprintId(config);
+    const carry = flags.carry ? ((lastClosedSprint(config) || {}).carry || []) : [];
+    const s = {
+      id, title: flags.title && flags.title !== true ? String(flags.title) : `Sprint ${id.slice(1)}`, goal: flags.goal && flags.goal !== true ? String(flags.goal) : '',
+      start, end: addDays(start, Math.max(1, days) - 1), capacity: parseInt(flags.capacity || set.capacity, 10), status: 'aktiv',
+      tasks: carry.filter((x) => byId.has(x) && OPEN_STATUSES.includes(byId.get(x).status)),
+    };
+    config.sprints.push(s);
+    save();
+    out(`${s.id} ${s.title} läuft vom ${s.start} bis ${s.end}, Kapazität ${s.capacity} Punkte${s.tasks.length ? `, ${s.tasks.length} Aufgabe(n) übernommen` : ''}.`);
+  } else if (sub === 'add' || sub === 'remove') {
+    const s = need();
+    const ids = listFlag(pos.join(',')).map((x) => normalizeId(config, x));
+    if (!ids.length) fail(`Aufgaben angeben: works sprint ${sub} W-0001,W-0002`);
+    for (const id of ids) {
+      const t = byId.get(id);
+      if (!t) fail(`Aufgabe ${id} nicht gefunden.`);
+      if (sub === 'add') { if (!OPEN_STATUSES.includes(t.status)) fail(`${id} ist ${STATUS_LABEL[t.status]}.`); if (!s.tasks.includes(id)) s.tasks.push(id); } else s.tasks = s.tasks.filter((x) => x !== id);
+    }
+    save();
+    const st = sprintStats(config, s, tasks);
+    out(`${sub === 'add' ? 'Eingeplant' : 'Entfernt'}: ${ids.join(', ')}. ${st.planned} von ${st.capacity} Punkten verplant.`);
+    if (st.planned > st.capacity) out('Hinweis: Der Sprint ist überplant.');
+  } else if (sub === 'set') {
+    const s = need();
+    for (const pair of pos) {
+      const i = pair.indexOf('=');
+      const k = pair.slice(0, i); const v = pair.slice(i + 1);
+      if (k === 'capacity') s.capacity = Math.max(1, parseInt(v, 10) || s.capacity);
+      else if (k === 'end' || k === 'start') { if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) fail(`${k} braucht JJJJ-MM-TT.`); s[k] = v; } else if (k === 'title' || k === 'goal') s[k] = v.slice(0, 200);
+      else fail(`Unbekanntes Feld ${k}. Erlaubt: title, goal, start, end, capacity`);
+    }
+    save();
+    out(`${s.id} gespeichert.`);
+  } else if (sub === 'close') {
+    const s = need();
+    const st = sprintStats(config, s, tasks);
+    s.status = 'abgeschlossen';
+    s.closed = today();
+    s.result = { planned: st.planned, done: st.done };
+    s.carry = s.tasks.filter((id) => byId.has(id) && OPEN_STATUSES.includes(byId.get(id).status));
+    save();
+    out(`${s.id} abgeschlossen: ${st.done} von ${st.planned} Punkten geschafft.${s.carry.length ? ` Offen geblieben: ${s.carry.join(', ')}. Mit works sprint start --carry übernehmen.` : ''}`);
+  } else if (sub === 'list') {
+    if (!config.sprints.length) { out('Noch keine Sprints.'); return; }
+    for (const s of config.sprints) out(`${s.id} ${s.title} ${s.start} bis ${s.end} ${s.status}${s.result ? `, ${s.result.done}/${s.result.planned} Punkte` : ''}`);
+  } else {
+    if (!cur) { out(`Kein aktiver Sprint. Starten mit works sprint start --title ".." --goal ".." (Länge ${set.length_days} Tage, Kapazität ${set.capacity} Punkte, Punkte ${Object.entries(set.points).map(([k, v]) => `${k} ${v}`).join(', ')}).`); return; }
+    const st = sprintStats(config, cur, tasks);
+    if (flags.json) { out(JSON.stringify({ sprint: cur, stats: st }, null, 2)); return; }
+    out(`${cur.id} ${cur.title}, ${cur.start} bis ${cur.end}, Tag ${st.dayIndex} von ${st.days}${cur.goal ? `\nZiel: ${cur.goal}` : ''}`);
+    out(`Punkte: ${st.done} erledigt, ${st.working} in Arbeit, ${st.open} offen, ${st.planned} von ${st.capacity} verplant${st.unestimated ? ` (${st.unestimated} ohne Schätzung zählen als M)` : ''}`);
+    for (const id of cur.tasks) { const t = byId.get(id); if (t) out(`  ${t.id} ${STATUS_LABEL[t.status].padEnd(9)} ${(t.effort || '-').padEnd(2)} ${pointsOf(t, set)} P  ${t.title}`); }
+  }
+}
+
+// ---------- Kommentare ----------
+
+function commentAuthor() {
+  if (flags.as === 'Nutzer' || flags.as === 'Claude') return flags.as;
+  return process.env.WORKS_ACTOR === 'Board' ? 'Nutzer' : 'Claude';
+}
+
+function cmdComment() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const t = findTask(root, config, pos.shift());
+  let text = flags.file && flags.file !== true ? fs.readFileSync(String(flags.file), 'utf8') : flags.text && flags.text !== true ? String(flags.text) : pos.join(' ');
+  if (!text.trim()) fail('Text fehlt: works comment <ID> "..."');
+  const author = commentAuthor();
+  try { addComment(t, author, text); } catch (e) { fail(e.message); }
+  if (author === 'Claude') markRead(root, t);
+  refresh(root);
+  out(`Kommentar an ${t.id} gespeichert (${author}).`);
+}
+
+function cmdComments() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  if (!pos.length || flags.unread) {
+    const list = loadTasks(root, { archive: false }).map((t) => ({ t, n: unreadForClaude(root, t).length })).filter((x) => x.n);
+    if (!list.length) { out('Keine neuen Kommentare vom Nutzer.'); return; }
+    for (const x of list) out(`${x.t.id} ${x.t.title}: ${x.n} neu`);
+    return;
+  }
+  const t = findTask(root, config, pos[0]);
+  const list = loadComments(t);
+  const unread = new Set(unreadForClaude(root, t, list).map((c) => c.at));
+  if (flags.json) { out(JSON.stringify(list, null, 2)); return; }
+  if (!list.length) { out(`${t.id} hat noch keine Kommentare.`); return; }
+  for (const c of list) out(`\n${c.at.replace('T', ' ').slice(0, 16)} ${c.author}${unread.has(c.at) ? ' (neu)' : ''}\n${c.text}`);
+  if (process.env.WORKS_ACTOR !== 'Board') markRead(root, t);
+}
+
+// ---------- Ansichten ----------
+
+function cmdViews() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const views = Array.isArray(config.views) ? config.views : [];
+  if (pos[0] === 'delete' || pos[0] === 'remove') {
+    const name = pos.slice(1).join(' ');
+    config.views = views.filter((v) => v.name !== name);
+    if (config.views.length === views.length) fail(`Ansicht "${name}" gibt es nicht.`);
+    saveConfig(root, config); refresh(root);
+    out(`Ansicht "${name}" gelöscht.`);
+    return;
+  }
+  if (!views.length) { out('Keine gespeicherten Ansichten. Im Board unter den Filtern "Aktuelle Filter speichern".'); return; }
+  for (const v of views) out(`${v.name}: ${describeView(v)}`);
+}
+
+function describeView(v) {
+  const f = v.filter || {};
+  const parts = [];
+  if (f.prios && f.prios.length && f.prios.length < 4) parts.push(f.prios.join(' und '));
+  if (f.type) parts.push(`Typ ${f.type}`);
+  if (f.tag) parts.push(`#${f.tag}`);
+  if (f.ms) parts.push(`Meilenstein ${f.ms}`);
+  if (f.signal) parts.push({ blocked: 'nur blockierte', unblocked: 'ohne blockierte', overdue: 'überfällig', questions: 'mit offenen Fragen', incomplete: 'unvollständig' }[f.signal] || f.signal);
+  if (f.q) parts.push(`Suche "${f.q}"`);
+  if (v.view && v.view !== 'board') parts.push(`Ansicht ${v.view}`);
+  return parts.join(', ') || 'alle Aufgaben';
+}
+
+// Wendet eine gespeicherte Ansicht im Terminal an (works list --view "Name").
+function applyView(config, list, byId, name) {
+  const v = (config.views || []).find((x) => x.name.toLowerCase() === String(name).toLowerCase());
+  if (!v) fail(`Ansicht "${name}" gibt es nicht. works views zeigt alle.`);
+  const f = v.filter || {};
+  return list.filter((t) => {
+    if (f.prios && f.prios.length && !f.prios.includes(t.priority)) return false;
+    if (f.type && t.type !== f.type) return false;
+    if (f.tag && !(t.tags || []).includes(f.tag)) return false;
+    if (f.ms && t.milestone !== f.ms) return false;
+    if (f.signal === 'blocked' && !isBlocked(t, byId)) return false;
+    if (f.signal === 'unblocked' && isBlocked(t, byId)) return false;
+    if (f.signal === 'overdue' && !isOverdue(t)) return false;
+    if (f.signal === 'questions' && !openQuestions(t).length) return false;
+    if (f.signal === 'incomplete' && !t.incomplete) return false;
+    if (f.q) { const hay = `${t.id} ${t.title} ${(t.tags || []).join(' ')}`.toLowerCase(); if (!f.q.toLowerCase().split(/\s+/).every((w) => hay.includes(w))) return false; }
+    return true;
+  });
+}
+
+// ---------- Vorlagen ----------
+
+function cmdTemplate() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const sub = pos.shift() || 'list';
+  if (sub === 'list') {
+    const list = listTemplates(root);
+    if (!list.length) { out('Keine Vorlagen. Anlegen im Board oder mit works template save --from <ID> --name ".."'); return; }
+    for (const t of list) out(`${t.slug.padEnd(24)} ${t.name} (${TYPE_LABEL[t.type]}, ${t.fields.length} Felder, ${t.criteria.length} Kriterien, ${t.scope === 'user' ? 'alle Projekte' : 'Projekt'})`);
+  } else if (sub === 'show') {
+    const t = findTemplate(root, String(pos[0] || ''));
+    if (!t) fail(`Vorlage ${pos[0]} nicht gefunden.`);
+    out(JSON.stringify(t, null, 2));
+  } else if (sub === 'save') {
+    let input;
+    if (flags.file && flags.file !== true) input = JSON.parse(fs.readFileSync(String(flags.file), 'utf8'));
+    else if (flags.from && flags.from !== true) input = templateFromTask(findTask(root, config, String(flags.from)));
+    else fail('Quelle fehlt: --from <ID> oder --file vorlage.json');
+    if (flags.name && flags.name !== true) { input.name = String(flags.name); delete input.slug; }
+    try {
+      const t = saveTemplate(root, input, flags.scope === 'user' ? 'user' : 'project');
+      out(`Vorlage gespeichert: ${t.slug} (${t.name}). Anlegen mit works new --template ${t.slug}`);
+    } catch (e) { fail(e.message); }
+  } else if (sub === 'delete') {
+    const n = deleteTemplate(root, String(pos[0] || ''));
+    out(n ? `Vorlage ${pos[0]} gelöscht.` : `Vorlage ${pos[0]} nicht gefunden.`);
+  } else fail('Unterbefehle: list, show <slug>, save --from <ID> | --file, delete <slug>');
+}
+
+// Neue Aufgabe aus einer Vorlage: works new --template slug --field Name=Wert --text "Was genau passieren soll"
+function newFromTemplate(root, config) {
+  const tpl = findTemplate(root, String(flags.template));
+  if (!tpl) fail(`Vorlage ${flags.template} nicht gefunden. works template list zeigt alle.`);
+  const values = {};
+  for (const f of [].concat(flags.field || [])) {
+    const i = String(f).indexOf('=');
+    if (i > 0) values[String(f).slice(0, i)] = String(f).slice(i + 1);
+  }
+  const text = flags['text-file'] && flags['text-file'] !== true ? fs.readFileSync(String(flags['text-file']), 'utf8') : flags.text && flags.text !== true ? String(flags.text) : flags.description && flags.description !== true ? String(flags.description) : '';
+  const pick = flags.criteria && flags.criteria !== true && /^[\d,]+$/.test(String(flags.criteria)) ? String(flags.criteria).split(',').map(Number) : null;
+  let a;
+  try { a = applyTemplate(tpl, { values, text, criteria: pick, title: flags.title && flags.title !== true ? String(flags.title) : '' }); } catch (e) { fail(e.message); }
+  const opts = {
+    ...flags, title: a.title, type: flags.type || a.type, priority: flags.priority || a.priority, effort: flags.effort || a.effort || undefined,
+    tags: [...new Set([...a.tags, ...listFlag(flags.tags)])].join(','), description: a.description, criteriaList: a.criteria,
+    source: flags.source || `vorlage:${tpl.slug}`,
+  };
+  delete opts.template; delete opts.field; delete opts.text; delete opts.criteria;
+  const task = createTask(root, config, opts);
+  countUse(root, tpl.slug);
+  return task;
+}
+
+// ---------- Zeit ----------
+
+function cmdTime() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const tasks = loadTasks(root);
+  if (flags.mode) {
+    if (!['measured', 'fixed'].includes(flags.mode)) fail('--mode measured oder fixed');
+    config.effort_mode = flags.mode; saveConfig(root, config); refresh(root);
+    out(flags.mode === 'measured' ? 'Zeitleiste und Sprint rechnen jetzt mit den gemessenen Dauern.' : 'Zeitleiste und Sprint rechnen mit festen Werten.');
+    return;
+  }
+  if (pos[0]) {
+    const t = findTask(root, config, pos[0]);
+    const tt = taskTime(root, t);
+    if (flags.json) { out(JSON.stringify(tt, null, 2)); return; }
+    out(`${t.id} ${t.title}\nClaude aktiv: ${fmtDuration(tt.totalMs)} in ${tt.sessions.length} Sitzung(en)${tt.started ? `, gestartet am ${tt.started}` : ''}`);
+    out(`Tage je Status: ${Object.entries(tt.statusDays).map(([k, v]) => `${STATUS_LABEL[k] || k} ${v}`).join(', ') || 'keine'}`);
+    for (const s of tt.sessions) out(`  ${new Date(s.start).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}  ${fmtDuration(s.ms).padEnd(12)} ${s.label}`);
+    return;
+  }
+  const e = estimates(root, tasks, config);
+  if (flags.json) { out(JSON.stringify(e, null, 2)); return; }
+  out(`Schätzung gegen tatsächliche Dauer (Kalendertage vom Start bis zum Abschluss), Modus: ${e.mode === 'measured' ? 'gemessen' : 'fest'}`);
+  for (const s of e.sizes) out(`  ${s.effort.padEnd(3)} geschätzt ${String(s.estimate).padStart(2)} Tage, gemessen ${s.avg === null ? 'noch keine Daten' : `${s.avg} Tage aus ${s.n} Aufgabe(n)`}`);
+  if (e.worst.length) out(`Am längsten über der Schätzung: ${e.worst.map((w) => `${w.id} (${w.effort}, ${w.days} Tage)`).join(', ')}`);
+}
+
+// ---------- Prüfungen ----------
+
+async function cmdChecks() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const sub = pos.shift() || (flags.detect ? 'detect' : 'list');
+  if (sub === 'detect') {
+    const d = detectChecks(root);
+    out('Vorschlag aus dem Projekt:');
+    for (const [k, v] of Object.entries(d)) out(`  ${k.padEnd(10)} ${v}`);
+    if (flags.save) { config.checks = d; saveConfig(root, config); refresh(root); out('Gespeichert in .works/config.json unter checks.'); } else out('Erst nach Rückfrage beim Nutzer speichern: works checks detect --save');
+  } else if (sub === 'set') {
+    config.checks = configuredChecks(config);
+    for (const pair of pos) {
+      const i = pair.indexOf('=');
+      const k = pair.slice(0, i); const v = pair.slice(i + 1).trim();
+      if (!NAME_RE.test(k)) fail(`Ungültiger Name ${k}.`);
+      if (v) config.checks[k] = v; else delete config.checks[k];
+    }
+    saveConfig(root, config); refresh(root);
+    out(`Prüfungen: ${Object.keys(config.checks).join(', ') || 'keine'}`);
+  } else if (sub === 'remove') {
+    config.checks = configuredChecks(config);
+    for (const k of pos) delete config.checks[k];
+    saveConfig(root, config); refresh(root);
+    out(`Prüfungen: ${Object.keys(config.checks).join(', ') || 'keine'}`);
+  } else if (sub === 'run') {
+    const t = findTask(root, config, pos.shift());
+    if (!checksFor(config, t).length) fail('Keine Prüfungen eingerichtet. Vorschlag mit works checks detect.');
+    const data = await runChecks(root, config, t, { only: flags.only ? listFlag(flags.only) : null, onStart: (c) => out(`> ${c.name}: ${c.cmd}`) });
+    printChecks(data);
+    refresh(root);
+  } else if (sub === 'record') {
+    const t = findTask(root, config, pos.shift());
+    const name = pos.shift();
+    try { recordCheck(root, t, name, String(flags.status || 'ok'), flags.note && flags.note !== true ? String(flags.note) : ''); } catch (e) { fail(e.message); }
+    refresh(root);
+    out(`${name} für ${t.id} eingetragen: ${flags.status || 'ok'}`);
+  } else if (sub === 'ack') {
+    const t = findTask(root, config, pos.shift());
+    try { ackCheck(t, pos.shift(), flags.reason && flags.reason !== true ? String(flags.reason) : ''); } catch (e) { fail(e.message); }
+    refresh(root);
+    out('Als bekannt markiert.');
+  } else {
+    const c = configuredChecks(config);
+    if (!Object.keys(c).length) { out('Keine Prüfungen eingerichtet. Vorschlag mit works checks detect, speichern nach Rückfrage mit --save.'); return; }
+    for (const [k, v] of Object.entries(c)) out(`  ${k.padEnd(10)} ${v}`);
+    const by = config.checks_by_type || {};
+    for (const [ty, list] of Object.entries(by)) out(`  nur für ${ty}: ${list.join(', ') || 'keine'}`);
+    if (pos[0]) { const t = findTask(root, config, pos[0]); const d = loadResults(t); if (d) printChecks(d); }
+  }
+}
+
+function printChecks(data) {
+  const mark = { ok: 'ok', ack: 'ok, bekannt', warn: 'Fund', fail: 'FEHLER', manual: 'offen' };
+  for (const [k, r] of Object.entries(data.results)) {
+    out(`  ${k.padEnd(10)} ${(mark[r.status] || r.status).padEnd(12)} ${r.ms ? `${Math.round(r.ms / 1000)} s` : ''}${r.note ? `  ${r.note.split('\n')[0]}` : ''}`);
+    if (r.status === 'fail' && r.output) out(r.output.split('\n').slice(-12).map((l) => `      ${l}`).join('\n'));
+  }
+}
+
 // ---------- Dispatcher ----------
 
 const commands = {
@@ -1722,6 +2081,8 @@ const commands = {
   'gh-export': cmdGhExport, commits: cmdCommits, changelog: cmdChangelog, report: cmdReport,
   'install-hooks': cmdInstallHooks, section: cmdSection, check: cmdCheck, item: cmdItem,
   'idea-drop': cmdIdeaDrop, demo: cmdDemo, queue: cmdQueue, share: cmdShare, export: cmdExport,
+  sprint: cmdSprint, comment: cmdComment, comments: cmdComments, views: cmdViews, template: cmdTemplate,
+  templates: cmdTemplate, time: cmdTime, checks: cmdChecks,
 };
 
 const fn = commands[cmd];

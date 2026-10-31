@@ -18,7 +18,8 @@
   const HIGHLIGHT_MS = 10000;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const VIEWS = ['board', 'queue', 'timeline', 'table'];
+  const VIEWS = ['board', 'sprint', 'queue', 'timeline', 'graph', 'table'];
+  const VIEW_LABEL = { board: 'Board', sprint: 'Sprint', queue: 'Warteschlange', timeline: 'Zeitleiste', graph: 'Abhängigkeiten', table: 'Tabelle' };
   const state = { q: '', prios: new Set(PRIOS), type: '', tag: '', ms: '', closed: false, signal: '', view: 'board' };
   const PAGE_VERSION = meta.version || '';
   const PAGE_SERVER = meta.server || '';
@@ -148,6 +149,7 @@
     if (state.ms && t.milestone !== state.ms) return false;
     if (!state.closed && (t.archived || t.status === 'verworfen')) return false;
     if (state.signal === 'blocked' && !t.blocked) return false;
+    if (state.signal === 'unblocked' && t.blocked) return false;
     if (state.signal === 'overdue' && !t.overdue) return false;
     if (state.signal === 'questions' && !t.questions.length) return false;
     if (state.signal === 'incomplete' && !t.incomplete) return false;
@@ -412,8 +414,10 @@
   function renderAll(arrived) {
     renderHeader(); renderViews();
     if (state.view === 'board') { renderOverview(); renderProgress(); }
-    if (state.view !== 'queue') { renderFilters(); renderMsFilter(); }
+    if (['board', 'timeline', 'graph', 'table'].includes(state.view)) { renderFilters(); renderMsFilter(); renderSavedViews(); }
     renderBoard(arrived);
+    if (state.view === 'sprint') renderSprint();
+    if (state.view === 'graph') renderGraph();
     if (state.view === 'queue') renderQueue();
     if (state.view === 'timeline') renderTimeline();
     if (state.view === 'table') renderTable();
@@ -519,6 +523,11 @@
   const segCtl = (name, options, checked) => '<div class="seg-ctl" role="radiogroup">' + options.map((o) => '<label><input type="radio" name="' + name + '" value="' + esc(o.id) + '"' + (o.id === checked ? ' checked' : '') + '><span>' + (o.dot ? '<span class="pdot" style="--pc:' + o.dot + '"></span>' : '') + esc(o.label) + '</span></label>').join('') + '</div>';
 
   async function newTask(prefill = {}) {
+    if (!prefill.blank) {
+      let tpls = [];
+      try { tpls = await api('GET', 'api/templates'); } catch (e) { tpls = []; }
+      if (tpls.length) return pickTemplate(tpls, prefill);
+    }
     let m;
     try { m = await ensureMeta(); metaInfo = null; } catch (e) { return fail(e); }
     const type = prefill.type || 'feature';
@@ -576,9 +585,12 @@
     try { res = await api('GET', 'api/dod?id=' + encodeURIComponent(id)); } catch (e) { return fail(e); }
     const t = tasks.find((x) => x.id === id) || { title: '' };
     const missing = res.auto.filter((a) => !a.ok);
+    const isCheck = (a) => /^(Prüfung |Automatische Prüfungen)/.test(a.text);
+    const dodItems = res.checks ? res.auto.filter((a) => !isCheck(a)) : res.auto;
     const html = '<h2>' + esc(id) + ' abschließen</h2><p class="lead">' + esc(t.title) + '</p>' +
-      '<div class="block"><div class="block-head"><h3>Automatisch geprüft</h3><span class="meta">' + (res.auto.length - missing.length) + ' von ' + res.auto.length + ' erfüllt</span></div>' +
-      '<ul class="dod">' + res.auto.map((a) => '<li class="' + (a.ok ? 'ok' : 'no') + '"><span class="mark" aria-hidden="true">' + (a.ok ? '✓' : '!') + '</span><span>' + esc(a.text) + (a.detail ? ' <span class="detail">' + esc(a.detail) + '</span>' : '') + '<span class="sr">' + (a.ok ? ' erfüllt' : ' fehlt') + '</span></span></li>').join('') + '</ul></div>' +
+      (res.checks ? checksBlock(res.checks) : '') +
+      '<div class="block"><div class="block-head"><h3>' + (res.checks ? 'Aus der Definition of Done' : 'Automatisch geprüft') + '</h3><span class="meta">' + dodItems.filter((a) => a.ok).length + ' von ' + dodItems.length + ' erfüllt</span></div>' +
+      '<ul class="dod">' + dodItems.map((a) => '<li class="' + (a.ok ? 'ok' : 'no') + '"><span class="mark" aria-hidden="true">' + (a.ok ? '✓' : '!') + '</span><span>' + esc(a.text) + (a.detail ? ' <span class="detail">' + esc(a.detail) + '</span>' : '') + '<span class="sr">' + (a.ok ? ' erfüllt' : ' fehlt') + '</span></span></li>').join('') + '</ul></div>' +
       (res.manual.length ? '<div class="block"><div class="block-head"><h3>Selbst bestätigen</h3><span class="meta">Abhaken, was erledigt ist</span></div><ul class="dod">' + res.manual.map((m, i) => '<li><label><input type="checkbox" name="m' + i + '" class="man"><span>' + esc(m) + '</span></label></li>').join('') + '</ul></div>' : '') +
       (missing.length ? '<div class="alert bad">' + (missing.length === 1 ? 'Es fehlt noch 1 Punkt' : 'Es fehlen noch ' + missing.length + ' Punkte') + '. Abschließen ist nur mit Begründung möglich, die im Verlauf landet.</div><label class="field"><span>Begründung für das Abschließen trotz offener Punkte</span><input class="input" name="reason" maxlength="300"></label>' : '') +
       '<p class="err" role="alert"></p><div class="foot"><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn ' + (missing.length ? 'danger' : 'primary') + '" value="ok" id="dodGo" disabled>' + (missing.length ? 'Trotzdem abschließen' : 'Abschließen') + '</button></div>';
@@ -595,6 +607,7 @@
       };
       $$('input', f).forEach((i) => { i.oninput = update; i.onchange = update; });
       update();
+      bindChecks(f, id);
     });
     if (r) ok(id + ' erledigt');
   }
@@ -679,8 +692,15 @@
       (OPEN.includes(t.status) ? '<button class="btn small" data-act="dod">Abschließen</button>' : '') +
       '<button class="btn small ghost" data-close aria-label="Panel schließen">Schließen</button></div>' +
       '<textarea class="p-title" rows="1" maxlength="160" aria-label="Titel" data-title' + (EDIT ? '' : ' readonly') + '>' + esc(t.title) + '</textarea>' +
-      (LIVE ? '<div class="p-tabs" role="tablist"><button role="tab" data-tab="overview" aria-selected="' + (detailTab === 'overview') + '">Übersicht</button><button role="tab" data-tab="code" aria-selected="' + (detailTab === 'code') + '">Code und Commits</button></div>' : '') +
+      '<div class="p-tabs" role="tablist">' + [['overview', 'Übersicht'], ['comments', 'Kommentare' + ((d.comments || []).length ? ' <span class="count">' + d.comments.length + '</span>' : '')], ['time', 'Zeit']].concat(LIVE ? [['code', 'Code und Commits']] : []).map((x) => '<button role="tab" data-tab="' + x[0] + '" aria-selected="' + (detailTab === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' +
       '</div>');
+    if (detailTab === 'comments' || detailTab === 'time') {
+      h.push(detailTab === 'comments' ? commentsHtml(d) : timeHtml(d));
+      $('#panelBody').innerHTML = h.join('');
+      bindHead();
+      if (detailTab === 'comments') bindComments(t.id);
+      return;
+    }
     if (detailTab === 'code' && LIVE) {
       h.push('<div id="codeBox" class="code-box"><p class="md">Lädt Git-Daten …</p></div>');
       $('#panelBody').innerHTML = h.join('');
@@ -751,6 +771,7 @@
       '<ol class="timeline">' + d.history.slice(0, 60).map((e) => '<li><time datetime="' + esc(e.date) + '">' + esc(fmtDate(e.date)) + '</time><span>' + inline(e.text) + (e.actor ? '<span class="by">' + esc(e.actor) + '</span>' : '') + '</span></li>').join('') + '</ol></div></details>');
 
     h.push('<div class="p-foot"><span class="path" title="Datei">.works/' + esc(d.file) + '</span>' +
+      (EDIT ? '<button class="btn small ghost" data-act="template">Als Vorlage speichern</button>' : '') +
       (closed && !d.archived ? '<button class="btn small" data-act="archive">Archivieren</button>' : '') +
       (!closed ? '<button class="btn small danger" data-act="drop">Verwerfen</button>' : '<button class="btn small" data-act="reopen">Wiedereröffnen</button>') + '</div>');
 
@@ -822,6 +843,7 @@
       if (a === 'reopen') return requestMove(id, 'backlog');
       if (a === 'reload') { staleDetail = false; return loadDetail(); }
       if (a === 'archive') return run(() => act('archive', { id }), id + ' archiviert');
+      if (a === 'template') return editTemplate(null, id);
       if (a === 'complete') return run(() => act('set', { id, fields: { incomplete: false } }), 'Als vollständig markiert');
     }; });
 
@@ -967,6 +989,8 @@
         '<div class="block"><div class="block-head"><h3>Vorschläge</h3></div>' + (n.candidates.length ? n.candidates.map((c, i) => '<div class="cand"><div class="t">' + (i === 0 ? 'Empfohlen: ' : '') + esc(c.id + ' ' + c.title) + '</div><div class="why">' + esc(c.reasons.join(', ')) + '</div><div class="row"><button class="btn small primary" data-start="' + esc(c.id) + '">Starten</button><button class="btn small" data-goto="' + esc(c.id) + '">Ansehen</button></div></div>').join('') : '<p class="md empty-md">Nichts Startbares im Backlog.</p>') + '</div>';
       $$('[data-start]', body).forEach((b) => b.onclick = async () => { await requestMove(b.dataset.start, 'in-arbeit'); renderSide(); });
       $$('[data-goto]', body).forEach((b) => b.onclick = () => { closeSide(); openTask(b.dataset.goto); });
+    } else if (side === 'tools') {
+      return renderTools(body, head);
     } else if (side === 'activity') {
       unseen = 0; renderCounts();
       body.innerHTML = head('Aktivität') +
@@ -1066,6 +1090,7 @@
       const time = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const date = now.toLocaleDateString('de-DE');
       const arrived = new Set(); const moved = new Set();
+      notifyChanges(tasks, next, found);
       for (const c of found) {
         Object.assign(c, { time, date, fresh: true, at: Date.now() });
         changes.set(c.id, c);
@@ -1252,7 +1277,7 @@
     const memo = new Map();
     const span = (t, depth = 0) => {
       if (memo.has(t.id)) return memo.get(t.id);
-      const dur = EFFORT_DAYS[t.effort] || 5;
+      const dur = (meta.effortDays || EFFORT_DAYS)[t.effort] || (meta.effortDays || EFFORT_DAYS).M || 5;
       let r;
       if (t.status === 'erledigt') {
         const end = t.completed || t.updated || now;
@@ -1332,7 +1357,7 @@
         '</div>';
     };
 
-    box.innerHTML = '<div class="tl-scroll"><div class="tl" style="--weeks:' + weeks + ';min-width:calc(var(--lab) + ' + weeks + ' * 84px)">' +
+    box.innerHTML = (LIVE ? '<div id="estBox"></div>' : '') + '<div class="tl-scroll"><div class="tl" style="--weeks:' + weeks + ';min-width:calc(var(--lab) + ' + weeks + ' * 84px)">' +
       '<div class="tl-headrow"><div class="tl-corner">Aufgabe</div><div class="tl-weeks">' + weekHead + '</div></div>' +
       '<div class="tl-body"><div class="tl-grid" aria-hidden="true">' + Array.from({ length: weeks }, (_, i) => '<i' + (addDays(start, i * 7) === weekStart(now) ? ' class="cur"' : '') + '></i>').join('') + '</div>' +
       '<div class="tl-today" style="left:calc(var(--lab) + (100% - var(--lab)) * ' + frac(now).toFixed(4) + ')" title="Heute"></div>' +
@@ -1343,6 +1368,7 @@
       (hiddenOld ? '<span>' + hiddenOld + ' ältere erledigte ausgeblendet</span>' : '') + '</div>';
 
     $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
+    loadEstimates();
     $$('[data-bar]', box).forEach((b) => b.onclick = (e) => { if (e.target.closest('.tl-handle') || tlDrag) return; openTask(b.dataset.bar); });
     if (!EDIT) return;
     $$('.tl-handle', box).forEach((h) => {
@@ -1622,6 +1648,593 @@
     });
   }
 
+  // ---------- Prüfungen im Abschluss-Dialog ----------
+
+  function checksBlock(c) {
+    const icon = { ok: ['ok', '✓'], ack: ['ok', '✓'], fail: ['bad', '×'], warn: ['warn', '!'], manual: ['wait', '…'], missing: ['wait', '…'] };
+    const rows = c.list.map((x) => {
+      const r = c.results[x.name] || { status: 'missing' };
+      const st = c.stale ? 'missing' : r.status;
+      const [cls, ch] = icon[st] || icon.missing;
+      const label = { ok: 'bestanden', ack: 'bekannt', fail: 'fehlgeschlagen', warn: 'Fund', manual: 'trägt Claude ein', missing: 'noch nicht gelaufen' }[st];
+      let extra = '';
+      if (!c.stale && st === 'warn') extra = '<div class="ck-note">' + md(r.note || '') + (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-cfix="' + esc(x.name) + '">Claude beheben lassen</button><button type="button" class="btn small" data-cack="' + esc(x.name) + '">Als bekannt markieren</button></div>' : '') + '</div>';
+      else if (!c.stale && st === 'fail' && r.output) extra = '<details class="ck-out"><summary>Ausgabe</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>';
+      else if (!c.stale && (st === 'manual' || st === 'ack') && r.note) extra = '<div class="ck-note muted">' + esc(r.note.split('\n').slice(-1)[0]) + '</div>';
+      return '<li class="ck ' + cls + '"><div class="ck-row"><span class="ck-ic" aria-hidden="true">' + ch + '</span><span class="ck-name">' + esc(x.name) + '</span><span class="mono muted ck-cmd">' + esc(x.cmd) + '</span><span class="muted num ck-ms">' + (r.ms && !c.stale ? Math.round(r.ms / 1000) + ' s' : esc(label)) + '</span></div>' + extra + '</li>';
+    }).join('');
+    return '<div class="block"><div class="block-head"><h3>Automatische Prüfungen</h3><span class="meta">' + (c.stale ? 'für den aktuellen Stand noch nicht gelaufen' : 'zuletzt ' + esc(new Date(c.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }))) + '</span><span class="spacer"></span>' +
+      (EDIT ? '<button type="button" class="btn small" data-crun>' + (c.stale ? 'Jetzt prüfen' : 'Erneut prüfen') + '</button>' : '') + '</div><ul class="checks">' + rows + '</ul></div>';
+  }
+
+  function bindChecks(f, id) {
+    const reopen = () => { const c = $('button[value="cancel"]', f); if (c) c.click(); setTimeout(() => openDod(id), 50); };
+    $$('[data-crun]', f).forEach((b) => b.onclick = async () => {
+      b.disabled = true; b.textContent = 'Prüfungen laufen …';
+      $$('.ck', f).forEach((li) => li.classList.add('running'));
+      const r = await run(() => act('checksRun', { id }), 'Prüfungen gelaufen');
+      if (r) reopen(); else { b.disabled = false; b.textContent = 'Erneut prüfen'; }
+    });
+    $$('[data-cack]', f).forEach((b) => b.onclick = async () => { if (await run(() => act('checksAck', { id, name: b.dataset.cack }), 'Als bekannt markiert')) reopen(); });
+    $$('[data-cfix]', f).forEach((b) => b.onclick = async () => {
+      const note = (b.closest('.ck').querySelector('.ck-note') || {}).innerText || '';
+      const r = await run(() => act('comment', { id, text: 'Bitte den Fund aus der Prüfung ' + b.dataset.cfix + ' beheben und die Prüfung danach neu eintragen:\n\n' + note.replace(/Claude beheben lassen|Als bekannt markieren/g, '').trim() }), 'Auftrag an Claude als Kommentar gespeichert');
+      if (r) b.disabled = true;
+    });
+  }
+
+  // ---------- Kommentare ----------
+
+  function commentsHtml(d) {
+    const list = d.comments || [];
+    const seenKey = 'works-cseen-' + d.task.id;
+    const seen = store.get(seenKey, '');
+    if (list.length) store.set(seenKey, list[list.length - 1].at);
+    const item = (c) => {
+      const me = c.author === 'Nutzer';
+      const when = new Date(c.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      return '<li class="cm' + (me ? ' me' : ' cl') + '"><span class="cm-av" aria-hidden="true">' + (me ? 'Du' : 'C') + '</span><div class="cm-b"><div class="cm-meta"><strong>' + (me ? 'Du' : 'Claude') + '</strong> ' + esc(when) + (!me && c.at > seen && seen ? ' <span class="tag q-tag">neu</span>' : '') + '</div><div class="cm-text md">' + md(c.text) + '</div></div></li>';
+    };
+    const lastMine = list.length && list[list.length - 1].author === 'Nutzer';
+    return '<div class="comments">' +
+      (list.length ? '<ol class="cm-list">' + list.map(item).join('') + '</ol>' : '<div class="q-empty"><strong>Noch keine Kommentare.</strong><span>Schreib Claude hier, was bei dieser Aufgabe wichtig ist. Claude liest neue Kommentare beim Start der Sitzung und antwortet hier.</span></div>') +
+      (lastMine ? '<p class="sublabel">Claude hat deinen letzten Kommentar noch nicht beantwortet.</p>' : '') +
+      (EDIT ? '<div class="cm-compose"><label class="field"><span>Nachricht an Claude</span><textarea class="input" id="cmIn" rows="4" maxlength="10000" placeholder="Hinweis, Wunsch oder Antwort. Markdown möglich."></textarea></label><div class="add-row" style="justify-content:flex-end;align-items:center"><span class="sublabel" style="margin-right:auto">Strg+Enter sendet</span><button class="btn primary small" id="cmSend">Senden</button></div></div>' : '') +
+      '</div>';
+  }
+
+  function bindComments(id) {
+    const ta = $('#cmIn');
+    if (!ta) return;
+    ta.oninput = () => { dirty = !!ta.value.trim(); };
+    const send = async () => {
+      const text = ta.value.trim();
+      if (!text) return;
+      $('#cmSend').disabled = true;
+      const r = await run(() => act('comment', { id, text }), (x) => x.message);
+      $('#cmSend').disabled = false;
+      if (r) { ta.value = ''; dirty = false; }
+    };
+    ta.onkeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') send(); };
+    $('#cmSend').onclick = send;
+  }
+
+  // ---------- Zeit ----------
+
+  const fmtMs = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min'; };
+
+  function timeHtml(d) {
+    const tm = d.time || { totalMs: 0, sessions: [], statusDays: {} };
+    const t = d.task;
+    const est = (meta.effortDays || {})[t.effort];
+    const since = tm.started ? Math.max(0, Math.round((new Date(today() + 'T00:00:00') - new Date(tm.started + 'T00:00:00')) / 86400000)) : null;
+    const sd = Object.entries(tm.statusDays || {}).filter(([, v]) => v > 0);
+    const total = sd.reduce((a, [, v]) => a + v, 0) || 1;
+    return '<div class="time-box">' +
+      '<div class="code-cards"><div><small>Claude aktiv</small><strong>' + (tm.totalMs ? fmtMs(tm.totalMs) : '–') + '</strong><span class="muted">' + tm.sessions.length + (tm.sessions.length === 1 ? ' Sitzung' : ' Sitzungen') + '</span></div>' +
+      '<div><small>Seit dem Start</small><strong>' + (since === null ? 'nicht gestartet' : since + (since === 1 ? ' Tag' : ' Tage')) + '</strong><span class="muted">' + (est ? 'geschätzt ' + est + ' Tage bei ' + esc(t.effort) : 'ohne Schätzung') + '</span></div>' +
+      '<div><small>Offene Fragen</small><strong>' + d.openQuestions + '</strong><span class="muted">' + (d.openQuestions ? 'wartet auf dich' : 'nichts offen') + '</span></div></div>' +
+      (sd.length ? '<div class="block"><div class="block-head"><h3>Tage je Status</h3></div><div class="pg-bar">' + sd.map(([k, v]) => '<span style="flex-grow:' + v + ';background:' + statusVar(k) + '" title="' + esc(L(k)) + ': ' + v + ' Tage"></span>').join('') + '</div><div class="pg-legend">' + sd.map(([k, v]) => '<span class="pg-k"><i style="background:' + statusVar(k) + '"></i>' + esc(L(k)) + ' <b class="num">' + v + '</b></span>').join('') + '</div></div>' : '') +
+      '<div class="block"><div class="block-head"><h3>Sitzungen</h3><span class="meta">Pausen über 20 Minuten trennen</span></div>' +
+      (tm.sessions.length ? '<ol class="commits">' + tm.sessions.map((s) => '<li><time class="muted num">' + esc(new Date(s.start).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time><span class="subj">' + esc(s.label || s.turns + (s.turns === 1 ? ' Anfrage' : ' Anfragen')) + '</span><span class="num">' + fmtMs(s.ms) + '</span></li>').join('') + '</ol>'
+        : '<p class="md empty-md">Noch keine erfasste Zeit. Die Hooks messen, wie lange Claude an der aktiven Aufgabe arbeitet, sobald sie mit works start begonnen wurde.</p>') + '</div></div>';
+  }
+
+  async function loadEstimates() {
+    const box = $('#estBox');
+    if (!box) return;
+    let e;
+    try { e = await api('GET', 'api/estimates'); } catch (err) { return; }
+    const max = Math.max(1, ...e.sizes.map((s) => Math.max(s.estimate, s.avg || 0)));
+    const open = store.get('works-est-open', false);
+    box.innerHTML = '<details class="est"' + (open ? ' open' : '') + '><summary>Wie gut passen die Schätzungen? <span class="meta">Zeitleiste rechnet mit ' + (e.mode === 'measured' ? 'gemessenen' : 'festen') + ' Werten</span></summary><div class="est-body">' +
+      '<div class="est-grid">' + e.sizes.map((s) => '<strong>' + s.effort + '</strong><div class="est-track"><span class="est-bar' + (s.avg !== null && s.avg > s.estimate * 1.2 ? ' over' : '') + '" style="width:' + ((s.avg || 0) / max * 100).toFixed(1) + '%"></span><span class="est-mark" style="left:' + (s.estimate / max * 100).toFixed(1) + '%" title="Schätzung ' + s.estimate + ' Tage"></span></div><span class="' + (s.avg === null ? 'muted' : '') + '">' + (s.avg === null ? 'noch keine Daten' : s.avg + ' statt ' + s.estimate + ' Tage, ' + s.n + 'x') + '</span>').join('') + '</div>' +
+      '<p class="sublabel">Strich: Schätzung. Balken: tatsächliche Dauer im Mittel, vom Start bis zum Abschluss. Gemessene Werte zählen ab drei erledigten Aufgaben je Größe.</p>' +
+      (e.worst.length ? '<p class="sublabel">Am längsten über der Schätzung: ' + e.worst.map((w) => esc(w.id) + ' (' + esc(w.effort) + ', ' + w.days + ' Tage)').join(', ') + '</p>' : '') +
+      (EDIT ? '<div class="row-btns">' + (e.mode === 'measured' ? '<button class="btn small" data-emode="fixed">Feste Werte nutzen</button>' : '<button class="btn small primary" data-emode="measured">Gemessene Werte nutzen</button>') + '</div>' : '') +
+      '</div></details>';
+    $('details', box).ontoggle = (ev) => store.set('works-est-open', ev.target.open);
+    $$('[data-emode]', box).forEach((b) => b.onclick = () => run(() => act('effortMode', { mode: b.dataset.emode }), 'Gespeichert'));
+  }
+
+  // ---------- Sprint ----------
+
+  function renderSprint() {
+    const box = $('#viewSprint');
+    const sp = meta.sprint;
+    const set = meta.sprintSettings || { points: { S: 1, M: 2, L: 4, XL: 8 }, capacity: 20, length_days: 14 };
+    const pts = (t) => (set.points[t.effort] ?? set.points.M);
+    const byId = byIdNow();
+    const last = meta.lastSprint;
+    if (!sp) {
+      const carry = last && last.carry ? last.carry.filter((x) => byId.has(x)) : [];
+      box.innerHTML = '<div class="q-wrap"><section class="q-main"><div class="q-head"><h2>Kein Sprint aktiv</h2><p>Ein Sprint bündelt Aufgaben für einen festen Zeitraum mit einem Ziel. Die Kapazität in Punkten zeigt, ob der Plan realistisch ist. Punkte: ' + Object.entries(set.points).map(([k, v]) => k + ' ' + v).join(', ') + ', ohne Schätzung zählt eine Aufgabe wie M.</p></div>' +
+        (EDIT ? '<form class="sp-form" id="spStart"><div class="grid"><label class="field span2"><span>Titel</span><input class="input" name="title" required maxlength="120" value="Sprint ' + ((parseInt(String(last ? last.id : 'S0').slice(1), 10) || 0) + 1) + '"></label><label class="field span2"><span>Ziel</span><input class="input" name="goal" maxlength="300" placeholder="Was soll am Ende stehen?"></label>' +
+          '<label class="field"><span>Start</span><input type="date" class="input" name="start" value="' + today() + '"></label><label class="field"><span>Länge in Tagen</span><input type="number" class="input" name="days" min="1" max="60" value="' + set.length_days + '"></label><label class="field"><span>Kapazität in Punkten</span><input type="number" class="input" name="capacity" min="1" max="1000" value="' + set.capacity + '"></label></div>' +
+          (carry.length ? '<label class="toggle"><input type="checkbox" name="carry" checked> ' + carry.length + ' offene Aufgabe' + (carry.length === 1 ? '' : 'n') + ' aus ' + esc(last.id) + ' übernehmen</label>' : '') +
+          '<div class="row-btns"><button class="btn primary">Sprint starten</button></div></form>' : '<p class="md empty-md">Der Besitzer des Boards hat gerade keinen Sprint geplant.</p>') +
+        '</section>' + (last ? '<aside class="q-side"><div class="q-card"><small>' + esc(last.id + ' ' + last.title) + ' im Rückblick</small><span>' + (last.result ? last.result.done + ' von ' + last.result.planned + ' Punkten geschafft' : 'abgeschlossen') + (carry.length ? ', ' + carry.length + ' offen geblieben' : '') + '</span></div></aside>' : '') + '</div>';
+      const f = $('#spStart', box);
+      if (f) f.onsubmit = (e) => { e.preventDefault(); const fd = new FormData(f); run(() => act('sprintStart', { title: fd.get('title'), goal: fd.get('goal'), start: fd.get('start'), days: fd.get('days'), capacity: fd.get('capacity'), carry: fd.get('carry') === 'on' }), (x) => x.message); };
+      return;
+    }
+    const st = sp.stats;
+    const list = (sp.tasks || []).map((x) => byId.get(x)).filter(Boolean);
+    const free = st.capacity - st.planned;
+    const cap = Math.max(st.capacity, st.planned, 1);
+    const seg = (n, cls, label) => (n > 0 ? '<span class="' + cls + '" style="flex-grow:' + n + '" title="' + label + ': ' + n + ' Punkte"></span>' : '');
+    const W = 300; const H = 110; const P = 6;
+    const x = (i) => P + (i * (W - 2 * P)) / Math.max(1, st.days - 1);
+    const y = (v) => H - P - (v * (H - 2 * P)) / Math.max(1, st.planned);
+    const actual = st.series.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.remaining).toFixed(1)).join(' ');
+    const lastP = st.series[st.series.length - 1];
+    const ahead = lastP ? lastP.remaining <= st.idealNow + 0.01 : true;
+    const cand = tasks.filter((t) => ['backlog', 'geplant'].includes(t.status) && !t.archived && !(sp.tasks || []).includes(t.id))
+      .sort((a, b) => PRIOS.indexOf(a.priority) - PRIOS.indexOf(b.priority) || (b.status === 'geplant') - (a.status === 'geplant')).slice(0, 12);
+    const row = (t) => '<li class="sp-item' + (t.status === 'erledigt' ? ' done' : '') + '" data-id="' + esc(t.id) + '"><span class="st" style="--c:' + statusVar(t.status) + '" title="' + esc(L(t.status)) + '"></span><button class="q-title" data-open="' + esc(t.id) + '"><span class="id num">' + esc(t.id) + '</span> ' + esc(t.title) + '</button>' +
+      (t.crit[1] && t.status !== 'erledigt' ? '<span class="muted num">' + t.crit[0] + ' von ' + t.crit[1] + '</span>' : '') + '<span class="muted num">' + esc(t.effort || 'ohne') + ', ' + pts(t) + ' P</span>' + (EDIT && t.status !== 'erledigt' ? '<button class="btn small ghost icon" data-sprm="' + esc(t.id) + '" aria-label="Aus dem Sprint nehmen" title="Aus dem Sprint nehmen">×</button>' : '') + '</li>';
+    box.innerHTML = '<div class="sp">' +
+      '<div class="sp-top"><section class="sp-card sp-main"><div class="sp-head"><h2>' + esc(sp.title) + '</h2><span class="muted">' + esc(fmtDate(sp.start)) + ' bis ' + esc(fmtDate(sp.end)) + ', Tag ' + st.dayIndex + ' von ' + st.days + '</span>' + (EDIT ? '<span class="spacer"></span><button class="btn small ghost" id="spEdit">Bearbeiten</button><button class="btn small" id="spClose">Sprint abschließen</button>' : '') + '</div>' +
+        (sp.goal ? '<p class="sp-goal">Ziel: ' + esc(sp.goal) + '</p>' : '') +
+        '<div class="sp-cap"><span>Kapazität</span><strong class="num">' + st.planned + ' von ' + st.capacity + ' Punkten verplant</strong></div>' +
+        '<div class="pg-bar sp-bar">' + seg(st.done, 'pg-done', 'Erledigt') + seg(st.working, 'pg-work', 'In Arbeit') + seg(st.open, 'sp-open', 'Offen') + seg(Math.max(0, cap - st.planned), 'pg-wait', 'Frei') + '</div>' +
+        '<div class="pg-legend"><span class="pg-k"><i class="pg-done"></i>erledigt <b class="num">' + st.done + '</b></span><span class="pg-k"><i class="pg-work"></i>in Arbeit <b class="num">' + st.working + '</b></span><span class="pg-k"><i class="sp-open"></i>offen <b class="num">' + st.open + '</b></span>' + (free < 0 ? '<span class="late">' + (-free) + ' Punkte überplant</span>' : '<span class="muted">' + free + ' frei</span>') + (st.unestimated ? '<span class="muted">' + st.unestimated + ' ohne Schätzung zählen als M</span>' : '') + '</div></section>' +
+        '<section class="sp-card sp-burn"><div class="sp-cap"><strong>Burndown</strong><span class="' + (ahead ? 'good' : 'late') + '">' + (ahead ? 'im Plan' : 'hinter dem Plan') + '</span></div>' +
+        '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Offene Punkte: ' + (lastP ? lastP.remaining : st.planned) + ', ideal wären ' + st.idealNow.toFixed(1) + '"><path d="M' + x(0) + ' ' + y(st.planned) + ' L' + x(st.days - 1) + ' ' + y(0) + '" class="c-ideal"/>' + (actual ? '<path d="' + actual + '" class="c-done"/>' : '') + '' + '</svg>' +
+        '<div class="c-axis"><span>' + (lastP ? lastP.remaining : st.planned) + ' Punkte offen</span><span>ideal wären ' + st.idealNow.toFixed(1).replace('.', ',') + '</span></div></section></div>' +
+      '<div class="q-wrap"><section class="q-main"><h3 class="sp-h">Im Sprint <span class="muted">' + list.length + '</span></h3>' +
+        (list.length ? '<ol class="sp-list" id="spList">' + list.map(row).join('') + '</ol>' : '') +
+        (EDIT ? '<div class="sp-drop" id="spDrop">Aufgaben von rechts hierher ziehen oder mit + einplanen.' + (free > 0 ? ' Noch ' + free + ' Punkte frei.' : '') + '</div>' : '') + '</section>' +
+      '<aside class="q-side"><h3 class="sp-h">Vorschläge</h3>' + (cand.length ? cand.map((t) => {
+        const p = pts(t);
+        const fit = p === free ? ['good', 'passt genau'] : p < free ? ['', 'passt'] : ['late', 'passt nicht mehr'];
+        return '<div class="sp-cand' + (fit[0] === 'good' ? ' best' : '') + '" data-id="' + esc(t.id) + '"' + (EDIT ? ' draggable="true"' : '') + '><button class="q-title" data-open="' + esc(t.id) + '">' + esc(t.id + ' ' + t.title) + '</button><span class="q-meta"><span style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span>, ' + esc(t.effort || 'ohne Schätzung') + ', ' + p + ' P, <span class="' + fit[0] + '">' + fit[1] + '</span></span>' + (EDIT ? '<button class="btn small ghost icon sp-add" data-spadd="' + esc(t.id) + '" aria-label="' + esc(t.id) + ' einplanen" title="Einplanen">+</button>' : '') + '</div>';
+      }).join('') : '<p class="md empty-md">Keine offenen Aufgaben außerhalb des Sprints.</p>') +
+        (last && last.result ? '<div class="q-card"><small>' + esc(last.id) + ' im Rückblick</small><span>' + last.result.done + ' von ' + last.result.planned + ' Punkten geschafft</span></div>' : '') +
+      '</aside></div></div>';
+    $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
+    if (!EDIT) return;
+    $$('[data-spadd]', box).forEach((b) => b.onclick = () => run(() => act('sprintAdd', { id: b.dataset.spadd }), b.dataset.spadd + ' eingeplant'));
+    $$('[data-sprm]', box).forEach((b) => b.onclick = () => run(() => act('sprintRemove', { id: b.dataset.sprm }), b.dataset.sprm + ' aus dem Sprint genommen'));
+    $$('.sp-cand[draggable]', box).forEach((c) => {
+      c.ondragstart = (e) => { qDrag = c.dataset.id; e.dataTransfer.setData('text/plain', c.dataset.id); c.classList.add('dragging'); };
+      c.ondragend = () => { qDrag = null; c.classList.remove('dragging'); if (reloadPending) { reloadPending = false; reload(); } };
+    });
+    const drop = $('#spDrop', box);
+    const target = [drop, $('#spList', box)].filter(Boolean);
+    target.forEach((el) => {
+      el.ondragover = (e) => { if (qDrag) { e.preventDefault(); drop.classList.add('over'); } };
+      el.ondragleave = () => drop.classList.remove('over');
+      el.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); const idd = e.dataTransfer.getData('text/plain'); qDrag = null; if (idd) run(() => act('sprintAdd', { id: idd }), idd + ' eingeplant'); };
+    });
+    $('#spClose', box).onclick = async () => {
+      const open = list.filter((t) => OPEN.includes(t.status));
+      if (await confirmBox({ title: sp.id + ' abschließen', lead: st.done + ' von ' + st.planned + ' Punkten sind geschafft.' + (open.length ? ' ' + open.length + ' offene Aufgabe' + (open.length === 1 ? '' : 'n') + ' lassen sich in den nächsten Sprint übernehmen.' : ''), confirm: 'Abschließen' })) run(() => act('sprintClose', {}), (x) => x.message);
+    };
+    $('#spEdit', box).onclick = async () => {
+      const r = await showDialog('<h2>' + esc(sp.id) + ' bearbeiten</h2><label class="field"><span>Titel</span><input class="input" name="title" required maxlength="120" value="' + esc(sp.title) + '"></label><label class="field"><span>Ziel</span><input class="input" name="goal" maxlength="300" value="' + esc(sp.goal || '') + '"></label><div class="grid"><label class="field span2"><span>Ende</span><input type="date" name="end" value="' + esc(sp.end) + '"></label><label class="field span2"><span>Kapazität</span><input type="number" class="input" name="capacity" min="1" max="1000" value="' + st.capacity + '"></label></div>' + foot('Speichern'),
+        (fd) => act('sprintSet', { fields: { title: fd.get('title'), goal: fd.get('goal'), end: fd.get('end'), capacity: fd.get('capacity') } }));
+      if (r) ok('Sprint gespeichert');
+    };
+  }
+
+  // ---------- Abhängigkeitsgraph ----------
+
+  function renderGraph() {
+    const box = $('#viewGraph');
+    const showDone = store.get('works-graph-done', true);
+    const eff = meta.effortDays || EFFORT_DAYS;
+    const pool = tasks.filter((t) => match(t) && t.status !== 'verworfen' && (showDone || t.status !== 'erledigt'));
+    const ids = new Set(pool.map((t) => t.id));
+    const dependents = new Map();
+    pool.forEach((t) => (t.blockedBy || []).forEach((b) => { if (ids.has(b)) dependents.set(b, (dependents.get(b) || []).concat(t.id)); }));
+    const nodes = pool.filter((t) => (t.blockedBy || []).some((b) => ids.has(b)) || dependents.has(t.id));
+    const byId = new Map(nodes.map((t) => [t.id, t]));
+    const lvl = new Map();
+    const level = (t, depth = 0) => {
+      if (lvl.has(t.id)) return lvl.get(t.id);
+      if (depth > 50) return 0;
+      const bs = (t.blockedBy || []).filter((b) => byId.has(b));
+      const v = bs.length ? Math.max(...bs.map((b) => level(byId.get(b), depth + 1) + 1)) : 0;
+      lvl.set(t.id, v);
+      return v;
+    };
+    nodes.forEach((t) => level(t));
+    // Kritischer Pfad: längste Kette offener Aufgaben, gemessen in geschätzten Tagen.
+    const open = (t) => OPEN.includes(t.status);
+    const dist = new Map(); const prev = new Map();
+    const dfs = (t, depth = 0) => {
+      if (dist.has(t.id)) return dist.get(t.id);
+      const own = open(t) ? (eff[t.effort] || eff.M || 5) : 0;
+      let best = 0; let from = null;
+      if (depth < 50) for (const b of (t.blockedBy || []).filter((x) => byId.has(x))) { const d2 = dfs(byId.get(b), depth + 1); if (d2 > best) { best = d2; from = b; } }
+      dist.set(t.id, best + own); prev.set(t.id, from);
+      return best + own;
+    };
+    nodes.forEach((t) => dfs(t));
+    const endNode = nodes.filter(open).sort((a, b) => dist.get(b.id) - dist.get(a.id))[0];
+    const crit = [];
+    for (let c = endNode && endNode.id; c; c = prev.get(c)) if (open(byId.get(c))) crit.unshift(c);
+    const critSet = new Set(crit.length > 1 ? crit : []);
+    const allDeps = (idd, seen = new Set()) => { for (const d of dependents.get(idd) || []) if (!seen.has(d)) { seen.add(d); allDeps(d, seen); } return seen; };
+    const lever = nodes.filter((t) => ['backlog', 'geplant', 'in-arbeit'].includes(t.status) && !t.blocked).map((t) => ({ t, n: [...allDeps(t.id)].filter((d) => open(byId.get(d))).length })).filter((x) => x.n).sort((a, b) => b.n - a.n || PRIOS.indexOf(a.t.priority) - PRIOS.indexOf(b.t.priority))[0];
+    const cols = Math.max(0, ...nodes.map((t) => lvl.get(t.id))) + 1;
+    const NW = 210; const NH = 68; const CX = 270; const GY = 22; const PAD = 28;
+    const pos = new Map();
+    let maxRows = 0;
+    for (let c = 0; c < cols; c++) {
+      const col = nodes.filter((t) => lvl.get(t.id) === c).sort((a, b) => (critSet.has(b.id) - critSet.has(a.id)) || PRIOS.indexOf(a.priority) - PRIOS.indexOf(b.priority));
+      col.forEach((t, i) => pos.set(t.id, { x: PAD + c * CX, y: PAD + i * (NH + GY) }));
+      maxRows = Math.max(maxRows, col.length);
+    }
+    const W = PAD * 2 + (cols - 1) * CX + NW; const H = PAD * 2 + maxRows * (NH + GY) + 10;
+    const edges = [];
+    nodes.forEach((t) => (t.blockedBy || []).filter((b) => byId.has(b)).forEach((b) => {
+      const a = pos.get(b); const z = pos.get(t.id);
+      const x1 = a.x + NW; const y1 = a.y + NH / 2; const x2 = z.x - 2; const y2 = z.y + NH / 2; const mx = (x1 + x2) / 2;
+      const hot = critSet.has(b) && critSet.has(t.id) && crit.indexOf(t.id) === crit.indexOf(b) + 1;
+      edges.push('<path d="M' + x1 + ' ' + y1 + ' C ' + mx + ' ' + y1 + ', ' + mx + ' ' + y2 + ', ' + x2 + ' ' + y2 + '" class="gr-edge' + (hot ? ' hot' : '') + (byId.get(b).status === 'erledigt' ? ' done' : '') + '" marker-end="url(#' + (hot ? 'grh' : 'gra') + ')"/>');
+    }));
+    const node = (t) => {
+      const p = pos.get(t.id);
+      const label = t.status === 'erledigt' ? 'erledigt' : t.blocked ? 'blockiert' : L(t.status);
+      return '<div class="gr-node' + (critSet.has(t.id) ? ' crit' : '') + (t.status === 'erledigt' ? ' done' : '') + (t.blocked ? ' blocked' : '') + '" data-node="' + esc(t.id) + '" style="left:' + p.x + 'px;top:' + p.y + 'px;width:' + NW + 'px;height:' + NH + 'px">' +
+        '<button class="gr-open" data-open="' + esc(t.id) + '"><span class="gr-meta"><span class="st" style="--c:' + (t.blocked ? 'var(--danger)' : statusVar(t.status)) + '"></span>' + esc(t.id) + ' ' + esc(label) + (t.effort ? ', ' + esc(t.effort) : '') + '</span><span class="gr-t">' + esc(t.title) + '</span></button>' +
+        (EDIT && open(t) ? '<button class="gr-link" data-link="' + esc(t.id) + '" title="Zu einer anderen Karte ziehen: diese Aufgabe blockiert jene" aria-label="Abhängigkeit von ' + esc(t.id) + ' ziehen">+</button>' : '') + '</div>';
+    };
+    const loose = pool.length - nodes.length;
+    const days = endNode ? dist.get(endNode.id) : 0;
+    box.innerHTML = '<div class="q-wrap"><section class="q-main">' +
+      '<div class="gr-bar"><label class="toggle"><input type="checkbox" id="grDone"' + (showDone ? ' checked' : '') + '> Erledigte zeigen</label><span class="muted">' + nodes.length + ' Aufgaben mit Abhängigkeiten' + (loose ? ', ' + loose + ' ohne' : '') + '</span></div>' +
+      (nodes.length ? '<div class="gr-scroll"><div class="gr-canvas" style="width:' + W + 'px;height:' + H + 'px"><svg class="gr-svg" width="' + W + '" height="' + H + '" aria-hidden="true"><defs><marker id="gra" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" class="gr-ah"/></marker><marker id="grh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" class="gr-ah hot"/></marker></defs>' + edges.join('') + '<path id="grTmp" class="gr-edge tmp" d=""/></svg>' + nodes.map(node).join('') + '</div></div>'
+        : '<div class="q-empty"><strong>Noch keine Abhängigkeiten.</strong><span>Verknüpfe Aufgaben im Detailpanel unter Abhängigkeiten oder mit works link A blocked-by B. Dann zeigt diese Ansicht, was worauf wartet.</span></div>') +
+      '</section><aside class="q-side">' +
+      (critSet.size ? '<div class="q-card crit"><small>Kritischer Pfad</small><strong>' + crit.map(esc).join(', ') + '</strong><span>Zusammen etwa ' + days + ' Tage nach der Schätzung. Verzögert sich eine davon, verschiebt sich das Ende.</span></div>' : '') +
+      (lever ? '<div class="q-card"><small>Größter Hebel</small><button class="q-title" data-open="' + esc(lever.t.id) + '"><strong>' + esc(lever.t.id + ' ' + lever.t.title) + '</strong></button><span>Erledigt, gibt sie ' + lever.n + (lever.n === 1 ? ' Aufgabe' : ' Aufgaben') + ' frei.</span>' + (EDIT && !(meta.queue || []).includes(lever.t.id) && lever.t.status !== 'in-arbeit' ? '<button class="btn small" data-qfront="' + esc(lever.t.id) + '">In der Warteschlange nach vorn</button>' : '') + '</div>' : '') +
+      '<div class="q-card gr-legend"><span><i class="lg-hot"></i>kritischer Pfad</span><span><i class="lg-edge"></i>blockiert durch</span>' + (EDIT ? '<span class="muted">Das + an einer Karte auf eine andere ziehen legt eine Abhängigkeit an.</span>' : '') + '</div>' +
+      '</aside></div>';
+    $('#grDone', box).onchange = (e) => { store.set('works-graph-done', e.target.checked); renderGraph(); };
+    $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
+    $$('[data-qfront]', box).forEach((b) => b.onclick = () => run(() => act('queueAdd', { id: b.dataset.qfront, pos: 1 }), b.dataset.qfront + ' steht vorn in der Warteschlange'));
+    if (!EDIT) return;
+    const canvas = $('.gr-canvas', box);
+    const tmp = $('#grTmp', box);
+    $$('[data-link]', box).forEach((h) => h.onpointerdown = (e) => {
+      e.preventDefault();
+      const src = h.dataset.link; const p = pos.get(src);
+      const r0 = canvas.getBoundingClientRect();
+      h.setPointerCapture(e.pointerId);
+      tlDrag = { id: src };
+      const x1 = p.x + NW; const y1 = p.y + NH / 2;
+      h.onpointermove = (ev) => { const x2 = ev.clientX - r0.left; const y2 = ev.clientY - r0.top; tmp.setAttribute('d', 'M' + x1 + ' ' + y1 + ' L' + x2 + ' ' + y2); $$('.gr-node', canvas).forEach((n) => n.classList.toggle('target', n.contains(document.elementFromPoint(ev.clientX, ev.clientY)) && n.dataset.node !== src)); };
+      h.onpointerup = (ev) => {
+        h.onpointermove = null; h.onpointerup = null; tmp.setAttribute('d', ''); tlDrag = null;
+        $$('.gr-node', canvas).forEach((n) => n.classList.remove('target'));
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        const dst = el && el.closest('.gr-node');
+        if (dst && dst.dataset.node !== src) run(() => act('link', { id: src, rel: 'blocks', target: dst.dataset.node }), src + ' blockiert jetzt ' + dst.dataset.node);
+        if (reloadPending) { reloadPending = false; reload(); }
+      };
+    });
+  }
+
+  // ---------- Gespeicherte Ansichten ----------
+
+  const currentFilter = () => ({ prios: [...state.prios].sort(), type: state.type, tag: state.tag, ms: state.ms, signal: state.signal, q: state.q, closed: state.closed });
+  const sameFilter = (a, b) => JSON.stringify({ ...a, prios: (a.prios && a.prios.length ? a.prios : PRIOS).slice().sort() }) === JSON.stringify({ ...b, prios: (b.prios && b.prios.length ? b.prios : PRIOS).slice().sort() });
+  function withFilter(f, fn) {
+    const saved = { prios: state.prios, type: state.type, tag: state.tag, ms: state.ms, signal: state.signal, q: state.q, closed: state.closed };
+    Object.assign(state, { prios: new Set(f.prios && f.prios.length ? f.prios : PRIOS), type: f.type || '', tag: f.tag || '', ms: f.ms || '', signal: f.signal || '', q: f.q || '', closed: !!f.closed });
+    try { return fn(); } finally { Object.assign(state, saved); }
+  }
+
+  function renderSavedViews() {
+    const box = $('#savedViews');
+    const views = meta.views || [];
+    const cur = currentFilter();
+    if (!views.length && !(EDIT && filtersActive())) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = '<span class="sv-label">Ansichten</span>' +
+      '<button class="sv-chip" data-svall aria-pressed="' + (!filtersActive()) + '">Alles</button>' +
+      views.map((v, i) => {
+        const n = withFilter(v.filter || {}, () => tasks.filter((t) => match(t) && OPEN.includes(t.status)).length);
+        const on = sameFilter(v.filter || {}, cur) && (v.view || 'board') === state.view;
+        return '<span class="sv-wrap"><button class="sv-chip" data-sv="' + i + '" aria-pressed="' + on + '" title="' + esc(describeFilter(v)) + '">' + esc(v.name) + ' <span class="sv-n num">' + n + '</span></button>' + (EDIT ? '<button class="sv-x" data-svdel="' + i + '" aria-label="Ansicht ' + esc(v.name) + ' löschen" title="Löschen">×</button>' : '') + '</span>';
+      }).join('') +
+      (EDIT && filtersActive() && !views.some((v) => sameFilter(v.filter || {}, cur)) ? '<button class="sv-chip add" id="svSave">Aktuelle Filter speichern</button>' : '');
+    $('[data-svall]', box).onclick = () => resetFilters();
+    $$('[data-sv]', box).forEach((b) => b.onclick = () => applySavedView(views[+b.dataset.sv]));
+    $$('[data-svdel]', box).forEach((b) => b.onclick = async () => { const v = views[+b.dataset.svdel]; if (await confirmBox({ title: 'Ansicht löschen', lead: 'Die Ansicht „' + v.name + '“ wird entfernt. Die Aufgaben bleiben unverändert.', confirm: 'Löschen', danger: true })) run(() => act('viewDelete', { name: v.name }), 'Ansicht gelöscht'); });
+    const sv = $('#svSave', box);
+    if (sv) sv.onclick = saveViewDialog;
+  }
+
+  function describeFilter(v) {
+    const f = v.filter || {};
+    const p = [];
+    if (f.prios && f.prios.length && f.prios.length < 4) p.push(f.prios.join(' und '));
+    if (f.type) p.push(meta.typeLabel[f.type] || f.type);
+    if (f.tag) p.push('#' + f.tag);
+    if (f.ms) p.push('Meilenstein ' + f.ms);
+    if (f.signal) p.push({ blocked: 'nur blockierte', unblocked: 'ohne blockierte', overdue: 'überfällig', questions: 'mit offenen Fragen', incomplete: 'unvollständig' }[f.signal] || f.signal);
+    if (f.q) p.push('Suche „' + f.q + '“');
+    if (v.view && v.view !== 'board') p.push('Ansicht ' + (VIEW_LABEL[v.view] || v.view));
+    if (v.sort) p.push('sortiert nach ' + v.sort.key);
+    return p.join(', ') || 'alle Aufgaben';
+  }
+
+  function applySavedView(v) {
+    const f = v.filter || {};
+    Object.assign(state, { prios: new Set(f.prios && f.prios.length ? f.prios : PRIOS), type: f.type || '', tag: f.tag || '', ms: f.ms || '', signal: f.signal || '', q: f.q || '', closed: !!f.closed });
+    $('#q').value = state.q; $('#typeFilter').value = state.type; $('#showClosed').checked = state.closed;
+    if (v.sort) { tableSort.key = v.sort.key; tableSort.dir = v.sort.dir; }
+    setView(VIEWS.includes(v.view) ? v.view : 'board');
+  }
+
+  async function saveViewDialog() {
+    const f = currentFilter();
+    const defKey = 'works-default-view-' + meta.project;
+    const r = await showDialog('<h2>Ansicht speichern</h2><label class="field"><span>Name</span><input class="input" name="name" required maxlength="40" placeholder="Zum Beispiel Bot dringend" autofocus></label>' +
+      '<div class="field"><span>Wird gespeichert</span><p class="lead" style="margin:0">' + esc(describeFilter({ filter: f, view: state.view, sort: state.view === 'table' ? tableSort : null })) + '</p></div>' +
+      (!f.signal ? '<label class="toggle"><input type="checkbox" name="unblocked"> Blockierte ausblenden</label>' : '') +
+      '<label class="toggle"><input type="checkbox" name="def"> Beim Öffnen des Boards diese Ansicht zeigen (nur in diesem Browser)</label>' +
+      '<p class="sublabel">Ansichten gelten für das ganze Projekt und stehen in .works/config.json. Claude kann sie mit works list --view "Name" nutzen.</p>' + foot('Speichern'),
+    async (fd) => {
+      const name = String(fd.get('name') || '').trim();
+      const filter = { ...f, signal: fd.get('unblocked') === 'on' ? 'unblocked' : f.signal };
+      const res = await act('viewSave', { name, filter, view: state.view, sort: state.view === 'table' ? { key: tableSort.key, dir: tableSort.dir } : null });
+      if (fd.get('def') === 'on') store.set(defKey, name);
+      return res;
+    });
+    if (r) ok(r.message);
+  }
+
+  // ---------- Benachrichtigungen ----------
+
+  const NKEY = 'works-notify-' + meta.project;
+  const NDEF = { on: false, review: true, question: true, p1: true, unblocked: false, queueEmpty: true, any: false, sound: true, title: true };
+  let notifySet = { ...NDEF, ...store.get(NKEY, {}) };
+  let hiddenCount = 0;
+  const baseTitle = () => 'Works ' + meta.project;
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { hiddenCount = 0; document.title = baseTitle(); } });
+
+  function beep() {
+    try {
+      const C = window.AudioContext || window.webkitAudioContext;
+      const ctx = new C(); const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.frequency.value = 880; g.gain.setValueAtTime(0.0001, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+      o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.4);
+    } catch (e) { /* kein Ton */ }
+  }
+
+  function notifyChanges(prev, next, found) {
+    const s = notifySet;
+    if (!s.on) return;
+    const before = new Map(prev.map((t) => [t.id, t]));
+    const ev = [];
+    for (const t of next.tasks) {
+      const o = before.get(t.id);
+      const own = /\[Board\]$/.test(t.lastLog || '');
+      if (!o) { if (s.p1 && t.priority === 'P1' && !own) ev.push({ id: t.id, title: 'Neue P1: ' + t.id, body: t.title }); continue; }
+      if (own && !(t.comments > o.comments && t.lastCommentBy === 'Claude')) continue;
+      if (s.review && o.status !== 'review' && t.status === 'review') ev.push({ id: t.id, title: t.id + ' wartet auf dein Review', body: t.title + (t.crit[1] ? ', ' + t.crit[0] + ' von ' + t.crit[1] + ' Kriterien erfüllt' : '') });
+      else if (s.any && o.status !== t.status) ev.push({ id: t.id, title: t.id + ': ' + L(o.status) + ' → ' + L(t.status), body: t.title });
+      if (s.question && t.questions.length > o.questions.length) ev.push({ id: t.id, title: 'Frage zu ' + t.id, body: t.questions[t.questions.length - 1] });
+      if (s.question && t.comments > o.comments && t.lastCommentBy === 'Claude') ev.push({ id: t.id, title: 'Claude hat ' + t.id + ' kommentiert', body: t.title });
+      if (s.p1 && o.priority !== 'P1' && t.priority === 'P1') ev.push({ id: t.id, title: t.id + ' ist jetzt P1', body: t.title });
+      if (s.unblocked && o.blocked && !t.blocked && OPEN.includes(t.status)) ev.push({ id: t.id, title: t.id + ' ist jetzt startbar', body: t.title });
+    }
+    if (s.queueEmpty && (meta.queue || []).length && !(next.meta.queue || []).length) ev.push({ id: '', title: 'Warteschlange leer', body: 'Claude hat alle eingereihten Aufgaben abgearbeitet.' });
+    if (!ev.length) return;
+    if (document.hidden) {
+      hiddenCount += ev.length;
+      if (s.title) document.title = '(' + hiddenCount + ') ' + baseTitle();
+      if ('Notification' in window && Notification.permission === 'granted') {
+        for (const e of ev.slice(0, 3)) {
+          try { const n = new Notification(e.title, { body: e.body, tag: 'works-' + (e.id || 'queue') }); n.onclick = () => { window.focus(); if (e.id) focusCard(e.id); n.close(); }; } catch (err) { /* blockiert */ }
+        }
+      }
+      if (s.sound) beep();
+    }
+  }
+
+  async function testNotification() {
+    if (!('Notification' in window)) return fail(new Error('Dieser Browser unterstützt keine Benachrichtigungen.'));
+    if (Notification.permission !== 'granted') await Notification.requestPermission();
+    if (Notification.permission !== 'granted') return fail(new Error('Benachrichtigungen sind im Browser blockiert. In den Seiteneinstellungen erlauben.'));
+    new Notification('works ' + meta.project, { body: 'So sieht eine Meldung aus. Ein Klick öffnet das Board.' });
+    if (notifySet.sound) beep();
+  }
+
+  // ---------- Werkzeuge: Bericht, Vorlagen, Prüfungen, Benachrichtigungen ----------
+
+  async function renderTools(body, head) {
+    const [rep, tpls, chk] = await Promise.all([
+      api('GET', 'api/reports').catch(() => null), api('GET', 'api/templates').catch(() => []), EDIT ? api('GET', 'api/checks').catch(() => null) : Promise.resolve(null),
+    ]);
+    const theme = store.get('works-theme', 'auto');
+    const dark = theme === 'dark' || (theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+    const days = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+    const sw = (key, label, on, attrs = '') => '<label class="switch small"><span><b>' + esc(label) + '</b></span><input type="checkbox" ' + attrs + (on ? ' checked' : '') + (EDIT ? '' : ' disabled') + ' data-k="' + key + '"><i aria-hidden="true"></i></label>';
+    const s = rep ? rep.settings : null;
+    const h = [head('Werkzeuge')];
+    if (rep) {
+      h.push('<details class="sec" open><summary>Wochenbericht</summary><div class="body">' +
+        '<p class="md">Zahlen und Listen aus den Aufgaben, die Zusammenfassung schreibt Claude. Ist ein Bericht fällig, erinnert der Hook beim nächsten Sitzungsstart daran.</p>' +
+        (EDIT ? '<div id="repSet">' + sw('enabled', 'Automatisch jede Woche', s.enabled) +
+          '<div class="row-btns"><select class="input" data-k="weekday" style="flex:1">' + days.slice(1).map((d, i) => '<option value="' + (i + 1) + '"' + (s.weekday === i + 1 ? ' selected' : '') + '>' + d + 's</option>').join('') + '</select><input type="time" class="input" data-k="time" value="' + esc(s.time) + '" style="flex:0 0 120px"></div>' +
+          sw('file', 'Datei in .works/reports', s.destinations.file) + sw('discord', 'An Discord senden', s.destinations.discord) +
+          '<div class="add-row"><input class="input" id="hookIn" type="url" placeholder="' + (rep.webhook ? 'Webhook hinterlegt, zum Ändern neue URL eingeben' : 'Discord-Webhook-URL') + '" autocomplete="off"><button class="btn small" id="hookSave">' + (rep.webhook ? 'Ersetzen' : 'Speichern') + '</button>' + (rep.webhook ? '<button class="btn small ghost" id="hookDel">Entfernen</button>' : '') + '</div>' +
+          '<p class="sublabel">Die URL bleibt nur auf diesem Rechner (.works/report.local.json, nicht im Git).</p>' +
+          sw('done', 'Erledigt und begonnen', s.include.done) + sw('attention', 'Was dich braucht', s.include.attention) + sw('next', 'Plan für nächste Woche', s.include.next) + sw('milestones', 'Meilensteine', s.include.milestones) + '</div>' +
+          '<label class="field"><span>Zusammenfassung, optional</span><textarea class="input" id="repSum" rows="2" placeholder="Ohne Text entsteht eine kurze Zusammenfassung aus den Zahlen."></textarea></label><div class="row-btns"><button class="btn small primary" id="repRun">Bericht für ' + esc(rep.current.replace('-', ', ')) + ' erzeugen</button></div>' : '') +
+        (rep.reports.length ? '<ul class="rep-list">' + rep.reports.map((r) => '<li><span>' + esc(r.name.replace('-', ', ')) + '</span>' + (r.html ? '<a href="' + esc(r.html) + '#theme=' + (dark ? 'dark' : 'light') + '" target="_blank" rel="noopener">Ansehen</a>' : '') + (r.md ? '<a href="' + esc(r.md) + '" target="_blank" rel="noopener">Markdown</a>' : '') + '</li>').join('') + '</ul>' : '<p class="md empty-md">Noch keine Berichte.</p>') +
+        '</div></details>');
+    }
+    if (EDIT) {
+      h.push('<details class="sec" open><summary>Vorlagen <span class="meta">' + tpls.length + '</span></summary><div class="body">' +
+        (tpls.length ? tpls.map((t) => '<div class="tpl-row"><div class="q-t"><strong>' + esc(t.name) + '</strong><span class="q-meta">' + esc((meta.typeLabel[t.type] || t.type) + ', ' + t.fields.length + ' Felder, ' + t.criteria.length + ' Kriterien' + (t.uses ? ', ' + t.uses + 'x benutzt' : '') + (t.scope === 'user' ? ', alle Projekte' : '')) + '</span></div><button class="btn small" data-tuse="' + esc(t.slug) + '">Nutzen</button><button class="btn small ghost" data-tedit="' + esc(t.slug) + '">Bearbeiten</button></div>').join('') : '<p class="md empty-md">Noch keine Vorlagen. Erstelle eine neue oder speichere eine bestehende Aufgabe im Detailpanel als Vorlage.</p>') +
+        '<div class="row-btns"><button class="btn small primary" id="tplNew">Neue Vorlage</button></div></div></details>');
+    }
+    if (chk) {
+      const rows = Object.entries(chk.checks);
+      h.push('<details class="sec"' + (rows.length ? '' : ' open') + '><summary>Prüfungen vor dem Abschluss <span class="meta">' + rows.length + '</span></summary><div class="body">' +
+        '<p class="md">Laufen bei works done und im Abschluss-Dialog. Rot verhindert das Abschließen, ein Fund braucht deine Entscheidung. <code>skill:code-audit</code> führt Claude aus und trägt das Ergebnis ein.</p>' +
+        '<div id="ckRows">' + (rows.length ? rows : Object.entries(chk.detected)).map(([k, v]) => ckRow(k, v)).join('') + '</div>' +
+        (!rows.length ? '<p class="sublabel">Vorschlag aus deinem Projekt. Erst mit Speichern aktiv.</p>' : '') +
+        '<div class="row-btns"><button class="btn small" id="ckAdd">Prüfung hinzufügen</button><button class="btn small primary" id="ckSave">Speichern</button></div></div></details>');
+    }
+    h.push('<details class="sec"><summary>Benachrichtigungen <span class="meta">' + (notifySet.on ? 'an' : 'aus') + '</span></summary><div class="body" id="ntSet">' +
+      '<p class="md">Meldet sich, wenn der Tab im Hintergrund ist. Gilt nur in diesem Browser.</p>' +
+      [['on', 'Benachrichtigungen an'], ['review', 'Aufgabe kommt in Review'], ['question', 'Frage oder Kommentar von Claude'], ['p1', 'Neue Aufgabe mit P1'], ['unblocked', 'Blockade aufgelöst'], ['queueEmpty', 'Warteschlange leer gelaufen'], ['any', 'Jede Statusänderung'], ['sound', 'Ton abspielen'], ['title', 'Zähler im Tab-Titel']].map(([k, l]) => '<label class="switch small"><span><b>' + l + '</b></span><input type="checkbox" data-n="' + k + '"' + (notifySet[k] ? ' checked' : '') + '><i aria-hidden="true"></i></label>').join('') +
+      '<div class="row-btns"><button class="btn small" id="ntTest">Testmeldung senden</button></div></div></details>');
+    body.innerHTML = h.join('');
+    $$('[data-sclose]', body).forEach((b) => b.onclick = closeSide);
+    $$('#ntSet [data-n]', body).forEach((c) => c.onchange = async () => {
+      notifySet = { ...notifySet, [c.dataset.n]: c.checked };
+      store.set(NKEY, notifySet);
+      if (c.dataset.n === 'on' && c.checked && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+    });
+    $('#ntTest', body).onclick = testNotification;
+    if (!EDIT) return;
+    $$('#repSet [data-k]', body).forEach((el) => el.onchange = () => {
+      const k = el.dataset.k;
+      const v = el.type === 'checkbox' ? el.checked : el.value;
+      run(() => act('reportSettings', { [k]: v }), 'Gespeichert');
+    });
+    const hs = $('#hookSave', body);
+    if (hs) hs.onclick = async () => { const url = $('#hookIn', body).value.trim(); if (url && await run(() => act('reportWebhook', { url }), 'Webhook gespeichert')) renderSide(); };
+    const hd = $('#hookDel', body);
+    if (hd) hd.onclick = async () => { if (await run(() => act('reportWebhook', { url: '' }), 'Webhook entfernt')) renderSide(); };
+    const rr = $('#repRun', body);
+    if (rr) rr.onclick = async () => { rr.disabled = true; const r = await run(() => act('reportRun', { summary: $('#repSum', body).value }), (x) => x.message); rr.disabled = false; if (r) renderSide(); };
+    $$('[data-tuse]', body).forEach((b) => b.onclick = async () => { closeSide(); const list = await api('GET', 'api/templates'); pickTemplate(list, {}, b.dataset.tuse); });
+    $$('[data-tedit]', body).forEach((b) => b.onclick = () => editTemplate(b.dataset.tedit));
+    $('#tplNew', body).onclick = () => editTemplate(null);
+    const ckBox = $('#ckRows', body);
+    if (ckBox) {
+      const bindRm = () => $$('[data-ckrm]', ckBox).forEach((b) => b.onclick = () => b.closest('.ck-edit').remove());
+      bindRm();
+      $('#ckAdd', body).onclick = () => { ckBox.insertAdjacentHTML('beforeend', ckRow('', '')); bindRm(); };
+      $('#ckSave', body).onclick = async () => {
+        const checks = {};
+        $$('.ck-edit', ckBox).forEach((r) => { const k = $('[data-ckk]', r).value.trim(); const v = $('[data-ckv]', r).value.trim(); if (k && v) checks[k] = v; });
+        if (await run(() => act('checksSave', { checks }), (x) => x.message)) renderSide();
+      };
+    }
+  }
+
+  const ckRow = (k, v) => '<div class="ck-edit add-row"><input class="input mono" data-ckk value="' + esc(k) + '" placeholder="name" style="flex:0 0 110px" maxlength="30" aria-label="Name"><input class="input mono" data-ckv value="' + esc(v) + '" placeholder="Befehl, etwa npm test" maxlength="300" aria-label="Befehl"><button class="btn small ghost icon" data-ckrm aria-label="Entfernen">×</button></div>';
+
+  // ---------- Vorlagen nutzen und bearbeiten ----------
+
+  async function pickTemplate(tpls, prefill = {}, preselect = '') {
+    let sel = preselect && tpls.some((t) => t.slug === preselect) ? preselect : tpls[0].slug;
+    let titleTouched = false;
+    const fillT = (text, vals) => String(text || '').replace(/\{([\p{L}\p{N}_]{1,30})\}/gu, (a, k) => vals[k] || a);
+    const pane = (t) => '<label class="field"><span>Titel</span><input class="input" name="title" maxlength="160" value="' + esc(fillT(t.title, {}) || t.name) + '" data-ttl></label>' +
+      '<div class="tp-tags"><span class="tag">' + esc(meta.typeLabel[t.type] || t.type) + '</span>' + (t.effort ? '<span class="tag">Aufwand ' + esc(t.effort) + '</span>' : '') + t.tags.map((x) => '<span class="tag">#' + esc(x) + '</span>').join('') + '</div>' +
+      (t.fields.length ? '<div class="grid">' + t.fields.map((f) => '<label class="field span2"><span>' + esc(f.key) + (f.required ? ' *' : '') + (f.hint ? ' <span class="sublabel">' + esc(f.hint) + '</span>' : '') + '</span>' + (f.kind === 'choice' ? '<select name="f_' + esc(f.key) + '" data-fk="' + esc(f.key) + '"' + (f.required ? ' required' : '') + '><option value="">Wählen</option>' + f.options.map((o) => '<option>' + esc(o) + '</option>').join('') + '</select>' : '<input class="input" name="f_' + esc(f.key) + '" data-fk="' + esc(f.key) + '" maxlength="300"' + (f.required ? ' required' : '') + '>') + '</label>').join('') + '</div>' : '') +
+      '<label class="field"><span>Was genau soll passieren?</span><textarea class="input" name="text" rows="5" placeholder="Beschreibe in eigenen Worten, was diese Aufgabe erreichen soll. Hat Vorrang vor dem Grundtext der Vorlage."></textarea><span class="sublabel">Landet zusammen mit den Feldern in der Beschreibung. Claude liest sie als Vorgabe von dir.</span></label>' +
+      (t.criteria.length ? '<div class="field"><span>Akzeptanzkriterien aus der Vorlage</span><ul class="dod">' + t.criteria.map((c, i) => '<li><label><input type="checkbox" name="c_' + i + '"' + (c.mode !== 'optional' ? ' checked' : '') + (c.mode === 'always' ? ' disabled' : '') + '><span>' + esc(c.text) + (c.mode === 'always' ? ' <span class="sublabel">immer</span>' : '') + '</span></label></li>').join('') + '</ul></div>' : '') +
+      '<div class="grid"><div class="field span2"><span>Priorität</span>' + segCtl('priority', PRIOS.map((p) => ({ id: p, label: p, dot: prioVar(p) })), t.priority) + '</div><div class="field span2"><span>Spalte</span>' + segCtl('status', [{ id: 'backlog', label: 'Backlog' }, { id: 'geplant', label: 'Geplant' }], prefill.status || 'backlog') + '</div></div>';
+    const html = '<h2>Neue Aufgabe</h2><div class="tp"><nav class="tp-list" aria-label="Vorlagen"><button type="button" class="tp-item" data-tp="">Leer<span>ohne Vorlage</span></button>' +
+      tpls.map((t) => '<button type="button" class="tp-item" data-tp="' + esc(t.slug) + '" aria-pressed="' + (t.slug === sel) + '">' + esc(t.name) + '<span>' + esc((meta.typeLabel[t.type] || t.type) + ', ' + t.criteria.length + ' Kriterien' + (t.uses ? ', ' + t.uses + 'x' : '')) + '</span></button>').join('') +
+      '<button type="button" class="tp-item new" data-tpnew>Eigene Vorlage erstellen</button></nav><div class="tp-pane" id="tpPane"></div></div>' + foot('Aufgabe anlegen');
+    let wantBlank = false; let wantNew = false;
+    const r = await showDialog(html, async (fd) => {
+      const t = tpls.find((x) => x.slug === sel);
+      const values = {};
+      t.fields.forEach((f) => { values[f.key] = String(fd.get('f_' + f.key) || '').trim(); });
+      const criteria = t.criteria.map((c, i) => (c.mode !== 'always' && fd.get('c_' + i) === 'on' ? i : -1)).filter((i) => i >= 0);
+      return act('createFromTemplate', { slug: sel, values, text: String(fd.get('text') || ''), criteria, title: titleTouched ? String(fd.get('title') || '').trim() : '', priority: fd.get('priority'), status: fd.get('status') });
+    }, (f) => {
+      const show = () => {
+        const t = tpls.find((x) => x.slug === sel);
+        $('#tpPane', f).innerHTML = pane(t);
+        $$('[data-tp]', f).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tp === sel)));
+        titleTouched = false;
+        const ttl = $('[data-ttl]', f);
+        ttl.oninput = () => { titleTouched = true; };
+        $$('[data-fk]', f).forEach((el) => el.oninput = el.onchange = () => {
+          if (titleTouched) return;
+          const vals = {}; $$('[data-fk]', f).forEach((x) => { vals[x.dataset.fk] = x.value.trim(); });
+          ttl.value = fillT(t.title, vals) || t.name;
+        });
+      };
+      $$('[data-tp]', f).forEach((b) => b.onclick = () => {
+        if (!b.dataset.tp) { wantBlank = true; $('button[value="cancel"]', f).click(); return; }
+        sel = b.dataset.tp; show();
+      });
+      $('[data-tpnew]', f).onclick = () => { wantNew = true; $('button[value="cancel"]', f).click(); };
+      show();
+    });
+    if (r) { ok(r.message); pendingOpen = r.id; }
+    else if (wantBlank) newTask({ ...prefill, blank: true });
+    else if (wantNew) editTemplate(null);
+  }
+
+  async function editTemplate(slug, fromTask) {
+    let tpl = null; let scope = 'project';
+    try {
+      if (slug) { const all = await api('GET', 'api/templates'); tpl = all.find((t) => t.slug === slug); scope = tpl ? tpl.scope : 'project'; }
+      else if (fromTask) tpl = await api('GET', 'api/template-draft?id=' + encodeURIComponent(fromTask));
+    } catch (e) { return fail(e); }
+    tpl = tpl || { name: '', about: '', title: '', type: 'feature', priority: 'P3', effort: '', tags: [], fields: [], description: '', hints: '', criteria: [] };
+    const opt = (list, cur, lab) => list.map((v) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(lab ? lab(v) : v || 'offen') + '</option>').join('');
+    const fieldRow = (f) => '<div class="te-field"><span class="grip" aria-hidden="true">⋮⋮</span><input class="input mono" data-fkey value="' + esc(f.key || '') + '" placeholder="Name" maxlength="30" aria-label="Feldname"><select class="input" data-fkind aria-label="Art"><option value="text"' + (f.kind !== 'choice' ? ' selected' : '') + '>Text</option><option value="choice"' + (f.kind === 'choice' ? ' selected' : '') + '>Auswahl</option></select><input class="input" data-fopts value="' + esc((f.options || []).join(', ')) + '" placeholder="Optionen, mit Komma" ' + (f.kind === 'choice' ? '' : 'hidden') + ' aria-label="Optionen"><label class="toggle"><input type="checkbox" data-freq' + (f.required ? ' checked' : '') + '> Pflicht</label><button type="button" class="btn small ghost icon" data-frm aria-label="Feld entfernen">×</button></div>';
+    const critRow = (c) => '<div class="te-crit"><input class="input" data-ctext value="' + esc(c.text || '') + '" placeholder="Prüfbar mit ja oder nein, Felder als {Name}" maxlength="300" aria-label="Kriterium"><select class="input" data-cmode aria-label="Art"><option value="always"' + (c.mode === 'always' ? ' selected' : '') + '>immer</option><option value="default"' + (c.mode === 'default' ? ' selected' : '') + '>vorausgewählt</option><option value="optional"' + (c.mode === 'optional' ? ' selected' : '') + '>optional</option></select><button type="button" class="btn small ghost icon" data-crm aria-label="Kriterium entfernen">×</button></div>';
+    const html = '<h2>' + (slug ? 'Vorlage bearbeiten' : 'Eigene Vorlage erstellen') + '</h2>' +
+      '<div class="grid"><label class="field span2"><span>Name der Vorlage</span><input class="input" name="name" required maxlength="80" value="' + esc(tpl.name) + '" autofocus></label><label class="field span2"><span>Titel der Aufgabe, Felder als {Name}</span><input class="input mono" name="title" maxlength="160" value="' + esc(tpl.title) + '" placeholder="Dashboard: {Seite}"></label>' +
+      '<label class="field"><span>Typ</span><select name="type">' + opt(Object.keys(meta.typeLabel), tpl.type, (v) => meta.typeLabel[v]) + '</select></label><label class="field"><span>Priorität</span><select name="priority">' + opt(PRIOS, tpl.priority) + '</select></label><label class="field"><span>Aufwand</span><select name="effort">' + opt(['', 'S', 'M', 'L', 'XL'], tpl.effort) + '</select></label><label class="field"><span>Tags</span><input class="input" name="tags" value="' + esc(tpl.tags.join(', ')) + '"></label></div>' +
+      '<label class="field"><span>Kurzbeschreibung, optional</span><input class="input" name="about" maxlength="200" value="' + esc(tpl.about || '') + '" placeholder="Wofür ist die Vorlage gedacht?"></label>' +
+      '<div class="field"><span>Felder beim Anlegen</span><div id="teFields">' + tpl.fields.map(fieldRow).join('') + '</div><div class="row-btns"><button type="button" class="btn small" id="teFieldAdd">Feld hinzufügen</button></div></div>' +
+      '<label class="field"><span>Grundtext der Beschreibung</span><textarea class="input mono" name="description" rows="5" placeholder="Felder mit {Name} einsetzen. Beim Anlegen kommt ein freies Feld „Was genau soll passieren?“ dazu, das Vorrang hat.">' + esc(tpl.description) + '</textarea></label>' +
+      '<div class="field"><span>Akzeptanzkriterien</span><div id="teCrit">' + tpl.criteria.map(critRow).join('') + '</div><div class="row-btns"><button type="button" class="btn small" id="teCritAdd">Kriterium hinzufügen</button></div></div>' +
+      '<label class="field"><span>Hinweise für Claude, optional</span><textarea class="input" name="hints" rows="2" maxlength="2000" placeholder="Etwa: vorher das UI UX Pro Max Skill nutzen">' + esc(tpl.hints || '') + '</textarea></label>' +
+      '<div class="field"><span>Speichern für</span>' + segCtl('scope', [{ id: 'project', label: 'Dieses Projekt' }, { id: 'user', label: 'Alle meine Projekte' }], scope) + '</div>' +
+      foot('Vorlage speichern', { extra: slug ? '<button type="button" class="btn danger" id="teDel" style="margin-right:auto">Löschen</button>' : '' });
+    const r = await showDialog(html, (fd, sub) => {
+      const fields = $$('.te-field', form).map((row) => ({ key: $('[data-fkey]', row).value.trim(), kind: $('[data-fkind]', row).value, options: $('[data-fopts]', row).value.split(',').map((s) => s.trim()).filter(Boolean), required: $('[data-freq]', row).checked })).filter((f) => f.key);
+      const criteria = $$('.te-crit', form).map((row) => ({ text: $('[data-ctext]', row).value.trim(), mode: $('[data-cmode]', row).value })).filter((c) => c.text);
+      const template = { name: fd.get('name'), title: fd.get('title'), type: fd.get('type'), priority: fd.get('priority'), effort: fd.get('effort'), tags: String(fd.get('tags') || '').split(','), about: fd.get('about'), description: fd.get('description'), hints: fd.get('hints'), fields, criteria };
+      if (slug) template.slug = slug;
+      return act('templateSave', { template, scope: fd.get('scope'), oldSlug: slug || '' });
+    }, (f) => {
+      const bind = () => {
+        $$('[data-frm]', f).forEach((b) => b.onclick = () => b.closest('.te-field').remove());
+        $$('[data-crm]', f).forEach((b) => b.onclick = () => b.closest('.te-crit').remove());
+        $$('[data-fkind]', f).forEach((s2) => s2.onchange = () => { s2.parentElement.querySelector('[data-fopts]').hidden = s2.value !== 'choice'; });
+      };
+      $('#teFieldAdd', f).onclick = () => { $('#teFields', f).insertAdjacentHTML('beforeend', fieldRow({ kind: 'text' })); bind(); $('#teFields .te-field:last-child [data-fkey]', f).focus(); };
+      $('#teCritAdd', f).onclick = () => { $('#teCrit', f).insertAdjacentHTML('beforeend', critRow({ mode: 'always' })); bind(); $('#teCrit .te-crit:last-child [data-ctext]', f).focus(); };
+      const del = $('#teDel', f);
+      if (del) del.onclick = async () => { if (!confirm('Vorlage „' + tpl.name + '“ löschen?')) return; if (await run(() => act('templateDelete', { slug }), 'Vorlage gelöscht')) { $('button[value="cancel"]', f).click(); if (side === 'tools') renderSide(); } };
+      bind();
+    });
+    if (r) { ok(r.message); if (side === 'tools') renderSide(); }
+  }
+
   // ---------- Schnellsuche (rechte Shift-Taste oder Strg+K) ----------
 
   const pal = $('#palette');
@@ -1633,10 +2246,9 @@
   function paletteCommands() {
     const c = [];
     if (EDIT) c.push({ label: 'Neue Aufgabe', hint: 'N', run: () => newTask() });
-    c.push({ label: 'Board anzeigen', hint: '1', run: () => setView('board') });
-    c.push({ label: 'Warteschlange anzeigen', hint: '2', run: () => setView('queue') });
-    c.push({ label: 'Zeitleiste anzeigen', hint: '3', run: () => setView('timeline') });
-    c.push({ label: 'Tabelle anzeigen', hint: '4', run: () => setView('table') });
+    VIEWS.forEach((v, i) => c.push({ label: VIEW_LABEL[v] + ' anzeigen', hint: String(i + 1), run: () => setView(v) }));
+    (meta.views || []).forEach((v) => c.push({ label: 'Ansicht „' + v.name + '“', run: () => applySavedView(v) }));
+    if (LIVE) c.push({ label: 'Wochenbericht, Vorlagen, Prüfungen, Benachrichtigungen', run: () => openSide('tools') });
     if (LIVE) {
       c.push({ label: 'Nächste Aufgabe vorschlagen', run: () => openSide('next') });
       c.push({ label: 'Ideen öffnen', run: () => openSide('ideas') });
@@ -1807,7 +2419,7 @@
     if (typing || dlg.open || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === '/') { e.preventDefault(); if (state.view === 'queue') setView('board'); $('#q').focus(); }
     if (EDIT && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); newTask(); }
-    if (/^[1-4]$/.test(e.key) && panel.hidden && pal.hidden) { e.preventDefault(); setView(VIEWS[+e.key - 1]); }
+    if (/^[1-6]$/.test(e.key) && panel.hidden && pal.hidden) { e.preventDefault(); setView(VIEWS[+e.key - 1]); }
   });
 
   document.body.classList.toggle('ro', !EDIT);
@@ -1826,6 +2438,7 @@
   }
   if (LIVE) {
     $('#btnIdeas').onclick = () => openSide('ideas');
+    $('#btnTools').onclick = () => openSide('tools');
     $('#btnNext').onclick = () => openSide('next');
     $('#btnActivity').onclick = () => openSide('activity');
     setLive(true, 'Live');
@@ -1852,13 +2465,16 @@
   state.view = store.get('works-view-' + meta.project, 'board');
   if (restored && restored.view) state.view = restored.view;
   if (!VIEWS.includes(state.view)) state.view = 'board';
+  // Gespeicherte Standardansicht dieses Browsers, wenn nicht gerade nach einem Update neu geladen wurde.
+  const defView = !restored && store.get('works-default-view-' + meta.project, '');
+  const defV = defView && (meta.views || []).find((v) => v.name === defView);
   if (restored) {
     Object.assign(state, { q: restored.q || '', type: restored.type || '', tag: restored.tag || '', ms: restored.ms || '', closed: !!restored.closed, signal: restored.signal || '' });
     if (Array.isArray(restored.prios) && restored.prios.length) state.prios = new Set(restored.prios);
     $('#q').value = state.q;
     $('#showClosed').checked = state.closed;
   }
-  renderAll();
+  if (defV) applySavedView(defV); else renderAll();
   if (restored) {
     $('#board').scrollLeft = restored.scrollX || 0;
     window.scrollTo(0, restored.scrollY || 0);
