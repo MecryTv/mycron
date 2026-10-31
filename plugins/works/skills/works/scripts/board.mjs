@@ -39,7 +39,7 @@ export function boardData(root) {
       blocked: OPEN_STATUSES.includes(t.status) && isBlocked(t, byId), blockers: openBlockers(t, byId),
       overdue: !!isOverdue(t), incomplete: !!t.incomplete, questions: openQuestions(t).map((q) => q.text),
       crit: [crit.done, crit.total], excerpt: excerpt(t), archived: t._archived,
-      completed: t.completed || '', updated: t.updated || '', lastLog: lastLog(t),
+      completed: t.completed || '', updated: t.updated || '', created: t.created || '', lastLog: lastLog(t),
       file: relFromWorks(root, t._file),
       thumb: imgs.length ? relFromWorks(root, path.resolve(t._dir, imgs[imgs.length - 1].src)) : '',
       thumbAlt: imgs.length ? imgs[imgs.length - 1].alt : '',

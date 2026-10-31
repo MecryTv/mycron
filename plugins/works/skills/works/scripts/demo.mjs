@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { exists } from './lib.mjs';
+import { exists, loadTasks, saveTask, today } from './lib.mjs';
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), 'works.mjs');
 
@@ -128,8 +128,29 @@ export function seedDemo(root) {
   w(root, ['idea', '--text=Leaderboard mit Wochenranking', '--tags=dashboard']);
   w(root, ['idea', '--text=Turnierkalender als iCal exportieren']);
   w(root, ['idea', '--text=Statistiken je Spieler nach jedem Match']);
+  // Bereits früher erledigte Arbeit, damit Fortschritt und Verlauf etwas zeigen.
+  for (const [title, type] of [['Bot auf discord.js 14 migriert', 'refactor'], ['Datenbank auf PostgreSQL mit Prisma umgestellt', 'chore'], ['Verifizierung über Forum-Tickets', 'feature']]) {
+    const id = newId(w(root, ['new', `--type=${type}`, `--title=${title}`, '--priority=P2', '--effort=M', '--tags=bot']));
+    w(root, ['start', id]);
+    w(root, ['done', id, '--confirm', '--force', '--reason=Demo']);
+    tasks[`old-${id}`] = id;
+  }
+  backdate(root);
   fs.rmSync(path.join(root, '.works', '.tmp'), { recursive: true, force: true });
   return tasks;
+}
+
+// Verteilt Anlage- und Abschlussdaten über die letzten Wochen, nur für die Demo.
+function backdate(root) {
+  const shift = (days) => { const d = new Date(today() + 'T00:00:00'); d.setDate(d.getDate() - days); return d.toLocaleDateString('sv-SE'); };
+  const plan = { 'W-0001': 40, 'W-0002': 12, 'W-0003': 30, 'W-0004': 26, 'W-0005': 33, 'W-0006': 19, 'W-0007': 15, 'W-0008': 9, 'W-0009': 22, 'W-0010': 6, 'W-0011': 3, 'W-0012': 55, 'W-0013': 52, 'W-0014': 47 };
+  const done = { 'W-0005': 4, 'W-0012': 38, 'W-0013': 24, 'W-0014': 11 };
+  for (const t of loadTasks(root)) {
+    if (plan[t.id] === undefined) continue;
+    t.created = shift(plan[t.id]);
+    if (done[t.id] !== undefined) t.completed = shift(done[t.id]);
+    saveTask(t, { touch: false });
+  }
 }
 
 // Spielt nacheinander Änderungen vor, wie Claude sie während der Arbeit macht.

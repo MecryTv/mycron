@@ -52,9 +52,21 @@ Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Se
 - Kopfzeile: Projekt, Verbindungsstatus, Suche (Taste `/`), Nächste Aufgabe, Ideen, Aktivität, Farbschema (System, Hell, Dunkel) und Neue Aufgabe (Taste `N`).
 - Flussleiste: Verteilung aller Aufgaben auf die Status. Ein Klick springt zur Spalte.
 - Hinweise darunter: offene P1, blockierte, überfällige, Aufgaben mit offenen Fragen und unvollständig erfasste. Ein Klick filtert.
-- Filter: Priorität, Typ, Tag, Archiv und Verworfene.
-- Meilensteine: Fortschritt, erledigt und offen, Zieldatum. Klick filtert, Rechtsklick bearbeitet, "Meilenstein anlegen" legt einen neuen an.
+- Filter: Priorität, Typ, Tag, Meilenstein, Archiv und Verworfene. Im Meilenstein-Filter lassen sich auch Meilensteine anlegen; ist einer gewählt, erscheint "Meilenstein bearbeiten".
+- Fortschritt: Anteil erledigter Aufgaben in Prozent, Balken für erledigt, in Arbeit und Review sowie noch offen, erfüllte Akzeptanzkriterien, Bilanz der letzten 7 Tage, eine Prognose aus dem Tempo der letzten 4 Wochen und ein Verlaufsdiagramm über 8 Wochen (angelegte gegen erledigte Aufgaben). Die Anzeige folgt den Filtern: Ist ein Meilenstein gewählt, zeigt sie dessen Fortschritt samt Zieldatum. Verworfene Aufgaben zählen nicht mit, erledigte im Archiv schon.
 - Spalten mit Karten. Karten zeigen ID, Typ, Aufwand, Priorität, Titel, letztes Bild, Fortschritt der Akzeptanzkriterien, Blockaden, Fälligkeit, offene Fragen, Meilenstein und Tags.
+
+## Schnellsuche
+
+Rechte Shift-Taste kurz drücken und loslassen, oder Strg+K (auf dem Mac Cmd+K), öffnet eine Suche wie bei GitHub.
+
+- Ohne Eingabe: offene Aufgaben nach Wichtigkeit und häufige Befehle.
+- Text: sucht in ID, Titel, Tags, Typ und Meilenstein. Enter öffnet die Aufgabe.
+- `#`: Tags, Enter filtert danach.
+- `>`: Befehle, etwa Neue Aufgabe, Ideen, Farbschema, Filter nach Priorität oder Meilenstein, Zu Spalte springen.
+- Pfeiltasten wählen, Esc schließt.
+
+Beim Tippen von Großbuchstaben mit der rechten Shift-Taste öffnet sich nichts, weil dabei eine weitere Taste gedrückt wird. In Eingabefeldern ist die Shift-Abkürzung aus; Strg+K funktioniert dort weiterhin.
 
 ## Bearbeiten im Board
 
@@ -73,7 +85,7 @@ Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Se
 | Verlauf | Notiz schreiben | `works log` |
 | Archivieren | Bei erledigten und verworfenen Aufgaben | `works archive` |
 | Ideen | Notieren, als Aufgabe übernehmen (Typ und Priorität wählen), verwerfen | `works idea`, `promote`, `idea-drop` |
-| Meilensteine | Anlegen und bearbeiten | `works milestone add`, `milestone set` |
+| Meilensteine | Im Meilenstein-Filter anlegen, gewählten Meilenstein bearbeiten, oder über die Schnellsuche | `works milestone add`, `milestone set` |
 | Nächste Aufgabe | Vorschläge mit Begründung, direkt starten | `works next`, `works start` |
 
 Verschieben im Detail:
@@ -130,7 +142,7 @@ Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen d
 
 ## Meilensteine
 
-Meilensteine fassen Aufgaben zu einem Ziel zusammen, etwa einem Release oder dem Livegang. Angelegt werden sie im Board oder mit `works milestone add M1 --title "Livegang" --due 2026-11-15`, zugeordnet im Detailpanel oder mit `works set <ID> milestone=M1`. Verworfene Aufgaben zählen nicht mit.
+Meilensteine fassen Aufgaben zu einem Ziel zusammen, etwa einem Release oder dem Livegang. Im Board erscheinen sie als Filter; mit gewähltem Meilenstein zeigt die Fortschrittsanzeige dessen Stand. Angelegt werden sie im Board oder mit `works milestone add M1 --title "Livegang" --due 2026-11-15`, zugeordnet im Detailpanel oder mit `works set <ID> milestone=M1`. Verworfene Aufgaben zählen nicht mit.
 
 ## Darstellung
 

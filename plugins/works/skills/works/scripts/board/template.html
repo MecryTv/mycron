@@ -42,11 +42,13 @@
   <div class="prio-filter" id="prioFilter" role="group" aria-label="Priorität"></div>
   <select id="typeFilter" aria-label="Typ"><option value="">Alle Typen</option></select>
   <select id="tagFilter" aria-label="Tag"><option value="">Alle Tags</option></select>
+  <select id="msFilter" aria-label="Meilenstein"><option value="">Alle Meilensteine</option></select>
+  <button class="btn small ghost" id="msEdit" hidden data-live>Meilenstein bearbeiten</button>
   <label class="toggle"><input type="checkbox" id="showClosed"> Archiv und Verworfene</label>
   <button class="btn link" id="resetFilters" hidden>Filter zurücksetzen</button>
 </section>
 
-<section class="milestones" id="milestones" aria-label="Meilensteine"></section>
+<section class="progress" id="progress" aria-label="Fortschritt"></section>
 
 <main class="board" id="board" tabindex="-1"></main>
 
@@ -61,6 +63,17 @@
 
 <dialog id="dialog"><form method="dialog" id="dialogForm"></form></dialog>
 <div class="toasts" id="toasts" aria-live="polite"></div>
+
+<div class="palette" id="palette" hidden>
+  <div class="pal-box" role="dialog" aria-modal="true" aria-label="Schnellsuche">
+    <div class="pal-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="palIn" type="text" autocomplete="off" spellcheck="false" placeholder="Aufgabe suchen, # für Tags, &gt; für Befehle" role="combobox" aria-expanded="true" aria-controls="palList">
+    </div>
+    <ul id="palList" role="listbox"></ul>
+    <div class="pal-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> auswählen</span><span><kbd>Enter</kbd> öffnen</span><span><kbd>Esc</kbd> schließen</span><span class="spacer"></span><span>Öffnen mit rechter <kbd>Shift</kbd> oder <kbd>Strg</kbd> <kbd>K</kbd></span></div>
+  </div>
+</div>
 
 <script>/*__BOOT__*/</script>
 <script>/*__JS__*/</script>

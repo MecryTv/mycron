@@ -216,26 +216,97 @@
     $('#resetFilters').hidden = !filtersActive();
   }
 
-  function renderMilestones() {
-    const box = $('#milestones');
-    const items = meta.milestones.map((m) => {
-      const late = m.due && m.status !== 'erledigt' && m.due < today() && m.open > 0;
-      const dueTxt = m.due ? (late ? 'Ziel ' + fmtDate(m.due) + ' überschritten' : 'Ziel ' + fmtDate(m.due)) : 'Kein Zieldatum';
-      return '<button class="ms" data-ms="' + esc(m.id) + '" aria-pressed="' + (state.ms === m.id) + '" title="Meilenstein ' + esc(m.id) + ': klicken, um nur seine Aufgaben zu zeigen">' +
-        '<span class="t"><small>' + esc(m.id) + '</small>' + esc(m.title) + '</span><span class="pct">' + m.pct + ' %</span>' +
-        '<span class="sub">' + (m.total ? m.done + ' von ' + m.total + ' erledigt, ' + m.open + ' offen' : 'Noch keine Aufgaben zugeordnet') + '</span>' +
-        '<span class="sub' + (late ? ' late' : '') + '">' + esc(dueTxt) + (m.status === 'erledigt' ? ', abgeschlossen' : '') + '</span>' +
-        '<span class="track"><span style="width:' + m.pct + '%"></span></span></button>';
-    });
-    if (LIVE) items.push('<button class="ms add" id="msAdd">Meilenstein anlegen</button>');
-    box.innerHTML = items.join('');
-    box.hidden = !items.length;
-    $$('.ms[data-ms]', box).forEach((b) => {
-      b.onclick = () => { state.ms = state.ms === b.dataset.ms ? '' : b.dataset.ms; renderAll(); };
-      if (LIVE) b.oncontextmenu = (e) => { e.preventDefault(); editMilestone(b.dataset.ms); };
-    });
-    const add = $('#msAdd');
-    if (add) add.onclick = () => editMilestone(null);
+  // ---------- Fortschritt ----------
+
+  // Zählt alle Aufgaben, die den Filtern entsprechen, unabhängig vom Status. Erledigte im Archiv zählen mit,
+  // verworfene nicht. So zeigt die Anzeige bei gewähltem Meilenstein genau dessen Fortschritt.
+  function scopeTasks() {
+    const saved = state.closed;
+    state.closed = true;
+    const list = tasks.filter((t) => match(t) && t.status !== 'verworfen');
+    state.closed = saved;
+    return list;
+  }
+
+  const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };
+
+  function burnup(list, weeks = 8) {
+    const end = today();
+    const points = [];
+    for (let i = weeks; i >= 0; i--) {
+      const d = addDays(end, -7 * i);
+      points.push({
+        d,
+        total: list.filter((t) => t.created && t.created <= d).length,
+        done: list.filter((t) => t.status === 'erledigt' && (t.completed || t.updated) <= d).length,
+      });
+    }
+    return points;
+  }
+
+  function chartSvg(points) {
+    const W = 320; const H = 96; const P = 4;
+    const max = Math.max(1, ...points.map((p) => p.total));
+    const x = (i) => P + (i * (W - 2 * P)) / (points.length - 1);
+    const y = (v) => H - P - (v * (H - 2 * P)) / max;
+    const line = (key) => points.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p[key]).toFixed(1)).join(' ');
+    const area = line('done') + ' L' + x(points.length - 1).toFixed(1) + ' ' + (H - P) + ' L' + x(0).toFixed(1) + ' ' + (H - P) + ' Z';
+    const dots = points.map((p, i) => '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.done).toFixed(1) + '" r="2.5" class="c-dot"><title>' + esc(fmtDate(p.d)) + ': ' + p.done + ' von ' + p.total + ' erledigt</title></circle>').join('');
+    const grid = [0.5, 1].map((f) => '<line x1="' + P + '" x2="' + (W - P) + '" y1="' + y(max * f).toFixed(1) + '" y2="' + y(max * f).toFixed(1) + '" class="c-grid"/>').join('');
+    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Verlauf der letzten 8 Wochen: ' + points[points.length - 1].done + ' von ' + points[points.length - 1].total + ' erledigt">' +
+      grid + '<path d="' + area + '" class="c-area"/><path d="' + line('total') + '" class="c-total"/><path d="' + line('done') + '" class="c-done"/>' + dots + '</svg>';
+  }
+
+  function renderProgress() {
+    const box = $('#progress');
+    const list = scopeTasks();
+    if (!list.length) { box.innerHTML = ''; box.hidden = true; return; }
+    box.hidden = false;
+    const n = (s) => list.filter((t) => t.status === s).length;
+    const total = list.length;
+    const done = n('erledigt');
+    const pct = Math.round((done / total) * 100);
+    const working = n('review') + n('in-arbeit');
+    const waiting = total - done - working;
+    const crit = list.reduce((a, t) => [a[0] + t.crit[0], a[1] + t.crit[1]], [0, 0]);
+    const weekAgo = addDays(today(), -7);
+    const doneWeek = list.filter((t) => t.status === 'erledigt' && (t.completed || '') > weekAgo).length;
+    const newWeek = list.filter((t) => (t.created || '') > weekAgo).length;
+    const fourWeeks = addDays(today(), -28);
+    const rate = list.filter((t) => t.status === 'erledigt' && (t.completed || '') > fourWeeks).length / 4;
+    const open = total - done;
+    const eta = !open ? 'Alles erledigt' : rate > 0 ? 'Bei diesem Tempo noch etwa ' + Math.max(1, Math.ceil(open / rate)) + (Math.ceil(open / rate) === 1 ? ' Woche' : ' Wochen') : 'Tempo noch nicht messbar';
+    const ms = state.ms ? meta.milestones.find((m) => m.id === state.ms) : null;
+    const scope = ms ? 'Meilenstein ' + ms.id + ' ' + ms.title : filtersActive() ? 'Gefilterte Aufgaben' : 'Gesamtes Projekt';
+    const late = ms && ms.due && ms.due < today() && open > 0;
+    const points = burnup(list);
+    box.innerHTML =
+      '<div class="pg-main">' +
+        '<div class="pg-head"><span class="pg-pct num">' + pct + '<small>%</small></span><span class="pg-title"><strong>Fortschritt</strong><span>' + esc(scope) + (ms && ms.due ? ', Ziel ' + esc(fmtDate(ms.due)) : '') + '</span></span></div>' +
+        '<div class="pg-bar" role="img" aria-label="' + done + ' von ' + total + ' Aufgaben erledigt, ' + working + ' in Arbeit oder Review">' +
+          (done ? '<span class="pg-done" style="flex-grow:' + done + '" title="Erledigt: ' + done + '"></span>' : '') +
+          (working ? '<span class="pg-work" style="flex-grow:' + working + '" title="In Arbeit oder Review: ' + working + '"></span>' : '') +
+          (waiting ? '<span class="pg-wait" style="flex-grow:' + waiting + '" title="Noch offen: ' + waiting + '"></span>' : '') +
+        '</div>' +
+        '<div class="pg-legend"><span class="pg-k"><i class="pg-done"></i>Erledigt <b class="num">' + done + '</b></span><span class="pg-k"><i class="pg-work"></i>In Arbeit und Review <b class="num">' + working + '</b></span><span class="pg-k"><i class="pg-wait"></i>Noch offen <b class="num">' + waiting + '</b></span></div>' +
+      '</div>' +
+      '<dl class="pg-stats">' +
+        '<div><dt>Erledigt</dt><dd class="num">' + done + ' von ' + total + '</dd></div>' +
+        '<div><dt>Kriterien erfüllt</dt><dd class="num">' + (crit[1] ? crit[0] + ' von ' + crit[1] : 'keine') + '</dd></div>' +
+        '<div><dt>Letzte 7 Tage</dt><dd class="num">' + doneWeek + ' erledigt, ' + newWeek + ' neu</dd></div>' +
+        '<div><dt>Prognose</dt><dd class="' + (late ? 'late' : '') + '">' + esc(late ? 'Zieldatum überschritten, ' + eta : eta) + '</dd></div>' +
+      '</dl>' +
+      '<figure class="pg-chart"><figcaption><span>Letzte 8 Wochen</span><span class="lg"><i class="lg-done"></i>erledigt <i class="lg-total"></i>angelegt</span></figcaption>' + chartSvg(points) +
+        '<div class="c-axis"><span>' + esc(fmtDate(points[0].d)) + '</span><span>heute</span></div></figure>';
+  }
+
+  function renderMsFilter() {
+    const sel2 = $('#msFilter');
+    const opts = '<option value="">Alle Meilensteine</option>' + meta.milestones.map((m) => '<option value="' + esc(m.id) + '">' + esc(m.id + ' ' + m.title) + ' (' + m.done + '/' + m.total + ')</option>').join('') + (LIVE ? '<option value="__new">Meilenstein anlegen …</option>' : '');
+    sel2.innerHTML = opts;
+    sel2.value = meta.milestones.some((m) => m.id === state.ms) ? state.ms : '';
+    sel2.hidden = !meta.milestones.length && !LIVE;
+    $('#msEdit').hidden = !LIVE || !state.ms;
   }
 
   // ---------- Spalten und Karten ----------
@@ -334,7 +405,7 @@
   let pendingOpen = null;
 
   function renderAll(arrived) {
-    renderHeader(); renderOverview(); renderFilters(); renderMilestones(); renderBoard(arrived);
+    renderHeader(); renderOverview(); renderFilters(); renderMsFilter(); renderProgress(); renderBoard(arrived);
   }
 
   // ---------- Drag and Drop ----------
@@ -981,6 +1052,144 @@
     el.hidden = false; el.classList.toggle('off', !okState); el.textContent = text;
   }
 
+  // ---------- Schnellsuche (rechte Shift-Taste oder Strg+K) ----------
+
+  const pal = $('#palette');
+  const palIn = $('#palIn');
+  const palList = $('#palList');
+  let palItems = [];
+  let palSel = 0;
+
+  function paletteCommands() {
+    const c = [];
+    if (LIVE) {
+      c.push({ label: 'Neue Aufgabe', hint: 'N', run: () => newTask() });
+      c.push({ label: 'Nächste Aufgabe vorschlagen', run: () => openSide('next') });
+      c.push({ label: 'Ideen öffnen', run: () => openSide('ideas') });
+      c.push({ label: 'Aktivität anzeigen', run: () => openSide('activity') });
+      c.push({ label: 'Meilenstein anlegen', run: () => editMilestone(null) });
+    }
+    c.push({ label: 'Farbschema wechseln', run: () => $('#btnTheme').click() });
+    c.push({ label: state.closed ? 'Archiv und Verworfene ausblenden' : 'Archiv und Verworfene anzeigen', run: () => { state.closed = !state.closed; renderAll(); } });
+    if (filtersActive()) c.push({ label: 'Filter zurücksetzen', run: resetFilters });
+    PRIOS.forEach((p) => c.push({ label: 'Nur ' + p + ' ' + meta.prioLabel[p] + ' zeigen', run: () => { state.prios = new Set([p]); renderAll(); } }));
+    meta.milestones.forEach((m) => c.push({ label: 'Meilenstein ' + m.id + ' ' + m.title + ' filtern', run: () => { state.ms = m.id; renderAll(); } }));
+    COLS.forEach((s) => c.push({ label: 'Zu Spalte ' + L(s) + ' springen', run: () => { const col = $('.col[data-col="' + s + '"]'); if (col) col.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', inline: 'start', block: 'nearest' }); } }));
+    return c.map((x) => ({ ...x, kind: 'cmd' }));
+  }
+
+  function mark(text, q) {
+    if (!q) return esc(text);
+    const i = text.toLowerCase().indexOf(q);
+    if (i === -1) return esc(text);
+    return esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length));
+  }
+
+  function scoreTask(t, q) {
+    if (!q) return OPEN.includes(t.status) ? 10 - PRIOS.indexOf(t.priority) + (t.status === 'in-arbeit' ? 5 : 0) : -1;
+    const id = t.id.toLowerCase(); const title = t.title.toLowerCase();
+    const words = q.split(/\s+/).filter(Boolean);
+    const hay = id + ' ' + title + ' ' + t.tags.join(' ') + ' ' + (meta.typeLabel[t.type] || '').toLowerCase() + ' ' + (t.milestone || '').toLowerCase();
+    if (!words.every((w) => hay.includes(w))) return -1;
+    let s = 0;
+    if (id === q || id.replace('-', '') === q.replace('-', '')) s += 100;
+    else if (id.includes(q)) s += 60;
+    if (title.startsWith(q)) s += 40; else if (title.includes(q)) s += 25;
+    if (OPEN.includes(t.status)) s += 8;
+    s += 4 - PRIOS.indexOf(t.priority);
+    return s;
+  }
+
+  function renderPalette() {
+    const raw = palIn.value.trim();
+    let items = [];
+    if (raw.startsWith('>')) {
+      const q = raw.slice(1).trim().toLowerCase();
+      items = paletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q)).map((c) => ({ ...c, q }));
+    } else if (raw.startsWith('#')) {
+      const q = raw.slice(1).trim().toLowerCase();
+      const tags = [...new Set(tasks.flatMap((t) => t.tags))].filter((g) => !q || g.toLowerCase().includes(q)).sort();
+      items = tags.slice(0, 12).map((g) => ({ kind: 'tag', label: '#' + g, q: q ? '#' + q : '', count: tasks.filter((t) => t.tags.includes(g) && OPEN.includes(t.status)).length, run: () => { state.tag = g; renderAll(); } }));
+    } else {
+      const q = raw.toLowerCase();
+      items = tasks.map((t) => ({ t, s: scoreTask(t, q) })).filter((x) => x.s >= 0).sort((a, b) => b.s - a.s).slice(0, q ? 12 : 8)
+        .map((x) => ({ kind: 'task', t: x.t, q, run: () => focusCard(x.t.id) }));
+      const cmds = paletteCommands().filter((c) => q && c.label.toLowerCase().includes(q)).slice(0, 4).map((c) => ({ ...c, q }));
+      items = items.concat(cmds);
+      if (!q) items = items.concat(paletteCommands().slice(0, LIVE ? 4 : 2).map((c) => ({ ...c, q: '' })));
+    }
+    palItems = items;
+    palSel = Math.min(palSel, Math.max(0, items.length - 1));
+    let lastGroup = '';
+    palList.innerHTML = items.length ? items.map((it, i) => {
+      const group = it.kind === 'task' ? (raw ? 'Aufgaben' : 'Offene Aufgaben') : it.kind === 'tag' ? 'Tags' : 'Befehle';
+      const head = group !== lastGroup ? '<li class="pal-group" role="presentation">' + esc(group) + '</li>' : '';
+      lastGroup = group;
+      let body;
+      if (it.kind === 'task') {
+        const t = it.t;
+        body = '<span class="st" style="--c:' + statusVar(t.status) + '" title="' + esc(L(t.status)) + '"></span><span class="pal-id num">' + mark(t.id, it.q) + '</span><span class="pal-t">' + mark(t.title, it.q) + '</span><span class="pal-m">' + esc(L(t.status)) + '</span><span class="pal-p" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span>';
+      } else if (it.kind === 'tag') {
+        body = '<span class="pal-ic">#</span><span class="pal-t">' + mark(it.label, it.q) + '</span><span class="pal-m">' + it.count + ' offen</span>';
+      } else {
+        body = '<span class="pal-ic">›</span><span class="pal-t">' + mark(it.label, it.q) + '</span>' + (it.hint ? '<kbd>' + esc(it.hint) + '</kbd>' : '');
+      }
+      return head + '<li role="option" id="pal-' + i + '" data-i="' + i + '" aria-selected="' + (i === palSel) + '">' + body + '</li>';
+    }).join('') : '<li class="pal-empty">Keine Treffer. Mit &gt; nach Befehlen suchen, mit # nach Tags.</li>';
+    palIn.setAttribute('aria-activedescendant', items.length ? 'pal-' + palSel : '');
+    $$('li[data-i]', palList).forEach((li) => {
+      li.onmousemove = () => { if (palSel !== +li.dataset.i) { palSel = +li.dataset.i; updateSel(); } };
+      li.onclick = () => runPal(+li.dataset.i);
+    });
+  }
+  function updateSel() {
+    $$('li[data-i]', palList).forEach((li) => li.setAttribute('aria-selected', String(+li.dataset.i === palSel)));
+    const el = $('#pal-' + palSel);
+    if (el) el.scrollIntoView({ block: 'nearest' });
+    palIn.setAttribute('aria-activedescendant', 'pal-' + palSel);
+  }
+  function runPal(i) {
+    const it = palItems[i];
+    if (!it) return;
+    closePalette();
+    it.run();
+  }
+  function openPalette(prefix = '') {
+    if (dlg.open) return;
+    pal.hidden = false;
+    palIn.value = prefix;
+    palSel = 0;
+    renderPalette();
+    palIn.focus();
+  }
+  function closePalette() { pal.hidden = true; }
+  palIn.oninput = () => { palSel = 0; renderPalette(); };
+  palIn.onkeydown = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); palSel = Math.min(palItems.length - 1, palSel + 1); updateSel(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); palSel = Math.max(0, palSel - 1); updateSel(); }
+    else if (e.key === 'Enter') { e.preventDefault(); runPal(palSel); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePalette(); }
+  };
+  pal.onclick = (e) => { if (e.target === pal) closePalette(); };
+
+  // Rechte Shift-Taste allein gedrückt und losgelassen öffnet die Suche. Beim Tippen von Großbuchstaben
+  // wird eine andere Taste dazwischen gedrückt, dann passiert nichts.
+  let shiftAlone = false;
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'ShiftRight' && !e.repeat) shiftAlone = true;
+    else shiftAlone = false;
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); if (pal.hidden) openPalette(); else closePalette(); }
+  }, true);
+  document.addEventListener('keyup', (e) => {
+    if (e.code !== 'ShiftRight' || !shiftAlone) return;
+    shiftAlone = false;
+    const a = document.activeElement;
+    const typing = a && a !== palIn && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable);
+    if (typing) return;
+    if (pal.hidden) openPalette(); else closePalette();
+  }, true);
+  document.addEventListener('mousedown', () => { shiftAlone = false; }, true);
+
   // ---------- Start ----------
 
   function applyTheme() {
@@ -1003,14 +1212,20 @@
   };
   applyTheme();
 
-  $('#q').oninput = (e) => { state.q = e.target.value.toLowerCase().trim(); renderOverview(); renderFilters(); renderBoard(); };
+  $('#q').oninput = (e) => { state.q = e.target.value.toLowerCase().trim(); renderOverview(); renderFilters(); renderProgress(); renderBoard(); };
   $('#typeFilter').onchange = (e) => { state.type = e.target.value; renderAll(); };
   $('#tagFilter').onchange = (e) => { state.tag = e.target.value; renderAll(); };
   $('#showClosed').onchange = (e) => { state.closed = e.target.checked; renderAll(); };
   $('#resetFilters').onclick = resetFilters;
+  $('#msFilter').onchange = (e) => {
+    if (e.target.value === '__new') { e.target.value = state.ms; editMilestone(null); return; }
+    state.ms = e.target.value; renderAll();
+  };
+  $('#msEdit').onclick = () => { if (state.ms) editMilestone(state.ms); };
 
   document.addEventListener('keydown', (e) => {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
+    if (e.key === 'Escape' && !pal.hidden) return;
     if (e.key === 'Escape' && !dlg.open) { if (!panel.hidden) closePanel(); else if (!sidePanel.hidden) closeSide(); return; }
     if (typing || dlg.open || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === '/') { e.preventDefault(); $('#q').focus(); }
