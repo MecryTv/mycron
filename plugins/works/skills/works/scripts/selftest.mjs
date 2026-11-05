@@ -247,6 +247,20 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     skip('Dateien und Parallelarbeit', 'Git fehlt');
   }
 
+  await step('Befehl works ohne Claude: install-cli, Aufruf aus beliebigem Ordner, uninstall', () => {
+    const bin = path.join(home, 'bin');
+    has(w(['install-cli', `--dir=${bin}`, '--no-path']).out, 'eingerichtet');
+    const shim = path.join(bin, process.platform === 'win32' ? 'works.cmd' : 'works');
+    expect(fs.existsSync(shim), `${shim} fehlt`);
+    const other = path.join(base, 'anderswo'); fs.mkdirSync(other);
+    const r = process.platform === 'win32'
+      ? spawnSync('cmd.exe', ['/d', '/s', '/c', `"${shim}" init`], { cwd: other, env, encoding: 'utf8', windowsVerbatimArguments: true })
+      : spawnSync(shim, ['init'], { cwd: other, env, encoding: 'utf8' });
+    expect(r.status === 0 && fs.existsSync(path.join(other, '.works', 'config.json')), `Aufruf über ${path.basename(shim)}: ${r.stderr || r.stdout}`);
+    has(w(['install-cli', '--uninstall', `--dir=${bin}`]).out, 'Entfernt');
+    expect(!fs.existsSync(shim), 'Befehl nach --uninstall noch vorhanden');
+  });
+
   // ---------- Server und API ----------
   let port = 0;
   await step('Live-Board: Start, Seite, Daten, API, Rückgängig, Stopp', async () => {

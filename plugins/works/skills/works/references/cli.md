@@ -12,6 +12,8 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 |---|---|
 | `init [--gitignore default\|assets\|all\|none] [--prefix W] [--path dir] [--force]` | Legt `.works/` mit allen Unterordnern, config.json, ideas.md und WORKS.md an |
 | `install-hooks [--claude] [--git] [--scope user\|project\|local] [--dry-run]` | Richtet die Hooks ein, siehe hooks.md |
+| `install-cli [--dir ordner] [--no-path] [--dry-run] [--uninstall]` | Befehl `works` im Terminal ohne Claude: Startscript in `~/.works/bin`, Aufruf in `~/.local/bin` (Windows: `works.cmd` und `works.ps1` in `%USERPROFILE%\.works\bin`), PATH-Eintrag falls nötig. Das Startscript nimmt immer die neueste installierte Version. `works which` zeigt die verwendete Installation |
+| `version`, `--version` | Version und Pfad des CLI |
 
 ## Erfassen
 

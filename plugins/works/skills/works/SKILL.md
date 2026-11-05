@@ -102,6 +102,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Wer hat diese Datei zuletzt geändert, was wurde dort entschieden | `works file <pfad>`, `works files <ID>` | `references/cli.md` |
 | Aufgaben aus Trello, Notion, Linear, CSV, Excel, Word, Liste übernehmen | `works import <datei>`, prüfen, dann `--apply` | `references/import.md` |
 | Funktioniert works noch, nach einem Update oder bei Fehlern | `works selftest` | `references/cli.md` |
+| works ohne Claude nutzen, Befehl `works` im Terminal | `works install-cli`. Ändert den PATH (Shell-Konfiguration oder Windows-Benutzer-PATH), das vorher kurz sagen. Danach in jedem Ordner `works board --serve --open` | `references/cli.md` |
 | Struktur prüfen, Fehler vermuten | `works doctor`, bei Bedarf `--fix` | `references/cli.md` |
 | Hooks einrichten | Bei Plugin-Installation nur `works install-hooks --git`, sonst nach Rückfrage `works install-hooks` | `references/hooks.md` |
 

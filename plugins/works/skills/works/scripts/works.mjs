@@ -50,7 +50,7 @@ const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
 const ASSET_KINDS = ['ist', 'vorher', 'nachher', 'referenz', 'mockup', 'skizze', 'fehler', 'diagramm'];
 
 const { pos, flags } = parseArgs(process.argv.slice(2));
-const cmd = pos.shift() || 'help';
+const cmd = pos.shift() || (flags.version ? 'version' : 'help');
 
 const out = (s = '') => process.stdout.write(s + '\n');
 // Ausgabe in eine geschlossene Pipe (etwa | head) ist kein Fehler.
@@ -1742,6 +1742,8 @@ function cmdHelp() {
 Einrichtung
   init [--gitignore default|assets|all|none] [--prefix W]
   install-hooks [--claude] [--git] [--scope user|project|local] [--dry-run]
+  install-cli [--dir ordner] [--no-path] [--dry-run] [--uninstall]   Befehl works im Terminal, ohne Claude
+  version
 
 Erfassen
   new --type <typ> --title "..." [--priority P1-P4] [--effort S|M|L|XL] [--risk niedrig|mittel|hoch]
@@ -2581,6 +2583,29 @@ function cmdParallel() {
   } catch (e) { fail(e.message); }
 }
 
+async function cmdInstallCli() {
+  const { installCli, uninstallCli } = await import('./cli-install.mjs');
+  if (flags.uninstall || flags.remove) {
+    const r = uninstallCli({ dir: flags.dir && flags.dir !== true ? String(flags.dir) : undefined, dryRun: !!flags['dry-run'] });
+    out(r.length ? `Entfernt${flags['dry-run'] ? ' (Probelauf)' : ''}:\n${r.map((x) => `  ${x}`).join('\n')}` : 'Der Befehl works war nicht eingerichtet.');
+    return;
+  }
+  const r = installCli({ dir: flags.dir && flags.dir !== true ? String(flags.dir) : undefined, path: !flags['no-path'], dryRun: !!flags['dry-run'] });
+  out(`Befehl works eingerichtet${flags['dry-run'] ? ' (Probelauf, nichts geschrieben)' : ''}.`);
+  for (const n of r.notes) out(`  ${n}`);
+  if (r.pathChanged) out(`  PATH ergänzt in: ${r.pathChanged}`);
+  out('');
+  if (r.onPath) out('Ab sofort in jedem Ordner: works board --serve --open, works new --title "...", works hub, works help');
+  else out(`Neues Terminal öffnen${process.platform === 'win32' ? '' : ` oder einmal: export PATH="${r.shimDir}:$PATH"`}. Danach in jedem Ordner: works board --serve --open, works new --title "...", works hub, works help`);
+  out('Das Startscript nimmt immer die neueste installierte works-Version, auch nach Plugin-Updates. Entfernen mit works install-cli --uninstall.');
+}
+
+function cmdVersion() {
+  out(`works ${cliVersion(path.join(SKILL_DIR, 'scripts', 'works.mjs'))}`);
+  out(`CLI: ${path.join(SKILL_DIR, 'scripts', 'works.mjs')}`);
+  out(`Node ${process.version}`);
+}
+
 async function cmdSelftest() {
   const { selftest } = await import('./selftest.mjs');
   const r = await selftest({ keep: !!flags.keep, browser: !!flags.browser, verbose: !!flags.verbose });
@@ -2604,7 +2629,7 @@ const commands = {
   templates: cmdTemplate, time: cmdTime, checks: cmdChecks,
   design: cmdDesign, instruct: cmdInstruct, know: cmdKnow, wissen: cmdKnow, recur: cmdRecur, hub: cmdHub,
   github: cmdGithub, gh: cmdGithub, ical: cmdIcal, undo: cmdUndo,
-  file: cmdFile, files: cmdFiles, parallel: cmdParallel, par: cmdParallel, import: cmdImport, selftest: cmdSelftest,
+  file: cmdFile, files: cmdFiles, parallel: cmdParallel, par: cmdParallel, import: cmdImport, selftest: cmdSelftest, 'install-cli': cmdInstallCli, version: cmdVersion, '--version': cmdVersion,
 };
 
 const fn = commands[cmd];

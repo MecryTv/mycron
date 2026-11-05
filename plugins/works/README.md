@@ -23,7 +23,7 @@ Es braucht nur Node.js 18 oder neuer, keine Datenbank, keinen Account und keine 
 - [Berichte](#berichte)
 - [Teilen](#teilen)
 - [Kalender und alle Projekte](#kalender-und-alle-projekte)
-- [Befehle im Terminal](#befehle-im-terminal)
+- [Befehle im Terminal und ohne Claude](#befehle-im-terminal)
 - [Einstellungen](#einstellungen)
 - [Hooks](#hooks)
 - [Sicherheit und Datenschutz](#sicherheit-und-datenschutz)
@@ -305,17 +305,38 @@ Dazu zählt der Stop Hook die Tokens jeder Antwort: Eingabe, Ausgabe, Cache-Schr
 
 ## Befehle im Terminal
 
-Claude ruft die Befehle selbst auf. Du kannst sie auch direkt nutzen:
+Claude ruft die Befehle selbst auf. Du kannst works aber auch ganz ohne Claude nutzen. Einmal einrichten, zum Beispiel indem du Claude sagst "Richte den works Befehl ein", oder selbst:
 
 ```
-node "<Pfad zum Skill>/scripts/works.mjs" <befehl>
+node "<Pfad zum Skill>/scripts/works.mjs" install-cli
 ```
 
-Den Pfad nennt dir Claude auf Nachfrage. Unter Windows funktioniert derselbe Aufruf in PowerShell.
+Danach gibt es in jedem Terminal und jedem Ordner den Befehl `works`:
+
+```
+works init                          works im aktuellen Ordner einrichten
+works board --serve --open          Live-Board starten und im Browser öffnen
+works new --type bug --title "..."  Aufgabe anlegen
+works list                          offene Aufgaben
+works hub                           alle Projekte
+works help                          alle Befehle
+```
+
+Im Board legst du Aufgaben an, bearbeitest, sortierst und importierst sie wie gewohnt. Arbeitet Claude später im Projekt, sieht es alles, was du ohne Claude angelegt hast.
+
+Was `install-cli` macht:
+
+- Ein Startscript in `~/.works/bin`, das bei jedem Aufruf die neueste installierte works-Version sucht. Nach einem Plugin-Update gilt also sofort die neue Version.
+- Linux und macOS: den Befehl in `~/.local/bin/works`. Steht der Ordner nicht im PATH, ergänzt `install-cli` eine Zeile in `.bashrc` oder `.zshrc`.
+- Windows: `works.cmd` und `works.ps1` in `%USERPROFILE%\.works\bin`. Der Ordner kommt in den PATH deines Benutzers. Danach ein neues Terminal öffnen.
+
+Mit `--no-path` bleibt der PATH unverändert, mit `--dir` wählst du einen eigenen Ordner, mit `--uninstall` entfernst du alles wieder. `works which` zeigt, welche Installation gerade verwendet wird, `works version` die Version.
+
+Ohne Claude fehlen nur die Hooks: Zeit, Tokens und die Anzeige "Claude arbeitet" entstehen nur in Sitzungen mit Claude.
 
 | Bereich | Befehle |
 |---|---|
-| Einrichten | `init`, `doctor [--fix]`, `install-hooks`, `demo`, `selftest` |
+| Einrichten | `init`, `doctor [--fix]`, `install-hooks`, `install-cli`, `demo`, `selftest`, `version` |
 | Erfassen | `new`, `idea`, `promote`, `scan`, `gh-import`, `recur`, `import` |
 | Ansehen | `list`, `show`, `next`, `status`, `views` |
 | Arbeiten | `start`, `set`, `section`, `check`, `item`, `log`, `question`, `link`, `handoff`, `asset`, `decisions`, `design`, `know`, `instruct` |
