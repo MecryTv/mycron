@@ -12,7 +12,7 @@ const hintsFile = (root) => path.join(worksDir(root), '.file-hints.json');
 const EDIT_TOOLS = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit']);
 
 function git(root, args, timeout = 8000) {
-  try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', timeout, maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return null; }
+  try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', timeout, maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }); } catch { return null; }
 }
 
 // Pfad relativ zur Projektwurzel mit Schrägstrichen, oder '' für Dateien außerhalb und in .works.

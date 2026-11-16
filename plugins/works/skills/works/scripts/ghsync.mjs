@@ -16,12 +16,12 @@ const stateFile = (root) => path.join(worksDir(root), 'github.json');
 export function syncState(root) { return readJson(stateFile(root), null); }
 
 function gh(root, args, timeout = 15000) {
-  const r = spawnSync('gh', args, { cwd: root, encoding: 'utf8', timeout, maxBuffer: 16 * 1024 * 1024 });
+  const r = spawnSync('gh', args, { cwd: root, encoding: 'utf8', timeout, maxBuffer: 16 * 1024 * 1024, windowsHide: true });
   return { ok: r.status === 0, out: r.stdout || '', err: (r.stderr || '') + (r.error ? r.error.message : '') };
 }
 
 function works(root, args) {
-  const r = spawnSync(process.execPath, [CLI, ...args], { cwd: root, encoding: 'utf8', timeout: 60000, env: { ...process.env, WORKS_ACTOR: 'GitHub' } });
+  const r = spawnSync(process.execPath, [CLI, ...args], { cwd: root, encoding: 'utf8', timeout: 60000, windowsHide: true, env: { ...process.env, WORKS_ACTOR: 'GitHub' } });
   return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || '').trim() };
 }
 

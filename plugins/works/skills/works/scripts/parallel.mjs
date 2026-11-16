@@ -23,7 +23,7 @@ export function laneOf(root, id) { return loadLanes(root).find((l) => l.task ===
 
 function git(cwd, args, { timeout = 30000, allowFail = true } = {}) {
   try {
-    return { ok: true, out: execFileSync('git', args, { cwd, encoding: 'utf8', timeout, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }) };
+    return { ok: true, out: execFileSync('git', args, { cwd, encoding: 'utf8', timeout, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }) };
   } catch (e) {
     if (!allowFail) throw new Error(String(e.stderr || e.message).trim());
     return { ok: false, out: String(e.stdout || ''), err: String(e.stderr || e.message).trim() };

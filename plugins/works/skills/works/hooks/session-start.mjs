@@ -43,14 +43,14 @@ async function main() {
   // Fällige wiederkehrende Aufgaben anlegen.
   let recurNote = '';
   if (Array.isArray(config.recurring) && config.recurring.length) {
-    const r = spawnSync(process.execPath, [CLI, 'recur', 'run'], { cwd: root, encoding: 'utf8', timeout: 20000, env: { ...process.env, WORKS_ACTOR: 'Wiederkehrend' } });
+    const r = spawnSync(process.execPath, [CLI, 'recur', 'run'], { cwd: root, encoding: 'utf8', timeout: 20000, windowsHide: true, env: { ...process.env, WORKS_ACTOR: 'Wiederkehrend' } });
     recurNote = (r.stdout || '').split('\n').filter((l) => l.startsWith('Wiederkehrend angelegt')).join('; ');
   }
   // GitHub-Abgleich im Hintergrund, damit der Start nicht wartet.
   const gs = syncSettings(config);
   const last = (syncState(root) || {}).last;
   if (gs.enabled && (!last || Date.now() - Date.parse(last) > gs.interval_min * 60000)) {
-    try { spawn(process.execPath, [CLI, 'github', 'sync', '--quiet'], { cwd: root, detached: true, stdio: 'ignore' }).unref(); } catch { /* gh fehlt */ }
+    try { spawn(process.execPath, [CLI, 'github', 'sync', '--quiet'], { cwd: root, detached: true, stdio: 'ignore', windowsHide: true }).unref(); } catch { /* gh fehlt */ }
   }
   generateIndex(root);
   refreshBoardIfPresent(root);

@@ -44,9 +44,9 @@ export function loadResults(task) { return readJson(resultFile(task), null); }
 
 // Fingerabdruck des Arbeitsstands: HEAD plus noch nicht committete Änderungen außerhalb von .works.
 export function workFingerprint(root) {
-  const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' });
+  const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true });
   if (head.status !== 0) return '';
-  const diff = spawnSync('git', ['diff', 'HEAD', '--', '.', ':(exclude).works'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const diff = spawnSync('git', ['diff', 'HEAD', '--', '.', ':(exclude).works'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true });
   return head.stdout.trim().slice(0, 12) + ':' + crypto.createHash('sha1').update(diff.stdout || '').digest('hex').slice(0, 12);
 }
 
@@ -54,7 +54,7 @@ function runOne(root, cmd) {
   return new Promise((resolve) => {
     const started = Date.now();
     const shell = process.platform === 'win32' ? ['cmd', ['/d', '/s', '/c', cmd]] : ['sh', ['-c', cmd]];
-    const child = spawn(shell[0], shell[1], { cwd: root, env: { ...process.env, CI: '1', FORCE_COLOR: '0' } });
+    const child = spawn(shell[0], shell[1], { cwd: root, windowsHide: true, env: { ...process.env, CI: '1', FORCE_COLOR: '0' } });
     let buf = '';
     const add = (d) => { buf += d; if (buf.length > TAIL * 4) buf = buf.slice(-TAIL * 2); };
     child.stdout.on('data', add); child.stderr.on('data', add);

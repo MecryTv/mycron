@@ -412,7 +412,7 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
       }
       if (open) {
         const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
-        run(opener, [url], { detached: true, stdio: 'ignore' });
+        run(opener, [url], { detached: true, stdio: 'ignore', windowsHide: false });
       }
     });
   };

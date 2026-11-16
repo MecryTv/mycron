@@ -20,7 +20,7 @@ export function cliPaths({ home = os.homedir(), dir } = {}) {
 const onPath = (dir) => String(process.env.PATH || '').split(path.delimiter).some((p) => p && path.resolve(p) === path.resolve(dir));
 
 function whichOther() {
-  const r = spawnSync(WIN ? 'where' : 'which', ['-a', 'works'].slice(WIN ? 1 : 0), { encoding: 'utf8' });
+  const r = spawnSync(WIN ? 'where' : 'which', ['-a', 'works'].slice(WIN ? 1 : 0), { encoding: 'utf8', windowsHide: true });
   return r.status === 0 ? r.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean) : [];
 }
 
@@ -53,7 +53,7 @@ export function installCli({ dir, path: addPath = true, dryRun = false, home } =
     if (!addPath) notes.push(`${p.shimDir} steht nicht im PATH. Selbst ergänzen, damit works überall funktioniert.`);
     else if (WIN) {
       const ps = `$d='${p.shimDir.replace(/'/g, "''")}'; $c=[Environment]::GetEnvironmentVariable('Path','User'); if (-not $c) { $c='' }; if (($c -split ';') -notcontains $d) { [Environment]::SetEnvironmentVariable('Path', ($c.TrimEnd(';') + ';' + $d).TrimStart(';'), 'User') }`;
-      if (!dryRun) { const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8' }); if (r.status !== 0) notes.push(`PATH ließ sich nicht setzen: ${(r.stderr || '').trim()}. Ordner ${p.shimDir} selbst in den Benutzer-PATH eintragen.`); else pathChanged = 'Benutzer-PATH'; }
+      if (!dryRun) { const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8', windowsHide: true }); if (r.status !== 0) notes.push(`PATH ließ sich nicht setzen: ${(r.stderr || '').trim()}. Ordner ${p.shimDir} selbst in den Benutzer-PATH eintragen.`); else pathChanged = 'Benutzer-PATH'; }
       else pathChanged = 'Benutzer-PATH';
     } else {
       const files = rcFiles(p.home);
@@ -85,7 +85,7 @@ export function uninstallCli({ dir, home, dryRun = false } = {}) {
     }
   } else if (!dryRun) {
     const ps = `$d='${p.shimDir.replace(/'/g, "''")}'; $c=[Environment]::GetEnvironmentVariable('Path','User'); if ($c) { [Environment]::SetEnvironmentVariable('Path', (($c -split ';') | Where-Object { $_ -and $_ -ne $d }) -join ';', 'User') }`;
-    spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps]);
+    spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { windowsHide: true });
     removed.push('Eintrag im Benutzer-PATH');
   }
   return removed;

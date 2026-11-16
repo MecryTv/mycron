@@ -177,7 +177,7 @@ export function startDetached(root, { cli = newestCli(), port = 4747, host = '12
   const log = fs.openSync(path.join(worksDir(root), 'server.log'), 'a');
   const args = [cli, 'board', '--serve', `--port=${port}`, `--host=${host}`];
   if (takeover) args.push('--takeover');
-  const child = spawn(process.execPath, args, { cwd: root, detached: true, stdio: ['ignore', log, log], env: { ...process.env, WORKS_ACTOR: '' } });
+  const child = spawn(process.execPath, args, { cwd: root, detached: true, windowsHide: true, stdio: ['ignore', log, log], env: { ...process.env, WORKS_ACTOR: '' } });
   child.unref();
   fs.closeSync(log);
   return child.pid;

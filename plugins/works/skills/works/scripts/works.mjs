@@ -939,7 +939,7 @@ async function cmdBoard() {
       out('Läuft im Hintergrund weiter. Beenden mit works board --stop.');
       if (flags.open) {
         const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
-        run(opener, [serverUrl(started)], { detached: true, stdio: 'ignore' });
+        run(opener, [serverUrl(started)], { detached: true, stdio: 'ignore', windowsHide: false });
       }
       return;
     }
@@ -954,7 +954,7 @@ async function cmdBoard() {
   out(`Board erzeugt: ${file}`);
   if (flags.open) {
     const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
-    run(opener, [file], { detached: true, stdio: 'ignore' });
+    run(opener, [file], { detached: true, stdio: 'ignore', windowsHide: false });
   }
 }
 

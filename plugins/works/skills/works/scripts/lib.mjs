@@ -155,8 +155,10 @@ export function warn(msg) {
   process.stderr.write(`Hinweis: ${msg}\n`);
 }
 
+// windowsHide: Ohne das öffnet Windows für jeden Aufruf aus einem Prozess ohne Konsole
+// (Board-Server, Hooks) ein eigenes Terminalfenster.
 export function run(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', ...opts });
+  const r = spawnSync(cmd, args, { encoding: 'utf8', windowsHide: true, ...opts });
   return { ok: r.status === 0, code: r.status, stdout: r.stdout || '', stderr: r.stderr || '', error: r.error };
 }
 

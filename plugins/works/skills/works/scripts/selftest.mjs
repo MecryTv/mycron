@@ -78,6 +78,19 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     for (const f of files) { const r = spawnSync(process.execPath, ['--check', f], { encoding: 'utf8' }); expect(r.status === 0, `${path.basename(f)}: ${r.stderr}`); }
   });
 
+  // Board-Server und Hooks haben unter Windows keine Konsole. Ein Prozessstart ohne windowsHide
+  // öffnet dort bei jedem Speichern ein Terminalfenster.
+  await step('Prozessstarts ohne Fenster', () => {
+    const files = [...fs.readdirSync(HERE).filter((f) => f.endsWith('.mjs') && !['selftest.mjs', 'launcher.mjs'].includes(f)).map((f) => path.join(HERE, f)), ...fs.readdirSync(HOOKS).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HOOKS, f))];
+    for (const f of files) {
+      const lines = fs.readFileSync(f, 'utf8').split('\n');
+      // Die Optionen stehen in derselben oder der nächsten Zeile.
+      lines.forEach((line, i) => {
+        if (/\b(spawn|spawnSync|execFile|execFileSync)\(/.test(line)) expect(/windowsHide/.test(line + (lines[i + 1] || '')), `${path.basename(f)}:${i + 1} startet einen Prozess ohne windowsHide`);
+      });
+    }
+  });
+
   if (hasGit) { git(['init', '-q']); git(['symbolic-ref', 'HEAD', 'refs/heads/main']); }
   fs.mkdirSync(path.join(proj, 'src', 'bot'), { recursive: true });
   fs.mkdirSync(path.join(proj, 'src', 'web'), { recursive: true });

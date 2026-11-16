@@ -95,7 +95,7 @@ let queue = Promise.resolve();
 function cli(root, args, { timeout = 30000 } = {}) {
   const job = queue.then(() => new Promise((resolve) => {
     execFile(process.execPath, [CLI, ...args], {
-      cwd: root, env: { ...process.env, WORKS_ACTOR: 'Board' }, timeout, maxBuffer: 4 * 1024 * 1024,
+      cwd: root, env: { ...process.env, WORKS_ACTOR: 'Board' }, timeout, maxBuffer: 4 * 1024 * 1024, windowsHide: true,
     }, (err, stdout, stderr) => {
       resolve({ ok: !err, code: err ? (err.code ?? 1) : 0, stdout: String(stdout), stderr: String(stderr) });
     });

@@ -10,7 +10,7 @@ const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), 'works.mjs')
 
 function w(root, args, actor = '') {
   return execFileSync(process.execPath, [CLI, ...args], {
-    cwd: root, encoding: 'utf8', env: { ...process.env, WORKS_ACTOR: actor }, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: root, encoding: 'utf8', env: { ...process.env, WORKS_ACTOR: actor }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   }).trim();
 }
 function newId(out) { return (out.match(/Angelegt: (\S+)/) || [])[1]; }
@@ -58,7 +58,7 @@ function addDays(iso, n) { const d = new Date(iso + 'T00:00:00'); d.setDate(d.ge
 export function seedDemo(root) {
   fs.mkdirSync(root, { recursive: true });
   if (exists(path.join(root, '.works'))) fs.rmSync(path.join(root, '.works'), { recursive: true, force: true });
-  try { execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' }); } catch { /* ohne Git geht es auch */ }
+  try { execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore', windowsHide: true }); } catch { /* ohne Git geht es auch */ }
   w(root, ['init']);
   w(root, ['milestone', 'add', 'M1', '--title=Livegang', '--due=2026-11-15', '--desc=Erste öffentliche Version von Bot und Dashboard']);
   w(root, ['milestone', 'add', 'M2', '--title=Turniersaison', '--due=2027-01-10']);

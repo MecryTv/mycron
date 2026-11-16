@@ -6,7 +6,7 @@ const MAX_DIFF_LINES = 400;
 
 function git(root, args, { timeout = 8000 } = {}) {
   return new Promise((resolve) => {
-    execFile('git', args, { cwd: root, timeout, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile('git', args, { cwd: root, timeout, maxBuffer: 8 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
       resolve({ ok: !err, out: String(stdout || ''), err: String(stderr || '') });
     });
   });
@@ -14,7 +14,7 @@ function git(root, args, { timeout = 8000 } = {}) {
 
 function run(cmd, args, root, timeout = 4000) {
   return new Promise((resolve) => {
-    execFile(cmd, args, { cwd: root, timeout, maxBuffer: 1024 * 1024 }, (err, stdout) => resolve(err ? null : String(stdout || '')));
+    execFile(cmd, args, { cwd: root, timeout, maxBuffer: 1024 * 1024, windowsHide: true }, (err, stdout) => resolve(err ? null : String(stdout || '')));
   });
 }
 
