@@ -253,6 +253,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   await step('Live: Zwischenstand der Prüfungen', () => {
     const dir = path.join('.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')));
     fs.writeFileSync(path.join(proj, 'peek.js'), "process.stdout.write(require('fs').readFileSync(process.argv[2], 'utf8'))\n");
+    fs.writeFileSync(path.join(proj, 'where.js'), 'process.stdout.write(process.cwd())\n'); // für den Worktree-Test in "Parallelarbeit"
     w(['checks', 'set', `peek=node peek.js ${path.join(dir, 'checks.json')}`]);
     w(['checks', 'run', 'W-0001']);
     const res = JSON.parse(fs.readFileSync(path.join(proj, dir, 'checks.json'), 'utf8'));
@@ -314,7 +315,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const l2 = lanes.find((l) => l.task === nid);
       has(w(['parallel', 'prompt', nid]).out, l2.path);
       w(['log', nid, 'Aus dem Worktree'], { cwd: l2.path });
-      w(['checks', 'set', 'where=node -p process.cwd()']);
+      // where.js ist seit dem Schritt "Dateien" committet und liegt damit auch im Worktree.
+      // Ohne Klammern und Anführungszeichen, damit der Befehl unter cmd und sh gleich läuft.
+      w(['checks', 'set', 'where=node where.js']);
       has(w(['parallel', 'prompt', nid]).out, 'checks run', 'Agenten-Auftrag');
       w(['checks', 'run', nid], { cwd: l2.path });
       const nd = fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith(nid));
