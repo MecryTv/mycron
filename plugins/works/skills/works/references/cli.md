@@ -49,7 +49,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `template list\|show\|save\|delete` | Vorlagen verwalten |
 | `new --template <slug> --field K=V --text ".." [--criteria 2,3]` | Aufgabe aus einer Vorlage |
 | `time [<ID>] [--mode measured\|fixed] [--json]` | Zeiterfassung und Schätzgenauigkeit |
-| `checks [detect [--save]\|set\|remove\|run <ID>\|record\|ack]` | Automatische Prüfungen vor dem Abschluss |
+| `checks [detect [--save]\|set\|remove\|run <ID>\|record\|ack]` | Automatische Prüfungen vor dem Abschluss. `set name=befehl --cwd ordner` legt einen Arbeitsordner relativ zum Projekt fest, `set --file datei.json` setzt mehrere auf einmal (Name zu Befehl oder zu `{ "cmd": "..", "cwd": ".." }`, leerer Wert entfernt) |
 | `report --week [--summary ..] [--send]`, `report --settings ..`, `report --webhook URL` | Wochenbericht als Markdown und HTML, optional an Discord |
 | `queue` | Warteschlange des Nutzers anzeigen (`--json` für Maschinen) |
 | `queue add <ID> [--pos N]` / `remove <ID>` / `move <ID> <N>` / `order A,B,C` / `clear` | Warteschlange bearbeiten |

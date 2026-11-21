@@ -621,16 +621,20 @@ const actions = {
     return { message: 'Als bekannt markiert.' };
   },
   async checksSave(root, b) {
-    const c = b.checks && typeof b.checks === 'object' ? b.checks : bad('Prüfungen fehlen.');
-    const pairs = [];
+    const c = b.checks && typeof b.checks === 'object' && !Array.isArray(b.checks) ? b.checks : bad('Prüfungen fehlen.');
     const cur = configuredChecks(loadConfig(root));
-    for (const k of Object.keys(cur)) if (!(k in c)) pairs.push(`${k}=`);
-    for (const [k, v] of Object.entries(c).slice(0, 12)) {
+    // Alles als JSON an works checks set --file: Befehl als Text oder { cmd, cwd }, entfernte Prüfungen mit leerem Wert.
+    const next = {};
+    for (const k of Object.keys(cur)) if (!(k in c)) next[k] = '';
+    for (const [k, v] of Object.entries(c).slice(0, 200)) {
       if (!NAME_RE.test(k)) bad(`Ungültiger Name ${k}.`);
-      pairs.push(`${k}=${str(v, k, { max: 300 })}`);
+      const isObj = v && typeof v === 'object';
+      const cmd = str(isObj ? v.cmd : v, `${k}: Befehl`, { max: 300 });
+      const cwd = isObj && v.cwd ? str(v.cwd, `${k}: Ordner`, { max: 200 }) : '';
+      next[k] = cwd ? { cmd, cwd } : cmd;
     }
-    if (!pairs.length) return { message: 'Keine Änderung.' };
-    await must(root, ['checks', 'set', ...pairs]);
+    if (!Object.keys(next).length) return { message: 'Keine Änderung.' };
+    await withTextFile(root, JSON.stringify(next), (file) => must(root, ['checks', 'set', `--file=${file}`]));
     return { message: 'Prüfungen gespeichert.' };
   },
 

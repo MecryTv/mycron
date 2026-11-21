@@ -10,16 +10,35 @@ const TIMEOUT_MS = 10 * 60 * 1000;
 const TAIL = 4000;
 export const NAME_RE = /^[a-z][a-z0-9_-]{0,30}$/;
 
+// Eine Prüfung steht in config.checks als Befehl (Text) oder als { cmd, cwd } mit Arbeitsordner relativ zum Projekt.
+export function checkEntry(v) {
+  if (typeof v === 'string') return v.trim() ? { cmd: v.trim(), cwd: '' } : null;
+  if (v && typeof v === 'object' && typeof v.cmd === 'string' && v.cmd.trim()) return { cmd: v.cmd.trim(), cwd: typeof v.cwd === 'string' ? v.cwd.trim() : '' };
+  return null;
+}
+// Gespeichert wird ohne Ordner weiter als reiner Text, damit bestehende Konfigurationen gleich aussehen.
+export const storedCheck = (e) => (e.cwd ? { cmd: e.cmd, cwd: e.cwd } : e.cmd);
+
 export function configuredChecks(config) {
   const c = config.checks && typeof config.checks === 'object' ? config.checks : {};
-  return Object.fromEntries(Object.entries(c).filter(([k, v]) => NAME_RE.test(k) && typeof v === 'string' && v.trim()));
+  return Object.fromEntries(Object.entries(c).filter(([k, v]) => NAME_RE.test(k) && checkEntry(v)));
 }
 
 export function checksFor(config, task) {
   const all = configuredChecks(config);
   const by = (config.checks_by_type || {})[task.type];
   const names = Array.isArray(by) ? by.filter((n) => all[n]) : Object.keys(all);
-  return names.map((n) => ({ name: n, cmd: all[n], skill: all[n].startsWith('skill:') }));
+  return names.map((n) => { const e = checkEntry(all[n]); return { name: n, cmd: e.cmd, cwd: e.cwd, skill: e.cmd.startsWith('skill:') }; });
+}
+
+// Arbeitsordner einer Prüfung: relativ zum Projekt (bzw. Worktree), nie außerhalb davon.
+function checkCwd(dir, c) {
+  if (!c.cwd) return { dir };
+  const abs = path.resolve(dir, c.cwd);
+  const rel = path.relative(dir, abs);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return { error: `Arbeitsordner ${c.cwd} liegt außerhalb des Projekts.` };
+  if (!exists(abs)) return { error: `Arbeitsordner ${c.cwd} fehlt.` };
+  return { dir: abs };
 }
 
 // Vorschläge aus package.json und typischen Dateien. Wird erst nach Bestätigung gespeichert.
@@ -53,8 +72,11 @@ export function workFingerprint(root) {
 function runOne(root, cmd) {
   return new Promise((resolve) => {
     const started = Date.now();
-    const shell = process.platform === 'win32' ? ['cmd', ['/d', '/s', '/c', cmd]] : ['sh', ['-c', cmd]];
-    const child = spawn(shell[0], shell[1], { cwd: root, windowsHide: true, env: { ...process.env, CI: '1', FORCE_COLOR: '0' } });
+    // Unter Windows wie Node mit shell: true: Befehl in Anführungszeichen und ohne Node-Maskierung an cmd geben,
+    // sonst kommen Anführungszeichen im Befehl verstümmelt an.
+    const win = process.platform === 'win32';
+    const shell = win ? ['cmd', ['/d', '/s', '/c', `"${cmd}"`]] : ['sh', ['-c', cmd]];
+    const child = spawn(shell[0], shell[1], { cwd: root, windowsHide: true, windowsVerbatimArguments: win, env: { ...process.env, CI: '1', FORCE_COLOR: '0' } });
     let buf = '';
     const add = (d) => { buf += d; if (buf.length > TAIL * 4) buf = buf.slice(-TAIL * 2); };
     child.stdout.on('data', add); child.stderr.on('data', add);
@@ -89,8 +111,9 @@ export async function runChecks(root, config, task, { only = null, onStart = nul
     if (onStart) onStart(c);
     // Zwischenstand für das Live-Board: welche Prüfung läuft gerade, was ist schon fertig.
     writeJson(resultFile(task), { at: prev.at || new Date().toISOString(), fingerprint: prev.fingerprint || '', results, running: c.name, runningSince: new Date().toISOString() });
-    const r = await runOne(dir, c.cmd);
-    results[c.name] = { status: r.ok ? 'ok' : 'fail', cmd: c.cmd, ms: r.ms, output: r.output, at: new Date().toISOString() };
+    const wd = checkCwd(dir, c);
+    const r = wd.error ? { ok: false, ms: 0, output: wd.error } : await runOne(wd.dir, c.cmd);
+    results[c.name] = { status: r.ok ? 'ok' : 'fail', cmd: c.cmd, cwd: c.cwd, ms: r.ms, output: r.output, at: new Date().toISOString() };
   }
   const data = { at: new Date().toISOString(), fingerprint: workFingerprint(dir), results };
   writeJson(resultFile(task), data);
@@ -124,7 +147,7 @@ export function checkItems(root, config, task) {
   const data = loadResults(task);
   const fp = workFingerprint(checkDir(root, task));
   // Veraltet, wenn sich der Code oder ein eingerichteter Befehl seit dem letzten Lauf geändert hat.
-  const cmdChanged = data && list.some((c) => !c.skill && data.results[c.name] && data.results[c.name].cmd !== c.cmd);
+  const cmdChanged = data && list.some((c) => !c.skill && data.results[c.name] && (data.results[c.name].cmd !== c.cmd || (data.results[c.name].cwd || '') !== c.cwd));
   const stale = !data || (fp && data.fingerprint !== fp) || cmdChanged || list.some((c) => !c.skill && !data.results[c.name]);
   const items = [];
   if (stale) items.push({ ok: false, text: 'Automatische Prüfungen sind auf dem aktuellen Stand gelaufen', detail: `works checks run ${task.id}` });

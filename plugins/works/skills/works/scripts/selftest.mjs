@@ -282,6 +282,26 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(!('running' in res) && res.results.peek.at, 'running nach dem Lauf nicht entfernt oder at fehlt');
   });
 
+  await step('Prüfungen: Anführungszeichen und Arbeitsordner', async () => {
+    const sub = path.join(proj, 'sub dir');
+    fs.mkdirSync(sub, { recursive: true });
+    fs.writeFileSync(path.join(sub, 'here.js'), 'process.stdout.write(process.cwd())\n');
+    w(['checks', 'set', 'quote=node -e "process.exit(0)"']);
+    w(['checks', 'set', 'folder=node here.js', '--cwd=sub dir']);
+    w(['checks', 'set', 'outside=node -v', '--cwd=../..']);
+    has(w(['checks']).out, 'sub dir', 'works checks');
+    w(['checks', 'run', 'W-0001', '--only=quote,folder,outside']);
+    const dir = path.join(proj, '.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')));
+    const r = JSON.parse(fs.readFileSync(path.join(dir, 'checks.json'), 'utf8')).results;
+    expect(r.quote.status === 'ok', `Befehl mit Anführungszeichen: ${r.quote.status} ${String(r.quote.output).slice(0, 200)}`);
+    expect(r.folder.status === 'ok' && fs.realpathSync(r.folder.output.trim()) === fs.realpathSync(sub), `Arbeitsordner: ${r.folder.status} ${String(r.folder.output).slice(0, 200)}`);
+    expect(r.outside.status === 'fail' && /außerhalb/.test(r.outside.output), `Ordner außerhalb des Projekts nicht abgelehnt: ${r.outside.status} ${String(r.outside.output).slice(0, 120)}`);
+    const { checksFor } = await import('./checks.mjs');
+    const { loadConfig } = await import('./lib.mjs');
+    expect(checksFor(loadConfig(proj), { type: 'feature' }).find((c) => c.name === 'folder').cwd === 'sub dir', 'checksFor liefert cwd nicht');
+    w(['checks', 'remove', 'quote', 'folder', 'outside']);
+  });
+
   await step('Live: Daten im Board', async () => {
     const { boardData } = await import('./board.mjs');
     const dir = path.join('.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')));
@@ -403,6 +423,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(up.ok && uj.candidates.length === 1, `Import-Upload: ${uj.error || uj.candidates.length}`);
     await api('POST', '/api/action', { action: 'importApply', token: uj.token, only: [1] });
     has(w(['list']).out, 'Aus dem Upload');
+    // Prüfungen im Board speichern, auch mit Arbeitsordner und mehr als 12 Einträgen.
+    const saved = Object.fromEntries(Array.from({ length: 14 }, (_, i) => [`api${i}`, i === 0 ? { cmd: 'node -v', cwd: 'sub dir' } : 'node -v']));
+    await api('POST', '/api/action', { action: 'checksSave', checks: saved });
+    const cfgChecks = JSON.parse(fs.readFileSync(path.join(proj, '.works', 'config.json'), 'utf8')).checks;
+    expect(cfgChecks.api0 && cfgChecks.api0.cwd === 'sub dir' && cfgChecks.api13 === 'node -v', `checksSave: ${JSON.stringify(cfgChecks).slice(0, 200)}`);
+    await api('POST', '/api/action', { action: 'checksSave', checks: {} });
     // W-0002 hat keinen Umsetzungsplan: Die Live-Ansicht darf dafür kein NaN oder "Schritt 0 von 0" zeigen.
     w(['start', 'W-0002']);
     // Viele Prüfungen: zehn eingerichtet, neun mit derselben Meldung fehlgeschlagen. Die Live-Ansicht fasst sie zusammen.

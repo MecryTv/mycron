@@ -30,7 +30,7 @@ import { sprintSettings, sprintList, activeSprint, lastClosedSprint, nextSprintI
 import { addComment, loadComments, unreadForClaude, markRead } from './comments.mjs';
 import { listTemplates, findTemplate, saveTemplate, deleteTemplate, templateFromTask, applyTemplate, countUse } from './templates.mjs';
 import { taskTime, estimates, fmtDuration } from './timelog.mjs';
-import { configuredChecks, checksFor, detectChecks, runChecks, recordCheck, ackCheck, loadResults, NAME_RE } from './checks.mjs';
+import { configuredChecks, checksFor, detectChecks, runChecks, recordCheck, ackCheck, loadResults, NAME_RE, checkEntry, storedCheck } from './checks.mjs';
 import { writeWeekly, reportSettings, setWebhook } from './weekly.mjs';
 import { setDirection, addVariant, addBrainstorm, chooseVariant, removeVariant, loadDesign, parseColors, needsDesign, detectDesignSkills } from './design.mjs';
 import { addInstruction } from './live.mjs';
@@ -2098,11 +2098,23 @@ async function cmdChecks() {
     if (flags.save) { config.checks = d; saveConfig(root, config); refresh(root); out('Gespeichert in .works/config.json unter checks.'); } else out('Erst nach Rückfrage beim Nutzer speichern: works checks detect --save');
   } else if (sub === 'set') {
     config.checks = configuredChecks(config);
+    // --file: JSON {"name": "befehl"} oder {"name": {"cmd": "..", "cwd": ".."}}, leerer Wert entfernt. Nutzt das Board.
+    if (flags.file && flags.file !== true) {
+      let obj;
+      try { obj = JSON.parse(readText(String(flags.file))); } catch { fail('--file muss JSON sein, etwa {"test": {"cmd": "npm test", "cwd": "app"}}.'); }
+      for (const [k, v] of Object.entries(obj && typeof obj === 'object' ? obj : {})) {
+        if (!NAME_RE.test(k)) fail(`Ungültiger Name ${k}.`);
+        const e = checkEntry(v);
+        if (e) config.checks[k] = storedCheck(e); else delete config.checks[k];
+      }
+    }
+    // --cwd gilt für alle Prüfungen dieses Aufrufs.
+    const cwd = flags.cwd && flags.cwd !== true ? String(flags.cwd).trim() : '';
     for (const pair of pos) {
       const i = pair.indexOf('=');
       const k = pair.slice(0, i); const v = pair.slice(i + 1).trim();
       if (!NAME_RE.test(k)) fail(`Ungültiger Name ${k}.`);
-      if (v) config.checks[k] = v; else delete config.checks[k];
+      if (v) config.checks[k] = storedCheck({ cmd: v, cwd }); else delete config.checks[k];
     }
     saveConfig(root, config); refresh(root);
     out(`Prüfungen: ${Object.keys(config.checks).join(', ') || 'keine'}`);
@@ -2131,7 +2143,7 @@ async function cmdChecks() {
   } else {
     const c = configuredChecks(config);
     if (!Object.keys(c).length) { out('Keine Prüfungen eingerichtet. Vorschlag mit works checks detect, speichern nach Rückfrage mit --save.'); return; }
-    for (const [k, v] of Object.entries(c)) out(`  ${k.padEnd(10)} ${v}`);
+    for (const [k, v] of Object.entries(c)) { const e = checkEntry(v); out(`  ${k.padEnd(10)} ${e.cmd}${e.cwd ? `  (im Ordner ${e.cwd})` : ''}`); }
     const by = config.checks_by_type || {};
     for (const [ty, list] of Object.entries(by)) out(`  nur für ${ty}: ${list.join(', ') || 'keine'}`);
     if (pos[0]) { const t = findTask(root, config, pos[0]); const d = loadResults(t); if (d) printChecks(d); }
