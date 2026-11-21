@@ -45,7 +45,7 @@ Vorschlag 6 vom 2026-11-21. works merkt sich je Prüfung die letzten fünf Ergeb
 - [x] Test: flakyOf, trendOf, Verlauf in checks.json, fertige Werte im Board
 - [x] Verlauf in runChecks, flakyOf und trendOf in checks.mjs, Werte in board.mjs
 - [x] Board: Striche, Abzeichen, Pfeil, Hinweiszeilen
-- [ ] Doku board.md, Selbsttest mit Browser, Linux
+- [x] Doku board.md, Selbsttest mit Browser, Linux
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -89,3 +89,4 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "Eine deutlich längere oder kürzere Laufzeit ist an der Dauer markiert, mit dem üblichen Wert als Vergleich" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Zeilen zeigen den Verlauf als kleine Striche, bei vielen Prüfungen gibt es je eine Zeile für wackelig und langsamer" abgehakt
 - 2026-11-21: Verlauf hist in checks.json, flakyOf und trendOf in checks.mjs, Werte in board.mjs, Anzeige in Zeilen und Zusammenfassung. Selbsttest Windows mit Browser 23/23.
+- 2026-11-21: Umsetzungsplan: "Doku board.md, Selbsttest mit Browser, Linux" abgehakt
