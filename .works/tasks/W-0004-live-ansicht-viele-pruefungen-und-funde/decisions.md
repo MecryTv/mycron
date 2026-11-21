@@ -6,7 +6,7 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 - [Klickbarer Entwurf (beide Varianten, Zustand nach und während des Laufs)](docs/viele-pruefungen.html) (kopiert am 2026-11-21)
 
 ## Brainstorm-Zusammenfassung
-<!-- Kernaussagen aus dem Brainstorming in eigenen Worten: Problemverständnis, betrachtete Ansätze, Ergebnis. -->
+Bei 51 Prüfungen und 45 Fehlschlägen listete die Live-Ansicht jeden Eintrag einzeln, in „Wartet auf dich“ und in der Prüfungsspalte. Zwei Ansätze als Entwurf: A gruppiert Fehlschläge nach gleicher Meldung (44 gleiche Pfadfehler werden eine Karte mit einer Aktion), B zeigt alle Prüfungen als Kachelraster mit Filter und Details auf Klick. Für beide: „Wartet auf dich“ fasst je Aufgabe zusammen (höchstens vier Zeilen), kompakte Darstellung erst ab etwa 9 Prüfungen. Empfehlung A, weil die gemeinsame Ursache sofort sichtbar ist. Wahl steht aus.
 
 ## Entscheidungen
 <!-- Pro Entscheidung ein Block. Neue Blöcke mit `works decisions <ID> --add "Titel" ...` oder von Hand im gleichen Format:
