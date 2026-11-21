@@ -1,18 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 14:21 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 14:23 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 0 | 0 | 1 | 0 | 0 | 0 | 9 | 0 |
+| 0 | 0 | 0 | 0 | 0 | 0 | 10 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 1
-
-## Aktive Aufgabe
-
-[W-0010](tasks/W-0010-design-funde-in-board-css-ueberarbeiten/task.md) Design-Funde in board.css überarbeiten (In Arbeit), letzte Übergabe 2026-11-21 10:30
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -20,9 +16,7 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
-|---|---|---|---|---|---|---|---|---|
-| [W-0010](tasks/W-0010-design-funde-in-board-css-ueberarbeiten/task.md) | Design-Funde in board.css überarbeiten | Design | P4 Niedrig | In Arbeit | S |  |  |  |
+_Keine Einträge._
 
 ## Geplant und Backlog
 
@@ -41,6 +35,7 @@ _Keine Einträge._
 | [W-0007](tasks/W-0007-live-ansicht-zeigt-wenn-claude-auf-eine/task.md) | Live-Ansicht zeigt, wenn Claude auf eine Freigabe wartet | Feature | P2 Hoch | 2026-11-21 |
 | [W-0008](tasks/W-0008-verbrauch-der-sitzung-in-der-live/task.md) | Verbrauch der Sitzung in der Live-Ansicht | Feature | P3 Mittel | 2026-11-21 |
 | [W-0009](tasks/W-0009-wackelige-pruefungen-und-laufzeittrend/task.md) | Wackelige Prüfungen und Laufzeittrend erkennen | Feature | P3 Mittel | 2026-11-21 |
+| [W-0010](tasks/W-0010-design-funde-in-board-css-ueberarbeiten/task.md) | Design-Funde in board.css überarbeiten | Design | P4 Niedrig | 2026-11-21 |
 
 ## Ideen
 

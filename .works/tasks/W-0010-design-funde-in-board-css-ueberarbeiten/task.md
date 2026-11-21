@@ -3,13 +3,13 @@ id: W-0010
 title: Design-Funde in board.css überarbeiten
 type: design
 priority: P4
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0010-design-funde-in-board-css
 tags: [ui, board, design]
@@ -75,6 +75,7 @@ Art: nachher · Hinzugefügt: 2026-11-21
 ## Offene Fragen
 
 ## Übergabe
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -96,3 +97,4 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "impeccable detect meldet für board.css nichts mehr, das nicht bewusst markiert ist" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Farben mit Bedeutung (Status, Priorität) bleiben erkennbar" abgehakt
 - 2026-11-21: Variante A umgesetzt, Geist markiert, toter Meilenstein-Block entfernt. impeccable detect meldet nichts mehr. Selbsttest Windows mit Browser 23/23.
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
