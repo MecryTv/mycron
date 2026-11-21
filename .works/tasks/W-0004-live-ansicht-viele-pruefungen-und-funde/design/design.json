@@ -1,0 +1,39 @@
+{
+  "direction": {
+    "source": "ui-ux-pro-max",
+    "at": "2026-11-21 11:02",
+    "file": "richtung.md",
+    "colors": [],
+    "fonts": [],
+    "notes": ""
+  },
+  "variants": [
+    {
+      "name": "A",
+      "title": "Fehlergruppen",
+      "file": "A-fehlergruppen.png",
+      "kind": "image",
+      "source": "ui-ux-pro-max",
+      "note": "Fehlschläge nach gleicher Meldung gruppiert, eine Aktion je Gruppe, komplette Liste aufklappbar (Empfehlung)",
+      "at": "2026-11-21 11:02"
+    },
+    {
+      "name": "B",
+      "title": "Prüfmatrix",
+      "file": "B-pruefmatrix.png",
+      "kind": "image",
+      "source": "ui-ux-pro-max",
+      "note": "Jede Prüfung als Kachel im Raster mit Filter, Details auf Klick",
+      "at": "2026-11-21 11:02"
+    }
+  ],
+  "brainstorm": [
+    {
+      "file": "brainstorm.md",
+      "source": "superpowers",
+      "title": "Viele Prüfungen und Funde",
+      "at": "2026-11-21 11:02"
+    }
+  ],
+  "chosen": null
+}

@@ -1,0 +1,1 @@
+Wie die Live-Ansicht: Tokens, Schrift und Bausteine des Boards. Bei vielen Einträgen zusammenfassen statt auflisten, Details auf Klick (UI UX Pro Max: Kürzen mit Aufklappen, Zustand immer auch als Text, höchstens ein animiertes Element).

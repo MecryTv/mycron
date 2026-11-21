@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Viele Prüfungen Entwurf</title>
+<style>
+@font-face { font-family: "Geist"; src: url("file:///D:/Development/mycron/plugins/works/skills/works/scripts/board/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+:root {
+  --bg: #f3f5f8; --surface: #ffffff; --raised: #f8fafc; --sunken: #e9edf2;
+  --line: #dce1e8; --line-strong: #c5cdd8; --text: #18202c; --text-2: #3f4a5c; --muted: #647085;
+  --accent: #5550d9; --accent-soft: #e9e8fc; --on-accent: #ffffff;
+  --danger: #d93a40; --ok: #1f9d6c; --warn: #c9860b;
+  --s-in-arbeit: #e0a21c; --s-review: #9667e6; --s-geplant: #3d7fe8;
+  --shadow-pop: 0 18px 48px rgba(20, 26, 36, .18);
+  --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #141a24; --surface: #1c2330; --raised: #222b3a; --sunken: #10151e;
+  --line: #2b3546; --line-strong: #3a475c; --text: #e6eaf2; --text-2: #c0c8d6; --muted: #8d98ab;
+  --accent: #7f7bf6; --accent-soft: #2a2b4d; --on-accent: #10131c;
+  --danger: #f0676c; --ok: #3dbe8b; --warn: #f2b33d;
+  --s-in-arbeit: #f2b33d; --s-review: #b08af2; --s-geplant: #6ea2f7;
+  --shadow-pop: 0 18px 48px rgba(0, 0, 0, .5);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--mono); font-size: 12px; }
+.muted { color: var(--muted); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+h2, h3, p { margin: 0; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.btn:hover { border-color: var(--line-strong); background: var(--raised); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn.link { border: 0; background: none; color: var(--accent); padding: 0; height: auto; }
+
+/* Rahmen */
+.frame { padding: 10px 24px 12px; background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--accent) 7%, var(--surface)) 0 12px, color-mix(in srgb, var(--accent) 11%, var(--surface)) 12px 24px); border-bottom: 1px dashed var(--accent); display: grid; gap: 8px; }
+.frame-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.frame-label { font-size: 12px; font-weight: 600; color: var(--accent); letter-spacing: .02em; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); padding: 2px; gap: 2px; }
+.seg button { border: 0; background: none; height: 30px; padding: 0 12px; border-radius: 7px; font-size: 13px; color: var(--text-2); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.seg .rec { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 4px; background: color-mix(in srgb, var(--ok) 22%, transparent); color: inherit; }
+.frame-note { font-size: 13px; color: var(--text-2); max-width: 125ch; }
+.frame-note b { color: var(--text); }
+.spacer { flex: 1; }
+
+/* Live-Ansicht, vereinfacht */
+.lv { padding: 16px 24px 40px; display: grid; gap: 16px; }
+.lv-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0; min-height: 112px; align-content: start; }
+.tile h3 { font-size: 12px; font-weight: 500; color: var(--muted); display: flex; gap: 7px; align-items: center; }
+.tile .big { font-size: 20px; font-weight: 650; line-height: 1.2; }
+.tile .big small { font-size: 13px; color: var(--muted); font-weight: 500; }
+.tile .sub { font-size: 12px; color: var(--text-2); }
+.tile.attn { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); background: color-mix(in srgb, var(--warn) 6%, var(--surface)); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--s-in-arbeit); display: inline-block; }
+.attn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.attn-list button { width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 3px 4px; margin: 0 -4px; border-radius: 6px; font-size: 12.5px; text-align: left; }
+.attn-list button:hover { background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.attn-list .n { margin-left: auto; font-weight: 650; font-variant-numeric: tabular-nums; }
+.more { font-size: 12px; color: var(--muted); }
+.si { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; flex: none; background: var(--sunken); color: var(--muted); }
+.si svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.si.sm { width: 16px; height: 16px; } .si.sm svg { width: 9px; height: 9px; }
+.si.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.si.fail { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+.si.warn { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
+.si.review { background: color-mix(in srgb, var(--s-review) 20%, transparent); color: var(--s-review); }
+.si.ask { background: var(--accent-soft); color: var(--accent); }
+.si.run { background: none; border: 2px solid var(--accent); border-right-color: transparent; animation: spin .8s linear infinite; }
+.si.wait { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .si.run { animation: none; border-style: dotted; } }
+
+.lv-grid { display: grid; grid-template-columns: 270px minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.ghost { padding: 14px; display: grid; gap: 10px; }
+.ghost i { display: block; height: 12px; border-radius: 6px; background: var(--sunken); }
+.ghost .h { width: 40%; height: 14px; }
+.head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 8px; }
+.head h2 { font-size: 13px; font-weight: 600; }
+.meta { font-size: 12px; color: var(--muted); }
+.body { padding: 2px 14px 14px; display: grid; gap: 12px; }
+
+/* Gruppe einer Aufgabe */
+.ckg-head { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
+.ckg-head b { white-space: nowrap; }
+.ckg-head .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.counts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.counts b { font-weight: 650; color: var(--text); }
+.counts .c-fail b { color: var(--danger); }
+.counts .c-ok b { color: var(--ok); }
+.strip { display: flex; gap: 1px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--sunken); }
+.strip i { flex: 1; }
+.strip i.ok { background: var(--ok); } .strip i.fail { background: var(--danger); } .strip i.warn { background: var(--warn); }
+.strip i.run { background: var(--accent); } .strip i.wait { background: color-mix(in srgb, var(--line-strong) 55%, transparent); }
+
+/* Variante A: Fehlergruppen */
+.errgrp { border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line)); background: color-mix(in srgb, var(--danger) 5%, var(--surface)); border-radius: 10px; padding: 10px 12px; display: grid; gap: 8px; }
+.errgrp.warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 6%, var(--surface)); }
+.errgrp .eh { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.errgrp .eh .n { font-variant-numeric: tabular-nums; }
+.errgrp .msg { font-family: var(--mono); font-size: 12px; color: var(--text-2); background: var(--sunken); border-radius: 6px; padding: 6px 8px; overflow-wrap: anywhere; }
+.names { display: flex; flex-wrap: wrap; gap: 4px; }
+.names span { font-size: 11.5px; padding: 1px 7px; border-radius: 9px; background: var(--sunken); color: var(--text-2); font-family: var(--mono); }
+.names button { font-size: 11.5px; border: 0; background: none; color: var(--accent); padding: 1px 4px; }
+.row-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.runline { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.runline .mono { color: var(--text-2); }
+.runline .tm { margin-left: auto; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.okline { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+details.all > summary { list-style: none; cursor: pointer; font-size: 12.5px; color: var(--accent); display: flex; align-items: center; gap: 6px; }
+details.all > summary::-webkit-details-marker { display: none; }
+.alllist { margin-top: 8px; max-height: 280px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr; }
+.alllist div { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 12px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); min-width: 0; }
+.alllist div span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+
+/* Variante B: Prüfmatrix */
+.filters { display: flex; flex-wrap: wrap; gap: 4px; }
+.filters button { height: 26px; padding: 0 9px; border-radius: 13px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; color: var(--text-2); }
+.filters button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); font-weight: 600; }
+.matrix { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 4px; max-height: 300px; overflow: auto; padding: 1px; }
+.cell { display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 6px 0 4px; border-radius: 7px; border: 1px solid var(--line); background: var(--raised); font-size: 11.5px; font-family: var(--mono); min-width: 0; text-align: left; }
+.cell span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell.fail { border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); background: color-mix(in srgb, var(--danger) 6%, var(--raised)); }
+.cell.warn { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); }
+.cell.run { border-color: var(--accent); }
+.cell[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.detail { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 8px; background: var(--raised); }
+.detail .dh { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.detail .dh b { font-family: var(--mono); }
+.detail .dh .st { margin-left: auto; font-size: 12px; color: var(--text-2); }
+.detail pre { margin: 0; font: 12px/1.5 var(--mono); background: var(--sunken); padding: 6px 8px; border-radius: 6px; white-space: pre-wrap; color: var(--text-2); }
+
+@media (max-width: 1200px) { .lv-grid { grid-template-columns: 240px minmax(0, 1fr); } .lv-checks { grid-column: 1 / -1; } .lv-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .lv-grid { grid-template-columns: minmax(0, 1fr); } .lv-sum { grid-template-columns: minmax(0, 1fr); } .lv, .frame { padding-left: 16px; padding-right: 16px; } .alllist { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="frame" role="region" aria-label="Entwurfsrahmen, nicht Teil des Designs">
+  <div class="frame-row">
+    <span class="frame-label">ENTWURF W-0004: VIELE PRÜFUNGEN</span>
+    <div class="seg" role="group" aria-label="Variante"><button data-v="A" aria-pressed="true">A Fehlergruppen<span class="rec">Empfehlung</span></button><button data-v="B" aria-pressed="false">B Prüfmatrix</button></div>
+    <div class="seg" role="group" aria-label="Zustand"><button data-s="done" aria-pressed="true">Nach dem Lauf</button><button data-s="run" aria-pressed="false">Während des Laufs</button></div>
+    <span class="spacer"></span>
+    <button class="btn" id="theme" type="button">Dunkel</button>
+  </div>
+  <p class="frame-note" id="note"></p>
+</div>
+<main class="lv" id="stage"></main>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const svg = (p) => '<svg viewBox="0 0 16 16" aria-hidden="true">' + p + '</svg>';
+  const IC = { ok: svg('<path d="M3.5 8.4l2.9 2.9 6.1-6.6"/>'), fail: svg('<path d="M5 5l6 6M11 5l-6 6"/>'), warn: svg('<path d="M8 4.2v4.4"/><path d="M8 11.5v.1"/>'), review: svg('<path d="M1.8 8s2.3-4.2 6.2-4.2S14.2 8 14.2 8s-2.3 4.2-6.2 4.2S1.8 8 1.8 8z"/><circle cx="8" cy="8" r="1.8"/>'), ask: svg('<path d="M6 6a2 2 0 1 1 3 1.7c-.6.4-1 .8-1 1.5"/><path d="M8 11.6v.1"/>') };
+  const si = (st, sm) => '<span class="si ' + st + (sm ? ' sm' : '') + '" aria-hidden="true">' + (IC[st] || '') + '</span>';
+  const LBL = { ok: 'bestanden', fail: 'fehlgeschlagen', warn: 'Fund', run: 'läuft', wait: 'noch nicht gelaufen' };
+
+  const NAMES = ['bot-tsc', 'bot-admin', 'bot-apply', 'bot-help', 'bot-antivillain', 'bot-automod', 'bot-card', 'bot-clips', 'bot-community', 'bot-dashboard', 'bot-db', 'bot-gallery', 'bot-image', 'bot-levels', 'bot-leveldesign', 'bot-studio', 'bot-lft', 'bot-logging', 'bot-matchups', 'bot-messages', 'bot-moderation', 'bot-presence', 'bot-prime', 'bot-rankroles', 'bot-rolelists', 'bot-serverbackup', 'bot-absences', 'bot-epicname', 'bot-epiclogin', 'bot-events', 'bot-giveaways', 'bot-invites', 'bot-music', 'bot-polls', 'bot-reminders', 'bot-reports', 'bot-roles', 'bot-rules', 'bot-shop', 'bot-stats', 'bot-streams', 'bot-suggestions', 'bot-teams', 'bot-tickets', 'bot-tournaments', 'bot-verify', 'bot-voice', 'bot-welcome', 'web-build', 'web-lint', 'audit'];
+  const PATH = 'The system cannot find the path specified.';
+  const TYPE = "src/modules/levels.ts(88,14): error TS2339: Property 'xp' does not exist on type 'Member'.";
+  function checks(state) {
+    return NAMES.map((n, i) => {
+      if (state === 'run') return { n, st: i < 10 ? 'ok' : i === 10 ? 'run' : 'wait', sec: 4 };
+      if (n === 'audit') return { n, st: 'warn', msg: 'Bot-Token wird in src/log.ts Zeile 41 ins Debug-Log geschrieben.' };
+      if (['bot-tsc', 'bot-admin', 'bot-apply', 'web-build', 'web-lint'].includes(n)) return { n, st: 'ok', ms: 15000 };
+      if (n === 'bot-levels') return { n, st: 'fail', msg: TYPE };
+      return { n, st: 'fail', msg: PATH };
+    });
+  }
+  const count = (list, st) => list.filter((c) => c.st === st).length;
+
+  let V = 'A', S = 'done', pick = 'bot-help', filter = 'all';
+
+  // Gemeinsam: Kacheln oben mit zusammengefasstem "Wartet auf dich"
+  function tiles(list) {
+    const fails = count(list, 'fail'), warns = count(list, 'warn');
+    const att = S === 'done'
+      ? [['fail', 'W-0152', fails + ' Prüfungen fehlgeschlagen', fails], ['warn', 'W-0152', 'Fund in audit', warns], ['review', 'W-0151', 'abnehmen', ''], ['ask', 'W-0150', 'offene Frage', 1], ['review', 'W-0148', 'abnehmen', '']]
+      : [['review', 'W-0151', 'abnehmen', ''], ['ask', 'W-0150', 'offene Frage', 1]];
+    const shown = att.slice(0, 4), rest = att.length - shown.length;
+    return '<section class="lv-sum" aria-label="Überblick">' +
+      '<article class="tile"><h3><i class="dot"></i>' + (S === 'run' ? 'Claude prüft gerade' : 'Claude denkt nach') + '</h3><div class="big">W-0152 <small>' + (S === 'run' ? 'Prüfung 11 von 51' : 'Schritt 4 von 4') + '</small></div><div class="sub">' + (S === 'run' ? 'Befehl <span class="mono">npm run -s check:db</span>, seit 0:04' : 'Zuletzt: Befehl <span class="mono">works checks run W-0152</span>, vor 0:05') + '</div></article>' +
+      '<article class="tile"><h3>Fortschritt heute</h3><div class="big">3 von 5 <small>fertig</small></div><div class="sub">3 erledigt · 0 im Review · 2 in Arbeit · 0 warten</div></article>' +
+      '<article class="tile"><h3>Parallel</h3><div class="big">Kein Agent aktiv</div><div class="sub">Alles läuft in der Hauptsitzung</div></article>' +
+      '<article class="tile attn"><h3>Wartet auf dich</h3><div class="big">' + att.length + ' <small>' + (att.length === 1 ? 'Punkt' : 'Punkte') + '</small></div><ul class="attn-list">' +
+      shown.map((a) => '<li><button type="button">' + si(a[0], true) + '<span><b>' + a[1] + '</b> ' + esc(a[2]) + '</span></button></li>').join('') + '</ul>' +
+      (rest ? '<span class="more">und ' + rest + ' weiterer Punkt</span>' : '') + '</article></section>';
+  }
+
+  function counts(list) {
+    const parts = [['fail', 'fehlgeschlagen'], ['warn', 'Fund'], ['ok', 'bestanden'], ['run', 'läuft'], ['wait', 'offen']];
+    return '<div class="counts">' + parts.filter(([s]) => count(list, s)).map(([s, l]) => '<span class="c-' + s + '"><b>' + count(list, s) + '</b> ' + l + '</span>').join('') + '</div>' +
+      '<div class="strip" aria-hidden="true">' + list.map((c) => '<i class="' + c.st + '" title="' + esc(c.n + ': ' + LBL[c.st]) + '"></i>').join('') + '</div>';
+  }
+
+  function variantA(list) {
+    let h = '<div class="ckg-head">' + si(S === 'run' ? 'run' : 'fail') + '<b>W-0152</b><span class="t">Kleinigkeiten aus dem Review von W-0151</span></div>' + counts(list);
+    if (S === 'run') {
+      const r = list.find((c) => c.st === 'run');
+      h += '<div class="runline">' + si('run', true) + '<b>' + r.n + '</b><span class="mono">npm run -s check:db</span><span class="tm">läuft 4 s</span></div>' +
+        '<div class="okline">' + si('ok', true) + '10 bestanden, zuletzt bot-dashboard in 6 s</div>';
+    } else {
+      const groups = {};
+      for (const c of list.filter((x) => x.st === 'fail')) (groups[c.msg] = groups[c.msg] || []).push(c.n);
+      for (const [msg, names] of Object.entries(groups).sort((a, b) => b[1].length - a[1].length)) {
+        const show = names.slice(0, 10), more = names.length - show.length;
+        h += '<div class="errgrp"><div class="eh">' + si('fail', true) + '<span class="n">' + (names.length === 1 ? names[0] + ' fehlgeschlagen' : names.length + ' Prüfungen, gleiche Meldung') + '</span></div>' +
+          '<div class="msg">' + esc(msg) + '</div>' + (names.length === 1 ? '' : '<div class="names">' + show.map((n) => '<span>' + n + '</span>').join('') + (more ? '<button type="button">+' + more + ' weitere</button>' : '') + '</div>') +
+          '<div class="row-btns"><button class="btn primary" type="button">Claude beheben lassen</button><button class="btn" type="button">Ausgabe ansehen</button></div></div>';
+      }
+      const w = list.find((c) => c.st === 'warn');
+      if (w) h += '<div class="errgrp warn"><div class="eh">' + si('warn', true) + 'Fund in ' + w.n + '</div><div class="msg">' + esc(w.msg) + '</div><div class="row-btns"><button class="btn primary" type="button">Claude beheben lassen</button><button class="btn" type="button">Als bekannt markieren</button></div></div>';
+      h += '<div class="okline">' + si('ok', true) + count(list, 'ok') + ' bestanden: bot-tsc, bot-admin, bot-apply, web-build, web-lint</div>';
+    }
+    h += '<details class="all"><summary>Alle ' + list.length + ' Prüfungen anzeigen</summary><div class="alllist">' + list.map((c) => '<div>' + si(c.st, true) + '<span>' + c.n + '</span></div>').join('') + '</div></details>';
+    return h;
+  }
+
+  function variantB(list) {
+    const vis = list.filter((c) => filter === 'all' || c.st === filter);
+    const f = (k, l, n) => '<button type="button" data-f="' + k + '" aria-pressed="' + (filter === k) + '">' + l + ' ' + n + '</button>';
+    let h = '<div class="ckg-head">' + si(S === 'run' ? 'run' : 'fail') + '<b>W-0152</b><span class="t">Kleinigkeiten aus dem Review von W-0151</span></div>' + counts(list) +
+      '<div class="filters" role="group" aria-label="Filter">' + f('all', 'Alle', list.length) + (count(list, 'fail') ? f('fail', 'Fehlgeschlagen', count(list, 'fail')) : '') + (count(list, 'warn') ? f('warn', 'Funde', count(list, 'warn')) : '') + (count(list, 'ok') ? f('ok', 'Bestanden', count(list, 'ok')) : '') + (count(list, 'wait') ? f('wait', 'Offen', count(list, 'wait')) : '') + '</div>' +
+      '<div class="matrix">' + vis.map((c) => '<button type="button" class="cell ' + c.st + '" data-c="' + c.n + '" aria-pressed="' + (pick === c.n) + '" title="' + esc(c.n + ': ' + LBL[c.st]) + '">' + si(c.st, true) + '<span>' + c.n.replace(/^bot-/, '') + '</span></button>').join('') + '</div>';
+    const c = list.find((x) => x.n === pick) || list[0];
+    h += '<div class="detail"><div class="dh">' + si(c.st, true) + '<b>' + c.n + '</b><span class="st">' + LBL[c.st] + (c.st === 'run' ? ' 4 s' : c.ms ? ', 15 s' : c.st === 'fail' ? ', 0 s' : '') + '</span></div><span class="mono muted">cd /d Discord Bot &amp;&amp; npm run -s check:' + c.n.replace(/^bot-/, '') + '</span>' +
+      (c.msg ? '<pre>' + esc(c.msg) + '</pre>' : '') + (c.st === 'fail' || c.st === 'warn' ? '<div class="row-btns"><button class="btn primary" type="button">Claude beheben lassen</button>' + (c.st === 'warn' ? '<button class="btn" type="button">Als bekannt markieren</button>' : '') + '</div>' : '') + '</div>';
+    return h;
+  }
+
+  const NOTES = {
+    A: '<b>A Fehlergruppen:</b> Oben Zähler und ein Streifen mit einem Strich je Prüfung. Darunter stehen Fehlschläge zusammengefasst nach gleicher Meldung: 44 Prüfungen mit demselben Pfadfehler ergeben eine Karte mit einem Knopf für alle. Die einzelnen Namen und die komplette Liste lassen sich aufklappen. Während eines Laufs steht nur die laufende Prüfung da, der Rest ist im Streifen. Zeigt sofort die gemeinsame Ursache, die einzelnen Namen erst auf Klick.',
+    B: '<b>B Prüfmatrix:</b> Jede Prüfung ist eine kleine Kachel in einem Raster, oben Filter nach Zustand. Ein Klick auf eine Kachel zeigt Befehl, Meldung und Knöpfe darunter. Man sieht alle Namen auf einen Blick, die gemeinsame Ursache aber erst, wenn man mehrere Kacheln anklickt. Das Raster braucht bei 51 Prüfungen rund 13 Zeilen.',
+  };
+
+  function render() {
+    const list = checks(S);
+    const col = V === 'A' ? variantA(list) : variantB(list);
+    $('#stage').innerHTML = tiles(list) + '<div class="lv-grid"><section class="panel ghost" aria-label="Tagesliste (unverändert)"><i class="h"></i><i></i><i></i><i style="width:70%"></i><i></i><i style="width:60%"></i></section>' +
+      '<section class="panel ghost" aria-label="Fokus (unverändert)"><i class="h"></i><i></i><i style="width:85%"></i><i></i><i style="width:50%"></i><i></i><i style="width:75%"></i></section>' +
+      '<section class="panel lv-checks" aria-label="Prüfungen"><div class="head"><h2>Prüfungen</h2><span class="meta">' + (S === 'run' ? '1 läuft' : count(list, 'fail') + ' fehlgeschlagen, ' + count(list, 'warn') + ' Fund') + '</span></div><div class="body">' + col + '</div></section></div>';
+    $('#note').innerHTML = NOTES[V];
+    document.querySelectorAll('[data-v]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === V)));
+    document.querySelectorAll('[data-s]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.s === S)));
+  }
+  document.addEventListener('click', (e) => {
+    const v = e.target.closest('[data-v]'); if (v) { V = v.dataset.v; render(); return; }
+    const s = e.target.closest('[data-s]'); if (s) { S = s.dataset.s; filter = 'all'; pick = S === 'run' ? 'bot-db' : 'bot-help'; render(); return; }
+    const f = e.target.closest('[data-f]'); if (f) { filter = f.dataset.f; render(); return; }
+    const c = e.target.closest('[data-c]'); if (c) { pick = c.dataset.c; render(); }
+  });
+  let theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const applyTheme = () => { document.documentElement.dataset.theme = theme; $('#theme').textContent = theme === 'dark' ? 'Hell' : 'Dunkel'; };
+  $('#theme').onclick = () => { theme = theme === 'dark' ? 'light' : 'dark'; applyTheme(); };
+  applyTheme();
+  render();
+})();
+</script>
+</body>
+</html>
