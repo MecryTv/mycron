@@ -207,3 +207,33 @@ export function checkItems(root, config, task) {
   }
   return { items, state: { stale, at: data ? data.at : null, results: data ? data.results : {}, list } };
 }
+
+// Prüfungs-Gesundheit über alle Aufgaben (Werkzeuge): je Prüfung Läufe, Fehlschläge, Median der bestandenen Läufe,
+// wackelig (Regel wie flakyOf), Trend und die letzten Läufe des jüngsten Ergebnisses. Skill-Prüfungen zählen nicht.
+export function checkHealth(tasks) {
+  const by = new Map();
+  let withChecks = 0;
+  for (const t of tasks) {
+    const d = loadResults(t);
+    if (!d || !d.results) continue;
+    let any = false;
+    for (const [name, r] of Object.entries(d.results)) {
+      if (!r || String(r.cmd || '').startsWith('skill:')) continue;
+      const hist = Array.isArray(r.hist) && r.hist.length ? r.hist : ['ok', 'fail'].includes(r.status) ? [{ s: r.status, ms: r.ms || 0, at: r.at || '' }] : [];
+      if (!hist.length) continue;
+      const e = by.get(name) || { name, runs: 0, fails: 0, oks: [], flaky: false, latest: null };
+      e.runs += hist.length;
+      e.fails += hist.filter((h) => h.s === 'fail').length;
+      for (const h of hist) if (h.s === 'ok' && typeof h.ms === 'number') e.oks.push(h.ms);
+      if (flakyOf(hist)) e.flaky = true;
+      const at = r.at || '';
+      if (!e.latest || at > e.latest.at) e.latest = { at, hist };
+      by.set(name, e);
+      any = true;
+    }
+    if (any) withChecks++;
+  }
+  const median = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const m = s.length; return m % 2 ? s[(m - 1) / 2] : Math.round((s[m / 2 - 1] + s[m / 2]) / 2); };
+  const checks = [...by.values()].map((e) => ({ name: e.name, runs: e.runs, fails: e.fails, median: median(e.oks), flaky: e.flaky, trend: trendOf(e.latest.hist), last: e.latest.hist.map((h) => h.s) }));
+  return { tasks: withChecks, checks };
+}

@@ -22,6 +22,10 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 - Konsequenzen:
 -->
 
+- 2026-11-21: checkHealth in checks.mjs wertet die checks.json aller Aufgaben aus (auch archivierte); ohne hist zählt das letzte Ergebnis als ein Lauf. Skill-Prüfungen zählen nicht. Neuer GET-Endpunkt /api/check-health.
+- 2026-11-21: Werkzeuge liegen in einer schmalen Seitenleiste, nicht wie im Entwurf über die volle Breite. Deshalb vier statt sechs Spalten: Läufe als Tooltip an Rot, wackelig als Abzeichen am Namen, lange Namen mit Auslassung.
+- 2026-11-21: Wackelig über alle Aufgaben: wahr, wenn der Verlauf einer Aufgabe nach flakyOf wackelig ist.
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 

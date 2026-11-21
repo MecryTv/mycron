@@ -3,7 +3,7 @@ id: W-0014
 title: "Werkzeuge: Prüfungs-Gesundheit über alle Aufgaben"
 type: feature
 priority: P3
-status: backlog
+status: in-arbeit
 effort: M
 risk:
 created: 2026-11-21
@@ -11,7 +11,7 @@ updated: 2026-11-21
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0014-werkzeuge-pruefungs
 tags: [ui, board, checks]
 blocked_by: []
 blocks: []
@@ -35,14 +35,14 @@ Vorschlag 5 vom 2026-11-21, vom Nutzer gewünscht. Eine Übersicht unter Werkzeu
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Werkzeuge zeigen je Prüfung Laufzeit, Fehlerquote und wackelig über alle Aufgaben
-- [ ] Sortierbar nach langsam, rot, wackelig
-- [ ] Funktioniert auch mit 51 Prüfungen übersichtlich
+- [x] Werkzeuge zeigen je Prüfung Laufzeit, Fehlerquote und wackelig über alle Aufgaben
+- [x] Sortierbar nach langsam, rot, wackelig
+- [x] Funktioniert auch mit 51 Prüfungen übersichtlich
 
 ## Umsetzungsplan
-- [ ] Entwurf zeigen, Wahl abwarten
-- [ ] Auswertung über alle checks.json (API)
-- [ ] Anzeige unter Werkzeuge
+- [x] Entwurf zeigen, Wahl abwarten
+- [x] Auswertung über alle checks.json (API)
+- [x] Anzeige unter Werkzeuge
 - [ ] Selbsttest mit Browser, Linux, Doku
 
 ## Betroffene Dateien
@@ -52,7 +52,13 @@ Vorschlag 5 vom 2026-11-21, vom Nutzer gewünscht. Eine Übersicht unter Werkzeu
 Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Nachher: Werkzeuge mit Abschnitt Prüfungen im Projekt, 50 Prüfungen aus 2 Aufgab](assets/2026-11-21-nachher-werkzeuge-mit-abschnitt-nachher.png)
+Beschreibung: Nachher: Werkzeuge mit Abschnitt Prüfungen im Projekt, 50 Prüfungen aus 2 Aufgaben, sortiert nach oft rot, Spalten Rot, Median, Letzte
+Art: nachher · Hinzugefügt: 2026-11-21
+
+![Vorher: Werkzeuge ohne Übersicht über Prüfungen über alle Aufgaben](assets/2026-11-21-vorher-werkzeuge-ohne-uebersicht-ueber-vorher.png)
+Beschreibung: Vorher: Werkzeuge ohne Übersicht über Prüfungen über alle Aufgaben
+Art: vorher · Hinzugefügt: 2026-11-21
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
@@ -66,3 +72,13 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-21: Brainstorming angehängt
 - 2026-11-21: Entwurf A „Board-Erweiterungen W-0011 bis W-0014“ angehängt
 - 2026-11-21: Entwurf A „Board-Erweiterungen W-0011 bis W-0014“ gewählt. Grund: Nutzer: A (Diff klappt unter dem Eintrag auf), Rest passt
+- 2026-11-21: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-nachher-werkzeuge-mit-abschnitt-nachher.png (nachher)
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-vorher-werkzeuge-ohne-uebersicht-ueber-vorher.png (vorher)
+- 2026-11-21: Umsetzungsplan: "Entwurf zeigen, Wahl abwarten" abgehakt
+- 2026-11-21: Umsetzungsplan: "Auswertung über alle checks.json (API)" abgehakt
+- 2026-11-21: Umsetzungsplan: "Anzeige unter Werkzeuge" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Werkzeuge zeigen je Prüfung Laufzeit, Fehlerquote und wackelig über alle Aufgaben" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Sortierbar nach langsam, rot, wackelig" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Funktioniert auch mit 51 Prüfungen übersichtlich" abgehakt
+- 2026-11-21: checkHealth und /api/check-health, Abschnitt Prüfungen im Projekt unter Werkzeuge mit drei Sortierungen, an die schmale Seitenleiste angepasst. Selbsttest Windows mit Browser 24/24. Linux folgt gemeinsam.

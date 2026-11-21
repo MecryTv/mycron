@@ -2134,9 +2134,32 @@
 
   // ---------- Werkzeuge: Bericht, Vorlagen, Prüfungen, Benachrichtigungen ----------
 
+  // Prüfungs-Gesundheit (W-0014): je Prüfung über alle Aufgaben, sortierbar nach oft rot, langsam, wackelig.
+  let hthSort = 'red';
+  let hthAll = false;
+  function hthHtml(hd) {
+    const rate = (c) => c.fails / c.runs;
+    const by = { red: (a, b) => rate(b) - rate(a) || b.fails - a.fails, slow: (a, b) => (b.median || 0) - (a.median || 0), flaky: (a, b) => (b.flaky - a.flaky) || rate(b) - rate(a) };
+    const rows = [...hd.checks].sort(by[hthSort]);
+    const shown = hthAll ? rows : rows.slice(0, 10);
+    return '<div class="hth-tabs" role="group" aria-label="Sortierung">' + [['red', 'Oft rot'], ['slow', 'Langsam'], ['flaky', 'Wackelig']].map(([k, l]) => '<button type="button" data-hth="' + k + '" aria-pressed="' + (hthSort === k) + '">' + l + '</button>').join('') + '</div>' +
+      // Schmal genug für die Seitenleiste: Läufe als Tooltip an "Rot", wackelig am Namen.
+      '<div class="hth-wrap"><table class="hth"><thead><tr><th>Prüfung</th><th class="num">Rot</th><th class="num">Median</th><th class="opt">Letzte</th></tr></thead><tbody>' +
+      shown.map((c) => {
+        const pct = Math.round(rate(c) * 100);
+        const up = c.trend && c.trend.dir === 'up';
+        return '<tr><td class="nm"><div class="nmw"><span class="nmt" title="' + esc(c.name) + '">' + esc(c.name) + '</span>' + (c.flaky ? '<span class="flk">wackelig</span>' : '') + '</div></td>' +
+          '<td class="num" title="' + c.fails + ' von ' + c.runs + (c.runs === 1 ? ' Lauf' : ' Läufen') + ' rot"><span class="bar" aria-hidden="true"><i style="width:' + pct + '%"></i></span>' + pct + ' %</td>' +
+          '<td class="num' + (up ? ' slow' : '') + '">' + (c.median == null ? '–' : lvMs(c.median)) + (c.trend ? (up ? ' ↑' : ' ↓') : '') + '</td>' +
+          '<td class="opt"><span class="lv-hist" aria-hidden="true">' + c.last.map((s) => '<i class="' + (s === 'ok' ? 'ok' : 'fail') + '"></i>').join('') + '</span></td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      (rows.length > 10 ? '<button type="button" class="btn link" data-hth-all>' + (hthAll ? 'Weniger anzeigen' : 'Alle ' + rows.length + ' anzeigen') + '</button>' : '');
+  }
+
   async function renderTools(body, head) {
-    const [rep, tpls, chk] = await Promise.all([
+    const [rep, tpls, chk, health] = await Promise.all([
       api('GET', 'api/reports').catch(() => null), api('GET', 'api/templates').catch(() => []), EDIT ? api('GET', 'api/checks').catch(() => null) : Promise.resolve(null),
+      api('GET', 'api/check-health').catch(() => null),
     ]);
     const theme = store.get('works-theme', 'auto');
     const dark = theme === 'dark' || (theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -2170,6 +2193,9 @@
         (!rows.length ? '<p class="sublabel">Vorschlag aus deinem Projekt. Erst mit Speichern aktiv.</p>' : '') +
         '<div class="row-btns"><button class="btn small" id="ckAdd">Prüfung hinzufügen</button><button class="btn small primary" id="ckSave">Speichern</button></div></div></details>');
     }
+    if (health && health.checks.length) {
+      h.push('<details class="sec"><summary>Prüfungen im Projekt <span class="meta">' + health.checks.length + (health.checks.length === 1 ? ' Prüfung, ' : ' Prüfungen, ') + health.tasks + (health.tasks === 1 ? ' Aufgabe' : ' Aufgaben') + '</span></summary><div class="body" id="hthBox">' + hthHtml(health) + '</div></details>');
+    }
     h.push(await toolsExtra());
     h.push('<details class="sec"><summary>Benachrichtigungen <span class="meta">' + (notifySet.on ? 'an' : 'aus') + '</span></summary><div class="body" id="ntSet">' +
       '<p class="md">Meldet sich, wenn der Tab im Hintergrund ist. Gilt nur in diesem Browser.</p>' +
@@ -2183,6 +2209,12 @@
       if (c.dataset.n === 'on' && c.checked && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
     });
     $('#ntTest', body).onclick = testNotification;
+    const hb = $('#hthBox', body);
+    if (hb) hb.onclick = (e) => {
+      const s = e.target.closest('[data-hth]');
+      if (s) { hthSort = s.dataset.hth; hb.innerHTML = hthHtml(health); return; }
+      if (e.target.closest('[data-hth-all]')) { hthAll = !hthAll; hb.innerHTML = hthHtml(health); }
+    };
     bindToolsExtra(body);
     if (!EDIT) return;
     $$('#repSet [data-k]', body).forEach((el) => el.onchange = () => {

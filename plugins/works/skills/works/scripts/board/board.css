@@ -1129,6 +1129,24 @@ dialog:has(.tbl.imp) { width: min(1100px, calc(100vw - 32px)); }
 .lv-trend.up { color: var(--warn); }
 .lv-trend.down { color: var(--ok); }
 .lv-names span.fl::after { content: " ~"; color: var(--warn); font-weight: 700; }
+/* Prüfungs-Gesundheit unter Werkzeuge (W-0014) */
+.hth-tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; padding: 2px; gap: 2px; background: var(--surface); margin-bottom: 8px; }
+.hth-tabs button { border: 0; background: none; height: 28px; padding: 0 10px; border-radius: 7px; font: inherit; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
+.hth-tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.hth-wrap { overflow-x: auto; }
+.hth { width: 100%; border-collapse: collapse; font-size: 13px; }
+.hth th { text-align: left; font-size: 12px; font-weight: 500; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.hth td { padding: 7px 8px; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); vertical-align: middle; white-space: nowrap; }
+.hth .num { text-align: right; font-variant-numeric: tabular-nums; }
+.hth .nmw { display: flex; align-items: center; gap: 6px; max-width: 190px; }
+.hth .nm { font-weight: 600; font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
+.hth .nmt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hth .flk { flex: none; font-family: var(--font); }
+.hth .bar { display: inline-block; width: 36px; height: 6px; border-radius: 3px; background: var(--sunken); vertical-align: middle; margin-right: 6px; overflow: hidden; }
+.hth .bar i { display: block; height: 100%; background: var(--danger); }
+.hth .flk { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 10px; font-size: 11.5px; font-weight: 600; background: color-mix(in srgb, var(--warn) 18%, transparent); }
+.hth .slow { color: var(--warn); font-weight: 600; }
+@media (max-width: 420px) { .hth .opt { display: none; } }
 .lv-infoline { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--text-2); }
 .lv-infoline .lv-si { width: 16px; height: 16px; margin-top: 1px; }
 .lv-infoline .lv-si svg { width: 10px; height: 10px; }

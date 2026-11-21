@@ -95,7 +95,7 @@ Das Detailpanel hat die Reiter **Übersicht**, **Kommentare** (Gespräch mit Cla
 
 Über dem Fortschritt zeigt die Zeile **Ansichten** gespeicherte Filter als Chips; "Aktuelle Filter speichern" erscheint, sobald Filter gesetzt sind. Über der Zeitleiste zeigt "Wie gut passen die Schätzungen?" Schätzung gegen tatsächliche Dauer.
 
-Das Symbol mit den Reglern in der Kopfzeile öffnet die **Werkzeuge**: Wochenbericht (Zeitplan, Discord, Inhalt, Berichte ansehen), Vorlagen (anlegen, bearbeiten, nutzen), Prüfungen vor dem Abschluss und Benachrichtigungen im Browser (Freigabe, Review, Frage oder Kommentar von Claude, neue P1, Blockade aufgelöst, Warteschlange leer, Ton und Zähler im Tab-Titel).
+Das Symbol mit den Reglern in der Kopfzeile öffnet die **Werkzeuge**: Wochenbericht (Zeitplan, Discord, Inhalt, Berichte ansehen), Vorlagen (anlegen, bearbeiten, nutzen), Prüfungen vor dem Abschluss, Prüfungen im Projekt (je Prüfung über alle Aufgaben: Anteil rot mit Läufen im Tooltip, Median der Laufzeit mit Pfeil bei deutlicher Abweichung, letzte Läufe und wackelig; sortierbar nach oft rot, langsam, wackelig; die ersten zehn, Rest aufklappbar) und Benachrichtigungen im Browser (Freigabe, Review, Frage oder Kommentar von Claude, neue P1, Blockade aufgelöst, Warteschlange leer, Ton und Zähler im Tab-Titel).
 
 Neue Aufgaben: Gibt es Vorlagen, fragt der Dialog zuerst nach einer Vorlage oder "Leer". Mit Vorlage gibt es die Felder der Vorlage, das freie Feld "Was genau soll passieren?" und die Kriterien zum An- und Abwählen.
 

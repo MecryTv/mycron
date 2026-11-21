@@ -14,7 +14,7 @@ import { dodCheck, nextCandidates, byIdMap } from './views.mjs';
 import { loadComments, unreadForClaude } from './comments.mjs';
 import { listTemplates, templateFromTask, normalizeTemplate, SLUG_RE } from './templates.mjs';
 import { taskTime, estimates } from './timelog.mjs';
-import { detectChecks, configuredChecks, NAME_RE } from './checks.mjs';
+import { detectChecks, configuredChecks, NAME_RE, checkHealth } from './checks.mjs';
 import { reportSettings, localReport, listReports, weekRange, reportName } from './weekly.mjs';
 import { designDetail, loadDesign, VARIANT_RE } from './design.mjs';
 import { taskUsage, projectUsage } from './usage.mjs';
@@ -831,6 +831,7 @@ export function recurringInfo(root) {
   return { rules: rules(config).map((r) => ({ ...r, text: describeRule(r), next: upcoming(r, 3, r.last ? addDaysIso(r.last, 1) : undefined) })), templates: listTemplates(root).map((t) => ({ slug: t.slug, name: t.name })) };
 }
 export function usageInfo(root) { return projectUsage(root, loadConfig(root), loadTasks(root)); }
+export function checkHealthInfo(root) { return checkHealth(loadTasks(root)); }
 export function githubInfo(root) {
   const config = loadConfig(root);
   return { settings: syncSettings(config), state: syncState(root) };

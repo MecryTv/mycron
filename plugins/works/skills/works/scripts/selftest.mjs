@@ -579,6 +579,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const out = await fetch(url + '/api/diff?id=W-0001&file=../geheim.txt&live=1', { headers: { 'X-Works-Token': token } });
       expect(out.status === 400, `Pfad außerhalb des Projekts: ${out.status}`);
     }
+    // Prüfungs-Gesundheit (W-0014): je Prüfung über alle Aufgaben Läufe, Fehlschläge, Median, wackelig.
+    const hh = await api('GET', '/api/check-health');
+    const rb = hh.checks.find((c) => c.name === 'rbad');
+    expect(hh.tasks >= 1 && rb && rb.runs >= 2 && rb.fails >= 2 && rb.fails <= rb.runs && Array.isArray(rb.last) && 'median' in rb && typeof rb.flaky === 'boolean', `Prüfungs-Gesundheit: ${JSON.stringify(rb)}`);
     await api('POST', '/api/action', { action: 'checksSave', checks: {} });
     // W-0002 hat keinen Umsetzungsplan: Die Live-Ansicht darf dafür kein NaN oder "Schritt 0 von 0" zeigen.
     w(['start', 'W-0002']);
@@ -715,6 +719,13 @@ async function browserCheck(url, log, between = async () => {}) {
     }
     await p.keyboard.press('1'); await p.waitForTimeout(250);
     await p.click('#btnTools'); await p.waitForTimeout(800);
+    // Prüfungs-Gesundheit unter Werkzeuge (W-0014): Tabelle da, Sortierung umschaltbar.
+    if (!(await p.$$('#hthBox .hth tbody tr')).length) errs.push('Werkzeuge: Prüfungen im Projekt fehlen');
+    else {
+      await p.evaluate(() => { document.querySelector('#hthBox').closest('details').open = true; });
+      await p.click('#hthBox [data-hth="slow"]');
+      if (!(await p.$('#hthBox [data-hth="slow"][aria-pressed="true"]'))) errs.push('Werkzeuge: Sortierung Langsam greift nicht');
+    }
     await between();
     const m = await b.newPage({ viewport: { width: 390, height: 844 } });
     m.on('pageerror', (e) => errs.push('mobil: ' + e.message));
