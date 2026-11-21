@@ -17,6 +17,7 @@ import { designSummary } from './design.mjs';
 import { loadActivity, pendingInstructions, stampSteps } from './live.mjs';
 import { loadKnowledge } from './knowledge.mjs';
 import { loadLanes } from './parallel.mjs';
+import { liveUsage } from './usage.mjs';
 
 function excerpt(t) {
   for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Beschreibung', 'Abkürzung', 'Kontext und Problem', 'Problem', 'Herkunft']) {
@@ -60,6 +61,7 @@ export function boardData(root) {
   const day = today();
   const plans = stampSteps(root, all.filter((t) => ['in-arbeit', 'review'].includes(t.status)
     || (OPEN_STATUSES.includes(t.status) && queued.has(t.id)) || (t.status === 'erledigt' && t.completed === day)), { prune: true });
+  const usage = liveUsage(root, config);
   const data = all.map((t) => {
     const imgs = imageLinks(getSection(t._body, 'Assets') || '').filter((i) => !/^https?:/.test(i.src));
     const crit = checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '');
@@ -77,7 +79,7 @@ export function boardData(root) {
       file: relFromWorks(root, t._file),
       thumb: imgs.length ? relFromWorks(root, path.resolve(t._dir, imgs[imgs.length - 1].src)) : '',
       thumbAlt: imgs.length ? imgs[imgs.length - 1].alt : '',
-      ...(plans.has(t.id) ? { plan: plans.get(t.id), checks: liveChecks(config, t) } : {}),
+      ...(plans.has(t.id) ? { plan: plans.get(t.id), checks: liveChecks(config, t), usage: usage.byTask[t.id] || null } : {}),
     };
   });
   const open = new Set(all.filter((t) => OPEN_STATUSES.includes(t.status)).map((t) => t.id));
@@ -91,6 +93,7 @@ export function boardData(root) {
     effortDays: effortDays(root, all, config),
     hasChecks: Object.keys(configuredChecks(config)).length > 0,
     today: day,
+    usage: { currency: usage.currency, today: usage.today },
     activity: (() => { const a = loadActivity(root); return a ? { busy: !!a.busy, current: a.current || null, recent: a.recent || [], since: a.since || '', idleSince: a.idleSince || '', lanes: a.lanes || {} } : null; })(),
     lanes: loadLanes(root).map((l) => ({ task: l.task, branch: l.branch, dir: path.basename(l.path), started: l.started, status: l.status })),
     instructions: pendingInstructions(root).map((x) => ({ task: x.task, text: x.text, at: x.at })),

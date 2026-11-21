@@ -40,9 +40,11 @@ export function buildSnapshot(root, { images = true, closed = true } = {}) {
   // Live-Daten bleiben draußen: Der Schnappschuss geht an andere und zeigt keinen Live-Zustand.
   data.meta.activity = null;
   data.meta.instructions = [];
+  data.meta.usage = null;
   for (const t of tasks) {
     delete t.plan;
     delete t.checks;
+    delete t.usage;
     t.thumb = embed(t.thumb);
     if (!t.thumb) t.thumbAlt = '';
     try {

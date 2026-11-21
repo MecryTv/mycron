@@ -1013,6 +1013,9 @@ dialog:has(.tbl.imp) { width: min(1100px, calc(100vw - 32px)); }
 .lv-tile .big small { font-size: 13px; color: var(--muted); font-weight: 500; letter-spacing: 0; }
 .lv-tile .sub { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lv-tile .sub .mono { font-size: 12px; }
+.lv-usage { font-size: 12px; color: var(--text-2); display: flex; gap: 5px; align-items: baseline; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-top: 6px; margin-top: 2px; border-top: 1px dashed var(--line); }
+.lv-usage b { color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; }
+.lv-ftop .lv-cost { font-variant-numeric: tabular-nums; color: var(--text-2); }
 .lv-tile.attn { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); background: color-mix(in srgb, var(--warn) 6%, var(--surface)); }
 .lv-attn { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .lv-attn button { width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 3px 4px; margin: 0 -4px; border-radius: 6px; font-size: 12.5px; text-align: left; cursor: pointer; min-width: 0; }

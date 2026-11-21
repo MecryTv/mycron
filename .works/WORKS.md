@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 13:26 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 13:34 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 0 | 0 | 0 | 0 | 7 | 0 |
+| 1 | 0 | 1 | 0 | 0 | 0 | 7 | 0 |
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 2 · P4 Niedrig: 0
+
+## Aktive Aufgabe
+
+[W-0008](tasks/W-0008-verbrauch-der-sitzung-in-der-live/task.md) Verbrauch der Sitzung in der Live-Ansicht (In Arbeit), letzte Übergabe 2026-11-21 10:30
 
 ## Kritisch (P1)
 
@@ -16,13 +20,14 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0008](tasks/W-0008-verbrauch-der-sitzung-in-der-live/task.md) | Verbrauch der Sitzung in der Live-Ansicht | Feature | P3 Mittel | In Arbeit | S |  |  |  |
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0008](tasks/W-0008-verbrauch-der-sitzung-in-der-live/task.md) | Verbrauch der Sitzung in der Live-Ansicht | Feature | P3 Mittel | Backlog | S |  |  |  |
 | [W-0009](tasks/W-0009-wackelige-pruefungen-und-laufzeittrend/task.md) | Wackelige Prüfungen und Laufzeittrend erkennen | Feature | P3 Mittel | Backlog | M |  |  |  |
 
 ## Zuletzt erledigt
