@@ -9,6 +9,15 @@
       "source": "ui-ux-pro-max",
       "note": "Varianten und Schriften oben im Rahmen umschaltbar",
       "at": "2026-11-21 14:16"
+    },
+    {
+      "name": "B",
+      "title": "Feinschliff Board: B Obere Kante (gleicher Entwurf, Variante B)",
+      "file": "B-feinschliff-board-b-obere.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Im Entwurf oben B Obere Kante wählen",
+      "at": "2026-11-21 14:25"
     }
   ],
   "brainstorm": [
@@ -20,8 +29,8 @@
     }
   ],
   "chosen": {
-    "name": "A",
-    "at": "2026-11-21 14:17",
-    "reason": "Nutzer: A und Geist (Streifen durch Punkte und Chips ersetzen, Schrift Geist behalten)"
+    "name": "B",
+    "at": "2026-11-21 14:25",
+    "reason": "Nutzer: Design mit der oberen Kante gefällt besser, Schrift Geist bleibt"
   }
 }

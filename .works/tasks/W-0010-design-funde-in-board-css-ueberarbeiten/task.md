@@ -3,13 +3,13 @@ id: W-0010
 title: Design-Funde in board.css überarbeiten
 type: design
 priority: P4
-status: erledigt
+status: in-arbeit
 effort: S
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed: 2026-11-21
+completed:
 milestone:
 branch: feature/w-0010-design-funde-in-board-css
 tags: [ui, board, design]
@@ -18,6 +18,7 @@ blocks: []
 related: []
 source: manuell
 incomplete: false
+reopened: 1
 ---
 
 # Design-Funde in board.css überarbeiten
@@ -72,6 +73,14 @@ Art: nachher · Hinzugefügt: 2026-11-21
 Beschreibung: Nachher: Verlauf unter Aktivität mit farbigem Punkt vor der Zeit, Meldung mit Pfeil-Symbol, P1-Karte mit Raute und getönter Kante
 Art: nachher · Hinzugefügt: 2026-11-21
 
+![Nachher Variante B: feine Linie oben an jeder Karte in der Prioritätsfarbe, Prio](assets/2026-11-21-nachher-obere-kante-nachher.png)
+Beschreibung: Nachher Variante B: feine Linie oben an jeder Karte in der Prioritätsfarbe, Priorität als farbiger Text, Flussleiste mit Balken unten
+Art: nachher · Hinzugefügt: 2026-11-21
+
+![Nachher Variante B: Meldung mit Linie oben, Verlauf mit Punkt vor der Zeit, P1-K](assets/2026-11-21-nachher-obere-kante-verlauf-nachher.png)
+Beschreibung: Nachher Variante B: Meldung mit Linie oben, Verlauf mit Punkt vor der Zeit, P1-Karte mit roter Linie oben
+Art: nachher · Hinzugefügt: 2026-11-21
+
 ## Offene Fragen
 
 ## Übergabe
@@ -98,3 +107,10 @@ Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 - 2026-11-21: Akzeptanzkriterien: "Farben mit Bedeutung (Status, Priorität) bleiben erkennbar" abgehakt
 - 2026-11-21: Variante A umgesetzt, Geist markiert, toter Meilenstein-Block entfernt. impeccable detect meldet nichts mehr. Selbsttest Windows mit Browser 23/23.
 - 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
+- 2026-11-21: Wiedereröffnet (Status: erledigt → backlog). Grund: Nutzer wählt nach dem Umsetzen doch Variante B (obere Kante)
+- 2026-11-21: Entwurf B „Feinschliff Board: B Obere Kante (gleicher Entwurf, Variante B)“ angehängt
+- 2026-11-21: Entwurf B „Feinschliff Board: B Obere Kante (gleicher Entwurf, Variante B)“ gewählt. Grund: Nutzer: Design mit der oberen Kante gefällt besser, Schrift Geist bleibt
+- 2026-11-21: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-nachher-obere-kante-nachher.png (nachher)
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-nachher-obere-kante-verlauf-nachher.png (nachher)
+- 2026-11-21: Auf Variante B (obere Kante) umgestellt. Detektor meldet nichts. Selbsttest Windows mit Browser 23/23.
