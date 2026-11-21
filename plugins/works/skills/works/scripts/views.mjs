@@ -1,7 +1,7 @@
 // Auswertungen: Index (WORKS.md), Empfehlungen, DoD-Prüfung, Session-Zusammenfassung.
 import fs from 'node:fs';
 import path from 'node:path';
-import {
+import { readText,
   loadTasks, loadConfig, loadState, queueOf, worksDir, getSection, checkboxes, hasContent,
   imageLinks, OPEN_STATUSES, STATUSES, STATUS_LABEL, PRIO_LABEL, TYPE_LABEL,
   isBlocked, openBlockers, isOverdue, openQuestions, prioRank, effortRank, sortTasks,
@@ -70,7 +70,7 @@ export function milestoneProgress(config, tasks) {
 function ideaCount(root) {
   const p = path.join(worksDir(root), 'ideas.md');
   if (!exists(p)) return 0;
-  return fs.readFileSync(p, 'utf8').split('\n').filter((l) => /^- \[I-\d+\]/.test(l) && !l.includes('~~')).length;
+  return readText(p).split('\n').filter((l) => /^- \[I-\d+\]/.test(l) && !l.includes('~~')).length;
 }
 
 export function generateIndex(root) {
@@ -233,7 +233,7 @@ export function dodCheck(root, config, task) {
   }
   if (task.type === 'design' || tags.includes('ui')) {
     const dec = path.join(task._dir, 'decisions.md');
-    const filled = exists(dec) && hasContent(getSection(fs.readFileSync(dec, 'utf8'), 'Entscheidungen') || '');
+    const filled = exists(dec) && hasContent(getSection(readText(dec), 'Entscheidungen') || '');
     auto.push({ ok: filled, text: 'decisions.md enthält Entscheidungen', detail: exists(dec) ? '' : 'Datei fehlt' });
   }
   if (task.type === 'bug') auto.push({ ok: hasContent(getSection(body, 'Ursache')), text: 'Ursache ist dokumentiert', detail: '' });

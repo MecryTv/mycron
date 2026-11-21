@@ -6,7 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
-import {
+import { readText,
   SKILL_DIR, STATUSES, OPEN_STATUSES, CLOSED_STATUSES, STATUS_LABEL, PRIORITIES, PRIO_LABEL,
   TYPES, TYPE_LABEL, EFFORTS, RISKS, BRANCH_PREFIX, FIELD_ORDER, LIST_FIELDS, DEFAULT_CONFIG,
   today, nowStamp, daysBetween, slugify, fail, warn, run, exists, readJson, writeJson,
@@ -148,7 +148,7 @@ function createTask(root, config, opts) {
 
   const task = loadTask(dir);
   if (opts['log-file']) {
-    const log = fs.readFileSync(String(opts['log-file']), 'utf8').trim();
+    const log = readText(String(opts['log-file'])).trim();
     task._body = setSection(task._body, 'Logs und Fehlermeldungen', '```\n' + log + '\n```');
   }
   // Ziel, Beschreibung und Kriterien in einem Schritt schreiben, damit nie eine halb angelegte Aufgabe entsteht.
@@ -259,7 +259,7 @@ function cmdShow() {
     out(s.trim());
     return;
   }
-  out(fs.readFileSync(t._file, 'utf8'));
+  out(readText(t._file));
   const byId = byIdMap(loadTasks(root));
   const info = [];
   if (isBlocked(t, byId)) info.push(`Blockiert durch: ${openBlockers(t, byId).join(', ')}`);
@@ -485,7 +485,7 @@ function cmdHandoff() {
   if (!id) fail('Keine aktive Aufgabe. ID angeben.');
   const t = findTask(root, config, id);
   let text = flags.text;
-  if (flags.file) text = fs.readFileSync(String(flags.file), 'utf8');
+  if (flags.file) text = readText(String(flags.file));
   if (!text || text === true) {
     const h = getSection(t._body, 'Übergabe');
     out(hasContent(h) ? stripComments(h).trim() : `Keine Übergabe für ${t.id} vorhanden.`);
@@ -523,7 +523,7 @@ function cmdSection() {
   if (!name) fail('Abschnittsname fehlt. Aufruf: works section <ID> "Ziel" --text "..." | --file pfad');
   if (['Verlauf', 'Assets'].includes(name)) fail(`Der Abschnitt ${name} wird nur über das CLI gepflegt.`);
   let text = flags.text;
-  if (flags.file) text = fs.readFileSync(String(flags.file), 'utf8');
+  if (flags.file) text = readText(String(flags.file));
   if (text === undefined || text === true) {
     const s = getSection(t._body, name);
     out(s === null ? '' : stripComments(s).trim());
@@ -670,7 +670,7 @@ async function cmdDone() {
   const unblocked = loadTasks(root).filter((o) => (o.blocked_by || []).includes(t.id) && OPEN_STATUSES.includes(o.status) && !isBlocked(o, byIdMap(loadTasks(root))));
   if (unblocked.length) out(`Jetzt frei: ${unblocked.map((o) => `${o.id} ${o.title}`).join('; ')}`);
   const dec = path.join(t._dir, 'decisions.md');
-  if (exists(dec) && hasContent(getSection(fs.readFileSync(dec, 'utf8'), 'Entscheidungen'))) {
+  if (exists(dec) && hasContent(getSection(readText(dec), 'Entscheidungen'))) {
     out('Hinweis: decisions.md enthält Entscheidungen. Übernahme ins Decision Log (second-brain-sync) anbieten.');
   }
 }
@@ -1058,9 +1058,9 @@ function cmdDoctor() {
     }
     if (t.incomplete && open) warnings.push(`${t.id}: als unvollständig markiert`);
     // Bilder
-    const texts = [fs.readFileSync(t._file, 'utf8')];
+    const texts = [readText(t._file)];
     const dec = path.join(t._dir, 'decisions.md');
-    if (exists(dec)) texts.push(fs.readFileSync(dec, 'utf8'));
+    if (exists(dec)) texts.push(readText(dec));
     const referenced = new Set();
     for (const txt of texts) {
       for (const img of imageLinks(txt)) {
@@ -1254,7 +1254,7 @@ function cmdDecisions() {
   const t = findTask(root, config, pos[0]);
   const file = createDecisions(root, t);
   if (flags.add) {
-    let txt = fs.readFileSync(file, 'utf8');
+    let txt = readText(file);
     const n = (stripComments(txt).match(/^### E(\d+)/gm) || []).length + 1;
     const entry = [
       `### E${n}: ${flags.add}`,
@@ -1298,7 +1298,7 @@ function cmdAttachDoc() {
   }
   const rel = path.relative(t._dir, target).split(path.sep).join('/');
   const label = flags.label && flags.label !== true ? flags.label : path.basename(src);
-  let txt = fs.readFileSync(decFile, 'utf8');
+  let txt = readText(decFile);
   const sec = stripComments(getSection(txt, 'Quellen') || '').trim();
   txt = setSection(txt, 'Quellen', (sec ? sec + '\n' : '') + `- [${label}](${encodeURI(rel)}) (${mode === 'link' ? 'verlinkt' : mode === 'copy' ? 'kopiert' : 'verschoben'} am ${today()})`);
   fs.writeFileSync(decFile, txt);
@@ -1328,7 +1328,7 @@ function cmdIdea() {
 
 function cmdIdeas() {
   const root = requireRoot();
-  const lines = fs.readFileSync(ideasFile(root), 'utf8').split('\n').filter((l) => /^- \[I-\d+\]/.test(l));
+  const lines = readText(ideasFile(root)).split('\n').filter((l) => /^- \[I-\d+\]/.test(l));
   const open = lines.filter((l) => !l.includes('~~'));
   out(open.length ? open.join('\n') : 'Keine offenen Ideen.');
 }
@@ -1337,7 +1337,7 @@ function cmdIdeaDrop() {
   const root = requireRoot();
   const iid = String(pos[0] || '').toUpperCase();
   const file = ideasFile(root);
-  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  const lines = readText(file).split('\n');
   const idx = lines.findIndex((l) => l.startsWith(`- [${iid}]`));
   if (idx === -1) fail(`Idee ${iid} nicht gefunden.`);
   lines[idx] = `- ~~${lines[idx].slice(2)}~~ verworfen${flags.reason && flags.reason !== true ? `: ${flags.reason}` : ''}`;
@@ -1351,7 +1351,7 @@ function cmdPromote() {
   const config = loadConfig(root);
   const iid = String(pos[0] || '').toUpperCase();
   const file = ideasFile(root);
-  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  const lines = readText(file).split('\n');
   const idx = lines.findIndex((l) => l.startsWith(`- [${iid}]`));
   if (idx === -1) fail(`Idee ${iid} nicht gefunden.`);
   if (lines[idx].includes('~~')) fail(`Idee ${iid} wurde bereits übernommen.`);
@@ -1914,7 +1914,7 @@ function cmdComment() {
   const root = requireRoot();
   const config = loadConfig(root);
   const t = findTask(root, config, pos.shift());
-  let text = flags.file && flags.file !== true ? fs.readFileSync(String(flags.file), 'utf8') : flags.text && flags.text !== true ? String(flags.text) : pos.join(' ');
+  let text = flags.file && flags.file !== true ? readText(String(flags.file)) : flags.text && flags.text !== true ? String(flags.text) : pos.join(' ');
   if (!text.trim()) fail('Text fehlt: works comment <ID> "..."');
   const author = commentAuthor();
   try { addComment(t, author, text); } catch (e) { fail(e.message); }

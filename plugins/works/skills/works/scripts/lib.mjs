@@ -419,9 +419,15 @@ export function taskDirs(root) {
   return res;
 }
 
+// Textdateien lesen und Zeilenenden auf LF bringen. Git mit core.autocrlf=true checkt .works unter Windows
+// mit CRLF aus; die Parser erwarten LF. Geschrieben wird immer mit LF.
+export function readText(file) {
+  return fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
+}
+
 export function loadTask(dir, archived = false) {
   const file = path.join(dir, 'task.md');
-  const text = fs.readFileSync(file, 'utf8');
+  const text = readText(file);
   const { data, body } = parseFrontmatter(text);
   const d = data || {};
   for (const f of LIST_FIELDS) {
@@ -517,7 +523,7 @@ export function sortTasks(list) {
 }
 
 export function readTemplate(name) {
-  return fs.readFileSync(path.join(TEMPLATE_DIR, name), 'utf8');
+  return readText(path.join(TEMPLATE_DIR, name));
 }
 
 export function fillTemplate(text, vars) {
