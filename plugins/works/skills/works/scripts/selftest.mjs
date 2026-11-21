@@ -405,7 +405,11 @@ function free(port) {
 async function browserCheck(url, log, between = async () => {}) {
   let pw;
   try { pw = createRequire(path.join(process.cwd(), 'x.js'))('playwright'); } catch { try { pw = createRequire(import.meta.url)('playwright'); } catch { log('        Playwright nicht gefunden, Browserprüfung übersprungen.'); return; } }
-  const b = await pw.chromium.launch();
+  // Ohne heruntergeladene Playwright-Browser auf ein installiertes Chrome oder Edge ausweichen.
+  let b = null;
+  for (const opt of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) {
+    try { b = await pw.chromium.launch(opt); break; } catch (e) { if (opt.channel === 'msedge') throw e; }
+  }
   const errs = [];
   try {
     const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
