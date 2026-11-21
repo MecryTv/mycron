@@ -13,6 +13,11 @@
       "name": "feierabend",
       "source": "./plugins/feierabend",
       "description": "Feierabend und Guten Morgen: Übergaben schreiben, Board stoppen, Tag zusammenfassen und am nächsten Morgen dort weitermachen (braucht works)"
+    },
+    {
+      "name": "ci-waechter",
+      "source": "./plugins/ci-waechter",
+      "description": "CI-Wächter: wartet nach einem Push auf den GitHub-Actions-Lauf zum Commit und meldet grün oder rot, bei rot mit Job und Fehlerstelle (ohne gh)"
     }
   ]
 }
