@@ -1,6 +1,6 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 09:50 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 09:51 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
@@ -12,7 +12,7 @@ Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 2 · P4 Niedri
 
 ## Aktive Aufgabe
 
-[W-0001](tasks/W-0001-live-ansicht-im-works-board/task.md) Live-Ansicht im works-Board (Review), letzte Übergabe 2026-11-21 09:49
+[W-0001](tasks/W-0001-live-ansicht-im-works-board/task.md) Live-Ansicht im works-Board (Review), letzte Übergabe 2026-11-21 09:51
 
 ## Kritisch (P1)
 

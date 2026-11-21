@@ -20,6 +20,7 @@ source: manuell
 incomplete: false
 ---
 
+
 # Live-Ansicht im works-Board
 
 ## Ziel
@@ -116,4 +117,13 @@ Stand 2026-11-21: Umgesetzt auf feature/w-0001-live-ansicht-im-works-board (43a0
 - 2026-11-21: Akzeptanzkriterien: "works selftest ist grün, inklusive der neuen Live-Schritte" abgehakt
 - 2026-11-21: Abschluss-Review umgesetzt (Senden-Knopf, Frische-Grenzen ohne neue Daten, Fehlerausgabe bleibt offen, Export ohne Live-Daten, Browserprüfung mit Chrome); selftest --browser 18/18; Kriterien im Browser am Testprojekt geprüft
 - 2026-11-21: Status: in-arbeit → review (Grund: Umsetzung fertig, Abschluss-Review eingearbeitet, wartet auf Abnahme)
+- 2026-11-21: Übergabe aktualisiert
+
+## Übergabe
+Stand: 2026-11-21 09:51
+
+Stand 2026-11-21: Lokal in main gemergt (bf52375), selftest --browser auf main 18/18, Feature-Branch gelöscht. Nicht gepusht; das installierte Plugin zeigt die Live-Ansicht erst nach Push auf GitHub und Plugin-Update. Offen: Abnahme durch den Nutzer im Board, danach works done W-0001 --confirm.
+
+## Verlauf
+- 2026-11-21: Lokal in main gemergt (bf52375, --no-ff), selftest --browser auf main 18/18, Branch gelöscht, nicht gepusht
 - 2026-11-21: Übergabe aktualisiert
