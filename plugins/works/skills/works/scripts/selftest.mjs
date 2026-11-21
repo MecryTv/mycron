@@ -230,6 +230,26 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     has(fs.readFileSync(path.join(HERE, '..', '..', '..', 'hooks', 'hooks.json'), 'utf8'), 'pre-tool.mjs', 'hooks.json');
   });
 
+  await step('Live: Uhrzeit abgehakter Schritte', async () => {
+    const { stampSteps, taskDirOf } = await import('./live.mjs');
+    const { loadTask } = await import('./lib.mjs');
+    const load = () => loadTask(path.join(proj, '.works', 'tasks', taskDirOf(proj, 'W-0001')));
+    const stepsF = path.join(proj, '.works', 'steps.json');
+    w(['check', 'W-0001', '1', '--section=Umsetzungsplan']);
+    hook('post-tool.mjs', { cwd: proj, session_id: 's1', tool_name: 'Bash', tool_input: { command: 'works check W-0001 1' }, tool_response: {} });
+    const st = JSON.parse(fs.readFileSync(stepsF, 'utf8'));
+    expect(st['W-0001'] && st['W-0001']['Format festlegen'], 'Hook hat keine Uhrzeit gestempelt');
+    const first = stampSteps(proj, [load()]).get('W-0001');
+    expect(first[0].done && first[0].at === st['W-0001']['Format festlegen'], 'Uhrzeit nicht stabil');
+    w(['check', 'W-0001', '1', '--section=Umsetzungsplan', '--undo']);
+    const after = stampSteps(proj, [load()]).get('W-0001');
+    expect(!after[0].done && after[0].at === '', 'Uhrzeit nach --undo nicht entfernt');
+    w(['check', 'W-0001', '1', '--section=Umsetzungsplan']);
+    stampSteps(proj, [], { prune: true });
+    expect(!JSON.parse(fs.readFileSync(stepsF, 'utf8'))['W-0001'], 'prune entfernt nichts');
+    has(fs.readFileSync(path.join(proj, '.works', '.gitignore'), 'utf8'), 'steps.json', '.works/.gitignore');
+  });
+
   if (hasGit) {
     await step('Dateien: Commits mit ID, works file, Hinweis beim Edit', () => {
       git(['add', '-A']); git(['commit', '-q', '-m', 'chore: start']);

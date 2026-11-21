@@ -3,8 +3,9 @@
 // je Aufgabe, weist auf frühere Arbeit an derselben Datei hin und reicht Anweisungen aus dem Board weiter.
 // Werkzeugaufrufe in einem Worktree einer parallelen Aufgabe zählen für diese Aufgabe.
 import fs from 'node:fs';
-import { findRoot, loadConfig } from '../scripts/lib.mjs';
-import { recordActivity, takeInstructions, instructionText, callTarget } from '../scripts/live.mjs';
+import path from 'node:path';
+import { findRoot, loadConfig, loadTask, worksDir } from '../scripts/lib.mjs';
+import { recordActivity, takeInstructions, instructionText, callTarget, stampSteps, taskDirOf } from '../scripts/live.mjs';
 import { recordEdit, editHint } from '../scripts/files.mjs';
 import { loadLanes } from '../scripts/parallel.mjs';
 
@@ -23,6 +24,9 @@ try {
     if (config.live_activity !== false) {
       const failed = input.tool_response && (input.tool_response.is_error || input.tool_response.error);
       recordActivity(root, task, input.tool_name || '', ti, !failed, lane ? lane.path : '');
+      // Uhrzeit frisch abgehakter Schritte festhalten, auch wenn gerade kein Board läuft.
+      const dir = task && taskDirOf(root, task);
+      if (dir) { try { stampSteps(root, [loadTask(path.join(worksDir(root), 'tasks', dir))]); } catch { /* nicht kritisch */ } }
     }
     if (config.file_tracking !== false && task) {
       const file = recordEdit(root, task, input.tool_name || '', ti, lane ? lane.path : root);
