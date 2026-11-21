@@ -176,13 +176,15 @@
     $('#project').innerHTML = esc(meta.project) + ' <span class="dim">Aufgaben</span>';
     const pill = $('#busy');
     const a = meta.activity;
-    const fresh = a && a.busy && a.current && Date.now() - Date.parse(a.current.at) < 10 * 60000;
-    const laneIds = (meta.lanes || []).map((l) => l.task).filter((id) => a && a.lanes && a.lanes[id] && Date.now() - Date.parse(a.lanes[id].at) < 10 * 60000);
+    const fresh = a && a.busy && lvFresh(a.current);
+    const laneIds = (meta.lanes || []).map((l) => l.task).filter((id) => a && a.lanes && lvFresh(a.lanes[id]));
     pill.hidden = !fresh && !laneIds.length;
+    const perm = lvPermEntry();
+    pill.classList.toggle('perm', !!perm);
     const pulse = $('#livePulse');
-    if (pulse) pulse.hidden = pill.hidden;
+    if (pulse) { pulse.hidden = pill.hidden; pulse.classList.toggle('perm', !!perm); }
     if (fresh || laneIds.length) {
-      const main = fresh ? 'Claude arbeitet' + (a.current.task ? ' an ' + esc(a.current.task) : '') + ', seit ' + lvSince(a.since || a.current.at, 'min') : '';
+      const main = fresh ? (a.current.perm ? 'Wartet auf deine Freigabe' + (a.current.task ? ' (' + esc(a.current.task) + ')' : '') : 'Claude arbeitet' + (a.current.task ? ' an ' + esc(a.current.task) : '') + ', seit ' + lvSince(a.since || a.current.at, 'min')) : '';
       const par = laneIds.length ? (laneIds.length === 1 ? '1 Agent parallel an ' + esc(laneIds[0]) : laneIds.length + ' Agenten parallel') : '';
       pill.innerHTML = [main, par].filter(Boolean).join(', ');
       const go = fresh && a.current.task ? a.current.task : laneIds[0];
@@ -192,7 +194,7 @@
     const tc = $('#toolsCount');
     const n = (meta.knowledgeProposals || 0);
     tc.hidden = !n; tc.textContent = n;
-    document.title = 'Works ' + meta.project;
+    document.title = (hiddenCount && notifySet.title ? '(' + hiddenCount + ') ' : '') + baseTitle();
   }
 
   function renderOverview() {
@@ -2057,10 +2059,10 @@
   // ---------- Benachrichtigungen ----------
 
   const NKEY = 'works-notify-' + meta.project;
-  const NDEF = { on: false, review: true, question: true, p1: true, unblocked: false, queueEmpty: true, any: false, sound: true, title: true };
+  const NDEF = { on: false, perm: true, review: true, question: true, p1: true, unblocked: false, queueEmpty: true, any: false, sound: true, title: true };
   let notifySet = { ...NDEF, ...store.get(NKEY, {}) };
   let hiddenCount = 0;
-  const baseTitle = () => 'Works ' + meta.project;
+  const baseTitle = () => (lvPermEntry() ? 'Freigabe · ' : '') + 'Works ' + meta.project;
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { hiddenCount = 0; document.title = baseTitle(); } });
 
   function beep() {
@@ -2090,6 +2092,10 @@
       if (s.p1 && o.priority !== 'P1' && t.priority === 'P1') ev.push({ id: t.id, title: t.id + ' ist jetzt P1', body: t.title });
       if (s.unblocked && o.blocked && !t.blocked && OPEN.includes(t.status)) ev.push({ id: t.id, title: t.id + ' ist jetzt startbar', body: t.title });
     }
+    // Freigabe: einmal je Rechteabfrage, erkannt an ihrer Startzeit.
+    const permAt = (a) => (a && a.busy && a.current && a.current.perm ? a.current.permSince || a.current.at : '');
+    const pn = permAt(next.meta.activity);
+    if (s.perm && pn && pn !== permAt(meta.activity)) { const c = next.meta.activity.current; ev.push({ id: c.task || '', title: 'Claude wartet auf deine Freigabe', body: (c.task ? c.task + ': ' : '') + c.verb + (c.what ? ' ' + c.what : '') }); }
     if (s.queueEmpty && (meta.queue || []).length && !(next.meta.queue || []).length) ev.push({ id: '', title: 'Warteschlange leer', body: 'Claude hat alle eingereihten Aufgaben abgearbeitet.' });
     if (!ev.length) return;
     if (document.hidden) {
@@ -2153,7 +2159,7 @@
     h.push(await toolsExtra());
     h.push('<details class="sec"><summary>Benachrichtigungen <span class="meta">' + (notifySet.on ? 'an' : 'aus') + '</span></summary><div class="body" id="ntSet">' +
       '<p class="md">Meldet sich, wenn der Tab im Hintergrund ist. Gilt nur in diesem Browser.</p>' +
-      [['on', 'Benachrichtigungen an'], ['review', 'Aufgabe kommt in Review'], ['question', 'Frage oder Kommentar von Claude'], ['p1', 'Neue Aufgabe mit P1'], ['unblocked', 'Blockade aufgelöst'], ['queueEmpty', 'Warteschlange leer gelaufen'], ['any', 'Jede Statusänderung'], ['sound', 'Ton abspielen'], ['title', 'Zähler im Tab-Titel']].map(([k, l]) => '<label class="switch small"><span><b>' + l + '</b></span><input type="checkbox" data-n="' + k + '"' + (notifySet[k] ? ' checked' : '') + '><i aria-hidden="true"></i></label>').join('') +
+      [['on', 'Benachrichtigungen an'], ['perm', 'Claude wartet auf deine Freigabe'], ['review', 'Aufgabe kommt in Review'], ['question', 'Frage oder Kommentar von Claude'], ['p1', 'Neue Aufgabe mit P1'], ['unblocked', 'Blockade aufgelöst'], ['queueEmpty', 'Warteschlange leer gelaufen'], ['any', 'Jede Statusänderung'], ['sound', 'Ton abspielen'], ['title', 'Zähler im Tab-Titel']].map(([k, l]) => '<label class="switch small"><span><b>' + l + '</b></span><input type="checkbox" data-n="' + k + '"' + (notifySet[k] ? ' checked' : '') + '><i aria-hidden="true"></i></label>').join('') +
       '<div class="row-btns"><button class="btn small" id="ntTest">Testmeldung senden</button></div></div></details>');
     body.innerHTML = h.join('');
     $$('[data-sclose]', body).forEach((b) => b.onclick = closeSide);
@@ -2363,6 +2369,8 @@
   // Daten: task.plan und task.checks (nur Tagesliste), meta.activity, meta.lanes, meta.queue.
 
   const LIVE_FRESH_MS = 10 * 60000;
+  // Auf eine Freigabe kann Claude lange warten. Eine Ablehnung meldet kein Hook, daher trotzdem eine Obergrenze.
+  const LIVE_PERM_MS = 60 * 60000;
   const LIVE_KEY = 'works-live-' + meta.project;
   const livePrefs = Object.assign({ focus: '', feedAll: false }, store.get(LIVE_KEY, {}));
   let liveFollow = !livePrefs.focus;
@@ -2380,6 +2388,7 @@
     next: lvSvg('<path d="M6 4l4 4-4 4"/>'),
     ask: lvSvg('<path d="M6 6a2 2 0 1 1 3 1.7c-.6.4-1 .8-1 1.5"/><path d="M8 11.6v.1"/>'),
     chk: lvSvg('<path d="M8 2.5l4.5 1.8v3.6c0 2.8-2 4.6-4.5 5.6-2.5-1-4.5-2.8-4.5-5.6V4.3z"/>'),
+    perm: lvSvg('<rect x="4" y="7.4" width="8" height="5.8" rx="1.2"/><path d="M5.8 7.4V5.6a2.2 2.2 0 0 1 4.4 0v1.8"/>'),
   };
   const lvSi = (st) => '<span class="lv-si ' + st + '" aria-hidden="true">' + (LV_IC[st === 'ack' ? 'ok' : st] || '') + '</span>';
   const lvPad = (n) => String(n).padStart(2, '0');
@@ -2402,13 +2411,32 @@
   function nextLiveDeadline() {
     const a = meta.activity;
     const times = [];
-    if (a && a.busy && a.current) times.push(Date.parse(a.current.at) + LIVE_FRESH_MS);
-    if (a && a.lanes) for (const e of Object.values(a.lanes)) times.push(Date.parse(e.at) + LIVE_FRESH_MS);
+    if (a && a.busy && a.current) times.push(Date.parse(a.current.at) + lvTtl(a.current));
+    if (a && a.lanes) for (const e of Object.values(a.lanes)) times.push(Date.parse(e.at) + lvTtl(e));
     for (const t of tasks) if (t.checks && t.checks.running) times.push(Date.parse(t.checks.runningSince) + 11 * 60000);
     const future = times.filter((x) => x > Date.now());
     return future.length ? Math.min(...future) + 1000 : Infinity;
   }
-  const lvFresh = (e) => !!e && Date.now() - Date.parse(e.at) < LIVE_FRESH_MS;
+  function lvTtl(e) { return e && e.perm ? LIVE_PERM_MS : LIVE_FRESH_MS; }
+  function lvFresh(e) { return !!e && Date.now() - Date.parse(e.at) < lvTtl(e); }
+  // Wartet Claude (oder ein Agent) gerade auf eine Freigabe? Liefert den Aufruf oder null.
+  function lvPermEntry() {
+    const a = meta.activity;
+    if (!a) return null;
+    if (a.busy && a.current && a.current.perm && lvFresh(a.current)) return a.current;
+    return Object.values(a.lanes || {}).find((e) => e.perm && lvFresh(e)) || null;
+  }
+  const LV_PERM = { Bash: 'einen Befehl', Edit: 'eine Änderung', MultiEdit: 'eine Änderung', NotebookEdit: 'eine Änderung', Write: 'eine neue Datei', WebFetch: 'einen Webzugriff', WebSearch: 'eine Websuche' };
+  const lvNotifyOn = () => notifySet.on && notifySet.perm && 'Notification' in window && Notification.permission === 'granted';
+  async function lvEnableNotify() {
+    if (!('Notification' in window)) return fail(new Error('Dieser Browser unterstützt keine Benachrichtigungen.'));
+    if (Notification.permission === 'default') await Notification.requestPermission();
+    if (Notification.permission !== 'granted') return fail(new Error('Benachrichtigungen sind im Browser blockiert. In den Seiteneinstellungen erlauben.'));
+    notifySet = { ...notifySet, on: true, perm: true };
+    store.set(NKEY, notifySet);
+    toast('<div class="what">Benachrichtigung an</div><div class="why">Meldet sich, wenn Claude auf eine Freigabe wartet und der Tab im Hintergrund ist.</div>');
+    renderLive();
+  }
   const lvLanes = () => new Set((meta.lanes || []).map((l) => l.task));
 
   function phaseOf(t) {
@@ -2453,6 +2481,8 @@
 
   function lvStatus(t) {
     const ph = phaseOf(t), s = lvSteps(t), c = lvChecks(t);
+    const pe = lvNowOf(t);
+    if (pe && pe.perm) return { ic: 'perm', text: 'Wartet auf deine Freigabe', w: s.total ? s.done / s.total : null };
     if (ph === 'erledigt') return { ic: 'ok', text: 'Heute erledigt' };
     if (ph === 'pruefung') return { ic: 'run', text: 'Prüfungen ' + c.finished + ' von ' + c.total + ', ' + c.running + ' läuft', w: c.finished / c.total, col: 'var(--accent)' };
     if (ph === 'review') return { ic: c && (c.warn || c.fail) ? 'warn' : 'review', text: 'Wartet auf deine Abnahme' + (c && (c.warn || c.fail) ? ', ' + lvFinds(c) : ''), w: 1, col: 'var(--s-review)' };
@@ -2467,6 +2497,7 @@
 
   function lvAttention(list) {
     const out = [];
+    for (const t of list) { const e = lvNowOf(t); if (e && e.perm) out.push({ id: t.id, ic: 'perm', text: t.id + ': Freigabe für ' + (LV_PERM[e.tool] || 'ein Werkzeug') }); }
     for (const t of list) {
       if (t.status === 'review') out.push({ id: t.id, ic: 'review', text: t.id + ' abnehmen' });
       // Je Aufgabe und Art eine Zeile, auch bei Dutzenden fehlgeschlagener Prüfungen.
@@ -2528,6 +2559,10 @@
     const e = lvNowOf(t);
     const agent = lvLanes().has(t.id);
     const where = ph === 'pruefung' ? 'Prüfung ' + Math.min(c.finished + 1, c.total) + ' von ' + c.total + ', Ergebnisse unter Prüfungen' : s.cur >= 0 ? 'Schritt ' + (s.cur + 1) + ': ' + esc(s.curT) : '';
+    if (e && e.perm) {
+      return '<div class="lv-now perm"><span class="n-label"><i class="lv-dot perm" aria-hidden="true"></i>' + (agent ? 'Agent wartet' : 'Wartet') + ' auf deine Freigabe</span><span class="n-what">' + lvWhat(e) + '</span><span class="n-meta">seit ' + lvSince(e.permSince || e.at) + (where ? ' · ' + where : '') + '</span>' +
+        '<span class="n-hint">Bestätige oder lehne im Claude-Fenster ab.' + (lvNotifyOn() ? '' : '<button type="button" class="btn link" data-lv-notify data-lk="notify">Mich im Browser benachrichtigen</button>') + '</span></div>';
+    }
     if (e && e.running) {
       return '<div class="lv-now"><span class="n-label"><i class="lv-dot" aria-hidden="true"></i>Gerade jetzt' + (agent ? ', Agent im eigenen Worktree' : '') + '</span><span class="n-what">' + lvWhat(e) + '</span><span class="n-meta">seit ' + lvSince(e.at) + (where ? ' · ' + where : '') + '</span></div>';
     }
@@ -2646,6 +2681,7 @@
     const stepTxt = cs && cs.total && cs.cur >= 0 ? ' <small>Schritt ' + (cs.cur + 1) + ' von ' + cs.total + '</small>' : '';
     let t1;
     if (!cur) t1 = '<h3>Claude wartet</h3><div class="big">' + (a && a.idleSince ? 'seit ' + lvTime(a.idleSince) : 'Gerade nicht aktiv') + '</div><div class="sub">Keine laufende Anfrage</div>';
+    else if (cur.perm) t1 = '<h3><i class="lv-dot perm" aria-hidden="true"></i>Claude wartet auf deine Freigabe</h3><div class="big">' + esc(cur.task || 'Ohne Aufgabe') + stepTxt + '</div><div class="sub">' + lvWhat(cur) + ', seit ' + lvSince(cur.permSince || cur.at) + '</div>';
     else if (cur.running) t1 = '<h3><i class="lv-dot" aria-hidden="true"></i>Claude arbeitet gerade</h3><div class="big">' + esc(cur.task || 'Ohne Aufgabe') + stepTxt + '</div><div class="sub">' + lvWhat(cur) + ', seit ' + lvSince(cur.at) + '</div>';
     else { const last = (a.recent || [])[0]; t1 = '<h3><i class="lv-dot" aria-hidden="true"></i>Claude denkt nach</h3><div class="big">' + esc(cur.task || 'Ohne Aufgabe') + stepTxt + '</div><div class="sub">' + (last ? 'Zuletzt: ' + lvWhat(last) + ', vor ' + lvSince(last.at) : 'seit ' + lvSince(cur.at)) + '</div>'; }
     const by = (p) => list.filter((t) => phaseOf(t) === p).length;
@@ -2660,7 +2696,7 @@
     const attRest = att.length - 4;
     const t4 = '<h3>Wartet auf dich</h3>' + (att.length ? '<div class="big">' + att.length + ' <small>' + (att.length === 1 ? 'Punkt' : 'Punkte') + '</small></div><ul class="lv-attn">' + att.slice(0, 4).map((x, i) => '<li><button type="button" data-lv-focus="' + esc(x.id) + '" data-lk="att' + i + '">' + lvSi(x.ic) + '<span class="t">' + esc(x.text) + '</span></button></li>').join('') + '</ul>' +
       (attRest > 0 ? '<span class="sub">und ' + attRest + (attRest === 1 ? ' weiterer Punkt' : ' weitere Punkte') + '</span>' : '') : '<div class="big">Nichts</div><div class="sub">Claude braucht gerade nichts von dir</div>');
-    return '<button type="button" class="lv-tile lv-tile-btn" data-lv-follow data-lk="follow" title="Ansicht folgt Claude">' + t1 + '</button><article class="lv-tile">' + t2 + '</article><article class="lv-tile">' + t3 + '</article><article class="lv-tile' + (att.length ? ' attn' : '') + '">' + t4 + '</article>';
+    return '<button type="button" class="lv-tile lv-tile-btn' + (cur && cur.perm ? ' perm' : '') + '" data-lv-follow data-lk="follow" title="Ansicht folgt Claude">' + t1 + '</button><article class="lv-tile">' + t2 + '</article><article class="lv-tile">' + t3 + '</article><article class="lv-tile' + (att.length ? ' attn' : '') + '">' + t4 + '</article>';
   }
 
   function lvFocusHtml(t, list) {
@@ -2695,7 +2731,7 @@
   // Ansage für Screenreader: Schritt erledigt, Prüfungen fertig, Aufgabe wartet auf Abnahme.
   function lvAnnounce(list) {
     const snap = {};
-    for (const t of list) { const c = lvChecks(t); snap[t.id] = { done: lvSteps(t).done, fin: c ? c.finished : 0, status: t.status }; }
+    for (const t of list) { const c = lvChecks(t); const e = lvNowOf(t); snap[t.id] = { done: lvSteps(t).done, fin: c ? c.finished : 0, status: t.status, perm: !!(e && e.perm) }; }
     const msgs = [];
     if (liveSnap && state.view === 'live') {
       for (const t of list) {
@@ -2704,6 +2740,7 @@
         if (n.done > o.done) { const st = t.plan[n.done - 1]; msgs.push(t.id + ': Schritt ' + n.done + ' von ' + t.plan.length + ' erledigt' + (st ? ', ' + st.text : '') + '.'); }
         if (n.fin > o.fin) { const c = lvChecks(t); msgs.push(t.id + ': Prüfungen ' + c.finished + ' von ' + c.total + ' fertig' + (c.warn || c.fail ? ', ' + lvFinds(c) : '') + '.'); }
         if (n.status === 'review' && o.status !== 'review') msgs.push(t.id + ' wartet auf deine Abnahme.');
+        if (n.perm && !o.perm) msgs.push(t.id + ': Claude wartet auf deine Freigabe.');
       }
     }
     if (msgs.length) { const say = $('#liveSay'); say.textContent = ''; setTimeout(() => { say.textContent = msgs.join(' '); }, 50); }
@@ -2750,6 +2787,7 @@
     if (e.target.closest('[data-lv-follow]')) { liveFollowClaude(); renderLive(); return; }
     const fb = e.target.closest('[data-lv-feed]');
     if (fb) { livePrefs.feedAll = fb.dataset.lvFeed === '1'; store.set(LIVE_KEY, livePrefs); renderLive(); return; }
+    if (e.target.closest('[data-lv-notify]')) { lvEnableNotify(); return; }
     const rv = e.target.closest('[data-lv-review]');
     if (rv) { openReview(rv.dataset.lvReview); return; }
     const op = e.target.closest('[data-lv-open]');

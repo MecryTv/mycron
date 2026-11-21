@@ -66,6 +66,17 @@
           }
         ]
       }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/works/hooks/permission.mjs\"",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

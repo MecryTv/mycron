@@ -4,7 +4,7 @@ Ein Skill wird nur geladen, wenn Claude ihn für relevant hält. Hooks sorgen da
 
 ## Installation über das Plugin mycron
 
-Wird works als Plugin aus dem Marketplace mycron installiert, bringt es SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStop und Stop Hook selbst mit (`plugins/works/hooks/hooks.json`). Sie sind aktiv, solange das Plugin aktiviert ist, und werden mit jedem Plugin-Update automatisch aktualisiert. `works install-hooks --claude` ist dann nicht nötig und meldet das auch so.
+Wird works als Plugin aus dem Marketplace mycron installiert, bringt es SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, SubagentStop und Stop Hook selbst mit (`plugins/works/hooks/hooks.json`). Sie sind aktiv, solange das Plugin aktiviert ist, und werden mit jedem Plugin-Update automatisch aktualisiert. `works install-hooks --claude` ist dann nicht nötig und meldet das auch so.
 
 Pro Projekt einrichten muss man nur den Git pre-commit Hook:
 
@@ -70,6 +70,14 @@ Datei: `hooks/pre-tool.mjs`, ohne Matcher, Timeout 5 Sekunden.
 
 Meldet jeden Werkzeugaufruf, bevor er läuft: `current` in `.works/activity.json` bekommt den Aufruf mit `running: true`, die Liste der letzten Aufrufe bleibt unverändert. Damit zeigt die Live-Ansicht während eines langen Befehls wie `npm test` den Befehl selbst und seine Laufzeit statt des Aufrufs davor. Der Hook schreibt sonst nichts und gibt nichts aus. Er kostet pro Werkzeugaufruf etwa 0,2 Sekunden (Start von Node, unter Windows gemessen). Abschalten mit `"live_activity": false`.
 
+## PermissionRequest
+
+Datei: `hooks/permission.mjs`, ohne Matcher, Timeout 5 Sekunden.
+
+Läuft, wenn Claude Code den Nutzer gleich um eine Freigabe für einen Werkzeugaufruf bittet. Markiert den laufenden Aufruf in `.works/activity.json` mit `perm: true` und `permSince`, damit die Live-Ansicht "Claude wartet auf deine Freigabe" mit Befehl und Wartezeit zeigt. Der Hook gibt nichts aus und entscheidet nie über die Freigabe, das bleibt beim Nutzer.
+
+Der Zustand endet mit dem nächsten PreToolUse, PostToolUse, Stop oder UserPromptSubmit. Eine Ablehnung und der Moment der Freigabe selbst melden keinen Hook: Nach einer Freigabe steht die Anzeige deshalb bis zum Ende dieses Aufrufs auf "wartet", nach einer Ablehnung bis zur nächsten Nachricht. Spätestens nach 60 Minuten gilt sie als veraltet. Abschalten mit `"live_activity": false`.
+
 ## PostToolUse
 
 Datei: `hooks/post-tool.mjs`, ohne Matcher, Timeout 5 Sekunden.
@@ -108,6 +116,9 @@ Nur für die Installation als Skill-Ordner:
     ],
     "PreToolUse": [
       { "hooks": [{ "type": "command", "command": "node \"$HOME/.claude/skills/works/hooks/pre-tool.mjs\"", "timeout": 5 }] }
+    ],
+    "PermissionRequest": [
+      { "hooks": [{ "type": "command", "command": "node \"$HOME/.claude/skills/works/hooks/permission.mjs\"", "timeout": 5 }] }
     ],
     "PostToolUse": [
       { "hooks": [{ "type": "command", "command": "node \"$HOME/.claude/skills/works/hooks/post-tool.mjs\"", "timeout": 5 }] }

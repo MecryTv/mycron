@@ -251,6 +251,31 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     has(fs.readFileSync(path.join(HERE, '..', '..', '..', 'hooks', 'hooks.json'), 'utf8'), 'pre-tool.mjs', 'hooks.json');
   });
 
+  await step('Live: Warten auf Freigabe', () => {
+    const actF = path.join(proj, '.works', 'activity.json');
+    const read = () => JSON.parse(fs.readFileSync(actF, 'utf8'));
+    const call = { cwd: proj, session_id: 's1', tool_name: 'Bash', tool_input: { command: 'npm install -D vitest' } };
+    hook('pre-tool.mjs', call);
+    // Der Hook darf nichts ausgeben, sonst entscheidet er womöglich über die Freigabe.
+    expect(hook('permission.mjs', { ...call, hook_event_name: 'PermissionRequest', permission_suggestions: [] }) === '', 'PermissionRequest gibt etwas aus');
+    let a = read();
+    expect(a.current.perm === true && a.current.running === true && a.current.what === 'npm install -D vitest' && a.current.permSince, `Freigabe: ${JSON.stringify(a.current)}`);
+    hook('pre-tool.mjs', { ...call, tool_input: { command: 'npm test' } });
+    expect(!read().current.perm, 'PreToolUse beendet die Freigabe nicht');
+    hook('permission.mjs', call);
+    hook('post-tool.mjs', { ...call, tool_response: {} });
+    expect(!read().current.perm, 'PostToolUse beendet die Freigabe nicht');
+    hook('permission.mjs', call);
+    hook('stop-reminder.mjs', { cwd: proj, session_id: 's1', stop_hook_active: false });
+    a = read();
+    expect(!a.busy && !a.current.perm, 'Stop beendet die Freigabe nicht');
+    hook('permission.mjs', call);
+    hook('prompt-submit.mjs', { cwd: proj, session_id: 's1', prompt: 'weiter' });
+    expect(!read().current.perm, 'UserPromptSubmit beendet die Freigabe nicht');
+    has(fs.readFileSync(path.join(HERE, '..', '..', '..', 'hooks', 'hooks.json'), 'utf8'), 'permission.mjs', 'hooks.json');
+    has(fs.readFileSync(path.join(HERE, 'works.mjs'), 'utf8'), "add('PermissionRequest', 'permission.mjs')", 'install-hooks');
+  });
+
   await step('Live: Uhrzeit abgehakter Schritte', async () => {
     const { stampSteps, taskDirOf } = await import('./live.mjs');
     const { loadTask } = await import('./lib.mjs');
@@ -439,6 +464,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     fs.writeFileSync(path.join(d2, 'checks.json'), JSON.stringify({ at, fingerprint: '', results: Object.fromEntries(many.map((n, i) => [n, i < 9
       ? { status: 'fail', cmd: 'node -v', ms: 40, output: 'The system cannot find the path specified.\n', at }
       : { status: 'ok', cmd: 'node -v', ms: 900, output: '', at }])) }));
+    // Claude wartet auf eine Freigabe für W-0002: Desktop zeigt das, der Stop-Hook beendet es vor der Handyprüfung.
+    hook('permission.mjs', { cwd: proj, session_id: 's9', tool_name: 'Bash', tool_input: { command: 'npm install -D vitest' } });
     if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }));
     w(['checks', 'remove', ...many]);
   });
@@ -509,6 +536,17 @@ async function browserCheck(url, log, between = async () => {}) {
     }));
     if (!many.groups.some((g) => /9 Prüfungen/.test(g) && /cannot find the path/.test(g))) errs.push(`Live: keine Fehlergruppe für 9 gleiche Fehlschläge (${many.groups.length} Gruppen)`);
     if (many.attn > 4) errs.push(`Live: Wartet auf dich zeigt ${many.attn} Zeilen statt höchstens 4`);
+    const perm = await p.evaluate(() => ({
+      tile: (document.querySelector('#viewLive .lv-tile.perm') || {}).innerText || '',
+      now: !!document.querySelector('#viewLive .lv-now.perm'),
+      first: (document.querySelector('#viewLive .lv-attn li') || {}).innerText || '',
+      pulse: !!document.querySelector('#livePulse.perm:not([hidden])'),
+      title: document.title,
+    }));
+    if (!/wartet auf deine Freigabe/.test(perm.tile) || !/npm install -D vitest/.test(perm.tile)) errs.push(`Live: Kachel zeigt keine Freigabe (${perm.tile.replace(/\n/g, ' ')})`);
+    if (!perm.now) errs.push('Live: Jetzt-Box zeigt keine Freigabe');
+    if (!/Freigabe für einen Befehl/.test(perm.first)) errs.push(`Live: Freigabe nicht erster Punkt in Wartet auf dich (${perm.first})`);
+    if (!perm.pulse || !/^Freigabe/.test(perm.title)) errs.push(`Live: Reiter oder Titel ohne Freigabe (${perm.title})`);
     await p.keyboard.press('1'); await p.waitForTimeout(250);
     await p.click('#btnTools'); await p.waitForTimeout(800);
     await between();
@@ -517,7 +555,8 @@ async function browserCheck(url, log, between = async () => {}) {
     await m.goto(url + '/'); await m.waitForSelector('.card');
     const wide = await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     if (wide) errs.push('mobil: seitliches Scrollen');
-    if (!(await liveText(m, 'mobil ')).includes('Claude wartet')) errs.push('mobil Live: "Claude wartet" fehlt nach dem Stop-Hook');
+    const mt = await liveText(m, 'mobil ');
+    if (!mt.includes('Claude wartet') || mt.includes('auf deine Freigabe')) errs.push('mobil Live: nach dem Stop-Hook fehlt "Claude wartet" oder die Freigabe steht noch da');
     if (await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) errs.push('mobil Live: seitliches Scrollen');
   } finally { await b.close(); }
   if (errs.length) throw new Error(`Browser: ${errs.join(' | ')}`);

@@ -70,10 +70,10 @@ Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Se
 
 Oben vier Kacheln:
 
-- **Claude arbeitet gerade**: Aufgabe, Schritt im Umsetzungsplan und der laufende Werkzeugaufruf mit Laufzeit, zum Beispiel "Befehl npm test, seit 1:12". Zwischen zwei Aufrufen steht "Claude denkt nach" mit dem letzten Aufruf, nach dem Ende einer Antwort "Claude wartet seit 14:03". Ein Klick lässt die Ansicht wieder Claude folgen.
+- **Claude arbeitet gerade**: Aufgabe, Schritt im Umsetzungsplan und der laufende Werkzeugaufruf mit Laufzeit, zum Beispiel "Befehl npm test, seit 1:12". Zwischen zwei Aufrufen steht "Claude denkt nach" mit dem letzten Aufruf, nach dem Ende einer Antwort "Claude wartet seit 14:03". Fragt Claude nach einer Freigabe, färbt sich die Kachel gelb und zeigt "Claude wartet auf deine Freigabe" mit Befehl und Wartezeit. Ein Klick lässt die Ansicht wieder Claude folgen.
 - **Fortschritt heute**: wie viele Aufgaben der Tagesliste fertig sind (Review oder erledigt), mit einem Segment je Aufgabe.
 - **Parallel**: Agenten in eigenen Worktrees und woran sie gerade sind.
-- **Wartet auf dich**: Aufgaben im Review, Funde und Fehlschläge in Prüfungen, offene Fragen an Aufgaben in Arbeit, je Aufgabe und Art eine Zeile ("W-0152: 45 Prüfungen fehlgeschlagen"), höchstens vier Zeilen, darunter "und N weitere Punkte". Ein Klick wählt die Aufgabe.
+- **Wartet auf dich**: wartende Freigaben (immer zuerst, "W-0152: Freigabe für einen Befehl"), Aufgaben im Review, Funde und Fehlschläge in Prüfungen, offene Fragen an Aufgaben in Arbeit, je Aufgabe und Art eine Zeile ("W-0152: 45 Prüfungen fehlgeschlagen"), höchstens vier Zeilen, darunter "und N weitere Punkte". Ein Klick wählt die Aufgabe.
 
 Darunter links die Tagesliste: Aufgaben in Arbeit (die der Hauptsitzung zuerst, dann Agenten), im Review, in der Warteschlange und heute erledigte. In der Mitte die gewählte Aufgabe mit Phasenleiste (Gestartet, Umsetzung, Prüfungen, Review, Erledigt), Umsetzungsplan mit der Uhrzeit jedes abgehakten Schritts, Akzeptanzkriterien, "Gerade jetzt", Verlauf (diese Aufgabe oder alle) und dem Feld "Anweisung an Claude". Rechts alle Prüfungen der Tagesliste: laufende mit Laufzeit, Funde mit "Claude beheben lassen" und "Als bekannt markieren", Fehlschläge mit den letzten Zeilen der Ausgabe, noch nicht gelaufene als kurze Zeile, bestandene eingeklappt.
 
@@ -81,15 +81,17 @@ Hat eine Aufgabe mehr als 8 Prüfungen, zeigt die Spalte eine Zusammenfassung st
 
 Die Phase "Prüfungen" hängt daran, ob gerade eine Prüfung läuft, nicht am Status. Prüfungen laufen oft erst bei der Abnahme im Review.
 
-Die Mitte folgt der Aufgabe, an der Claude arbeitet. Wer selbst eine Aufgabe wählt, behält sie, bis sie aus der Tagesliste fällt oder die Ansicht wieder Claude folgen soll (Kachel oder Pille im Kopf). Gewählte Aufgabe und Verlaufsfilter merkt sich der Browser. Mit geteiltem Leselink fehlen Anweisungsfeld, Abnahme und die Knöpfe an Funden. Bei reduzierter Bewegung stehen Punkte und Spinner still; Screenreader hören, wenn ein Schritt erledigt ist, Prüfungen fertig sind oder eine Aufgabe auf Abnahme wartet.
+Die Mitte folgt der Aufgabe, an der Claude arbeitet. Wer selbst eine Aufgabe wählt, behält sie, bis sie aus der Tagesliste fällt oder die Ansicht wieder Claude folgen soll (Kachel oder Pille im Kopf). Gewählte Aufgabe und Verlaufsfilter merkt sich der Browser. Mit geteiltem Leselink fehlen Anweisungsfeld, Abnahme und die Knöpfe an Funden. Bei reduzierter Bewegung stehen Punkte und Spinner still; Screenreader hören, wenn ein Schritt erledigt ist, Prüfungen fertig sind, eine Aufgabe auf Abnahme wartet oder Claude eine Freigabe braucht.
 
-Woher die Daten kommen: Werkzeugaufrufe aus den Hooks PreToolUse und PostToolUse (`activity.json`), Uhrzeiten abgehakter Schritte aus `steps.json` (die task.md speichert sie nicht; bei mehreren Häkchen zwischen zwei Beobachtungen bekommen sie dieselbe Uhrzeit), Prüfungsstand aus `checks.json` der Aufgabe. Ein Prüfungslauf, der länger als 11 Minuten "läuft", gilt als abgebrochen.
+Wartet Claude auf eine Freigabe, zeigen auch die Jetzt-Box der Aufgabe und ihre Zeile in der Tagesliste das. Der Reiter Live bekommt einen ruhigen gelben Punkt statt des pulsierenden, die Pille im Kopf "Wartet auf deine Freigabe (W-0152)" und der Fenstertitel ein "Freigabe" vorne, auch in den anderen Ansichten. Freigeben oder ablehnen geht nur im Claude-Fenster. "Mich im Browser benachrichtigen" in der Jetzt-Box schaltet die Browser-Benachrichtigung dafür ein (gemerkt im Browser, wie die übrigen Benachrichtigungen unter Werkzeuge). Nach einer Freigabe bleibt die Anzeige bis zum Ende des Aufrufs stehen, weil Claude Code den Moment der Freigabe nicht meldet.
+
+Woher die Daten kommen: Werkzeugaufrufe aus den Hooks PreToolUse, PermissionRequest und PostToolUse (`activity.json`), Uhrzeiten abgehakter Schritte aus `steps.json` (die task.md speichert sie nicht; bei mehreren Häkchen zwischen zwei Beobachtungen bekommen sie dieselbe Uhrzeit), Prüfungsstand aus `checks.json` der Aufgabe. Ein Prüfungslauf, der länger als 11 Minuten "läuft", gilt als abgebrochen.
 
 Das Detailpanel hat die Reiter **Übersicht**, **Kommentare** (Gespräch mit Claude, siehe planning.md), **Zeit** (aktive Zeit von Claude, Tage je Status, Sitzungen) und **Code und Commits**. Unten gibt es "Als Vorlage speichern".
 
 Über dem Fortschritt zeigt die Zeile **Ansichten** gespeicherte Filter als Chips; "Aktuelle Filter speichern" erscheint, sobald Filter gesetzt sind. Über der Zeitleiste zeigt "Wie gut passen die Schätzungen?" Schätzung gegen tatsächliche Dauer.
 
-Das Symbol mit den Reglern in der Kopfzeile öffnet die **Werkzeuge**: Wochenbericht (Zeitplan, Discord, Inhalt, Berichte ansehen), Vorlagen (anlegen, bearbeiten, nutzen), Prüfungen vor dem Abschluss und Benachrichtigungen im Browser (Review, Frage oder Kommentar von Claude, neue P1, Blockade aufgelöst, Warteschlange leer, Ton und Zähler im Tab-Titel).
+Das Symbol mit den Reglern in der Kopfzeile öffnet die **Werkzeuge**: Wochenbericht (Zeitplan, Discord, Inhalt, Berichte ansehen), Vorlagen (anlegen, bearbeiten, nutzen), Prüfungen vor dem Abschluss und Benachrichtigungen im Browser (Freigabe, Review, Frage oder Kommentar von Claude, neue P1, Blockade aufgelöst, Warteschlange leer, Ton und Zähler im Tab-Titel).
 
 Neue Aufgaben: Gibt es Vorlagen, fragt der Dialog zuerst nach einer Vorlage oder "Leer". Mit Vorlage gibt es die Felder der Vorlage, das freie Feld "Was genau soll passieren?" und die Kriterien zum An- und Abwählen.
 
@@ -173,7 +175,7 @@ Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen d
 
 ## Claude arbeitet gerade
 
-Solange Claude an einer Aufgabe arbeitet, zeigt der Kopf "Claude arbeitet an W-0003, seit 6 min" (Klick öffnet die Live-Ansicht, im statischen Board springt er zur Karte), der Reiter Live trägt einen pulsierenden Punkt. Die aktive Karte zeigt den aktuellen Schritt und die letzten drei, zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test", dazu den Knopf "Anweisung an Claude". Die Daten kommen aus den Hooks PreToolUse (Aufruf beginnt) und PostToolUse (Aufruf fertig) in `.works/activity.json` (lokal). Nach zehn Minuten ohne Werkzeugaufruf verschwindet die Anzeige.
+Solange Claude an einer Aufgabe arbeitet, zeigt der Kopf "Claude arbeitet an W-0003, seit 6 min" (Klick öffnet die Live-Ansicht, im statischen Board springt er zur Karte), der Reiter Live trägt einen pulsierenden Punkt. Die aktive Karte zeigt den aktuellen Schritt und die letzten drei, zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test", dazu den Knopf "Anweisung an Claude". Wartet Claude auf eine Freigabe, steht dort "Wartet auf deine Freigabe (W-0003)" und der Punkt am Reiter pulsiert nicht. Die Daten kommen aus den Hooks PreToolUse (Aufruf beginnt), PermissionRequest (Freigabe nötig) und PostToolUse (Aufruf fertig) in `.works/activity.json` (lokal). Nach zehn Minuten ohne Werkzeugaufruf verschwindet die Anzeige, eine wartende Freigabe nach 60 Minuten.
 
 Anweisungen landen in `.works/instructions.json` und als Kommentar an der Aufgabe. Claude bekommt sie beim nächsten Werkzeugaufruf als Kontext, spätestens am Ende der Antwort, und liest sie, wenn es sinnvoll ist. Bis dahin zeigt das Board "wartet".
 
