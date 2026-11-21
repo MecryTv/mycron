@@ -1,0 +1,1 @@
+Farben, Schrift (Geist) und Bausteine 1:1 aus dem bestehenden Board. Stil Real-Time Monitoring laut UI UX Pro Max: dichte Kacheln, Status immer als Symbol plus Text, pulsierender Punkt für aktiv, Spinner für laufende Prüfungen, reduzierte Bewegung beachtet.

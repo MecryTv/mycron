@@ -217,6 +217,75 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(fs.readFileSync(path.join(proj, '.works', 'time.jsonl'), 'utf8').includes('"agent:x"'), 'SubagentStop hat nichts erfasst');
   });
 
+  await step('Live: Jetzt-Anzeige mit PreToolUse', () => {
+    const actF = path.join(proj, '.works', 'activity.json');
+    const n0 = JSON.parse(fs.readFileSync(actF, 'utf8')).recent.length;
+    const call = { cwd: proj, session_id: 's1', tool_name: 'Bash', tool_input: { command: 'npm test' } };
+    hook('pre-tool.mjs', call);
+    let a = JSON.parse(fs.readFileSync(actF, 'utf8'));
+    expect(a.current.running === true && a.current.what === 'npm test' && a.recent.length === n0, `PreToolUse: ${JSON.stringify(a.current)}`);
+    hook('post-tool.mjs', { ...call, tool_response: {} });
+    a = JSON.parse(fs.readFileSync(actF, 'utf8'));
+    expect(!a.current.running && a.recent[0].what === 'npm test' && a.recent.length === n0 + 1, 'PostToolUse nach PreToolUse');
+    has(fs.readFileSync(path.join(HERE, '..', '..', '..', 'hooks', 'hooks.json'), 'utf8'), 'pre-tool.mjs', 'hooks.json');
+  });
+
+  await step('Live: Uhrzeit abgehakter Schritte', async () => {
+    const { stampSteps, taskDirOf } = await import('./live.mjs');
+    const { loadTask } = await import('./lib.mjs');
+    const load = () => loadTask(path.join(proj, '.works', 'tasks', taskDirOf(proj, 'W-0001')));
+    const stepsF = path.join(proj, '.works', 'steps.json');
+    w(['check', 'W-0001', '1', '--section=Umsetzungsplan']);
+    hook('post-tool.mjs', { cwd: proj, session_id: 's1', tool_name: 'Bash', tool_input: { command: 'works check W-0001 1' }, tool_response: {} });
+    const st = JSON.parse(fs.readFileSync(stepsF, 'utf8'));
+    expect(st['W-0001'] && st['W-0001']['Format festlegen'], 'Hook hat keine Uhrzeit gestempelt');
+    const first = stampSteps(proj, [load()]).get('W-0001');
+    expect(first[0].done && first[0].at === st['W-0001']['Format festlegen'], 'Uhrzeit nicht stabil');
+    w(['check', 'W-0001', '1', '--section=Umsetzungsplan', '--undo']);
+    const after = stampSteps(proj, [load()]).get('W-0001');
+    expect(!after[0].done && after[0].at === '', 'Uhrzeit nach --undo nicht entfernt');
+    w(['check', 'W-0001', '1', '--section=Umsetzungsplan']);
+    stampSteps(proj, [], { prune: true });
+    expect(!JSON.parse(fs.readFileSync(stepsF, 'utf8'))['W-0001'], 'prune entfernt nichts');
+    has(fs.readFileSync(path.join(proj, '.works', '.gitignore'), 'utf8'), 'steps.json', '.works/.gitignore');
+  });
+
+  await step('Live: Zwischenstand der Prüfungen', () => {
+    const dir = path.join('.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')));
+    fs.writeFileSync(path.join(proj, 'peek.js'), "process.stdout.write(require('fs').readFileSync(process.argv[2], 'utf8'))\n");
+    w(['checks', 'set', `peek=node peek.js ${path.join(dir, 'checks.json')}`]);
+    w(['checks', 'run', 'W-0001']);
+    const res = JSON.parse(fs.readFileSync(path.join(proj, dir, 'checks.json'), 'utf8'));
+    expect(/"running":\s*"peek"/.test(res.results.peek.output), `running fehlt während des Laufs: ${res.results.peek.output.slice(0, 200)}`);
+    expect(!('running' in res) && res.results.peek.at, 'running nach dem Lauf nicht entfernt oder at fehlt');
+  });
+
+  await step('Live: Daten im Board', async () => {
+    const { boardData } = await import('./board.mjs');
+    const dir = path.join('.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')));
+    const d = boardData(proj);
+    const t1 = d.tasks.find((t) => t.id === 'W-0001');
+    expect(Array.isArray(t1.plan) && t1.plan[0].text === 'Format festlegen' && t1.plan[0].at, 'plan fehlt an W-0001');
+    expect(t1.checks && t1.checks.list.some((c) => c.name === 'peek') && t1.checks.results.peek, 'checks fehlt an W-0001');
+    const other = d.tasks.find((t) => t.status === 'backlog' && !d.meta.queue.includes(t.id));
+    expect(other && !('plan' in other) && !('checks' in other), 'Aufgabe außerhalb der Tagesliste hat plan/checks');
+    expect(d.meta.today && Array.isArray(d.meta.activity.recent), 'meta.today oder recent fehlt');
+    const cf = path.join(proj, dir, 'checks.json');
+    const cj = JSON.parse(fs.readFileSync(cf, 'utf8'));
+    const runningOf = () => boardData(proj).tasks.find((t) => t.id === 'W-0001').checks.running;
+    fs.writeFileSync(cf, JSON.stringify({ ...cj, running: 'peek', runningSince: new Date(Date.now() - 12 * 60000).toISOString() }));
+    expect(runningOf() === '', 'veraltetes running wird angezeigt');
+    fs.writeFileSync(cf, JSON.stringify({ ...cj, running: 'peek', runningSince: new Date().toISOString() }));
+    expect(runningOf() === 'peek', 'frisches running fehlt');
+    fs.writeFileSync(cf, JSON.stringify(cj));
+    // Der Export geht an Leute außerhalb: keine Befehlszeilen und kein Live-Stand aus der Live-Ansicht.
+    const { buildSnapshot } = await import('./export.mjs');
+    const snap = buildSnapshot(proj, { images: false }).html;
+    expect(!snap.includes('works check W-0001 1') && !snap.includes('"plan":['), 'Export enthält Live-Daten (Befehle oder Schritte)');
+    w(['checks', 'remove', 'peek']);
+    expect(boardData(proj).tasks.find((t) => t.id === 'W-0001').checks === null, 'ohne Prüfungen ist checks nicht null');
+  });
+
   if (hasGit) {
     await step('Dateien: Commits mit ID, works file, Hinweis beim Edit', () => {
       git(['add', '-A']); git(['commit', '-q', '-m', 'chore: start']);
@@ -245,6 +314,13 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const l2 = lanes.find((l) => l.task === nid);
       has(w(['parallel', 'prompt', nid]).out, l2.path);
       w(['log', nid, 'Aus dem Worktree'], { cwd: l2.path });
+      w(['checks', 'set', 'where=node -p process.cwd()']);
+      has(w(['parallel', 'prompt', nid]).out, 'checks run', 'Agenten-Auftrag');
+      w(['checks', 'run', nid], { cwd: l2.path });
+      const nd = fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith(nid));
+      const wr = JSON.parse(fs.readFileSync(path.join(proj, '.works', 'tasks', nd, 'checks.json'), 'utf8')).results.where.output.trim();
+      expect(fs.realpathSync(wr) === fs.realpathSync(l2.path), `Prüfung lief in ${wr} statt im Worktree`);
+      w(['checks', 'remove', 'where']);
       has(fs.readFileSync(path.join(proj, '.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith(nid)), 'task.md'), 'utf8'), 'Aus dem Worktree', 'Hauptprojekt');
       expect(w(['done', nid], { cwd: l2.path, ok: false }).code !== 0, 'done im Worktree war erlaubt');
       fs.appendFileSync(path.join(l2.path, 'src', 'web', 'page.tsx'), 'export const d = 4;\n');
@@ -282,6 +358,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     has(w(['board', '--serve', '--detach', `--port=${port}`]).out, `:${port}`);
     const url = `http://127.0.0.1:${port}`;
     const html = await (await fetch(url + '/')).text();
+    has(html, 'data-view="live"', 'Seite'); has(html, 'id="viewLive"', 'Seite');
     const token = (html.match(/"token":"([a-f0-9]{20,})"/) || [])[1];
     expect(token, 'Kein Token in der Seite');
     const data = await (await fetch(url + '/data.json')).json();
@@ -302,7 +379,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(up.ok && uj.candidates.length === 1, `Import-Upload: ${uj.error || uj.candidates.length}`);
     await api('POST', '/api/action', { action: 'importApply', token: uj.token, only: [1] });
     has(w(['list']).out, 'Aus dem Upload');
-    if (browser) await browserCheck(url, log);
+    // W-0002 hat keinen Umsetzungsplan: Die Live-Ansicht darf dafür kein NaN oder "Schritt 0 von 0" zeigen.
+    w(['start', 'W-0002']);
+    if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }));
   });
   w(['board', '--stop'], { ok: false });
 
@@ -322,23 +401,40 @@ function free(port) {
   }));
 }
 
-async function browserCheck(url, log) {
+// between: läuft zwischen Desktop- und Handyprüfung, hier setzt der Stop-Hook Claude auf untätig.
+async function browserCheck(url, log, between = async () => {}) {
   let pw;
   try { pw = createRequire(path.join(process.cwd(), 'x.js'))('playwright'); } catch { try { pw = createRequire(import.meta.url)('playwright'); } catch { log('        Playwright nicht gefunden, Browserprüfung übersprungen.'); return; } }
-  const b = await pw.chromium.launch();
+  // Ohne heruntergeladene Playwright-Browser auf ein installiertes Chrome oder Edge ausweichen.
+  let b = null;
+  for (const opt of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) {
+    try { b = await pw.chromium.launch(opt); break; } catch (e) { if (opt.channel === 'msedge') throw e; }
+  }
   const errs = [];
   try {
     const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
     p.on('pageerror', (e) => errs.push(e.message));
     await p.goto(url + '/'); await p.waitForSelector('.card', { timeout: 15000 });
     await p.click('.card'); await p.waitForTimeout(500);
-    for (const k of ['2', '3', '4', '5', '6', '1']) { await p.keyboard.press('Escape'); await p.keyboard.press(k); await p.waitForTimeout(250); }
+    for (const k of ['2', '3', '4', '5', '6', '7', '1']) { await p.keyboard.press('Escape'); await p.keyboard.press(k); await p.waitForTimeout(250); }
+    const liveText = async (pg, who) => {
+      await pg.keyboard.press('Escape'); await pg.keyboard.press('7'); await pg.waitForTimeout(400);
+      const v = await pg.evaluate(() => { const el = document.querySelector('#viewLive'); return { run: !!(el && el.querySelector('.lv-run')), text: el ? el.innerText : '' }; });
+      if (!v.run) errs.push(`${who}Live: Tagesliste fehlt`);
+      if (/NaN|Schritt 0 von 0/.test(v.text)) errs.push(`${who}Live: NaN oder Schritt 0 von 0`);
+      return v.text;
+    };
+    await liveText(p, '');
+    await p.keyboard.press('1'); await p.waitForTimeout(250);
     await p.click('#btnTools'); await p.waitForTimeout(800);
+    await between();
     const m = await b.newPage({ viewport: { width: 390, height: 844 } });
     m.on('pageerror', (e) => errs.push('mobil: ' + e.message));
     await m.goto(url + '/'); await m.waitForSelector('.card');
     const wide = await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     if (wide) errs.push('mobil: seitliches Scrollen');
+    if (!(await liveText(m, 'mobil ')).includes('Claude wartet')) errs.push('mobil Live: "Claude wartet" fehlt nach dem Stop-Hook');
+    if (await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) errs.push('mobil Live: seitliches Scrollen');
   } finally { await b.close(); }
   if (errs.length) throw new Error(`Browser: ${errs.join(' | ')}`);
 }

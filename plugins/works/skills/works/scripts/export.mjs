@@ -37,7 +37,12 @@ export function buildSnapshot(root, { images = true, closed = true } = {}) {
 
   const tasks = data.tasks.filter((t) => closed || (!t.archived && t.status !== 'verworfen'));
   const details = {};
+  // Live-Daten bleiben draußen: Der Schnappschuss geht an andere und zeigt keinen Live-Zustand.
+  data.meta.activity = null;
+  data.meta.instructions = [];
   for (const t of tasks) {
+    delete t.plan;
+    delete t.checks;
     t.thumb = embed(t.thumb);
     if (!t.thumb) t.thumbAlt = '';
     try {

@@ -94,7 +94,7 @@ function cmdInit() {
     if (!exists(keep)) fs.writeFileSync(keep, '');
   }
   const mode = flags.gitignore || 'default';
-  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json', 'inbox/*', '!inbox/.gitkeep'];
+  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'steps.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json', 'inbox/*', '!inbox/.gitkeep'];
   if (mode === 'assets') ignore.push('tasks/*/assets/', 'archive/*/assets/');
   if (mode === 'all') ignore.splice(1, ignore.length - 1, '*', '!.gitignore');
   if (mode !== 'none') fs.writeFileSync(path.join(wd, '.gitignore'), ignore.join('\n') + '\n');
@@ -1706,6 +1706,7 @@ function cmdInstallHooks() {
     add('SessionStart', 'session-start.mjs', 'startup|resume|clear|compact');
     add('Stop', 'stop-reminder.mjs');
     add('UserPromptSubmit', 'prompt-submit.mjs');
+    add('PreToolUse', 'pre-tool.mjs');
     add('PostToolUse', 'post-tool.mjs');
     add('SubagentStop', 'subagent-stop.mjs');
     if (!flags['dry-run']) writeJson(file, settings);

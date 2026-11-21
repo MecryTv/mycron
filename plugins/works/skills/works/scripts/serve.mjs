@@ -399,7 +399,7 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     });
     server.listen(p, host, () => {
       boundPort = p;
-      ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json']);
+      ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'steps.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json']);
       writeServer(root, { pid: process.pid, port: p, host, version: runningVersion(), cli: OWN_CLI, started: new Date().toISOString() });
       const url = `http://${host === '0.0.0.0' || host === '::' ? 'localhost' : host}:${p}/`;
       process.stdout.write(`Live-Board läuft: ${url}\nBeobachte ${wd}\nBeenden mit Strg+C.\n`);

@@ -18,8 +18,8 @@
   const HIGHLIGHT_MS = 10000;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const VIEWS = ['board', 'sprint', 'queue', 'timeline', 'graph', 'table'];
-  const VIEW_LABEL = { board: 'Board', sprint: 'Sprint', queue: 'Warteschlange', timeline: 'Zeitleiste', graph: 'Abhängigkeiten', table: 'Tabelle' };
+  const VIEWS = ['board', 'sprint', 'queue', 'timeline', 'graph', 'table', 'live'];
+  const VIEW_LABEL = { board: 'Board', sprint: 'Sprint', queue: 'Warteschlange', timeline: 'Zeitleiste', graph: 'Abhängigkeiten', table: 'Tabelle', live: 'Live' };
   const state = { q: '', prios: new Set(PRIOS), type: '', tag: '', ms: '', closed: false, signal: '', view: 'board' };
   const PAGE_VERSION = meta.version || '';
   const PAGE_SERVER = meta.server || '';
@@ -179,13 +179,15 @@
     const fresh = a && a.busy && a.current && Date.now() - Date.parse(a.current.at) < 10 * 60000;
     const laneIds = (meta.lanes || []).map((l) => l.task).filter((id) => a && a.lanes && a.lanes[id] && Date.now() - Date.parse(a.lanes[id].at) < 10 * 60000);
     pill.hidden = !fresh && !laneIds.length;
+    const pulse = $('#livePulse');
+    if (pulse) pulse.hidden = pill.hidden;
     if (fresh || laneIds.length) {
-      const mins = fresh ? Math.max(1, Math.round((Date.now() - Date.parse(a.since || a.current.at)) / 60000)) : 0;
-      const main = fresh ? 'Claude arbeitet' + (a.current.task ? ' an ' + a.current.task : '') + ', seit ' + mins + ' min' : '';
-      const par = laneIds.length ? (laneIds.length === 1 ? '1 Agent parallel an ' + laneIds[0] : laneIds.length + ' Agenten parallel') : '';
-      pill.textContent = [main, par].filter(Boolean).join(', ');
+      const main = fresh ? 'Claude arbeitet' + (a.current.task ? ' an ' + esc(a.current.task) : '') + ', seit ' + lvSince(a.since || a.current.at, 'min') : '';
+      const par = laneIds.length ? (laneIds.length === 1 ? '1 Agent parallel an ' + esc(laneIds[0]) : laneIds.length + ' Agenten parallel') : '';
+      pill.innerHTML = [main, par].filter(Boolean).join(', ');
       const go = fresh && a.current.task ? a.current.task : laneIds[0];
-      pill.onclick = () => { if (go) focusCard(go); };
+      // Im Live-Board führt die Pille in die Live-Ansicht und lässt sie wieder Claude folgen.
+      pill.onclick = () => { if (LIVE) { liveFollowClaude(); setView('live'); } else if (go) focusCard(go); };
     }
     const tc = $('#toolsCount');
     const n = (meta.knowledgeProposals || 0);
@@ -443,6 +445,8 @@
     if (state.view === 'queue') renderQueue();
     if (state.view === 'timeline') renderTimeline();
     if (state.view === 'table') renderTable();
+    if (state.view === 'live') renderLive();
+    liveDeadline = nextLiveDeadline();
   }
 
   // ---------- Drag and Drop ----------
@@ -1158,7 +1162,7 @@
   // ---------- Ansichten ----------
 
   function setView(v) {
-    if (!VIEWS.includes(v)) return;
+    if (!VIEWS.includes(v) || (v === 'live' && !LIVE)) return;
     state.view = v;
     store.set('works-view-' + meta.project, v);
     if (v !== 'table') { selected.clear(); }
@@ -2336,13 +2340,378 @@
     }
     const s = e.target.closest('[data-instr-send]');
     if (s) {
-      const inp = $('[data-instr-in="' + CSS.escape(s.dataset.instrSend) + '"]');
+      // Das Feld neben dem Knopf nehmen: Detailpanel und Live-Ansicht können gleichzeitig ein Feld für dieselbe Aufgabe haben.
+      const inp = s.parentElement.querySelector('[data-instr-in="' + CSS.escape(s.dataset.instrSend) + '"]');
       if (inp && await sendInstruction(s.dataset.instrSend, inp.value)) inp.value = '';
     }
   }, true);
   document.addEventListener('keydown', (e) => {
     const inp = e.target.closest && e.target.closest('[data-instr-in]');
     if (inp && e.key === 'Enter') { e.preventDefault(); sendInstruction(inp.dataset.instrIn, inp.value).then((okk) => { if (okk) inp.value = ''; }); }
+  });
+
+  // ---------- Live-Ansicht ----------
+  // Zeigt, an welcher Aufgabe und welchem Schritt Claude arbeitet, was gerade läuft und wie die Prüfungen stehen.
+  // Daten: task.plan und task.checks (nur Tagesliste), meta.activity, meta.lanes, meta.queue.
+
+  const LIVE_FRESH_MS = 10 * 60000;
+  const LIVE_KEY = 'works-live-' + meta.project;
+  const livePrefs = Object.assign({ focus: '', feedAll: false }, store.get(LIVE_KEY, {}));
+  let liveFollow = !livePrefs.focus;
+  let liveSnap = null;
+  let liveSeen = null;
+  const LV_CK = { ok: 'bestanden', ack: 'bekannt', fail: 'fehlgeschlagen', warn: 'Fund', manual: 'trägt Claude ein', run: 'läuft', wait: 'noch nicht gelaufen' };
+  const lvSvg = (p) => '<svg viewBox="0 0 16 16" aria-hidden="true">' + p + '</svg>';
+  const LV_IC = {
+    ok: lvSvg('<path d="M3.5 8.4l2.9 2.9 6.1-6.6"/>'),
+    fail: lvSvg('<path d="M5 5l6 6M11 5l-6 6"/>'),
+    warn: lvSvg('<path d="M8 4.2v4.4"/><path d="M8 11.5v.1"/>'),
+    manual: lvSvg('<path d="M10.4 3.6l2 2L6.2 11.8H4.2v-2z"/>'),
+    cur: lvSvg('<circle cx="8" cy="8" r="2.8" fill="currentColor" stroke="none"/>'),
+    review: lvSvg('<path d="M1.8 8s2.3-4.2 6.2-4.2S14.2 8 14.2 8s-2.3 4.2-6.2 4.2S1.8 8 1.8 8z"/><circle cx="8" cy="8" r="1.8"/>'),
+    next: lvSvg('<path d="M6 4l4 4-4 4"/>'),
+    ask: lvSvg('<path d="M6 6a2 2 0 1 1 3 1.7c-.6.4-1 .8-1 1.5"/><path d="M8 11.6v.1"/>'),
+    chk: lvSvg('<path d="M8 2.5l4.5 1.8v3.6c0 2.8-2 4.6-4.5 5.6-2.5-1-4.5-2.8-4.5-5.6V4.3z"/>'),
+  };
+  const lvSi = (st) => '<span class="lv-si ' + st + '" aria-hidden="true">' + (LV_IC[st === 'ack' ? 'ok' : st] || '') + '</span>';
+  const lvPad = (n) => String(n).padStart(2, '0');
+  const lvTime = (iso, sec) => { const d = new Date(iso); return isNaN(d) ? '' : lvPad(d.getHours()) + ':' + lvPad(d.getMinutes()) + (sec ? ':' + lvPad(d.getSeconds()) : ''); };
+  const lvMs = (ms) => (ms < 60000 ? Math.round(ms / 1000) + ' s' : Math.floor(ms / 60000) + ':' + lvPad(Math.round(ms / 1000) % 60) + ' min');
+  function lvSinceText(iso, fmt) {
+    const s = Math.floor((Date.now() - Date.parse(iso)) / 1000);
+    if (!isFinite(s)) return '';
+    const v = Math.max(0, s);
+    if (fmt === 'min') { const m = Math.max(1, Math.floor(v / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; }
+    if (fmt === 'sec') return v < 60 ? v + ' s' : Math.floor(v / 60) + ':' + lvPad(v % 60) + ' min';
+    return Math.floor(v / 60) + ':' + lvPad(v % 60);
+  }
+  // Zeitangabe, die der Sekundentakt weiterzählt.
+  function lvSince(iso, fmt) { return '<span class="num" data-since="' + esc(iso) + '" data-fmt="' + (fmt || 'clock') + '">' + lvSinceText(iso, fmt) + '</span>'; }
+  function liveFollowClaude() { liveFollow = true; livePrefs.focus = ''; store.set(LIVE_KEY, livePrefs); }
+  // Frische-Grenzen laufen auch ohne neue Daten ab, etwa nach einem Abbruch mit Esc, bei dem kein Stop-Hook läuft.
+  // Der Sekundentakt lädt dann einmal neu; der Server wertet ein veraltetes running dabei selbst aus.
+  let liveDeadline = Infinity;
+  function nextLiveDeadline() {
+    const a = meta.activity;
+    const times = [];
+    if (a && a.busy && a.current) times.push(Date.parse(a.current.at) + LIVE_FRESH_MS);
+    if (a && a.lanes) for (const e of Object.values(a.lanes)) times.push(Date.parse(e.at) + LIVE_FRESH_MS);
+    for (const t of tasks) if (t.checks && t.checks.running) times.push(Date.parse(t.checks.runningSince) + 11 * 60000);
+    const future = times.filter((x) => x > Date.now());
+    return future.length ? Math.min(...future) + 1000 : Infinity;
+  }
+  const lvFresh = (e) => !!e && Date.now() - Date.parse(e.at) < LIVE_FRESH_MS;
+  const lvLanes = () => new Set((meta.lanes || []).map((l) => l.task));
+
+  function phaseOf(t) {
+    if (t.status === 'erledigt') return 'erledigt';
+    if (t.checks && t.checks.running) return 'pruefung';
+    if (t.status === 'review') return 'review';
+    if (t.status === 'in-arbeit') return 'umsetzung';
+    if ((meta.queue || []).includes(t.id)) return 'queue';
+    return '';
+  }
+
+  // Tagesliste: in Arbeit (Hauptsitzung vor Agenten), Review, Warteschlange in Queue-Reihenfolge, heute erledigt.
+  function liveTasks() {
+    const q = meta.queue || [];
+    const lanes = lvLanes();
+    const cur = meta.activity && meta.activity.current ? meta.activity.current.task : '';
+    const rank = (t) => (t.status === 'in-arbeit' ? (lanes.has(t.id) ? 1 : t.id === cur ? 0 : 0.5) : t.status === 'review' ? 2 : t.status === 'erledigt' ? 4 : 3);
+    return tasks.filter((t) => Array.isArray(t.plan)).sort((a, b) => rank(a) - rank(b) || q.indexOf(a.id) - q.indexOf(b.id) || a.id.localeCompare(b.id));
+  }
+
+  function lvSteps(t) { const p = t.plan || []; const cur = p.findIndex((s) => !s.done); return { done: p.filter((s) => s.done).length, total: p.length, cur, curT: cur >= 0 ? p[cur].text : '' }; }
+
+  // Zustand einer Prüfung. Während eines Laufs zeigen Befehle nach dem laufenden "noch nicht gelaufen",
+  // auch wenn ein Ergebnis aus einem früheren Lauf existiert.
+  function lvCheckState(t, x) {
+    const c = t.checks;
+    if (c.running === x.name) return 'run';
+    if (c.running && !x.skill) {
+      const ri = c.list.findIndex((y) => y.name === c.running);
+      if (c.list.indexOf(x) > ri) return 'wait';
+    }
+    const r = c.results[x.name];
+    return r ? r.status : 'wait';
+  }
+  function lvChecks(t) {
+    if (!t.checks) return null;
+    const states = t.checks.list.map((x) => lvCheckState(t, x));
+    const n = (...k) => states.filter((s) => k.includes(s)).length;
+    return { total: states.length, ok: n('ok', 'ack'), warn: n('warn'), fail: n('fail'), finished: n('ok', 'ack', 'warn', 'fail'), running: t.checks.running };
+  }
+  const lvFinds = (c) => (c.fail ? c.fail + ' fehlgeschlagen' : c.warn === 1 ? '1 Fund' : c.warn + ' Funde');
+
+  function lvStatus(t) {
+    const ph = phaseOf(t), s = lvSteps(t), c = lvChecks(t);
+    if (ph === 'erledigt') return { ic: 'ok', text: 'Heute erledigt' };
+    if (ph === 'pruefung') return { ic: 'run', text: 'Prüfungen ' + c.finished + ' von ' + c.total + ', ' + c.running + ' läuft', w: c.finished / c.total, col: 'var(--accent)' };
+    if (ph === 'review') return { ic: c && (c.warn || c.fail) ? 'warn' : 'review', text: 'Wartet auf deine Abnahme' + (c && (c.warn || c.fail) ? ', ' + lvFinds(c) : ''), w: 1, col: 'var(--s-review)' };
+    if (ph === 'umsetzung') {
+      if (!s.total) return { ic: 'cur', text: 'In Umsetzung, kein Umsetzungsplan' };
+      if (s.cur < 0) return { ic: 'cur', text: 'Alle ' + s.total + ' Schritte erledigt', w: 1 };
+      return { ic: 'cur', text: 'Schritt ' + (s.cur + 1) + ' von ' + s.total + ': ' + s.curT, w: s.done / s.total };
+    }
+    if (ph === 'queue') { const pos = (meta.queue || []).indexOf(t.id); return pos === 0 ? { ic: 'next', text: 'Als Nächstes in der Warteschlange' } : { ic: 'wait', text: 'Warteschlange, Platz ' + (pos + 1) }; }
+    return { ic: 'wait', text: L(t.status) };
+  }
+
+  function lvAttention(list) {
+    const out = [];
+    for (const t of list) {
+      if (t.status === 'review') out.push({ id: t.id, ic: 'review', text: t.id + ' abnehmen' });
+      if (t.status !== 'erledigt' && t.checks) {
+        for (const x of t.checks.list) {
+          const st = lvCheckState(t, x);
+          if (st === 'warn') out.push({ id: t.id, ic: 'warn', text: t.id + ': Fund in ' + x.name });
+          if (st === 'fail') out.push({ id: t.id, ic: 'fail', text: t.id + ': ' + x.name + ' fehlgeschlagen' });
+        }
+      }
+      if (t.status === 'in-arbeit' && t.questions.length) out.push({ id: t.id, ic: 'ask', text: t.id + ': ' + (t.questions.length === 1 ? '1 offene Frage' : t.questions.length + ' offene Fragen') });
+    }
+    return out;
+  }
+
+  // Was tut Claude (oder der Agent der Bahn) gerade an dieser Aufgabe?
+  function lvNowOf(t) {
+    const a = meta.activity;
+    if (!a) return null;
+    if (lvLanes().has(t.id)) { const e = a.lanes && a.lanes[t.id]; return lvFresh(e) ? e : null; }
+    return a.busy && a.current && a.current.task === t.id && lvFresh(a.current) ? a.current : null;
+  }
+  const lvLastOf = (id) => ((meta.activity && meta.activity.recent) || []).find((r) => r.task === id) || null;
+  const lvWhat = (e) => esc(e.verb) + (e.what ? ' <span class="mono">' + esc(e.what) + '</span>' : '');
+
+  function lvPhases(t) {
+    const ph = phaseOf(t), s = lvSteps(t), c = lvChecks(t);
+    const started = ph !== 'queue' && ph !== '';
+    const implDone = t.status === 'review' || t.status === 'erledigt' || (s.total > 0 && s.done === s.total);
+    const chk = !c ? ['', 'keine eingerichtet'] : ph === 'pruefung' ? ['cur', c.finished + ' von ' + c.total]
+      : c.total && c.ok === c.total ? ['done', 'alle bestanden'] : (c.warn || c.fail) ? ['warn', lvFinds(c)] : c.finished ? ['', c.finished + ' von ' + c.total] : ['', 'noch nicht gelaufen'];
+    const rows = [
+      ['Gestartet', started ? 'done' : '', started ? (t.started === meta.today ? 'heute' : fmtDate(t.started)) : 'noch nicht', 1, ''],
+      ['Umsetzung', ph === 'umsetzung' ? 'cur' : implDone ? 'done' : '', s.total ? s.done + ' von ' + s.total + ' Schritten' : '', s.total ? s.done / s.total : 0, 'var(--s-in-arbeit)'],
+      ['Prüfungen', chk[0], chk[1], c && c.total ? c.finished / c.total : 0, 'var(--accent)'],
+      ['Review', t.status === 'review' && ph !== 'pruefung' ? 'cur' : t.status === 'erledigt' ? 'done' : '', t.status === 'review' ? 'wartet auf dich' : '', 1, 'var(--s-review)'],
+      ['Erledigt', t.status === 'erledigt' ? 'done' : '', t.status === 'erledigt' ? fmtDate(t.completed) : '', 1, ''],
+    ];
+    return '<ol class="lv-phases" aria-label="Phasen der Aufgabe">' + rows.map((r) => '<li class="' + r[1] + '" style="--p:' + Math.max(6, Math.round(r[3] * 100)) + '%' + (r[4] ? ';--phc:' + r[4] : '') + '"' + (r[1] === 'cur' ? ' aria-current="step"' : '') + '><span class="ph-name">' + r[0] + '</span><span class="ph-sub">' + esc(r[2]) + '</span></li>').join('') + '</ol>';
+  }
+
+  function lvStepsHtml(t) {
+    const s = lvSteps(t);
+    if (!s.total) return '<p class="lv-empty">Kein Umsetzungsplan. Schritte stehen in der task.md unter Umsetzungsplan.</p>';
+    const fresh = liveSnap && liveSnap[t.id] && liveSnap[t.id].done < s.done;
+    return '<ol class="lv-steps">' + t.plan.map((st, i) => {
+      const cur = i === s.cur && phaseOf(t) === 'umsetzung';
+      const cls = st.done ? 'done' : cur ? 'cur' + (fresh ? ' fresh' : '') : 'todo';
+      const prevAt = i > 0 && t.plan[i - 1].at;
+      const right = st.done ? lvTime(st.at) : cur && prevAt ? 'seit ' + lvSince(prevAt, 'min') : '';
+      return '<li class="' + cls + '"' + (cur ? ' aria-current="step"' : '') + '>' + lvSi(st.done ? 'ok' : cur ? 'cur' : 'wait') +
+        '<span class="s-t">' + esc(st.text) + '<span class="sr">, ' + (st.done ? 'erledigt' : cur ? 'in Arbeit' : 'offen') + '</span></span><span class="s-time">' + right + '</span></li>';
+    }).join('') + '</ol>';
+  }
+
+  function lvNowHtml(t) {
+    const ph = phaseOf(t), s = lvSteps(t), c = lvChecks(t);
+    if (ph === 'review') return '<div class="lv-now done">' + lvSi(c && (c.warn || c.fail) ? 'warn' : 'review') + '<div class="lv-now-t"><span class="n-label">Claude ist fertig</span><span class="n-what">Wartet auf deine Abnahme' + (c && (c.warn || c.fail) ? ', ' + lvFinds(c) : '') + '</span></div>' + (EDIT ? '<button class="btn small primary" data-lv-review="' + esc(t.id) + '" data-lk="review">Abnehmen</button>' : '') + '</div>';
+    if (ph === 'erledigt') return '<div class="lv-now fin">' + lvSi('ok') + '<div class="lv-now-t"><span class="n-label">Abgeschlossen</span><span class="n-what">Heute erledigt</span></div></div>';
+    const e = lvNowOf(t);
+    const agent = lvLanes().has(t.id);
+    const where = ph === 'pruefung' ? 'Prüfung ' + Math.min(c.finished + 1, c.total) + ' von ' + c.total + ', Ergebnisse unter Prüfungen' : s.cur >= 0 ? 'Schritt ' + (s.cur + 1) + ': ' + esc(s.curT) : '';
+    if (e && e.running) {
+      return '<div class="lv-now"><span class="n-label"><i class="lv-dot" aria-hidden="true"></i>Gerade jetzt' + (agent ? ', Agent im eigenen Worktree' : '') + '</span><span class="n-what">' + lvWhat(e) + '</span><span class="n-meta">seit ' + lvSince(e.at) + (where ? ' · ' + where : '') + '</span></div>';
+    }
+    const last = e && e.tool ? e : lvLastOf(t.id);
+    if (e) return '<div class="lv-now"><span class="n-label"><i class="lv-dot" aria-hidden="true"></i>' + (agent ? 'Agent denkt nach' : 'Claude denkt nach') + '</span>' + (last ? '<span class="n-what">Zuletzt: ' + lvWhat(last) + '</span><span class="n-meta">vor ' + lvSince(last.at) + (where ? ' · ' + where : '') + '</span>' : where ? '<span class="n-meta">' + where + '</span>' : '') + '</div>';
+    return '<div class="lv-now idle"><span class="n-label">Gerade nicht aktiv</span>' + (last ? '<span class="n-what">Zuletzt: ' + lvWhat(last) + '</span><span class="n-meta">um ' + lvTime(last.at) + (where ? ' · ' + where : '') + '</span>' : where ? '<span class="n-meta">' + where + '</span>' : '') + '</div>';
+  }
+
+  function lvFeed(list, onlyId) {
+    const items = [];
+    for (const r of (meta.activity && meta.activity.recent) || []) items.push({ at: r.at, task: r.task, verb: r.verb, what: r.what, err: r.ok === false, kind: 'tool' });
+    for (const t of list) {
+      for (const s of t.plan || []) if (s.done && s.at) items.push({ at: s.at, task: t.id, verb: 'Schritt erledigt', what: s.text, kind: 'step' });
+      if (t.checks) {
+        for (const [name, r] of Object.entries(t.checks.results)) {
+          if (r.at && ['ok', 'ack', 'warn', 'fail'].includes(r.status)) items.push({ at: r.at, task: t.id, verb: 'Prüfung', what: name + ' ' + LV_CK[r.status], kind: 'check', ok: r.status === 'ok' || r.status === 'ack', err: r.status === 'fail' });
+        }
+      }
+    }
+    return items.filter((x) => !onlyId || x.task === onlyId).sort((x, y) => Date.parse(y.at) - Date.parse(x.at)).slice(0, 7);
+  }
+  function lvFeedHtml(items, withId) {
+    if (!items.length) return '<p class="lv-empty">Noch keine Einträge.</p>';
+    return '<ol class="lv-feed' + (withId ? ' with-id' : '') + '">' + items.map((x) => {
+      const key = x.at + x.task + x.verb + x.what;
+      const ic = x.err ? '<span class="fi err">' + LV_IC.fail + '</span>' : x.kind === 'step' || x.ok ? '<span class="fi ok">' + LV_IC.ok + '</span>' : x.kind === 'check' ? '<span class="fi chk">' + LV_IC.chk + '</span>' : '';
+      return '<li class="k-' + x.kind + (liveSeen && !liveSeen.has(key) ? ' new' : '') + '"><span class="f-time">' + lvTime(x.at, true) + '</span>' + (withId ? '<span class="f-id">' + esc(x.task || '–') + '</span>' : '') +
+        '<span class="f-what">' + ic + '<span class="f-verb">' + esc(x.verb) + '</span><span class="mono">' + esc(x.what) + '</span>' + (x.err ? '<span class="f-err">Fehler</span>' : '') + '</span></li>';
+    }).join('') + '</ol>';
+  }
+
+  function lvChecksList(t) {
+    const cls = { ok: 'ok', ack: 'ok', warn: 'warn', fail: 'bad', run: 'running' };
+    const ch = { ok: '✓', ack: '✓', warn: '!', fail: '×', run: '', manual: '…', wait: '' };
+    return '<ul class="checks">' + t.checks.list.map((x) => {
+      const st = lvCheckState(t, x);
+      const r = t.checks.results[x.name] || {};
+      const right = st === 'run' ? 'läuft ' + lvSince(t.checks.runningSince, 'sec') : r.ms && (st === 'ok' || st === 'fail') ? LV_CK[st] + ', ' + lvMs(r.ms) : LV_CK[st] || st;
+      let extra = '';
+      if (st === 'warn') {
+        extra = '<div class="ck-note">' + md(r.note || '') + (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fix="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">Claude beheben lassen</button><button type="button" class="btn small" data-lv-ack="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">Als bekannt markieren</button></div>' : '') + '</div>';
+      } else if (st === 'fail' && r.output) extra = '<details class="ck-out" data-out="' + esc(t.id + ':' + x.name) + '"><summary>Ausgabe</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>';
+      return '<li class="ck ' + (cls[st] || '') + '"><div class="ck-row"><span class="ck-ic" aria-hidden="true">' + ch[st] + '</span><span class="ck-name">' + esc(x.name) + '</span><span class="mono muted ck-cmd">' + esc(x.cmd) + '</span><span class="muted num ck-ms">' + right + '</span></div>' + extra + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function lvChecksHtml(list, focusId) {
+    // Ohne Ergebnis abgeschlossene Aufgaben haben nichts zu zeigen.
+    const groups = list.filter((t) => t.checks && phaseOf(t) !== 'queue' && !(t.status === 'erledigt' && !lvChecks(t).finished));
+    const order = (t) => { const c = lvChecks(t); return c.running ? 0 : c.warn || c.fail ? 1 : !c.finished ? 3 : c.ok === c.total ? 4 : 2; };
+    groups.sort((a, b) => order(a) - order(b));
+    const running = groups.filter((t) => t.checks.running).length;
+    const finds = groups.reduce((n, t) => { const c = lvChecks(t); return n + c.warn + c.fail; }, 0);
+    let h = '<div class="lv-head"><h2>Prüfungen</h2><span class="meta">' + ([running ? running + ' läuft' : '', finds ? finds + (finds === 1 ? ' Fund' : ' Funde') : ''].filter(Boolean).join(', ') || (groups.length ? 'alles ruhig' : '')) + '</span></div><div class="lv-body">';
+    if (!meta.hasChecks) return h + '<p class="lv-empty">Noch keine Prüfungen eingerichtet. Unter Werkzeuge lassen sich Befehle wie Tests oder Build hinterlegen, sie laufen dann vor dem Abschluss.</p></div>';
+    if (!groups.length) return h + '<p class="lv-empty">Heute ist noch keine Aufgabe mit Prüfungen in Arbeit.</p></div>';
+    h += groups.map((t) => {
+      const c = lvChecks(t);
+      const agent = lvLanes().has(t.id) ? '<span class="tag lv-agent">Agent</span>' : '';
+      const head = (ic, note) => '<div class="lv-ckg-head">' + lvSi(ic) + '<b>' + esc(t.id) + '</b><span class="t">' + esc(t.title) + '</span>' + agent + '</div>' + (note ? '<p class="lv-ckg-note">' + note + '</p>' : '');
+      if (!c.running && !c.finished) return '<div class="lv-ckg">' + head('wait', 'Laufen, sobald die Aufgabe abgeschlossen wird: ' + esc(t.checks.list.map((x) => x.name).join(', ')) + '.') + '</div>';
+      if (!c.running && c.ok === c.total) return '<details class="lv-ckg"><summary class="lv-ckg-head">' + lvSi('ok') + '<b>' + esc(t.id) + '</b><span class="t">Alle ' + c.total + ' bestanden' + (t.checks.at ? ', ' + lvTime(t.checks.at) : '') + '</span>' + agent + '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>' + lvChecksList(t) + '</details>';
+      const note = c.running ? 'Läuft, ' + c.finished + ' von ' + c.total + ' fertig' : (c.warn || c.fail) ? lvFinds(c) + ', Entscheidung nötig' : c.finished + ' von ' + c.total + ' gelaufen';
+      return '<div class="lv-ckg' + (t.id === focusId ? ' hl' : '') + '">' + head(c.running ? 'run' : c.fail ? 'fail' : c.warn ? 'warn' : 'ok', note) + lvChecksList(t) + '</div>';
+    }).join('');
+    return h + '</div>';
+  }
+
+  function lvTilesHtml(list) {
+    const a = meta.activity;
+    const busy = a && a.busy && lvFresh(a.current);
+    const cur = busy ? a.current : null;
+    const ct = cur && cur.task ? tasks.find((t) => t.id === cur.task) : null;
+    const cs = ct ? lvSteps(ct) : null;
+    const stepTxt = cs && cs.total && cs.cur >= 0 ? ' <small>Schritt ' + (cs.cur + 1) + ' von ' + cs.total + '</small>' : '';
+    let t1;
+    if (!cur) t1 = '<h3>Claude wartet</h3><div class="big">' + (a && a.idleSince ? 'seit ' + lvTime(a.idleSince) : 'Gerade nicht aktiv') + '</div><div class="sub">Keine laufende Anfrage</div>';
+    else if (cur.running) t1 = '<h3><i class="lv-dot" aria-hidden="true"></i>Claude arbeitet gerade</h3><div class="big">' + esc(cur.task || 'Ohne Aufgabe') + stepTxt + '</div><div class="sub">' + lvWhat(cur) + ', seit ' + lvSince(cur.at) + '</div>';
+    else { const last = (a.recent || [])[0]; t1 = '<h3><i class="lv-dot" aria-hidden="true"></i>Claude denkt nach</h3><div class="big">' + esc(cur.task || 'Ohne Aufgabe') + stepTxt + '</div><div class="sub">' + (last ? 'Zuletzt: ' + lvWhat(last) + ', vor ' + lvSince(last.at) : 'seit ' + lvSince(cur.at)) + '</div>'; }
+    const by = (p) => list.filter((t) => phaseOf(t) === p).length;
+    const fertig = by('review') + by('erledigt');
+    const seg = list.map((t) => '<i class="' + ({ erledigt: 'done', review: 'review', umsetzung: 'cur', pruefung: 'check' }[phaseOf(t)] || '') + '" title="' + esc(t.id) + '"></i>').join('');
+    const t2 = list.length ? '<h3>Fortschritt heute</h3><div class="big">' + fertig + ' von ' + list.length + ' <small>fertig</small></div><div class="lv-seg" aria-hidden="true">' + seg + '</div><div class="sub">' + by('erledigt') + ' erledigt · ' + by('review') + ' im Review · ' + (by('umsetzung') + by('pruefung')) + ' in Arbeit · ' + by('queue') + ' warten</div>'
+      : '<h3>Fortschritt heute</h3><div class="big">Nichts geplant</div><div class="sub">Keine Aufgabe in Arbeit, im Review oder in der Warteschlange</div>';
+    const lanes = list.filter((t) => lvLanes().has(t.id) && t.status === 'in-arbeit');
+    const t3 = '<h3>Parallel</h3>' + (lanes.length ? '<div class="big">' + (lanes.length === 1 ? '1 Agent' : lanes.length + ' Agenten') + '</div>' + lanes.map((t) => '<div class="sub">' + esc(t.id) + ' · ' + esc(lvStatus(t).text) + '</div>').join('') : '<div class="big">Kein Agent aktiv</div><div class="sub">Alles läuft in der Hauptsitzung</div>');
+    const att = lvAttention(list);
+    const t4 = '<h3>Wartet auf dich</h3>' + (att.length ? '<div class="big">' + att.length + '</div><ul class="lv-attn">' + att.map((x, i) => '<li><button type="button" data-lv-focus="' + esc(x.id) + '" data-lk="att' + i + '">' + lvSi(x.ic) + '<span class="t">' + esc(x.text) + '</span></button></li>').join('') + '</ul>' : '<div class="big">Nichts</div><div class="sub">Claude braucht gerade nichts von dir</div>');
+    return '<button type="button" class="lv-tile lv-tile-btn" data-lv-follow data-lk="follow" title="Ansicht folgt Claude">' + t1 + '</button><article class="lv-tile">' + t2 + '</article><article class="lv-tile">' + t3 + '</article><article class="lv-tile' + (att.length ? ' attn' : '') + '">' + t4 + '</article>';
+  }
+
+  function lvFocusHtml(t, list) {
+    if (!t) return '<p class="lv-empty">Heute gibt es keine Aufgabe in Arbeit, im Review oder in der Warteschlange. Mit works start oder über die Warteschlange geht es los.</p>';
+    const s = lvSteps(t);
+    let h = '<div class="lv-ftop"><span class="r-id">' + esc(t.id) + '</span><span class="r-prio" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span><span>' + esc(meta.typeLabel[t.type] || t.type) + '</span>' +
+      (t.branch ? '<span class="mono">' + esc(t.branch) + '</span>' : '') + (lvLanes().has(t.id) ? '<span class="tag lv-agent">Agent im eigenen Worktree</span>' : '') +
+      '<button type="button" class="btn link" data-lv-open="' + esc(t.id) + '">Details</button></div><h2 class="lv-title">' + esc(t.title) + '</h2>' + lvPhases(t);
+    if (phaseOf(t) === 'queue') return h + '<p class="lv-empty">Noch nicht gestartet. ' + esc(lvStatus(t).text) + '.</p>';
+    const feed = lvFeed(list, livePrefs.feedAll ? '' : t.id);
+    h += '<div class="lv-cols"><div class="lv-col"><div class="lv-head"><h3>Umsetzungsplan</h3>' + (s.total ? '<span class="meta">' + s.done + ' von ' + s.total + ' erledigt</span>' : '') + '</div>' + lvStepsHtml(t) +
+      '<p class="lv-crit">' + lvSi(t.crit[1] && t.crit[0] === t.crit[1] ? 'ok' : 'wait') + 'Akzeptanzkriterien: ' + t.crit[0] + ' von ' + t.crit[1] + ' abgehakt</p></div>' +
+      '<div class="lv-col">' + lvNowHtml(t) + '<div class="lv-head"><h3>Verlauf</h3><div class="lv-segbtn" role="group" aria-label="Verlauf filtern"><button type="button" data-lv-feed="0" data-lk="feed0" aria-pressed="' + !livePrefs.feedAll + '">Diese Aufgabe</button><button type="button" data-lv-feed="1" data-lk="feed1" aria-pressed="' + livePrefs.feedAll + '">Alle</button></div></div>' + lvFeedHtml(feed, livePrefs.feedAll) + '</div></div>';
+    if (EDIT && (t.status === 'in-arbeit')) {
+      const pend = (meta.instructions || []).filter((x) => x.task === t.id).length;
+      h += '<div class="lv-instr"><label class="sr" for="lvInstr">Anweisung an Claude</label><input class="input" id="lvInstr" data-instr-in="' + esc(t.id) + '" maxlength="4000" placeholder="Anweisung an Claude, zum Beispiel: Bitte auch Beiträge mit Umfragen sichern"><button type="button" class="btn small primary" data-instr-send="' + esc(t.id) + '">Senden</button>' +
+        (pend ? '<span class="meta">' + (pend === 1 ? '1 Anweisung wartet' : pend + ' Anweisungen warten') + '. Claude liest sie nach dem aktuellen Schritt.</span>' : '') + '</div>';
+    }
+    return h;
+  }
+
+  function lvFocusId(list) {
+    const ids = list.map((t) => t.id);
+    if (!liveFollow && ids.includes(livePrefs.focus)) return livePrefs.focus;
+    if (!liveFollow) liveFollowClaude();
+    const a = meta.activity;
+    if (a && a.busy && lvFresh(a.current) && ids.includes(a.current.task)) return a.current.task;
+    const w = list.find((t) => t.status === 'in-arbeit');
+    return w ? w.id : ids[0] || '';
+  }
+
+  // Ansage für Screenreader: Schritt erledigt, Prüfungen fertig, Aufgabe wartet auf Abnahme.
+  function lvAnnounce(list) {
+    const snap = {};
+    for (const t of list) { const c = lvChecks(t); snap[t.id] = { done: lvSteps(t).done, fin: c ? c.finished : 0, status: t.status }; }
+    const msgs = [];
+    if (liveSnap && state.view === 'live') {
+      for (const t of list) {
+        const o = liveSnap[t.id], n = snap[t.id];
+        if (!o) continue;
+        if (n.done > o.done) { const st = t.plan[n.done - 1]; msgs.push(t.id + ': Schritt ' + n.done + ' von ' + t.plan.length + ' erledigt' + (st ? ', ' + st.text : '') + '.'); }
+        if (n.fin > o.fin) { const c = lvChecks(t); msgs.push(t.id + ': Prüfungen ' + c.finished + ' von ' + c.total + ' fertig' + (c.warn || c.fail ? ', ' + lvFinds(c) : '') + '.'); }
+        if (n.status === 'review' && o.status !== 'review') msgs.push(t.id + ' wartet auf deine Abnahme.');
+      }
+    }
+    if (msgs.length) { const say = $('#liveSay'); say.textContent = ''; setTimeout(() => { say.textContent = msgs.join(' '); }, 50); }
+    return snap;
+  }
+
+  function renderLive() {
+    const box = $('#viewLive');
+    if (!box) return;
+    const list = liveTasks();
+    const focusId = lvFocusId(list);
+    const ft = list.find((t) => t.id === focusId) || null;
+    // Fokus und angefangene Anweisung über das Neuzeichnen retten.
+    const ae = document.activeElement;
+    const keyEl = ae && box.contains(ae) ? (ae.id ? '#' + ae.id : ae.dataset.lk ? '[data-lk="' + ae.dataset.lk + '"]' : ae.dataset.lvFocus ? '.lv-run [data-lv-focus="' + ae.dataset.lvFocus + '"]' : null) : null;
+    const inp = $('#lvInstr', box);
+    const keep = inp ? { v: inp.value, s: inp.selectionStart, task: inp.dataset.instrIn } : null;
+    const openGroups = $$('details.lv-ckg[open] summary b', box).map((b) => b.textContent);
+    const openOut = $$('details.ck-out[open]', box).map((d) => d.dataset.out);
+    box.innerHTML = '<section class="lv-sum" aria-label="Überblick">' + lvTilesHtml(list) + '</section>' +
+      '<div class="lv-grid"><section class="lv-panel lv-runbox" aria-label="Aufgaben heute"><div class="lv-head"><h2>Heute</h2><span class="meta">' + list.length + (list.length === 1 ? ' Aufgabe' : ' Aufgaben') + '</span></div>' +
+      (list.length ? '<ul class="lv-run">' + list.map((t) => {
+        const st = lvStatus(t);
+        return '<li><button type="button" data-lv-focus="' + esc(t.id) + '" aria-current="' + (t.id === focusId) + '">' + lvSi(st.ic) +
+          '<span class="r-top"><span class="r-id">' + esc(t.id) + '</span>' + (lvLanes().has(t.id) ? '<span class="tag lv-agent">Agent</span>' : '') + '<span class="r-prio" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span></span>' +
+          '<span class="r-title">' + esc(t.title) + '</span><span class="r-sub">' + esc(st.text) + '</span>' +
+          (st.w != null && t.status !== 'erledigt' ? '<span class="lv-bar r-bar" style="--s:' + Math.max(0, Math.min(1, st.w)).toFixed(3) + (st.col ? ';--c:' + st.col : '') + '"><i></i></span>' : '') + '</button></li>';
+      }).join('') + '</ul>' : '<p class="lv-empty">Keine Aufgaben für heute.</p>') + '</section>' +
+      '<section class="lv-panel lv-focus" aria-label="Gewählte Aufgabe">' + lvFocusHtml(ft, list) + '</section>' +
+      '<section class="lv-panel lv-checks" aria-label="Prüfungen">' + lvChecksHtml(list, focusId) + '</section></div>';
+    $$('details.lv-ckg', box).forEach((d) => { const b = $('summary b', d); if (b && openGroups.includes(b.textContent)) d.open = true; });
+    $$('details.ck-out', box).forEach((d) => { if (openOut.includes(d.dataset.out)) d.open = true; });
+    const ni = $('#lvInstr', box);
+    if (ni && keep && keep.task === ni.dataset.instrIn) { ni.value = keep.v; }
+    if (keyEl) { const el = $(keyEl, box); if (el) { el.focus({ preventScroll: true }); if (el === ni && keep) { try { el.setSelectionRange(keep.s, keep.s); } catch (e) { /* egal */ } } } }
+    liveSnap = lvAnnounce(list);
+    liveSeen = new Set(lvFeed(list, '').concat(lvFeed(list, focusId)).map((x) => x.at + x.task + x.verb + x.what));
+  }
+
+  document.addEventListener('click', async (e) => {
+    if (!e.target.closest('#viewLive')) return;
+    const f = e.target.closest('[data-lv-focus]');
+    if (f) { liveFollow = false; livePrefs.focus = f.dataset.lvFocus; store.set(LIVE_KEY, livePrefs); renderLive(); return; }
+    if (e.target.closest('[data-lv-follow]')) { liveFollowClaude(); renderLive(); return; }
+    const fb = e.target.closest('[data-lv-feed]');
+    if (fb) { livePrefs.feedAll = fb.dataset.lvFeed === '1'; store.set(LIVE_KEY, livePrefs); renderLive(); return; }
+    const rv = e.target.closest('[data-lv-review]');
+    if (rv) { openReview(rv.dataset.lvReview); return; }
+    const op = e.target.closest('[data-lv-open]');
+    if (op) { openTask(op.dataset.lvOpen); return; }
+    const fx = e.target.closest('[data-lv-fix]');
+    if (fx) {
+      const id = fx.dataset.lvTask;
+      const note = (fx.closest('.ck').querySelector('.ck-note') || {}).innerText || '';
+      const r = await run(() => act('comment', { id, text: 'Bitte den Fund aus der Prüfung ' + fx.dataset.lvFix + ' beheben und die Prüfung danach neu eintragen:\n\n' + note.replace(/Claude beheben lassen|Als bekannt markieren/g, '').trim() }), 'Auftrag an Claude als Kommentar gespeichert');
+      if (r) fx.disabled = true;
+      return;
+    }
+    const ak = e.target.closest('[data-lv-ack]');
+    if (ak) run(() => act('checksAck', { id: ak.dataset.lvTask, name: ak.dataset.lvAck }), 'Als bekannt markiert');
   });
 
   // ---------- Entwürfe ----------
@@ -2916,7 +3285,7 @@
     if (typing || dlg.open || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === '/') { e.preventDefault(); if (state.view === 'queue') setView('board'); $('#q').focus(); }
     if (EDIT && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); newTask(); }
-    if (/^[1-6]$/.test(e.key) && panel.hidden && pal.hidden) { e.preventDefault(); setView(VIEWS[+e.key - 1]); }
+    if (/^[1-7]$/.test(e.key) && panel.hidden && pal.hidden) { e.preventDefault(); setView(VIEWS[+e.key - 1]); }
   });
 
   document.body.classList.toggle('ro', !EDIT);
@@ -2954,6 +3323,9 @@
       let d = false;
       for (const [id, c] of changes) if (Date.now() - c.at > HIGHLIGHT_MS) { changes.delete(id); d = true; }
       if (d) renderBoard();
+      // Zeitangaben der Live-Ansicht und der Pille im Kopf weiterzählen.
+      $$('#viewLive [data-since], #busy [data-since]').forEach((el) => { el.textContent = lvSinceText(el.dataset.since, el.dataset.fmt); });
+      if (Date.now() >= liveDeadline) { liveDeadline = Infinity; reload(); }
     }, 1000);
   }
   // Ansicht nach einem Update-Neuladen wiederherstellen.
@@ -2961,7 +3333,7 @@
   try { restored = JSON.parse(sessionStorage.getItem(UI_KEY) || 'null'); sessionStorage.removeItem(UI_KEY); } catch (e) { restored = null; }
   state.view = store.get('works-view-' + meta.project, 'board');
   if (restored && restored.view) state.view = restored.view;
-  if (!VIEWS.includes(state.view)) state.view = 'board';
+  if (!VIEWS.includes(state.view) || (state.view === 'live' && !LIVE)) state.view = 'board';
   // Gespeicherte Standardansicht dieses Browsers, wenn nicht gerade nach einem Update neu geladen wurde.
   const defView = !restored && store.get('works-default-view-' + meta.project, '');
   const defV = defView && (meta.views || []).find((v) => v.name === defView);

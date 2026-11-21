@@ -1,0 +1,34 @@
+{
+  "direction": {
+    "source": "ui-ux-pro-max",
+    "at": "2026-11-20 23:03",
+    "file": "richtung.md",
+    "colors": [],
+    "fonts": [],
+    "notes": ""
+  },
+  "variants": [
+    {
+      "name": "A",
+      "title": "Live-Ansicht",
+      "file": "A-live-ansicht.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Entwurfsseite mit allen drei Varianten, gewählt ist Reiter A",
+      "at": "2026-11-20 23:03"
+    }
+  ],
+  "brainstorm": [
+    {
+      "file": "brainstorm.md",
+      "source": "superpowers",
+      "title": "Design Live-Ansicht",
+      "at": "2026-11-20 23:03"
+    }
+  ],
+  "chosen": {
+    "name": "A",
+    "at": "2026-11-20 23:03",
+    "reason": "Zeigt am meisten auf einmal und passt ins vorhandene Ansichtssystem; Pille im Kopf führt direkt hin"
+  }
+}

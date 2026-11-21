@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { exists, readJson, writeJson } from './lib.mjs';
+import { exists, readJson, writeJson, worksDir } from './lib.mjs';
 
 const TIMEOUT_MS = 10 * 60 * 1000;
 const TAIL = 4000;
@@ -67,21 +67,32 @@ function runOne(root, cmd) {
   });
 }
 
+// Arbeitsordner der Prüfungen: Läuft die Aufgabe parallel, liegt ihr Code im Worktree, sonst im Projekt.
+// lanes.json direkt lesen, weil parallel.mjs seinerseits checks.mjs braucht.
+export function checkDir(root, task) {
+  const lanes = (readJson(path.join(worksDir(root), 'lanes.json'), null) || {}).lanes || [];
+  const lane = lanes.find((l) => l.task === task.id);
+  return lane && exists(lane.path) ? lane.path : root;
+}
+
 export async function runChecks(root, config, task, { only = null, onStart = null } = {}) {
+  const dir = checkDir(root, task);
   const list = checksFor(config, task).filter((c) => !only || only.includes(c.name));
   const prev = loadResults(task) || {};
   const results = { ...(prev.results || {}) };
   for (const c of list) {
     if (c.skill) {
       // Skill-Prüfungen führt Claude aus und trägt sie ein. Ein altes Ergebnis gilt nur für denselben Stand.
-      if (!results[c.name] || results[c.name].fingerprint !== workFingerprint(root)) results[c.name] = { status: 'manual', cmd: c.cmd, note: `Claude führt ${c.cmd.slice(6)} aus und trägt das Ergebnis mit works checks record ${task.id} ${c.name} ein.` };
+      if (!results[c.name] || results[c.name].fingerprint !== workFingerprint(dir)) results[c.name] = { status: 'manual', cmd: c.cmd, note: `Claude führt ${c.cmd.slice(6)} aus und trägt das Ergebnis mit works checks record ${task.id} ${c.name} ein.` };
       continue;
     }
     if (onStart) onStart(c);
-    const r = await runOne(root, c.cmd);
-    results[c.name] = { status: r.ok ? 'ok' : 'fail', cmd: c.cmd, ms: r.ms, output: r.output };
+    // Zwischenstand für das Live-Board: welche Prüfung läuft gerade, was ist schon fertig.
+    writeJson(resultFile(task), { at: prev.at || new Date().toISOString(), fingerprint: prev.fingerprint || '', results, running: c.name, runningSince: new Date().toISOString() });
+    const r = await runOne(dir, c.cmd);
+    results[c.name] = { status: r.ok ? 'ok' : 'fail', cmd: c.cmd, ms: r.ms, output: r.output, at: new Date().toISOString() };
   }
-  const data = { at: new Date().toISOString(), fingerprint: workFingerprint(root), results };
+  const data = { at: new Date().toISOString(), fingerprint: workFingerprint(dir), results };
   writeJson(resultFile(task), data);
   return data;
 }
@@ -89,8 +100,9 @@ export async function runChecks(root, config, task, { only = null, onStart = nul
 export function recordCheck(root, task, name, status, note) {
   if (!NAME_RE.test(name)) throw new Error('Ungültiger Name der Prüfung.');
   if (!['ok', 'warn', 'fail'].includes(status)) throw new Error('Status muss ok, warn oder fail sein.');
-  const data = loadResults(task) || { at: new Date().toISOString(), fingerprint: workFingerprint(root), results: {} };
-  data.results[name] = { status, cmd: (data.results[name] || {}).cmd || '', note: String(note || '').slice(0, 2000), fingerprint: workFingerprint(root), at: new Date().toISOString() };
+  const fp = workFingerprint(checkDir(root, task));
+  const data = loadResults(task) || { at: new Date().toISOString(), fingerprint: fp, results: {} };
+  data.results[name] = { status, cmd: (data.results[name] || {}).cmd || '', note: String(note || '').slice(0, 2000), fingerprint: fp, at: new Date().toISOString() };
   writeJson(resultFile(task), data);
   return data;
 }
@@ -110,7 +122,7 @@ export function checkItems(root, config, task) {
   const list = checksFor(config, task);
   if (!list.length) return { items: [], state: null };
   const data = loadResults(task);
-  const fp = workFingerprint(root);
+  const fp = workFingerprint(checkDir(root, task));
   // Veraltet, wenn sich der Code oder ein eingerichteter Befehl seit dem letzten Lauf geändert hat.
   const cmdChanged = data && list.some((c) => !c.skill && data.results[c.name] && data.results[c.name].cmd !== c.cmd);
   const stale = !data || (fp && data.fingerprint !== fp) || cmdChanged || list.some((c) => !c.skill && !data.results[c.name]);

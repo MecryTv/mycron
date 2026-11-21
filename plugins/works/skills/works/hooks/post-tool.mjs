@@ -4,8 +4,8 @@
 // Werkzeugaufrufe in einem Worktree einer parallelen Aufgabe zählen für diese Aufgabe.
 import fs from 'node:fs';
 import path from 'node:path';
-import { findRoot, loadConfig, loadState } from '../scripts/lib.mjs';
-import { recordActivity, takeInstructions, instructionText } from '../scripts/live.mjs';
+import { findRoot, loadConfig, loadTask, worksDir } from '../scripts/lib.mjs';
+import { recordActivity, takeInstructions, instructionText, callTarget, stampSteps, taskDirOf } from '../scripts/live.mjs';
 import { recordEdit, editHint } from '../scripts/files.mjs';
 import { loadLanes } from '../scripts/parallel.mjs';
 
@@ -14,21 +14,19 @@ try {
   if (!process.stdin.isTTY) input = JSON.parse(fs.readFileSync(0, 'utf8') || '{}');
 } catch { input = {}; }
 
-const inside = (p, dir) => { if (!p || !dir) return false; const r = path.relative(dir, path.resolve(String(p))); return r === '' || (!r.startsWith('..') && !path.isAbsolute(r)); };
-
 try {
   const root = findRoot(input.cwd || process.cwd());
   if (root) {
     const config = loadConfig(root);
     const ti = input.tool_input || {};
-    const target = ti.file_path || ti.notebook_path || ti.path || '';
-    const cmd = String(ti.command || '');
-    const lane = loadLanes(root).find((l) => inside(target, l.path) || inside(input.cwd, l.path) || (cmd && cmd.includes(l.path)));
-    const task = lane ? lane.task : (loadState(root).active || '');
+    const { task, lane } = callTarget(root, input);
     const notes = [];
     if (config.live_activity !== false) {
       const failed = input.tool_response && (input.tool_response.is_error || input.tool_response.error);
       recordActivity(root, task, input.tool_name || '', ti, !failed, lane ? lane.path : '');
+      // Uhrzeit frisch abgehakter Schritte festhalten, auch wenn gerade kein Board läuft.
+      const dir = task && taskDirOf(root, task);
+      if (dir) { try { stampSteps(root, [loadTask(path.join(worksDir(root), 'tasks', dir))]); } catch { /* nicht kritisch */ } }
     }
     if (config.file_tracking !== false && task) {
       const file = recordEdit(root, task, input.tool_name || '', ti, lane ? lane.path : root);

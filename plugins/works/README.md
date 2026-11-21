@@ -116,7 +116,7 @@ Beim Start jeder Sitzung bekommt Claude automatisch eine Kurzübersicht: offene 
 
 Claude startet es mit `works board --serve --detach`, oder du sagst "Öffne das Board". Es läuft im Hintergrund und aktualisiert sich jede Sekunde. Wenn Claude eine Karte verschiebt, gleitet sie in die neue Spalte, und unten rechts erscheint, was passiert ist und warum.
 
-Solange Claude arbeitet, steht oben "Claude arbeitet an W-0003, seit 6 min". Die aktive Karte zeigt den aktuellen Schritt, etwa "Bearbeitet src/backup.ts" oder "Befehl npm test", und die drei davor. Über "Anweisung an Claude" schickst du mitten in der Arbeit einen Hinweis. Claude bekommt ihn beim nächsten Schritt und berücksichtigt ihn, sobald es sinnvoll ist.
+Solange Claude arbeitet, steht oben "Claude arbeitet an W-0003, seit 6 min". Ein Klick darauf öffnet die Ansicht Live: Dort siehst du die Aufgabe mit ihrem Umsetzungsplan, den gerade laufenden Befehl mit Laufzeit, parallele Agenten, was auf dich wartet, und alle Prüfungen samt Laufzeit und Funden. Die aktive Karte zeigt den aktuellen Schritt, etwa "Bearbeitet src/backup.ts" oder "Befehl npm test", und die drei davor. Über "Anweisung an Claude" schickst du mitten in der Arbeit einen Hinweis. Claude bekommt ihn beim nächsten Schritt und berücksichtigt ihn, sobald es sinnvoll ist.
 
 Jede Änderung im Board lässt sich zurücknehmen: über "Rückgängig" in der Meldung, mit Strg+Z oder in den Werkzeugen unter Letzte Änderungen.
 
@@ -130,6 +130,7 @@ Jede Änderung im Board lässt sich zurücknehmen: über "Rückgängig" in der M
 | Zeitleiste | 4 | Wochen und Meilensteine, Fälligkeit per Ziehen am Balkenende |
 | Abhängigkeiten | 5 | Graph mit kritischem Pfad und der Aufgabe mit dem größten Hebel |
 | Tabelle | 6 | Sortieren, direkt bearbeiten, mehrere Aufgaben auf einmal ändern |
+| Live | 7 | Was Claude gerade tut, welcher Schritt dran ist, wie weit die Aufgaben des Tages sind und wie die Prüfungen stehen |
 
 Über den Spalten zeigt der Fortschritt den Anteil erledigter Aufgaben, die letzten sieben Tage, eine Prognose und den Verlauf der letzten acht Wochen. Mit gewähltem Meilenstein gilt alles nur für ihn.
 

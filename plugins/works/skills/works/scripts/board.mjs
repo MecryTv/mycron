@@ -5,16 +5,16 @@ import { fileURLToPath } from 'node:url';
 import {
   loadTasks, loadConfig, worksDir, queueOf, getSection, checkboxes, stripComments, imageLinks,
   isBlocked, openBlockers, isOverdue, openQuestions, relFromWorks, nowStamp, STATUS_LABEL,
-  PRIO_LABEL, TYPE_LABEL, OPEN_STATUSES,
+  PRIO_LABEL, TYPE_LABEL, OPEN_STATUSES, today,
 } from './lib.mjs';
 import { byIdMap, milestoneProgress } from './views.mjs';
 import { runningVersion } from './server-control.mjs';
 import { activeSprint, lastClosedSprint, sprintStats, sprintSettings } from './sprint.mjs';
 import { loadComments } from './comments.mjs';
 import { effortDays } from './timelog.mjs';
-import { configuredChecks } from './checks.mjs';
+import { configuredChecks, checksFor, loadResults } from './checks.mjs';
 import { designSummary } from './design.mjs';
-import { loadActivity, pendingInstructions } from './live.mjs';
+import { loadActivity, pendingInstructions, stampSteps } from './live.mjs';
 import { loadKnowledge } from './knowledge.mjs';
 import { loadLanes } from './parallel.mjs';
 
@@ -40,10 +40,26 @@ function startedOf(t) {
   return m ? m[1] : '';
 }
 
+// Prüfungsstand einer Aufgabe für die Live-Ansicht. null, wenn keine Prüfungen eingerichtet sind.
+// Ein running älter als Zeitgrenze plus eine Minute stammt aus einem abgebrochenen Lauf und zählt nicht.
+const STALE_RUN_MS = 11 * 60 * 1000;
+function liveChecks(config, t) {
+  const list = checksFor(config, t);
+  if (!list.length) return null;
+  const r = loadResults(t) || {};
+  const fresh = !!r.running && Date.now() - Date.parse(r.runningSince) < STALE_RUN_MS;
+  return { list, results: r.results || {}, running: fresh ? r.running : '', runningSince: fresh ? r.runningSince : '', at: r.at || '' };
+}
+
 export function boardData(root) {
   const config = loadConfig(root);
   const all = loadTasks(root);
   const byId = byIdMap(all);
+  // Tagesliste der Live-Ansicht: in Arbeit, im Review, in der Warteschlange oder heute erledigt.
+  const queued = new Set(queueOf(config));
+  const day = today();
+  const plans = stampSteps(root, all.filter((t) => ['in-arbeit', 'review'].includes(t.status)
+    || (OPEN_STATUSES.includes(t.status) && queued.has(t.id)) || (t.status === 'erledigt' && t.completed === day)), { prune: true });
   const data = all.map((t) => {
     const imgs = imageLinks(getSection(t._body, 'Assets') || '').filter((i) => !/^https?:/.test(i.src));
     const crit = checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '');
@@ -61,6 +77,7 @@ export function boardData(root) {
       file: relFromWorks(root, t._file),
       thumb: imgs.length ? relFromWorks(root, path.resolve(t._dir, imgs[imgs.length - 1].src)) : '',
       thumbAlt: imgs.length ? imgs[imgs.length - 1].alt : '',
+      ...(plans.has(t.id) ? { plan: plans.get(t.id), checks: liveChecks(config, t) } : {}),
     };
   });
   const open = new Set(all.filter((t) => OPEN_STATUSES.includes(t.status)).map((t) => t.id));
@@ -73,7 +90,8 @@ export function boardData(root) {
     views: Array.isArray(config.views) ? config.views : [],
     effortDays: effortDays(root, all, config),
     hasChecks: Object.keys(configuredChecks(config)).length > 0,
-    activity: (() => { const a = loadActivity(root); return a ? { busy: !!a.busy, current: a.current || null, recent: (a.recent || []).slice(0, 12), since: a.since || '', idleSince: a.idleSince || '', lanes: a.lanes || {} } : null; })(),
+    today: day,
+    activity: (() => { const a = loadActivity(root); return a ? { busy: !!a.busy, current: a.current || null, recent: a.recent || [], since: a.since || '', idleSince: a.idleSince || '', lanes: a.lanes || {} } : null; })(),
     lanes: loadLanes(root).map((l) => ({ task: l.task, branch: l.branch, dir: path.basename(l.path), started: l.started, status: l.status })),
     instructions: pendingInstructions(root).map((x) => ({ task: x.task, text: x.text, at: x.at })),
     knowledgeProposals: loadKnowledge(root).filter((e) => e.status === 'vorschlag').length,

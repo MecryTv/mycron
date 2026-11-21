@@ -49,7 +49,7 @@ Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Se
 
 ## Aufbau der Oberfläche
 
-- Kopfzeile: Projekt, Verbindungsstatus, Ansicht (Board, Sprint, Warteschlange, Zeitleiste, Abhängigkeiten, Tabelle, Tasten `1` bis `6`), Werkzeuge, Suche (Taste `/`), Nächste Aufgabe, Ideen, Aktivität, Teilen, Farbschema (System, Hell, Dunkel) und Neue Aufgabe (Taste `N`).
+- Kopfzeile: Projekt, Verbindungsstatus, Ansicht (Board, Sprint, Warteschlange, Zeitleiste, Abhängigkeiten, Tabelle, Live, Tasten `1` bis `7`), Werkzeuge, Suche (Taste `/`), Nächste Aufgabe, Ideen, Aktivität, Teilen, Farbschema (System, Hell, Dunkel) und Neue Aufgabe (Taste `N`).
 - Flussleiste: Verteilung aller Aufgaben auf die Status. Ein Klick springt zur Spalte.
 - Hinweise darunter: offene P1, blockierte, überfällige, Aufgaben mit offenen Fragen und unvollständig erfasste. Ein Klick filtert.
 - Filter: Priorität, Typ, Tag, Meilenstein, Archiv und Verworfene. Im Meilenstein-Filter lassen sich auch Meilensteine anlegen; ist einer gewählt, erscheint "Meilenstein bearbeiten".
@@ -64,6 +64,24 @@ Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Se
 - **Warteschlange**: die Reihenfolge, in der Claude arbeiten soll. Aufgaben einreihen (Auswahlfeld, Detailpanel oder Tabelle), per Ziehen oder Pfeilen sortieren, mit × entfernen. Oben steht, was gerade läuft. Rechts die Einstellungen: nach dem Abschluss weitermachen (`auto_next`), vorher nachfragen (`ask_before`), blockierte überspringen (`skip_blocked`), dazu was Claude als Nächstes nimmt und der Aufwand in der Schlange. Erledigte und verworfene fallen automatisch heraus. Im CLI: `works queue`.
 - **Zeitleiste**: Wochen mit Kalenderwoche, gruppiert nach Meilenstein. Volle Balken laufen oder sind erledigt, gestrichelt farbig sind geplant mit Fälligkeit, gestrichelt grau sind aus dem Aufwand geschätzt (S 2, M 5, L 10, XL 15 Tage, blockierte beginnen nach ihrer Abhängigkeit). Linie für heute, gestrichelte grüne Linie für das Ziel eines Meilensteins, Überfälliges rot. Das rechte Ende eines Balkens ziehen setzt die Fälligkeit.
 - **Tabelle**: alle gefilterten Aufgaben mit sortierbaren Spalten. Priorität, Aufwand und Fälligkeit direkt in der Zeile ändern. Mehrere auswählen (Shift wählt einen Bereich), dann in der Leiste unten Priorität, Status, Meilenstein, Aufwand oder Tags setzen, einreihen, verwerfen oder archivieren. Abschließen geht bewusst nur einzeln über die Definition of Done.
+- **Live**: was Claude gerade tut und wie weit die Aufgaben des Tages sind. Nur im Live-Board, nicht in `board.html` und im Export. Aufbau im Abschnitt Live-Ansicht.
+
+## Live-Ansicht
+
+Oben vier Kacheln:
+
+- **Claude arbeitet gerade**: Aufgabe, Schritt im Umsetzungsplan und der laufende Werkzeugaufruf mit Laufzeit, zum Beispiel "Befehl npm test, seit 1:12". Zwischen zwei Aufrufen steht "Claude denkt nach" mit dem letzten Aufruf, nach dem Ende einer Antwort "Claude wartet seit 14:03". Ein Klick lässt die Ansicht wieder Claude folgen.
+- **Fortschritt heute**: wie viele Aufgaben der Tagesliste fertig sind (Review oder erledigt), mit einem Segment je Aufgabe.
+- **Parallel**: Agenten in eigenen Worktrees und woran sie gerade sind.
+- **Wartet auf dich**: Aufgaben im Review, Funde und Fehlschläge in Prüfungen, offene Fragen an Aufgaben in Arbeit. Ein Klick wählt die Aufgabe.
+
+Darunter links die Tagesliste: Aufgaben in Arbeit (die der Hauptsitzung zuerst, dann Agenten), im Review, in der Warteschlange und heute erledigte. In der Mitte die gewählte Aufgabe mit Phasenleiste (Gestartet, Umsetzung, Prüfungen, Review, Erledigt), Umsetzungsplan mit der Uhrzeit jedes abgehakten Schritts, Akzeptanzkriterien, "Gerade jetzt", Verlauf (diese Aufgabe oder alle) und dem Feld "Anweisung an Claude". Rechts alle Prüfungen der Tagesliste: laufende mit Laufzeit, Funde mit "Claude beheben lassen" und "Als bekannt markieren", Fehlschläge mit den letzten Zeilen der Ausgabe, noch nicht gelaufene als kurze Zeile, bestandene eingeklappt.
+
+Die Phase "Prüfungen" hängt daran, ob gerade eine Prüfung läuft, nicht am Status. Prüfungen laufen oft erst bei der Abnahme im Review.
+
+Die Mitte folgt der Aufgabe, an der Claude arbeitet. Wer selbst eine Aufgabe wählt, behält sie, bis sie aus der Tagesliste fällt oder die Ansicht wieder Claude folgen soll (Kachel oder Pille im Kopf). Gewählte Aufgabe und Verlaufsfilter merkt sich der Browser. Mit geteiltem Leselink fehlen Anweisungsfeld, Abnahme und die Knöpfe an Funden. Bei reduzierter Bewegung stehen Punkte und Spinner still; Screenreader hören, wenn ein Schritt erledigt ist, Prüfungen fertig sind oder eine Aufgabe auf Abnahme wartet.
+
+Woher die Daten kommen: Werkzeugaufrufe aus den Hooks PreToolUse und PostToolUse (`activity.json`), Uhrzeiten abgehakter Schritte aus `steps.json` (die task.md speichert sie nicht; bei mehreren Häkchen zwischen zwei Beobachtungen bekommen sie dieselbe Uhrzeit), Prüfungsstand aus `checks.json` der Aufgabe. Ein Prüfungslauf, der länger als 11 Minuten "läuft", gilt als abgebrochen.
 
 Das Detailpanel hat die Reiter **Übersicht**, **Kommentare** (Gespräch mit Claude, siehe planning.md), **Zeit** (aktive Zeit von Claude, Tage je Status, Sitzungen) und **Code und Commits**. Unten gibt es "Als Vorlage speichern".
 
@@ -153,7 +171,7 @@ Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen d
 
 ## Claude arbeitet gerade
 
-Solange Claude an einer Aufgabe arbeitet, zeigt der Kopf "Claude arbeitet an W-0003, seit 6 min" (Klick springt zur Karte). Die aktive Karte zeigt den aktuellen Schritt und die letzten drei, zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test", dazu den Knopf "Anweisung an Claude". Die Daten kommen aus dem PostToolUse Hook (`.works/activity.json`, lokal). Nach zehn Minuten ohne Werkzeugaufruf verschwindet die Anzeige.
+Solange Claude an einer Aufgabe arbeitet, zeigt der Kopf "Claude arbeitet an W-0003, seit 6 min" (Klick öffnet die Live-Ansicht, im statischen Board springt er zur Karte), der Reiter Live trägt einen pulsierenden Punkt. Die aktive Karte zeigt den aktuellen Schritt und die letzten drei, zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test", dazu den Knopf "Anweisung an Claude". Die Daten kommen aus den Hooks PreToolUse (Aufruf beginnt) und PostToolUse (Aufruf fertig) in `.works/activity.json` (lokal). Nach zehn Minuten ohne Werkzeugaufruf verschwindet die Anzeige.
 
 Anweisungen landen in `.works/instructions.json` und als Kommentar an der Aufgabe. Claude bekommt sie beim nächsten Werkzeugaufruf als Kontext, spätestens am Ende der Antwort, und liest sie, wenn es sinnvoll ist. Bis dahin zeigt das Board "wartet".
 
