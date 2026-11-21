@@ -3,13 +3,13 @@ id: W-0002
 title: Board-Start im Hintergrund weicht nicht auf freien Port aus
 type: bug
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-20
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: fix/w-0002-board-start-im-hintergrund
 tags: [board, server]
@@ -72,9 +72,7 @@ Fehler: Port 4747 ist nicht verfügbar (EADDRINUSE). Anderen Port mit --port wä
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-21 10:30
-
-Stand 2026-11-21: Fix auf fix/w-0002-board-start-im-hintergrund (fa9f06c, aaa13e8), alle 6 Kriterien erfüllt, Selbsttest Windows und Linux 20/20, im echten Fall (RL Nexus auf 4747) startet das Board ohne --port auf 4748. Offen: Merge in main und works done W-0002 nach Entscheidung des Nutzers. main ist 6 Commits vor GitHub (CI-Fix aus W-0001, W-0003), nicht gepusht.
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-20: Aufgabe angelegt
@@ -90,3 +88,5 @@ Stand 2026-11-21: Fix auf fix/w-0002-board-start-im-hintergrund (fa9f06c, aaa13e
 - 2026-11-21: Akzeptanzkriterien: "Selbsttest prüft den Start im Hintergrund bei belegtem Port" abgehakt
 - 2026-11-21: startDetached übergibt --port nur bei festem Port; Selbsttest-Schritt rot ohne, grün mit Korrektur; Windows und Linux 20/20; in mycron mit RL Nexus auf 4747 startet das Board ohne --port auf 4748
 - 2026-11-21: Übergabe aktualisiert
+- 2026-11-21: In main gemergt (5e1c029), selftest auf main Windows mit Browser und Linux 20/20, gepusht
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
