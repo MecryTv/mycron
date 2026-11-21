@@ -3,13 +3,13 @@ id: W-0008
 title: Verbrauch der Sitzung in der Live-Ansicht
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0008-verbrauch-der-sitzung-in-der
 tags: [ui, board]
@@ -66,7 +66,7 @@ Art: nachher · Hinzugefügt: 2026-11-21
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -85,3 +85,4 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "Export und Leselink-Schnappschuss enthalten keinen Verbrauch" abgehakt
 - 2026-11-21: liveUsage mit Cache in usage.mjs, meta.usage und task.usage in board.mjs, Export bereinigt, Anzeige in Kachel und Kopf. Selbsttest Windows mit Browser 22/22.
 - 2026-11-21: Umsetzungsplan: "Doku board.md, Selbsttest mit Browser, Linux" abgehakt
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

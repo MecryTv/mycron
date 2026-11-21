@@ -3,13 +3,13 @@ id: W-0009
 title: Wackelige Prüfungen und Laufzeittrend erkennen
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0009-wackelige-pruefungen-und
 tags: [ui, board, checks]
@@ -70,7 +70,7 @@ Art: nachher · Hinzugefügt: 2026-11-21
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -90,3 +90,4 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "Zeilen zeigen den Verlauf als kleine Striche, bei vielen Prüfungen gibt es je eine Zeile für wackelig und langsamer" abgehakt
 - 2026-11-21: Verlauf hist in checks.json, flakyOf und trendOf in checks.mjs, Werte in board.mjs, Anzeige in Zeilen und Zusammenfassung. Selbsttest Windows mit Browser 23/23.
 - 2026-11-21: Umsetzungsplan: "Doku board.md, Selbsttest mit Browser, Linux" abgehakt
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
