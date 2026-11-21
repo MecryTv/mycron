@@ -1,18 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 09:41 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 09:49 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
+| 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 2 · P4 Niedrig: 0
 
 ## Aktive Aufgabe
 
-[W-0001](tasks/W-0001-live-ansicht-im-works-board/task.md) Live-Ansicht im works-Board (In Arbeit), letzte Übergabe 2026-11-21 09:21
+[W-0001](tasks/W-0001-live-ansicht-im-works-board/task.md) Live-Ansicht im works-Board (Review), letzte Übergabe 2026-11-21 09:49
 
 ## Kritisch (P1)
 
@@ -22,7 +22,7 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0001](tasks/W-0001-live-ansicht-im-works-board/task.md) | Live-Ansicht im works-Board | Feature | P3 Mittel | In Arbeit | L |  |  |  |
+| [W-0001](tasks/W-0001-live-ansicht-im-works-board/task.md) | Live-Ansicht im works-Board | Feature | P3 Mittel | Review | L |  |  |  |
 
 ## Geplant und Backlog
 

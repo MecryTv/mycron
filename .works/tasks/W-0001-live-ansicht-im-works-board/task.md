@@ -3,7 +3,7 @@ id: W-0001
 title: Live-Ansicht im works-Board
 type: feature
 priority: P3
-status: in-arbeit
+status: review
 effort: L
 risk:
 created: 2026-11-20
@@ -35,13 +35,13 @@ Im works-Board soll man live verfolgen können, wie weit Claude mit den Aufgaben
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Board hat den Reiter Live (Taste 7) mit Kacheln, Tagesliste, Fokus-Aufgabe und Prüfungsspalte wie im gewählten Entwurf A
-- [ ] Gerade jetzt zeigt einen laufenden Werkzeugaufruf ab dem Start (PreToolUse-Hook), nach dem Ende Claude denkt nach und Zuletzt
-- [ ] Abgehakte Schritte des Umsetzungsplans zeigen ihre Uhrzeit
-- [ ] Laufende Prüfungen zeigen ihre Laufzeit, fertige ihr Ergebnis mit Uhrzeit, Funde lassen sich aus der Ansicht beheben lassen oder als bekannt markieren
-- [ ] Prüfungen paralleler Aufgaben laufen im Worktree und erscheinen live in der Ansicht
-- [ ] Kein seitliches Scrollen bei 375 px, Status nie nur über Farbe, reduzierte Bewegung wird beachtet
-- [ ] works selftest ist grün, inklusive der neuen Live-Schritte
+- [x] Board hat den Reiter Live (Taste 7) mit Kacheln, Tagesliste, Fokus-Aufgabe und Prüfungsspalte wie im gewählten Entwurf A
+- [x] Gerade jetzt zeigt einen laufenden Werkzeugaufruf ab dem Start (PreToolUse-Hook), nach dem Ende Claude denkt nach und Zuletzt
+- [x] Abgehakte Schritte des Umsetzungsplans zeigen ihre Uhrzeit
+- [x] Laufende Prüfungen zeigen ihre Laufzeit, fertige ihr Ergebnis mit Uhrzeit, Funde lassen sich aus der Ansicht beheben lassen oder als bekannt markieren
+- [x] Prüfungen paralleler Aufgaben laufen im Worktree und erscheinen live in der Ansicht
+- [x] Kein seitliches Scrollen bei 375 px, Status nie nur über Farbe, reduzierte Bewegung wird beachtet
+- [x] works selftest ist grün, inklusive der neuen Live-Schritte
 
 ## Umsetzungsplan
 - [x] Task 1: PreToolUse-Hook und genaue Jetzt-Anzeige
@@ -58,15 +58,21 @@ Im works-Board soll man live verfolgen können, wie weit Claude mit den Aufgaben
 Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Board vor der Änderung (Testprojekt, 1440 px): nur Pille 'Claude arbeitet an W-0](assets/2026-11-21-board-vor-der-aenderung-testprojekt-vorher.png)
+Beschreibung: Board vor der Änderung (Testprojekt, 1440 px): nur Pille 'Claude arbeitet an W-0003' im Kopf und ein kleiner Kasten 'Bearbeitet src/restore/thread…' auf der Karte in Arbeit, keine Prüfungen, keine Schritte, kein Reiter Live.
+Art: vorher · Hinzugefügt: 2026-11-21
+
+![Ansicht Live nach der Änderung (Testprojekt, 1440 px, hell): Kacheln (Claude arb](assets/2026-11-21-ansicht-live-nach-der-aenderung-nachher.png)
+Beschreibung: Ansicht Live nach der Änderung (Testprojekt, 1440 px, hell): Kacheln (Claude arbeitet gerade W-0003 Schritt 4 von 6, Fortschritt 2 von 6, Kein Agent aktiv, Wartet auf dich 3), Tagesliste mit 6 Aufgaben, Fokus W-0003 mit Phasenleiste, Umsetzungsplan mit Uhrzeiten, Gerade jetzt 'Bearbeitet src/restore/threads.ts seit 0:50', Verlauf, Anweisungsfeld; rechts Prüfungen: W-0004 läuft (typecheck und lint bestanden, test läuft 46 s), W-0002 mit Fund in audit und den Knöpfen Claude beheben lassen / Als bekannt markieren.
+Art: nachher · Hinzugefügt: 2026-11-21
 
 ## Offene Fragen
 - [x] Plan freigeben und auf eigenem Branch loslegen? (Frage vom 2026-11-20 noch offen) Antwort: Freigegeben am 2026-11-21: umsetzen wie besprochen, eigener Branch, ein Commit pro Task, nichts pushen.
 
 ## Übergabe
-Stand: 2026-11-21 09:21
+Stand: 2026-11-21 09:49
 
-Stand 2026-11-21: Alle sechs Tasks des Plans umgesetzt und committet auf feature/w-0001-live-ansicht-im-works-board (43a05f2..5754834), works selftest 18/18 grün. Live-Ansicht im eingebauten Browser an einem Testprojekt geprüft (1440 px hell/dunkel, 375 px ohne seitliches Scrollen, laufende Prüfung, Fund, Leerlauf). Die --browser-Prüfung im Selbsttest ist geschrieben, aber hier nicht gelaufen (Playwright ohne Browser). Offen: Abschluss-Review des Branches durch frischen Reviewer, danach ggf. Fixes, dann works done. Nichts gepusht, nicht gemergt. Protokoll mit Entscheidungen: .superpowers/sdd/2026-11-20-live-tracking/progress.md (lokal, git-ignoriert).
+Stand 2026-11-21: Umgesetzt auf feature/w-0001-live-ansicht-im-works-board (43a05f2..HEAD), alle 7 Kriterien erfüllt, selftest --browser 18/18 (Playwright mit installiertem Chrome). Abschluss-Review (frischer Reviewer) eingearbeitet: Senden-Knopf, Frische-Grenzen ohne neue Daten, Fehlerausgabe bleibt offen, Export ohne Live-Daten, Browserprüfung. code-audit: nur eine Nebensache (Leselink zeigt 40 statt 12 Befehle). Vorher/Nachher-Screenshots angehängt. Offen: Abnahme durch den Nutzer, dann works done; Merge in main nur auf Wunsch, nichts gepusht. Kleinere Punkte aus dem Review sind im Abschlussbericht der Sitzung aufgeführt.
 
 ## Verlauf
 - 2026-11-20: Aufgabe angelegt
@@ -99,3 +105,15 @@ Stand 2026-11-21: Alle sechs Tasks des Plans umgesetzt und committet auf feature
 - 2026-11-21: Umsetzungsplan: "Task 6: Dokumentation" abgehakt
 - 2026-11-21: Übergabe aktualisiert
 - 2026-11-21: Alle sechs Tasks umgesetzt, Selbsttest 18/18, Abschluss-Review läuft
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-board-vor-der-aenderung-testprojekt-vorher.png (vorher)
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-ansicht-live-nach-der-aenderung-nachher.png (nachher)
+- 2026-11-21: Akzeptanzkriterien: "Board hat den Reiter Live (Taste 7) mit Kacheln, Tagesliste, Fokus-Aufgabe und Prüfungsspalte wie im gewählten Entwurf A" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Gerade jetzt zeigt einen laufenden Werkzeugaufruf ab dem Start (PreToolUse-Hook), nach dem Ende Claude denkt nach und Zuletzt" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Abgehakte Schritte des Umsetzungsplans zeigen ihre Uhrzeit" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Laufende Prüfungen zeigen ihre Laufzeit, fertige ihr Ergebnis mit Uhrzeit, Funde lassen sich aus der Ansicht beheben lassen oder als bekannt markieren" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Prüfungen paralleler Aufgaben laufen im Worktree und erscheinen live in der Ansicht" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Kein seitliches Scrollen bei 375 px, Status nie nur über Farbe, reduzierte Bewegung wird beachtet" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "works selftest ist grün, inklusive der neuen Live-Schritte" abgehakt
+- 2026-11-21: Abschluss-Review umgesetzt (Senden-Knopf, Frische-Grenzen ohne neue Daten, Fehlerausgabe bleibt offen, Export ohne Live-Daten, Browserprüfung mit Chrome); selftest --browser 18/18; Kriterien im Browser am Testprojekt geprüft
+- 2026-11-21: Status: in-arbeit → review (Grund: Umsetzung fertig, Abschluss-Review eingearbeitet, wartet auf Abnahme)
+- 2026-11-21: Übergabe aktualisiert
