@@ -3,13 +3,13 @@ id: W-0014
 title: "Werkzeuge: Prüfungs-Gesundheit über alle Aufgaben"
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0014-werkzeuge-pruefungs
 tags: [ui, board, checks]
@@ -43,7 +43,7 @@ Vorschlag 5 vom 2026-11-21, vom Nutzer gewünscht. Eine Übersicht unter Werkzeu
 - [x] Entwurf zeigen, Wahl abwarten
 - [x] Auswertung über alle checks.json (API)
 - [x] Anzeige unter Werkzeuge
-- [ ] Selbsttest mit Browser, Linux, Doku
+- [x] Selbsttest mit Browser, Linux, Doku
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -64,7 +64,7 @@ Art: vorher · Hinzugefügt: 2026-11-21
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -82,3 +82,6 @@ Art: vorher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "Sortierbar nach langsam, rot, wackelig" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Funktioniert auch mit 51 Prüfungen übersichtlich" abgehakt
 - 2026-11-21: checkHealth und /api/check-health, Abschnitt Prüfungen im Projekt unter Werkzeuge mit drei Sortierungen, an die schmale Seitenleiste angepasst. Selbsttest Windows mit Browser 24/24. Linux folgt gemeinsam.
+- 2026-11-21: Umsetzungsplan: "Selbsttest mit Browser, Linux, Doku" abgehakt
+- 2026-11-21: Linux 24/24 (Docker) und GitHub-CI grün auf f95a0b1.
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

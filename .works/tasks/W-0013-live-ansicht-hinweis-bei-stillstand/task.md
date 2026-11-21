@@ -3,13 +3,13 @@ id: W-0013
 title: "Live-Ansicht: Hinweis bei Stillstand einer Aufgabe"
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0013-live-ansicht-hinweis-bei
 tags: [ui, board]
@@ -43,7 +43,7 @@ Vorschlag 4 vom 2026-11-21, vom Nutzer gewünscht. Eine Aufgabe, die seit Tagen 
 - [x] Entwurf zeigen, Wahl abwarten
 - [x] Letzte Aktivität je Aufgabe ermitteln
 - [x] Anzeige im Board, Einstellung in config.json
-- [ ] Selbsttest mit Browser, Linux, Doku
+- [x] Selbsttest mit Browser, Linux, Doku
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -68,7 +68,7 @@ Art: nachher · Hinzugefügt: 2026-11-21
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -87,3 +87,6 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "Der Hinweis sagt, seit wann nichts passiert ist und ob eine Übergabe fehlt" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Die Schwelle ist in config.json einstellbar, Standard 3 Tage" abgehakt
 - 2026-11-21: staleTasks in timelog.mjs, stale je Aufgabe in board.mjs, Hinweis, Filter, Etikett und Punkt unter Wartet auf dich. Selbsttest Windows mit Browser 23/23. Linux folgt gemeinsam mit W-0011, W-0012, W-0014.
+- 2026-11-21: Umsetzungsplan: "Selbsttest mit Browser, Linux, Doku" abgehakt
+- 2026-11-21: Linux 24/24 (Docker) und GitHub-CI grün auf f95a0b1.
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

@@ -1,18 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 15:37 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 15:46 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 4 | 0 | 0 | 0 | 11 | 0 |
+| 2 | 0 | 0 | 0 | 0 | 0 | 15 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 6 · P4 Niedrig: 0
-
-## Aktive Aufgabe
-
-[W-0014](tasks/W-0014-werkzeuge-pruefungs-gesundheit-ueber/task.md) Werkzeuge: Prüfungs-Gesundheit über alle Aufgaben (In Arbeit), letzte Übergabe 2026-11-21 14:53
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 2 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -20,12 +16,7 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
-|---|---|---|---|---|---|---|---|---|
-| [W-0011](tasks/W-0011-live-ansicht-diff-zu-einem-schritt-im/task.md) | Live-Ansicht: Diff zu einem Schritt im Verlauf | Feature | P3 Mittel | In Arbeit | M |  |  |  |
-| [W-0012](tasks/W-0012-board-konflikt-radar-fuer-aufgaben-mit/task.md) | Board: Konflikt-Radar für Aufgaben mit denselben Dateien | Feature | P3 Mittel | In Arbeit | M |  |  |  |
-| [W-0013](tasks/W-0013-live-ansicht-hinweis-bei-stillstand/task.md) | Live-Ansicht: Hinweis bei Stillstand einer Aufgabe | Feature | P3 Mittel | In Arbeit | S |  |  |  |
-| [W-0014](tasks/W-0014-werkzeuge-pruefungs-gesundheit-ueber/task.md) | Werkzeuge: Prüfungs-Gesundheit über alle Aufgaben | Feature | P3 Mittel | In Arbeit | M |  |  |  |
+_Keine Einträge._
 
 ## Geplant und Backlog
 

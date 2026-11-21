@@ -3,13 +3,13 @@ id: W-0012
 title: "Board: Konflikt-Radar für Aufgaben mit denselben Dateien"
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0012-board-konflikt-radar-fuer
 tags: [ui, board, parallel]
@@ -44,7 +44,7 @@ Vorschlag 2 vom 2026-11-21, vom Nutzer gewünscht. works merkt sich in .works/fi
 - [x] Entwurf zeigen, Wahl abwarten
 - [x] Erkennung aus files.jsonl in board.mjs
 - [x] Anzeige im Board
-- [ ] Selbsttest mit Browser, Linux, Doku
+- [x] Selbsttest mit Browser, Linux, Doku
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -69,7 +69,7 @@ Art: nachher · Hinzugefügt: 2026-11-21
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -89,3 +89,6 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "Erledigte und verworfene Aufgaben zählen nicht" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "works parallel plan nutzt dieselbe Erkennung" abgehakt
 - 2026-11-21: taskFiles und fileConflicts in files.mjs, parallel plan nutzt taskFiles, conflicts je Aufgabe in board.mjs, Hinweis, Filter, Etikett, Zeile unter Wartet auf dich. Selbsttest Windows 24/24. Browser und Linux folgen gemeinsam.
+- 2026-11-21: Umsetzungsplan: "Selbsttest mit Browser, Linux, Doku" abgehakt
+- 2026-11-21: Linux 24/24 (Docker) und GitHub-CI grün auf f95a0b1.
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

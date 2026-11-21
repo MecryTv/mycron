@@ -3,13 +3,13 @@ id: W-0011
 title: "Live-Ansicht: Diff zu einem Schritt im Verlauf"
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0011-live-ansicht-diff-zu-einem
 tags: [ui, board]
@@ -44,7 +44,7 @@ Vorschlag 1 vom 2026-11-21, vom Nutzer gewünscht. Im Verlauf der Live-Ansicht s
 - [x] Entwurf zeigen, Wahl abwarten
 - [x] API für Diff einer Datei je Aufgabe (vorhandenen Code nutzen)
 - [x] Verlauf klickbar machen, Anzeige im Board
-- [ ] Selbsttest mit Browser, Linux, Doku
+- [x] Selbsttest mit Browser, Linux, Doku
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -65,7 +65,7 @@ Art: nachher · Hinzugefügt: 2026-11-21
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -84,3 +84,6 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "Im Leselink ist der Eintrag nicht klickbar" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Große Diffs werden gekürzt, die Seite bleibt bedienbar" abgehakt
 - 2026-11-21: liveFileDiff in git.mjs, /api/diff live=1 mit Pfadprüfung und Leselink-Sperre, aufklappbare Dateieinträge im Verlauf. Selbsttest Windows mit Browser 24/24. Linux folgt gemeinsam.
+- 2026-11-21: Umsetzungsplan: "Selbsttest mit Browser, Linux, Doku" abgehakt
+- 2026-11-21: Linux 24/24 (Docker) und GitHub-CI grün auf f95a0b1.
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
