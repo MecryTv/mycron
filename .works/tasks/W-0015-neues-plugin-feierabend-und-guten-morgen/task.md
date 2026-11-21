@@ -3,13 +3,13 @@ id: W-0015
 title: "Neues Plugin: Feierabend und Guten Morgen"
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0015-neues-plugin-feierabend-und
 tags: [skill, plugin]
@@ -61,9 +61,7 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-21 14:53
-
-Branch feature/w-0015-feierabend. Fertig: plugins/feierabend (plugin.json, README, skills/feierabend/SKILL.md), Eintrag in .claude-plugin/marketplace.json. Läuft: Test von feierabend mit Skill in scratchpad/fa-skill, Baseline guten-morgen ohne Skill in scratchpad/gm-base (beide ohne Board). Nächster Schritt: Testergebnisse auswerten, skills/guten-morgen/SKILL.md schreiben und testen, README angleichen, dann done, Merge, Push. Wichtig: Test-Agenten dürfen kein Board starten (Nutzerwunsch).
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -84,3 +82,4 @@ Branch feature/w-0015-feierabend. Fertig: plugins/feierabend (plugin.json, READM
 - 2026-11-21: Akzeptanzkriterien: "Ohne .works im Projekt gibt es einen verständlichen Hinweis statt eines Fehlers" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Das Plugin steht im Marketplace mycron und lässt sich installieren" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Nichts wird ungefragt gepusht" abgehakt
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

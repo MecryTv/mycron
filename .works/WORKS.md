@@ -6,13 +6,9 @@
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 6 | 0 | 1 | 0 | 0 | 0 | 10 | 0 |
+| 6 | 0 | 0 | 0 | 0 | 0 | 11 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 6 · P4 Niedrig: 0
-
-## Aktive Aufgabe
-
-[W-0015](tasks/W-0015-neues-plugin-feierabend-und-guten-morgen/task.md) Neues Plugin: Feierabend und Guten Morgen (In Arbeit), letzte Übergabe 2026-11-21 14:53
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 6 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -20,9 +16,7 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
-|---|---|---|---|---|---|---|---|---|
-| [W-0015](tasks/W-0015-neues-plugin-feierabend-und-guten-morgen/task.md) | Neues Plugin: Feierabend und Guten Morgen | Feature | P2 Hoch | In Arbeit | M |  |  |  |
+_Keine Einträge._
 
 ## Geplant und Backlog
 
