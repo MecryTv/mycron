@@ -39,13 +39,17 @@ export function callTarget(root, input = {}) {
 // lane: Pfad des Worktrees einer parallelen Aufgabe. Dann zählt der Aufruf für diese Bahn, nicht für die Hauptsitzung.
 // running: Aufruf beginnt gerade (PreToolUse). Er wird nur als aktueller Aufruf gezeigt, in recent landet er erst, wenn er fertig ist.
 // perm: Claude wartet auf die Freigabe des Nutzers (PermissionRequest). Der nächste Hook ersetzt den Eintrag wieder.
-export function recordActivity(root, task, tool, input, ok = true, lane = '', { running = false, perm = false } = {}) {
+// agent: agent_id aus der Hook-Eingabe, leer für die Hauptsitzung.
+export function recordActivity(root, task, tool, input, ok = true, lane = '', { running = false, perm = false, agent = '' } = {}) {
   const a = readJson(actFile(root), null) || { recent: [] };
   const d = describeTool(lane || root, tool, input);
   const at = new Date().toISOString();
-  const entry = { at, task: task || '', tool, verb: d.verb, what: d.what, ok, ...(lane ? { lane: true } : {}), ...(running ? { running: true } : {}), ...(perm ? { perm: true, permSince: at } : {}) };
+  const entry = { at, task: task || '', tool, verb: d.verb, what: d.what, ok, ...(lane ? { lane: true } : {}), ...(running ? { running: true } : {}), ...(perm ? { perm: true, permSince: at } : {}), ...(agent ? { agent } : {}) };
+  // Wartet die Hauptsitzung (oder ein Agent) auf eine Freigabe, ersetzt der Aufruf eines anderen Agenten sie nicht.
+  // Der Aufruf landet trotzdem im Verlauf. Ein Aufruf desselben Agenten heißt: Die Freigabe ist erledigt.
+  const held = !lane && a.current && a.current.perm && (a.current.agent || '') !== agent && Date.now() - Date.parse(a.current.at) < 60 * 60000;
   if (lane) a.lanes = { ...(a.lanes || {}), [task]: entry };
-  else { a.current = entry; a.busy = true; }
+  else if (!held) { a.current = entry; a.busy = true; }
   if (!running) a.recent = [entry, ...(a.recent || [])].slice(0, 40);
   writeJson(actFile(root), a);
 }

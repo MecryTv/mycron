@@ -68,11 +68,11 @@ function histOf(r, c) {
   return r.status === 'ok' || r.status === 'fail' ? [{ s: r.status, ms: r.ms || 0, at: r.at || '' }] : [];
 }
 
-// Wackelig: in den letzten Läufen mindestens zweimal zwischen bestanden und fehlgeschlagen gewechselt.
-// Ein einzelner Wechsel heißt nur "seit kurzem rot" oder "repariert".
+// Wackelig: in den letzten Läufen mindestens zweimal zwischen bestanden und fehlgeschlagen gewechselt,
+// und zwar ohne Codeänderung dazwischen (gleicher Fingerabdruck fp). Kaputt gemacht und repariert ist nicht wackelig.
 export function flakyOf(hist = []) {
   let flips = 0;
-  for (let i = 1; i < hist.length; i++) if (hist[i].s !== hist[i - 1].s) flips++;
+  for (let i = 1; i < hist.length; i++) if (hist[i].s !== hist[i - 1].s && hist[i].fp && hist[i].fp === hist[i - 1].fp) flips++;
   return flips >= 2 ? { fails: hist.filter((h) => h.s === 'fail').length, runs: hist.length } : null;
 }
 
@@ -132,6 +132,7 @@ export async function runChecks(root, config, task, { only = null, onStart = nul
   const list = checksFor(config, task).filter((c) => !only || only.includes(c.name));
   const prev = loadResults(task) || {};
   const results = { ...(prev.results || {}) };
+  const ran = [];
   for (const c of list) {
     if (c.skill) {
       // Skill-Prüfungen führt Claude aus und trägt sie ein. Ein altes Ergebnis gilt nur für denselben Stand.
@@ -146,8 +147,13 @@ export async function runChecks(root, config, task, { only = null, onStart = nul
     const at = new Date().toISOString();
     const status = r.ok ? 'ok' : 'fail';
     results[c.name] = { status, cmd: c.cmd, cwd: c.cwd, ms: r.ms, output: r.output, at, hist: [...histOf(results[c.name], c), { s: status, ms: r.ms, at }].slice(-HIST) };
+    ran.push(c.name);
   }
-  const data = { at: new Date().toISOString(), fingerprint: workFingerprint(dir), results };
+  // Jedes Ergebnis merkt sich den Stand, auf dem es lief. Bei einem Teillauf (--only) bleiben die übrigen
+  // Ergebnisse bei ihrem alten Stand und gelten nach einer Codeänderung als veraltet.
+  const fingerprint = workFingerprint(dir);
+  for (const n of ran) { results[n].fp = fingerprint; results[n].hist[results[n].hist.length - 1].fp = fingerprint; }
+  const data = { at: new Date().toISOString(), fingerprint, results };
   writeJson(resultFile(task), data);
   return data;
 }
@@ -180,7 +186,9 @@ export function checkItems(root, config, task) {
   const fp = workFingerprint(checkDir(root, task));
   // Veraltet, wenn sich der Code oder ein eingerichteter Befehl seit dem letzten Lauf geändert hat.
   const cmdChanged = data && list.some((c) => !c.skill && data.results[c.name] && (data.results[c.name].cmd !== c.cmd || (data.results[c.name].cwd || '') !== c.cwd));
-  const stale = !data || (fp && data.fingerprint !== fp) || cmdChanged || list.some((c) => !c.skill && !data.results[c.name]);
+  const cmds = list.filter((c) => !c.skill);
+  const codeChanged = (r) => (r.fp || data.fingerprint) !== fp;
+  const stale = !data || (fp && (cmds.length ? cmds.some((c) => data.results[c.name] && codeChanged(data.results[c.name])) : data.fingerprint !== fp)) || cmdChanged || cmds.some((c) => !data.results[c.name]);
   const items = [];
   if (stale) items.push({ ok: false, text: 'Automatische Prüfungen sind auf dem aktuellen Stand gelaufen', detail: `works checks run ${task.id}` });
   else {

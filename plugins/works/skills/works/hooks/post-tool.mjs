@@ -23,7 +23,7 @@ try {
     const notes = [];
     if (config.live_activity !== false) {
       const failed = input.tool_response && (input.tool_response.is_error || input.tool_response.error);
-      recordActivity(root, task, input.tool_name || '', ti, !failed, lane ? lane.path : '');
+      recordActivity(root, task, input.tool_name || '', ti, !failed, lane ? lane.path : '', { agent: input.agent_id || '' });
       // Uhrzeit frisch abgehakter Schritte festhalten, auch wenn gerade kein Board läuft.
       const dir = task && taskDirOf(root, task);
       if (dir) { try { stampSteps(root, [loadTask(path.join(worksDir(root), 'tasks', dir))]); } catch { /* nicht kritisch */ } }

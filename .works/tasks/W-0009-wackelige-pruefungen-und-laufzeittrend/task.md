@@ -91,3 +91,4 @@ Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 - 2026-11-21: Verlauf hist in checks.json, flakyOf und trendOf in checks.mjs, Werte in board.mjs, Anzeige in Zeilen und Zusammenfassung. Selbsttest Windows mit Browser 23/23.
 - 2026-11-21: Umsetzungsplan: "Doku board.md, Selbsttest mit Browser, Linux" abgehakt
 - 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
+- 2026-11-21: Nach Review korrigiert, siehe decisions.md (Branch fix/review-w0006-w0009).

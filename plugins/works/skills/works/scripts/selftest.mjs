@@ -260,6 +260,13 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(hook('permission.mjs', { ...call, hook_event_name: 'PermissionRequest', permission_suggestions: [] }) === '', 'PermissionRequest gibt etwas aus');
     let a = read();
     expect(a.current.perm === true && a.current.running === true && a.current.what === 'npm install -D vitest' && a.current.permSince, `Freigabe: ${JSON.stringify(a.current)}`);
+    // Ein parallel laufender Agent (agent_id) arbeitet weiter: Die Freigabe der Hauptsitzung bleibt stehen,
+    // sein Aufruf landet trotzdem im Verlauf.
+    const n1 = read().recent.length;
+    hook('pre-tool.mjs', { ...call, agent_id: 'sub1', tool_input: { command: 'git status' } });
+    hook('post-tool.mjs', { ...call, agent_id: 'sub1', tool_input: { command: 'git status' }, tool_response: {} });
+    a = read();
+    expect(a.current.perm === true && a.current.what === 'npm install -D vitest' && a.recent.length === n1 + 1 && a.recent[0].what === 'git status', `Agent überschreibt die Freigabe: ${JSON.stringify(a.current)}`);
     hook('pre-tool.mjs', { ...call, tool_input: { command: 'npm test' } });
     expect(!read().current.perm, 'PreToolUse beendet die Freigabe nicht');
     hook('permission.mjs', call);
@@ -329,7 +336,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
 
   await step('Prüfungen: Verlauf, wackelig, Laufzeit', async () => {
     const { flakyOf, trendOf } = await import('./checks.mjs');
-    const h = (s) => [...s].map((x) => ({ s: x === 'o' ? 'ok' : 'fail', ms: 1000 }));
+    // fp: Stand des Codes beim Lauf. Wackelig zählt nur Wechsel auf demselben Stand.
+    const h = (s, fps) => [...s].map((x, i) => ({ s: x === 'o' ? 'ok' : 'fail', ms: 1000, fp: fps ? fps[i] : 'a' }));
+    expect(!flakyOf(h('ofo', ['a', 'b', 'c'])) && !flakyOf(h('ofof', ['a', 'b', 'b', 'c'])), 'wackelig zählt Wechsel über Codeänderungen hinweg (kaputt, repariert)');
     expect(JSON.stringify(flakyOf(h('ofoof'))) === '{"fails":2,"runs":5}', `wackelig ofoof: ${JSON.stringify(flakyOf(h('ofoof')))}`);
     expect(flakyOf(h('ofo')) && !flakyOf(h('oooof')) && !flakyOf(h('ffffo')) && !flakyOf(h('ooooo')), 'wackelig: ein einzelner Wechsel zählt nicht');
     const ms = (...a) => a.map((x) => ({ s: x < 0 ? 'fail' : 'ok', ms: Math.abs(x) }));
@@ -348,7 +357,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(hist().length === 1, `Verlauf nach neuem Befehl: ${hist().length}`);
     // Das Board bekommt wackelig und Trend fertig berechnet.
     const cj = JSON.parse(fs.readFileSync(cfile, 'utf8'));
-    cj.results.hx = { ...cj.results.hx, status: 'fail', hist: [...h('ofoo'), { s: 'fail', ms: 900 }] };
+    cj.results.hx = { ...cj.results.hx, status: 'fail', hist: [...h('ofoo'), { s: 'fail', ms: 900, fp: 'a' }] };
     fs.writeFileSync(cfile, JSON.stringify(cj));
     const { boardData } = await import('./board.mjs');
     const lr = boardData(proj).tasks.find((t) => t.id === 'W-0001').checks.results.hx;
@@ -508,6 +517,19 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     await api('POST', '/api/action', { action: 'checksRun', id: 'W-0001', only: ['rbad'] });
     const r1 = JSON.parse(fs.readFileSync(ckF, 'utf8')).results;
     expect(r1.rok.at === r0.rok.at && r1.rbad.at !== r0.rbad.at, 'checksRun mit only hat nicht nur rbad laufen lassen');
+    // Hat sich der Code seit dem letzten vollen Lauf geändert, gelten die stehengebliebenen Ergebnisse nicht als aktuell.
+    if (hasGit) {
+      const src = path.join(proj, 'src', 'bot', 'backup.ts');
+      const before = fs.readFileSync(src, 'utf8');
+      fs.appendFileSync(src, 'export const geaendert = 1;\n');
+      await api('POST', '/api/action', { action: 'checksRun', id: 'W-0001', only: ['rbad'] });
+      // checkItems direkt, works done würde veraltete Prüfungen selbst neu starten.
+      const { checkItems } = await import('./checks.mjs');
+      const { loadConfig, loadTask } = await import('./lib.mjs');
+      const ci = checkItems(proj, loadConfig(proj), loadTask(path.dirname(ckF)));
+      fs.writeFileSync(src, before);
+      expect(ci.state.stale && ci.items.some((x) => !x.ok && /aktuellen Stand/.test(x.text)), `Teillauf nach Codeänderung gilt als aktuell: ${JSON.stringify(ci.items).slice(0, 200)}`);
+    }
     const badOnly = await fetch(url + '/api/action', { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'checksRun', id: 'W-0001', only: ['../x'] }) });
     expect(badOnly.status === 400, `Ungültiger Name in only: ${badOnly.status}`);
     await api('POST', '/api/action', { action: 'checksSave', checks: {} });
@@ -519,7 +541,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const d2 = path.join(proj, '.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((x) => x.startsWith('W-0002-')));
     const at = new Date().toISOString();
     fs.writeFileSync(path.join(d2, 'checks.json'), JSON.stringify({ at, fingerprint: '', results: Object.fromEntries(many.map((n, i) => [n, i < 9
-      ? { status: 'fail', cmd: 'node -v', ms: 40, output: 'The system cannot find the path specified.\n', at, ...(i === 0 ? { hist: ['ok', 'fail', 'ok', 'fail'].map((s) => ({ s, ms: 40, at })) } : {}) }
+      ? { status: 'fail', cmd: 'node -v', ms: 40, output: 'The system cannot find the path specified.\n', at, ...(i === 0 ? { hist: ['ok', 'fail', 'ok', 'fail'].map((s) => ({ s, ms: 40, at, fp: 'x' })) } : {}) }
       // m10 bestanden, aber deutlich langsamer als sonst (W-0009).
       : { status: 'ok', cmd: 'node -v', ms: 48000, output: '', at, hist: [21000, 22000, 20000, 48000].map((ms) => ({ s: 'ok', ms, at })) }])) }));
     // Claude wartet auf eine Freigabe für W-0002: Desktop zeigt das, der Stop-Hook beendet es vor der Handyprüfung.
@@ -544,7 +566,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     try {
       const out = w(['board', '--serve', '--detach']).out;
       const port = (out.match(/127\.0\.0\.1:(\d+)/) || [])[1];
-      expect(port && port !== '4747', `Start bei belegtem Port 4747: ${out.split('\n')[0]}`);
+      if (!port || port === '4747') {
+        // Diagnose für den seltenen Fall, dass der Start den belegten Port trotzdem bekommt.
+        const tail = fs.readFileSync(path.join(proj, '.works', 'server.log'), 'utf8').split(/\r?\n/).filter(Boolean).slice(-6).join(' | ');
+        const ns = process.platform === 'win32' ? spawnSync('netstat', ['-ano'], { encoding: 'utf8' }).stdout.split(/\r?\n/).filter((l) => /:4747 /.test(l)).join(' | ') : '';
+        throw new Error(`Start bei belegtem Port 4747: ${out.split('\n')[0]} (Blocker hält: ${held}, server.log: ${tail}, netstat: ${ns})`);
+      }
       has(w(['board', '--restart']).out, `:${port}/`, 'Neustart behält den Port');
       w(['board', '--stop']);
       const fixed = w(['board', '--serve', '--detach', '--port=4747'], { ok: false });
