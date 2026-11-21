@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { worksDir, run } from './lib.mjs';
 import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
-import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload } from './api.mjs';
+import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload } from './api.mjs';
 import { buildIcal } from './ical.mjs';
 import { registerProject } from './hub.mjs';
 import { syncSettings, syncState } from './ghsync.mjs';
@@ -251,6 +251,7 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         if (p === '/api/knowledge') return json(res, 200, knowledgeList(root));
         if (p === '/api/recurring') return json(res, 200, recurringInfo(root));
         if (p === '/api/usage') return json(res, 200, usageInfo(root));
+        if (p === '/api/check-health') return json(res, 200, checkHealthInfo(root));
         if (p === '/api/github') return json(res, 200, githubInfo(root));
         if (p === '/api/cleanup') return json(res, 200, cleanupInfo(root));
         if (p === '/api/similar') return json(res, 200, similarTo(root, String(q.get('title') || '').slice(0, 200), String(q.get('text') || '').slice(0, 2000)));
