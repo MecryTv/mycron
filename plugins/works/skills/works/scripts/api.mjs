@@ -610,8 +610,14 @@ const actions = {
   // ---------- Prüfungen ----------
   async checksRun(root, b) {
     const tid = id(b.id);
-    await must(root, ['checks', 'run', tid], { timeout: 11 * 60 * 1000 });
-    return { message: 'Prüfungen gelaufen.' };
+    // only: nur diese Prüfungen neu starten (Erneut prüfen in der Live-Ansicht), die übrigen Ergebnisse bleiben stehen.
+    let only = [];
+    if (b.only !== undefined) {
+      if (!Array.isArray(b.only) || !b.only.length || b.only.length > 200 || b.only.some((n) => typeof n !== 'string' || !NAME_RE.test(n))) bad('Ungültige Auswahl an Prüfungen.');
+      only = [`--only=${b.only.join(',')}`];
+    }
+    await must(root, ['checks', 'run', tid, ...only], { timeout: 11 * 60 * 1000 });
+    return { message: b.only ? `${b.only.length === 1 ? b.only[0] : `${b.only.length} Prüfungen`} erneut geprüft.` : 'Prüfungen gelaufen.' };
   },
   async checksAck(root, b) {
     const tid = id(b.id);

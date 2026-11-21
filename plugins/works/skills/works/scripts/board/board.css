@@ -1108,6 +1108,9 @@ dialog:has(.tbl.imp) { width: min(1100px, calc(100vw - 32px)); }
 .lv-ckg-head b { white-space: nowrap; }
 .lv-ckg-head .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
 .lv-ckg-note { margin: 0; font-size: 12.5px; color: var(--muted); }
+.lv-ckg-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ck-acts { margin-left: 30px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12.5px; color: var(--text-2); }
+.ck-acts .ck-out { margin-left: 0; flex-basis: 100%; }
 .lv-ckg.hl > .lv-ckg-head b { color: var(--accent); }
 details.lv-ckg > summary { list-style: none; cursor: pointer; border-radius: 8px; padding: 2px 0; }
 details.lv-ckg > summary::-webkit-details-marker { display: none; }

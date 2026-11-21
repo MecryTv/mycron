@@ -2604,9 +2604,30 @@
       let extra = '';
       if (st === 'warn') {
         extra = '<div class="ck-note">' + md(r.note || '') + (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fix="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">Claude beheben lassen</button><button type="button" class="btn small" data-lv-ack="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">Als bekannt markieren</button></div>' : '') + '</div>';
-      } else if (st === 'fail' && r.output) extra = '<details class="ck-out" data-out="' + esc(t.id + ':' + x.name) + '"><summary>Ausgabe</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>';
+      } else if (st === 'fail') {
+        const acts = lvRerunBtn(t, [x.name], 'Erneut prüfen', 'btn link') + (r.output ? '<details class="ck-out" data-out="' + esc(t.id + ':' + x.name) + '"><summary>Ausgabe</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>' : '');
+        if (acts) extra = '<div class="ck-acts">' + acts + '</div>';
+      }
       return '<li class="ck ' + (cls[st] || '') + '"><div class="ck-row"><span class="ck-ic" aria-hidden="true">' + ch[st] + '</span><span class="ck-name">' + esc(x.name) + '</span><span class="mono muted ck-cmd">' + esc(x.cmd) + '</span><span class="muted num ck-ms">' + right + '</span></div>' + extra + '</li>';
     }).join('') + '</ul>';
+  }
+
+  // Erneut prüfen: startet nur die genannten Prüfungen neu. Während eines Laufs (oder bis er beginnt) gibt es keinen Knopf.
+  const lvRerunning = new Set();
+  function lvRerunBtn(t, names, label, cls = 'btn small') {
+    if (!EDIT || !names.length || t.checks.running || lvRerunning.has(t.id)) return '';
+    return '<button type="button" class="' + cls + '" data-lv-rerun="' + esc(t.id) + '" data-names="' + esc(names.join(',')) + '">' + esc(label) + '</button>';
+  }
+  function lvRerunAll(t, many) {
+    const fails = t.checks.list.filter((x) => lvCheckState(t, x) === 'fail').map((x) => x.name);
+    const b = fails.length >= 2 ? lvRerunBtn(t, fails, many ? 'Alle ' + fails.length + ' fehlgeschlagenen erneut prüfen' : 'Fehlgeschlagene erneut prüfen (' + fails.length + ')') : '';
+    return b ? '<div class="lv-ckg-acts">' + b + '</div>' : '';
+  }
+  async function lvRerun(id, names) {
+    lvRerunning.add(id);
+    ok((names.length === 1 ? names[0] + ' läuft' : names.length + ' Prüfungen laufen') + ' erneut');
+    renderLive();
+    try { await run(() => act('checksRun', { id, only: names }), (r) => r.message); } finally { lvRerunning.delete(id); renderLive(); }
   }
 
   // Ab dieser Anzahl Prüfungen einer Aufgabe zeigt die Spalte eine Zusammenfassung statt einer Zeile je Prüfung.
@@ -2622,7 +2643,7 @@
     const of = (...st) => items.filter((i) => st.includes(i.st));
     const parts = [[['fail'], 'fehlgeschlagen'], [['warn'], 'Fund'], [['ok', 'ack'], 'bestanden'], [['run'], 'läuft'], [['manual'], 'trägt Claude ein'], [['wait'], 'offen']];
     let h = '<div class="lv-counts">' + parts.map(([st, l]) => { const n = of(...st).length; return n ? '<span class="c-' + st[0] + '"><b>' + n + '</b> ' + l + '</span>' : ''; }).join('') + '</div>' +
-      '<div class="lv-strip" aria-hidden="true">' + items.map((i) => '<i class="' + i.st + '" title="' + esc(i.x.name + ': ' + (LV_CK[i.st] || i.st)) + '"></i>').join('') + '</div>';
+      '<div class="lv-strip" aria-hidden="true">' + items.map((i) => '<i class="' + i.st + '" title="' + esc(i.x.name + ': ' + (LV_CK[i.st] || i.st)) + '"></i>').join('') + '</div>' + lvRerunAll(t, true);
     const run = of('run')[0];
     if (run) h += '<div class="lv-runline">' + lvSi('run') + '<b>' + esc(run.x.name) + '</b><span class="mono">' + esc(run.x.cmd) + '</span><span class="tm">läuft ' + lvSince(c.runningSince, 'sec') + '</span></div>';
     // Fehlschläge mit derselben ersten Zeile der Ausgabe gehören zusammen, meist haben sie dieselbe Ursache.
@@ -2634,7 +2655,7 @@
       const names = list.map((i) => i.x.name);
       h += '<div class="lv-errgrp"><div class="eh">' + lvSi('fail') + '<span>' + (list.length === 1 ? esc(names[0]) + ' fehlgeschlagen' : list.length + ' Prüfungen, gleiche Meldung') + '</span></div><div class="lv-msg">' + esc(msg) + '</div>' +
         (list.length > 1 ? '<div class="lv-names">' + shown.map((i) => '<span>' + esc(i.x.name) + '</span>').join('') + (list.length > shown.length ? '<button type="button" data-lv-more="' + esc(key) + '">+' + (list.length - shown.length) + ' weitere</button>' : '') + '</div>' : '') +
-        (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fixall="' + esc(t.id) + '" data-names="' + esc(names.join(', ')) + '">Claude beheben lassen</button></div>' : '') +
+        (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fixall="' + esc(t.id) + '" data-names="' + esc(names.join(', ')) + '">Claude beheben lassen</button>' + lvRerunBtn(t, names, 'Erneut prüfen') + '</div>' : '') +
         '<details class="ck-out" data-out="' + esc(key) + '"><summary>Ausgabe von ' + esc(names[0]) + '</summary><pre>' + esc(String(list[0].r.output || '').split('\n').slice(-40).join('\n')) + '</pre></details></div>';
     }
     for (const i of of('warn')) {
@@ -2667,7 +2688,7 @@
       const icon = c.running ? 'run' : c.fail ? 'fail' : c.warn ? 'warn' : 'ok';
       if (many) return '<div class="lv-ckg' + (t.id === focusId ? ' hl' : '') + '">' + head(icon, '') + lvCompact(t) + '</div>';
       const note = c.running ? 'Läuft, ' + c.finished + ' von ' + c.total + ' fertig' : (c.warn || c.fail) ? lvFinds(c) + ', Entscheidung nötig' : c.finished + ' von ' + c.total + ' gelaufen';
-      return '<div class="lv-ckg' + (t.id === focusId ? ' hl' : '') + '">' + head(icon, note) + lvChecksList(t) + '</div>';
+      return '<div class="lv-ckg' + (t.id === focusId ? ' hl' : '') + '">' + head(icon, note) + lvRerunAll(t, false) + lvChecksList(t) + '</div>';
     }).join('');
     return h + '</div>';
   }
@@ -2788,6 +2809,8 @@
     const fb = e.target.closest('[data-lv-feed]');
     if (fb) { livePrefs.feedAll = fb.dataset.lvFeed === '1'; store.set(LIVE_KEY, livePrefs); renderLive(); return; }
     if (e.target.closest('[data-lv-notify]')) { lvEnableNotify(); return; }
+    const rr = e.target.closest('[data-lv-rerun]');
+    if (rr) { lvRerun(rr.dataset.lvRerun, rr.dataset.names.split(',').filter(Boolean)); return; }
     const rv = e.target.closest('[data-lv-review]');
     if (rv) { openReview(rv.dataset.lvReview); return; }
     const op = e.target.closest('[data-lv-open]');
