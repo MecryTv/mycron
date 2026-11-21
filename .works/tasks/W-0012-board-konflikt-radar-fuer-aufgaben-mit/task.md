@@ -3,7 +3,7 @@ id: W-0012
 title: "Board: Konflikt-Radar für Aufgaben mit denselben Dateien"
 type: feature
 priority: P3
-status: backlog
+status: in-arbeit
 effort: M
 risk:
 created: 2026-11-21
@@ -11,7 +11,7 @@ updated: 2026-11-21
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0012-board-konflikt-radar-fuer
 tags: [ui, board, parallel]
 blocked_by: []
 blocks: []
@@ -35,15 +35,15 @@ Vorschlag 2 vom 2026-11-21, vom Nutzer gewünscht. works merkt sich in .works/fi
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Zwei offene Aufgaben mit gemeinsamen Dateien werden im Board als möglicher Konflikt angezeigt
-- [ ] Der Hinweis nennt die Aufgaben und die gemeinsamen Dateien
-- [ ] Erledigte und verworfene Aufgaben zählen nicht
-- [ ] works parallel plan nutzt dieselbe Erkennung
+- [x] Zwei offene Aufgaben mit gemeinsamen Dateien werden im Board als möglicher Konflikt angezeigt
+- [x] Der Hinweis nennt die Aufgaben und die gemeinsamen Dateien
+- [x] Erledigte und verworfene Aufgaben zählen nicht
+- [x] works parallel plan nutzt dieselbe Erkennung
 
 ## Umsetzungsplan
-- [ ] Entwurf zeigen, Wahl abwarten
-- [ ] Erkennung aus files.jsonl in board.mjs
-- [ ] Anzeige im Board
+- [x] Entwurf zeigen, Wahl abwarten
+- [x] Erkennung aus files.jsonl in board.mjs
+- [x] Anzeige im Board
 - [ ] Selbsttest mit Browser, Linux, Doku
 
 ## Betroffene Dateien
@@ -53,7 +53,17 @@ Vorschlag 2 vom 2026-11-21, vom Nutzer gewünscht. works merkt sich in .works/fi
 Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Vorher: Board ohne Hinweis, wenn offene Aufgaben dieselben Dateien ändern](assets/2026-11-21-vorher-board-ohne-hinweis-wenn-offene-vorher.png)
+Beschreibung: Vorher: Board ohne Hinweis, wenn offene Aufgaben dieselben Dateien ändern
+Art: vorher · Hinzugefügt: 2026-11-21
+
+![Nachher: Hinweis 2 mit gleichen Dateien, Etiketten Gleiche Dateien wie W-0004 un](assets/2026-11-21-nachher-hinweis-2-mit-gleichen-dateien-nachher.png)
+Beschreibung: Nachher: Hinweis 2 mit gleichen Dateien, Etiketten Gleiche Dateien wie W-0004 und W-0003 an den Karten
+Art: nachher · Hinzugefügt: 2026-11-21
+
+![Nachher Live-Ansicht: W-0003 und W-0004 ändern threads](assets/2026-11-21-nachher-live-nachher.png)
+Beschreibung: Nachher Live-Ansicht: W-0003 und W-0004 ändern threads.ts unter Wartet auf dich
+Art: nachher · Hinzugefügt: 2026-11-21
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
@@ -67,3 +77,15 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-21: Brainstorming angehängt
 - 2026-11-21: Entwurf A „Board-Erweiterungen W-0011 bis W-0014“ angehängt
 - 2026-11-21: Entwurf A „Board-Erweiterungen W-0011 bis W-0014“ gewählt. Grund: Nutzer: A (Diff klappt unter dem Eintrag auf), Rest passt
+- 2026-11-21: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-vorher-board-ohne-hinweis-wenn-offene-vorher.png (vorher)
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-nachher-hinweis-2-mit-gleichen-dateien-nachher.png (nachher)
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-nachher-live-nachher.png (nachher)
+- 2026-11-21: Umsetzungsplan: "Entwurf zeigen, Wahl abwarten" abgehakt
+- 2026-11-21: Umsetzungsplan: "Erkennung aus files.jsonl in board.mjs" abgehakt
+- 2026-11-21: Umsetzungsplan: "Anzeige im Board" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Zwei offene Aufgaben mit gemeinsamen Dateien werden im Board als möglicher Konflikt angezeigt" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Der Hinweis nennt die Aufgaben und die gemeinsamen Dateien" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Erledigte und verworfene Aufgaben zählen nicht" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "works parallel plan nutzt dieselbe Erkennung" abgehakt
+- 2026-11-21: taskFiles und fileConflicts in files.mjs, parallel plan nutzt taskFiles, conflicts je Aufgabe in board.mjs, Hinweis, Filter, Etikett, Zeile unter Wartet auf dich. Selbsttest Windows 24/24. Browser und Linux folgen gemeinsam.

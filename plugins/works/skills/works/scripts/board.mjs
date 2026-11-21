@@ -18,6 +18,7 @@ import { loadActivity, pendingInstructions, stampSteps } from './live.mjs';
 import { loadKnowledge } from './knowledge.mjs';
 import { loadLanes } from './parallel.mjs';
 import { liveUsage } from './usage.mjs';
+import { fileConflicts } from './files.mjs';
 
 function excerpt(t) {
   for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Beschreibung', 'Abkürzung', 'Kontext und Problem', 'Problem', 'Herkunft']) {
@@ -65,6 +66,8 @@ export function boardData(root) {
     || (OPEN_STATUSES.includes(t.status) && queued.has(t.id)) || (t.status === 'erledigt' && t.completed === day)), { prune: true });
   const usage = liveUsage(root, config);
   const stale = staleTasks(root, config, all);
+  // Konflikt-Radar: offene Aufgaben (in Arbeit, Review, Warteschlange), die dieselben Dateien ändern.
+  const conflicts = fileConflicts(root, config, all.filter((t) => ['in-arbeit', 'review'].includes(t.status) || (OPEN_STATUSES.includes(t.status) && queued.has(t.id))));
   const data = all.map((t) => {
     const imgs = imageLinks(getSection(t._body, 'Assets') || '').filter((i) => !/^https?:/.test(i.src));
     const crit = checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '');
@@ -81,6 +84,7 @@ export function boardData(root) {
       blockedBy: t.blocked_by || [], risk: t.risk || '', branch: t.branch || '',
       file: relFromWorks(root, t._file),
       stale: stale[t.id] || null,
+      conflicts: conflicts[t.id] || null,
       thumb: imgs.length ? relFromWorks(root, path.resolve(t._dir, imgs[imgs.length - 1].src)) : '',
       thumbAlt: imgs.length ? imgs[imgs.length - 1].alt : '',
       ...(plans.has(t.id) ? { plan: plans.get(t.id), checks: liveChecks(config, t), usage: usage.byTask[t.id] || null } : {}),

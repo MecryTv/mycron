@@ -164,6 +164,8 @@ h1 .dim { color: var(--muted); font-weight: 500; }
 .signal b { font-weight: 650; color: var(--text); font-variant-numeric: tabular-nums; }
 .signal.hot { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
 .signal.hot b { color: var(--danger); }
+.signal.warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+.signal.warn b { color: var(--warn); }
 .signal[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .signal.calm { cursor: default; }
 
@@ -285,6 +287,8 @@ h1 .dim { color: var(--muted); font-weight: 500; }
 .cflag { display: inline-flex; align-items: center; gap: 6px; justify-self: start; max-width: 100%; height: 22px; padding: 0 8px; border-radius: 11px; font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cflag svg { width: 12px; height: 12px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .cflag.still { background: var(--sunken); color: var(--text-2); }
+.cflag.conflict { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--text); }
+.cflag.conflict svg { color: var(--warn); }
 .card-top { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .card-top .id { font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .card-top .prio { margin-left: auto; font-weight: 650; color: var(--pc); font-variant-numeric: tabular-nums; }

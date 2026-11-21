@@ -22,6 +22,10 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 - Konsequenzen:
 -->
 
+- 2026-11-21: Gemeinsame Funktion taskFiles in files.mjs (Commits mit der ID, files.jsonl, in der task.md genannte Dateien), genutzt von works parallel plan und dem Board. fileConflicts bildet daraus Paare.
+- 2026-11-21: Gezählt werden Aufgaben in Arbeit, im Review und in der Warteschlange; Backlog außerhalb der Warteschlange, erledigte und verworfene nicht.
+- 2026-11-21: Hinweis gelb (signal warn), nicht rot wie P1: ein möglicher Konflikt, kein Fehler.
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 
