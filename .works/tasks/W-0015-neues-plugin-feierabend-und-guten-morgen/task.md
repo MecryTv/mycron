@@ -3,7 +3,7 @@ id: W-0015
 title: "Neues Plugin: Feierabend und Guten Morgen"
 type: feature
 priority: P2
-status: backlog
+status: in-arbeit
 effort: M
 risk:
 created: 2026-11-21
@@ -11,7 +11,7 @@ updated: 2026-11-21
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0015-neues-plugin-feierabend-und
 tags: [skill, plugin]
 blocked_by: []
 blocks: []
@@ -66,3 +66,4 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
 - 2026-11-21: decisions.md angelegt
+- 2026-11-21: Gestartet (Status: backlog → in-arbeit)
