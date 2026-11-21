@@ -2663,7 +2663,7 @@
         return '<li><button type="button" data-lv-focus="' + esc(t.id) + '" aria-current="' + (t.id === focusId) + '">' + lvSi(st.ic) +
           '<span class="r-top"><span class="r-id">' + esc(t.id) + '</span>' + (lvLanes().has(t.id) ? '<span class="tag lv-agent">Agent</span>' : '') + '<span class="r-prio" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span></span>' +
           '<span class="r-title">' + esc(t.title) + '</span><span class="r-sub">' + esc(st.text) + '</span>' +
-          (st.w != null && t.status !== 'erledigt' ? '<span class="lv-bar r-bar" style="--w:' + Math.round(st.w * 100) + '%' + (st.col ? ';--c:' + st.col : '') + '"><i></i></span>' : '') + '</button></li>';
+          (st.w != null && t.status !== 'erledigt' ? '<span class="lv-bar r-bar" style="--s:' + Math.max(0, Math.min(1, st.w)).toFixed(3) + (st.col ? ';--c:' + st.col : '') + '"><i></i></span>' : '') + '</button></li>';
       }).join('') + '</ul>' : '<p class="lv-empty">Keine Aufgaben für heute.</p>') + '</section>' +
       '<section class="lv-panel lv-focus" aria-label="Gewählte Aufgabe">' + lvFocusHtml(ft, list) + '</section>' +
       '<section class="lv-panel lv-checks" aria-label="Prüfungen">' + lvChecksHtml(list, focusId) + '</section></div>';

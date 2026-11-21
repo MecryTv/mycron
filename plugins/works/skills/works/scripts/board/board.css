@@ -980,7 +980,7 @@ dialog:has(.tbl.imp) { width: min(1100px, calc(100vw - 32px)); }
 .lv-si.review { background: color-mix(in srgb, var(--s-review) 20%, transparent); color: var(--s-review); }
 .lv-si.next { background: color-mix(in srgb, var(--s-geplant) 16%, transparent); color: var(--s-geplant); }
 .lv-bar { display: block; height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
-.lv-bar > i { display: block; height: 100%; width: var(--w, 0%); background: var(--c, var(--s-in-arbeit)); border-radius: 3px; transition: width .6s cubic-bezier(.2, .7, .2, 1); }
+.lv-bar > i { display: block; height: 100%; width: 100%; transform: scaleX(var(--s, 0)); transform-origin: left center; background: var(--c, var(--s-in-arbeit)); transition: transform .6s cubic-bezier(.2, .7, .2, 1); }
 .lv-seg { display: flex; gap: 3px; }
 .lv-seg i { flex: 1; height: 8px; border-radius: 2px; background: var(--sunken); transition: background-color .4s; }
 .lv-seg i.done { background: var(--ok); }
