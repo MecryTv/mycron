@@ -3,13 +3,13 @@ id: W-0017
 title: "Neues Plugin: CI-Wächter für GitHub Actions"
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0017-neues-plugin-ci-waechter-fuer
 tags: [skill, plugin, ci]
@@ -63,10 +63,11 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
 - 2026-11-21: decisions.md angelegt
 - 2026-11-21: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-21: Skript ci-status.mjs fertig, live geprüft: grün (f95a0b1, Exit 0), rot (e33417b, Exit 1, Jobs, Schritte, Annotationen), kein Lauf (216b794, Exit 2). Skill per Agent ohne und mit Skill getestet.
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
