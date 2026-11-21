@@ -260,6 +260,28 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(!('running' in res) && res.results.peek.at, 'running nach dem Lauf nicht entfernt oder at fehlt');
   });
 
+  await step('Live: Daten im Board', async () => {
+    const { boardData } = await import('./board.mjs');
+    const dir = path.join('.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')));
+    const d = boardData(proj);
+    const t1 = d.tasks.find((t) => t.id === 'W-0001');
+    expect(Array.isArray(t1.plan) && t1.plan[0].text === 'Format festlegen' && t1.plan[0].at, 'plan fehlt an W-0001');
+    expect(t1.checks && t1.checks.list.some((c) => c.name === 'peek') && t1.checks.results.peek, 'checks fehlt an W-0001');
+    const other = d.tasks.find((t) => t.status === 'backlog' && !d.meta.queue.includes(t.id));
+    expect(other && !('plan' in other) && !('checks' in other), 'Aufgabe außerhalb der Tagesliste hat plan/checks');
+    expect(d.meta.today && Array.isArray(d.meta.activity.recent), 'meta.today oder recent fehlt');
+    const cf = path.join(proj, dir, 'checks.json');
+    const cj = JSON.parse(fs.readFileSync(cf, 'utf8'));
+    const runningOf = () => boardData(proj).tasks.find((t) => t.id === 'W-0001').checks.running;
+    fs.writeFileSync(cf, JSON.stringify({ ...cj, running: 'peek', runningSince: new Date(Date.now() - 12 * 60000).toISOString() }));
+    expect(runningOf() === '', 'veraltetes running wird angezeigt');
+    fs.writeFileSync(cf, JSON.stringify({ ...cj, running: 'peek', runningSince: new Date().toISOString() }));
+    expect(runningOf() === 'peek', 'frisches running fehlt');
+    fs.writeFileSync(cf, JSON.stringify(cj));
+    w(['checks', 'remove', 'peek']);
+    expect(boardData(proj).tasks.find((t) => t.id === 'W-0001').checks === null, 'ohne Prüfungen ist checks nicht null');
+  });
+
   if (hasGit) {
     await step('Dateien: Commits mit ID, works file, Hinweis beim Edit', () => {
       git(['add', '-A']); git(['commit', '-q', '-m', 'chore: start']);
