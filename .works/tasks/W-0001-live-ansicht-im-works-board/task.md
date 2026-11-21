@@ -127,3 +127,4 @@ Stand 2026-11-21: Lokal in main gemergt (bf52375), selftest --browser auf main 1
 ## Verlauf
 - 2026-11-21: Lokal in main gemergt (bf52375, --no-ff), selftest --browser auf main 18/18, Branch gelöscht, nicht gepusht
 - 2026-11-21: Übergabe aktualisiert
+- 2026-11-21: CI nach dem Push rot unter Linux/macOS: Testbefehl mit Klammern scheiterte an sh; korrigiert, Selbsttest unter Windows (mit Browser) und Linux-Container 18/18
