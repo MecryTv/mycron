@@ -3,13 +3,13 @@ id: W-0004
 title: "Live-Ansicht: viele Prüfungen und Funde übersichtlich zeigen"
 type: design
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0004-live-ansicht-viele-pruefungen
 tags: [ui, board]
@@ -81,6 +81,7 @@ Art: nachher · Hinzugefügt: 2026-11-21
 ## Offene Fragen
 
 ## Übergabe
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -118,3 +119,5 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "Die Prüfungsspalte bleibt bei 50 Prüfungen übersichtlich und zeigt zuerst, was fehlgeschlagen ist" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Bei wenigen Prüfungen (bis etwa 8) bleibt die bisherige Liste" abgehakt
 - 2026-11-21: Entscheidung E1 dokumentiert: Fehlergruppen ab 9 Prüfungen
+- 2026-11-21: In main gemergt (e44b5b1), selftest --browser auf main 20/20, gepusht
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
