@@ -879,6 +879,9 @@ dialog:has(.tp), dialog:has(#teFields) { width: min(920px, calc(100vw - 24px)); 
 .busy { display: none; align-items: center; gap: 7px; height: 26px; padding: 0 11px; border-radius: 13px; border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .busy:not([hidden]) { display: inline-flex; }
 .busy::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); animation: wpulse 1.4s ease-in-out infinite; }
+/* Wartet auf Freigabe: ruhiger Punkt mit Ring statt Pulsieren, damit es sich vom Arbeiten unterscheidet. */
+.busy.perm { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 18%, var(--surface)); font-weight: 600; }
+.busy.perm::before { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 30%, transparent); }
 @keyframes wpulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .busy::before, .lb-dot { animation: none; } }
 .live-box { display: grid; gap: 6px; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 8%, var(--raised)); border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--line)); font-size: 12px; }
@@ -986,6 +989,8 @@ dialog:has(.tbl.imp) { width: min(1100px, calc(100vw - 32px)); }
 .lv-si.manual, .lv-si.ask { background: var(--accent-soft); color: var(--accent); }
 .lv-si.review { background: color-mix(in srgb, var(--s-review) 20%, transparent); color: var(--s-review); }
 .lv-si.next { background: color-mix(in srgb, var(--s-geplant) 16%, transparent); color: var(--s-geplant); }
+.lv-si.perm { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
+.lv-dot.perm { background: var(--warn); animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 28%, transparent); }
 .lv-bar { display: block; height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
 .lv-bar > i { display: block; height: 100%; width: 100%; transform: scaleX(var(--s, 0)); transform-origin: left center; background: var(--c, var(--s-in-arbeit)); transition: transform .6s cubic-bezier(.2, .7, .2, 1); }
 .lv-seg { display: flex; gap: 3px; }
@@ -1068,6 +1073,9 @@ dialog:has(.tbl.imp) { width: min(1100px, calc(100vw - 32px)); }
 .lv-now .n-what { font-size: 15px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-now .n-what .mono { font-size: 13.5px; font-weight: 500; }
 .lv-now .n-meta { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-now.perm { background: color-mix(in srgb, var(--warn) 9%, var(--raised)); border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+.lv-now .n-hint { font-size: 12.5px; color: var(--text-2); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.lv-tile.perm { border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); background: color-mix(in srgb, var(--warn) 9%, var(--surface)); }
 .lv-segbtn { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; margin-left: auto; }
 .lv-segbtn button { border: 0; background: none; height: 24px; padding: 0 8px; font-size: 12px; color: var(--text-2); cursor: pointer; }
 .lv-segbtn button + button { border-left: 1px solid var(--line); }

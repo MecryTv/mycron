@@ -38,10 +38,12 @@ export function callTarget(root, input = {}) {
 
 // lane: Pfad des Worktrees einer parallelen Aufgabe. Dann zählt der Aufruf für diese Bahn, nicht für die Hauptsitzung.
 // running: Aufruf beginnt gerade (PreToolUse). Er wird nur als aktueller Aufruf gezeigt, in recent landet er erst, wenn er fertig ist.
-export function recordActivity(root, task, tool, input, ok = true, lane = '', { running = false } = {}) {
+// perm: Claude wartet auf die Freigabe des Nutzers (PermissionRequest). Der nächste Hook ersetzt den Eintrag wieder.
+export function recordActivity(root, task, tool, input, ok = true, lane = '', { running = false, perm = false } = {}) {
   const a = readJson(actFile(root), null) || { recent: [] };
   const d = describeTool(lane || root, tool, input);
-  const entry = { at: new Date().toISOString(), task: task || '', tool, verb: d.verb, what: d.what, ok, ...(lane ? { lane: true } : {}), ...(running ? { running: true } : {}) };
+  const at = new Date().toISOString();
+  const entry = { at, task: task || '', tool, verb: d.verb, what: d.what, ok, ...(lane ? { lane: true } : {}), ...(running ? { running: true } : {}), ...(perm ? { perm: true, permSince: at } : {}) };
   if (lane) a.lanes = { ...(a.lanes || {}), [task]: entry };
   else { a.current = entry; a.busy = true; }
   if (!running) a.recent = [entry, ...(a.recent || [])].slice(0, 40);
@@ -89,6 +91,7 @@ export function setIdle(root) {
   if (!a) return;
   a.busy = false;
   a.idleSince = new Date().toISOString();
+  if (a.current) delete a.current.perm;
   writeJson(actFile(root), a);
 }
 
