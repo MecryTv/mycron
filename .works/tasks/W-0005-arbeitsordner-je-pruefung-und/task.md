@@ -3,13 +3,13 @@ id: W-0005
 title: Arbeitsordner je Prüfung und Prüfbefehle mit Anführungszeichen unter Windows
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0005-arbeitsordner-je-pruefung-und
 tags: [checks, windows]
@@ -59,7 +59,7 @@ Vorschlag 1 vom 2026-11-21. (a) Prüfungen bekommen optional einen eigenen Arbei
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -76,3 +76,5 @@ Vorschlag 1 vom 2026-11-21. (a) Prüfungen bekommen optional einen eigenen Arbei
 - 2026-11-21: Akzeptanzkriterien: "Im Board unter Werkzeuge lässt sich der Ordner je Prüfung eintragen" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Selbsttest prüft Anführungszeichen und Arbeitsordner" abgehakt
 - 2026-11-21: Umgesetzt: cwd je Prüfung, Windows-Quoting, Board-Feld Ordner, checksSave über --file; selftest Windows mit Browser und Linux 21/21
+- 2026-11-21: In main gemergt (a373cc7), selftest --browser auf main 21/21, gepusht
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
