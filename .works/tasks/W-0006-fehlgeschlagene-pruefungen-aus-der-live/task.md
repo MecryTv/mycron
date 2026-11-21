@@ -60,3 +60,4 @@ Vorschlag 2 vom 2026-11-21. In der Live-Ansicht an einer Fehlergruppe (und für 
 - 2026-11-21: Aufgabe angelegt
 - 2026-11-21: Brainstorming angehängt
 - 2026-11-21: Entwurf A „Live-Ansicht Ergänzungen W-0006 bis W-0009“ angehängt
+- 2026-11-21: Entwurf A „Live-Ansicht Ergänzungen W-0006 bis W-0009“ gewählt. Grund: Nutzer: Beide A (Freigabe A Kacheln, Verbrauch A in Kachel und Kopf), Rest wie im Entwurf

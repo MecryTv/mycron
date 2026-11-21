@@ -3,7 +3,7 @@ id: W-0007
 title: Live-Ansicht zeigt, wenn Claude auf eine Freigabe wartet
 type: feature
 priority: P2
-status: backlog
+status: in-arbeit
 effort: M
 risk:
 created: 2026-11-21
@@ -11,7 +11,7 @@ updated: 2026-11-21
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0007-live-ansicht-zeigt-wenn
 tags: [ui, board, hooks]
 blocked_by: []
 blocks: []
@@ -60,3 +60,5 @@ Vorschlag 3 vom 2026-11-21. Fragt Claude nach einer Erlaubnis für ein Werkzeug,
 - 2026-11-21: Aufgabe angelegt
 - 2026-11-21: Brainstorming angehängt
 - 2026-11-21: Entwurf A „Live-Ansicht Ergänzungen W-0006 bis W-0009“ angehängt
+- 2026-11-21: Entwurf A „Live-Ansicht Ergänzungen W-0006 bis W-0009“ gewählt. Grund: Nutzer: Beide A (Freigabe A Kacheln, Verbrauch A in Kachel und Kopf), Rest wie im Entwurf
+- 2026-11-21: Gestartet (Status: backlog → in-arbeit)

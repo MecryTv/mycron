@@ -19,5 +19,9 @@
       "at": "2026-11-21 12:40"
     }
   ],
-  "chosen": null
+  "chosen": {
+    "name": "A",
+    "at": "2026-11-21 12:43",
+    "reason": "Nutzer: Beide A (Freigabe A Kacheln, Verbrauch A in Kachel und Kopf), Rest wie im Entwurf"
+  }
 }
