@@ -406,6 +406,16 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(!snap.includes('works check W-0001 1') && !snap.includes('"plan":[') && !snap.includes('"today":{"tokens"'), 'Export enthält Live-Daten (Befehle, Schritte oder Verbrauch)');
     w(['checks', 'remove', 'peek']);
     expect(boardData(proj).tasks.find((t) => t.id === 'W-0001').checks === null, 'ohne Prüfungen ist checks nicht null');
+    // Stillstand (W-0013): Aufgaben in Arbeit ohne Aktivität seit handoff_stale_days Tagen (Standard 3, 0 schaltet ab).
+    const { staleTasks } = await import('./timelog.mjs');
+    const { loadTasks } = await import('./lib.mjs');
+    const busy = loadTasks(proj).filter((t) => t.status === 'in-arbeit');
+    const inTenDays = Date.now() + 10 * 86400000;
+    const later = staleTasks(proj, { handoff_stale_days: 3 }, busy, inTenDays);
+    expect(busy.length && busy.every((t) => later[t.id] && later[t.id].days >= 9 && typeof later[t.id].handoff === 'boolean'), `Stillstand nach 10 Tagen: ${JSON.stringify(later)}`);
+    expect(!Object.keys(staleTasks(proj, { handoff_stale_days: 3 }, busy)).length, 'Frisch bearbeitete Aufgabe gilt als still');
+    expect(!Object.keys(staleTasks(proj, { handoff_stale_days: 0 }, busy, inTenDays)).length, 'handoff_stale_days 0 schaltet den Hinweis nicht ab');
+    expect(boardData(proj).tasks.find((t) => t.id === 'W-0001').stale === null && boardData(proj).meta.staleDays === 3, 'Board kennt stale nicht');
   });
 
   if (hasGit) {

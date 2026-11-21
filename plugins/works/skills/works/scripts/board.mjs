@@ -11,7 +11,7 @@ import { byIdMap, milestoneProgress } from './views.mjs';
 import { runningVersion } from './server-control.mjs';
 import { activeSprint, lastClosedSprint, sprintStats, sprintSettings } from './sprint.mjs';
 import { loadComments } from './comments.mjs';
-import { effortDays } from './timelog.mjs';
+import { effortDays, staleTasks } from './timelog.mjs';
 import { configuredChecks, checksFor, loadResults, flakyOf, trendOf } from './checks.mjs';
 import { designSummary } from './design.mjs';
 import { loadActivity, pendingInstructions, stampSteps } from './live.mjs';
@@ -64,6 +64,7 @@ export function boardData(root) {
   const plans = stampSteps(root, all.filter((t) => ['in-arbeit', 'review'].includes(t.status)
     || (OPEN_STATUSES.includes(t.status) && queued.has(t.id)) || (t.status === 'erledigt' && t.completed === day)), { prune: true });
   const usage = liveUsage(root, config);
+  const stale = staleTasks(root, config, all);
   const data = all.map((t) => {
     const imgs = imageLinks(getSection(t._body, 'Assets') || '').filter((i) => !/^https?:/.test(i.src));
     const crit = checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '');
@@ -79,6 +80,7 @@ export function boardData(root) {
       completed: t.completed || '', updated: t.updated || '', created: t.created || '', started: startedOf(t), lastLog: lastLog(t),
       blockedBy: t.blocked_by || [], risk: t.risk || '', branch: t.branch || '',
       file: relFromWorks(root, t._file),
+      stale: stale[t.id] || null,
       thumb: imgs.length ? relFromWorks(root, path.resolve(t._dir, imgs[imgs.length - 1].src)) : '',
       thumbAlt: imgs.length ? imgs[imgs.length - 1].alt : '',
       ...(plans.has(t.id) ? { plan: plans.get(t.id), checks: liveChecks(config, t), usage: usage.byTask[t.id] || null } : {}),
@@ -95,6 +97,7 @@ export function boardData(root) {
     effortDays: effortDays(root, all, config),
     hasChecks: Object.keys(configuredChecks(config)).length > 0,
     today: day,
+    staleDays: config.handoff_stale_days === undefined ? 3 : Number(config.handoff_stale_days) || 0,
     usage: { currency: usage.currency, today: usage.today },
     activity: (() => { const a = loadActivity(root); return a ? { busy: !!a.busy, current: a.current || null, recent: a.recent || [], since: a.since || '', idleSince: a.idleSince || '', lanes: a.lanes || {} } : null; })(),
     lanes: loadLanes(root).map((l) => ({ task: l.task, branch: l.branch, dir: path.basename(l.path), started: l.started, status: l.status })),

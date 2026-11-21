@@ -22,6 +22,10 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 - Konsequenzen:
 -->
 
+- 2026-11-21: Schwelle aus der vorhandenen Einstellung handoff_stale_days (Standard 3), die auch works doctor nutzt, statt einer neuen Einstellung. 0 schaltet den Hinweis im Board ab.
+- 2026-11-21: Aktivität = Antworten (time.jsonl), Dateiänderungen (files.jsonl), abgehakte Schritte (steps.json), updated und Änderungszeit der task.md. Gelesen wird time.jsonl/files.jsonl nur bei Änderung (Cache wie beim Verbrauch).
+- 2026-11-21: Keine Übergabe = Abschnitt Übergabe leer.
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 
