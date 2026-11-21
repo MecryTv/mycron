@@ -1,0 +1,18 @@
+# works: generierte und lokale Dateien
+board.html
+state.json
+server.json
+server.log
+.tmp/
+share.json
+activity.json
+instructions.json
+.undo/
+.usage-state.json
+github.json
+lanes.json
+files.jsonl
+.filemap.json
+.file-hints.json
+inbox/*
+!inbox/.gitkeep

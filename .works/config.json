@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "id_prefix": "W",
+  "id_digits": 4,
+  "next_id": 3,
+  "next_idea_id": 1,
+  "language": "de",
+  "milestones": [],
+  "dod": {
+    "global": [
+      "Build und Tests laufen ohne Fehler",
+      "code-audit Skill wurde für die Änderungen ausgeführt",
+      "Verlauf ist aktuell und Designentscheidungen sind dokumentiert"
+    ],
+    "by_type": {
+      "bug": [
+        "Regressionstest vorhanden oder Verzicht begründet"
+      ],
+      "refactor": [
+        "Verhalten nach außen unverändert"
+      ],
+      "spike": [
+        "Folgeaufgaben sind angelegt"
+      ],
+      "debt": [
+        "Schuld ist vollständig getilgt oder die verbleibenden Folgekosten sind dokumentiert"
+      ]
+    },
+    "by_tag": {
+      "ui": [
+        "responsive-website-check wurde ausgeführt"
+      ]
+    },
+    "commands": []
+  },
+  "assets": {
+    "max_width": 2400,
+    "quality": 82,
+    "compress_on_add": false
+  },
+  "brainstorm": {
+    "mode": "link"
+  },
+  "github": {
+    "label_priority": {
+      "P1": [
+        "P1",
+        "critical",
+        "kritisch",
+        "blocker",
+        "security"
+      ],
+      "P2": [
+        "P2",
+        "high",
+        "hoch",
+        "important"
+      ],
+      "P4": [
+        "P4",
+        "low",
+        "niedrig",
+        "nice-to-have"
+      ]
+    },
+    "label_type": {
+      "bug": [
+        "bug",
+        "fehler"
+      ],
+      "feature": [
+        "enhancement",
+        "feature"
+      ],
+      "design": [
+        "design",
+        "ui",
+        "ux"
+      ],
+      "refactor": [
+        "refactor",
+        "refactoring"
+      ],
+      "chore": [
+        "chore",
+        "maintenance",
+        "dependencies"
+      ],
+      "spike": [
+        "question",
+        "research",
+        "spike"
+      ],
+      "debt": [
+        "tech-debt",
+        "debt"
+      ]
+    }
+  },
+  "scan": {
+    "markers": [
+      "TODO",
+      "FIXME",
+      "HACK",
+      "XXX"
+    ],
+    "ignore": [
+      "node_modules",
+      "dist",
+      "build",
+      ".next",
+      "out",
+      "coverage",
+      "vendor",
+      ".works",
+      ".git",
+      "target"
+    ]
+  },
+  "hooks": {
+    "session_start": true,
+    "stop_reminder": true
+  },
+  "report": {
+    "days": 7
+  },
+  "handoff_stale_days": 3,
+  "queue": [],
+  "queue_settings": {
+    "auto_next": false,
+    "skip_blocked": true,
+    "ask_before": true
+  },
+  "migrations": [
+    "sections-1"
+  ]
+}
