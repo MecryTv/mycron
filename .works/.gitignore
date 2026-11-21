@@ -16,3 +16,4 @@ files.jsonl
 .file-hints.json
 inbox/*
 !inbox/.gitkeep
+steps.json
