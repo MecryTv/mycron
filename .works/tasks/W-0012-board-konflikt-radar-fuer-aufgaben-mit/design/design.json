@@ -19,5 +19,9 @@
       "at": "2026-11-21 14:46"
     }
   ],
-  "chosen": null
+  "chosen": {
+    "name": "A",
+    "at": "2026-11-21 14:48",
+    "reason": "Nutzer: A (Diff klappt unter dem Eintrag auf), Rest passt"
+  }
 }

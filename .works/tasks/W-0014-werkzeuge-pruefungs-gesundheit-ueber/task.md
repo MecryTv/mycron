@@ -65,3 +65,4 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-21: decisions.md angelegt
 - 2026-11-21: Brainstorming angehängt
 - 2026-11-21: Entwurf A „Board-Erweiterungen W-0011 bis W-0014“ angehängt
+- 2026-11-21: Entwurf A „Board-Erweiterungen W-0011 bis W-0014“ gewählt. Grund: Nutzer: A (Diff klappt unter dem Eintrag auf), Rest passt

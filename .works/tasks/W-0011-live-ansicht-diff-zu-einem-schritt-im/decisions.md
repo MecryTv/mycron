@@ -51,3 +51,7 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 
 ### Verworfene Varianten
 <!-- Was wurde gezeigt oder erwogen und warum nicht genommen? -->
+
+## Gewählter Entwurf
+
+- 2026-11-21: Variante A „Board-Erweiterungen W-0011 bis W-0014“ gewählt, Grund: Nutzer: A (Diff klappt unter dem Eintrag auf), Rest passt. Datei: design/A-board-erweiterungen-w-0011.html

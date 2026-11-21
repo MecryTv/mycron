@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 14:46 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 14:58 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 7 | 0 | 0 | 0 | 0 | 0 | 10 | 0 |
+| 6 | 0 | 1 | 0 | 0 | 0 | 10 | 0 |
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 6 · P4 Niedrig: 0
+
+## Aktive Aufgabe
+
+[W-0015](tasks/W-0015-neues-plugin-feierabend-und-guten-morgen/task.md) Neues Plugin: Feierabend und Guten Morgen (In Arbeit), letzte Übergabe 2026-11-21 14:53
 
 ## Kritisch (P1)
 
@@ -16,13 +20,14 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0015](tasks/W-0015-neues-plugin-feierabend-und-guten-morgen/task.md) | Neues Plugin: Feierabend und Guten Morgen | Feature | P2 Hoch | In Arbeit | M |  |  |  |
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0015](tasks/W-0015-neues-plugin-feierabend-und-guten-morgen/task.md) | Neues Plugin: Feierabend und Guten Morgen | Feature | P2 Hoch | Backlog | M |  |  |  |
 | [W-0011](tasks/W-0011-live-ansicht-diff-zu-einem-schritt-im/task.md) | Live-Ansicht: Diff zu einem Schritt im Verlauf | Feature | P3 Mittel | Backlog | M |  |  |  |
 | [W-0012](tasks/W-0012-board-konflikt-radar-fuer-aufgaben-mit/task.md) | Board: Konflikt-Radar für Aufgaben mit denselben Dateien | Feature | P3 Mittel | Backlog | M |  |  |  |
 | [W-0013](tasks/W-0013-live-ansicht-hinweis-bei-stillstand/task.md) | Live-Ansicht: Hinweis bei Stillstand einer Aufgabe | Feature | P3 Mittel | Backlog | S |  |  |  |

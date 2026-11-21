@@ -22,6 +22,12 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 - Konsequenzen:
 -->
 
+- 2026-11-21: Eigenes Plugin feierabend mit zwei Skills (feierabend, guten-morgen), Wunsch des Nutzers. Beide rufen das works-CLI über den works-Skill auf und haben keine eigenen Skripte.
+- 2026-11-21: Feierabend committet nur .works und nur, wenn es im Git liegt; Code bleibt liegen und wird mit genau einer Frage angesprochen. Nie pushen. Die Übergabe der aktiven Aufgabe kommt zuletzt, weil works handoff die aktive Aufgabe umstellt.
+- 2026-11-21: Reihenfolge für weiter: aktive Aufgabe, dann andere in Arbeit nach Priorität, dann Warteschlange, dann works next. Die Warteschlange gilt für die Zeit nach dem Angefangenen.
+- 2026-11-21: Guten Morgen fängt bei ausdrücklichem Weiter ohne Rückfrage an, wenn keine offene Frage blockiert und die Übergabe zum Repo passt; sonst höchstens drei nummerierte Fragen.
+- 2026-11-21: Getestet mit Subagenten in Kopien eines Testprojekts, ohne Board (Nutzerwunsch: keine zusätzlichen Boards). Baseline ohne Skill und drei Läufe mit Skill; Lücken (Review-Aufgaben in Guten Morgen, Reihenfolge) nachgeschärft.
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 
