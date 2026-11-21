@@ -46,7 +46,7 @@ Im works-Board soll man live verfolgen können, wie weit Claude mit den Aufgaben
 ## Umsetzungsplan
 - [x] Task 1: PreToolUse-Hook und genaue Jetzt-Anzeige
 - [x] Task 2: Uhrzeit abgehakter Schritte (steps.json)
-- [ ] Task 3: Prüfungen mit Zwischenstand, für Agenten im Worktree
+- [x] Task 3: Prüfungen mit Zwischenstand, für Agenten im Worktree
 - [ ] Task 4: Live-Daten in boardData
 - [ ] Task 5: Ansicht Live im Board
 - [ ] Task 6: Dokumentation
@@ -93,3 +93,4 @@ Stand 2026-11-20: Entwurf (Variante A gewählt), Design-Dokument (freigegeben) u
 - 2026-11-21: Frage 1 geklärt: Freigegeben am 2026-11-21: umsetzen wie besprochen, eigener Branch, ein Commit pro Task, nichts pushen.
 - 2026-11-21: Umsetzungsplan: "Task 1: PreToolUse-Hook und genaue Jetzt-Anzeige" abgehakt
 - 2026-11-21: Umsetzungsplan: "Task 2: Uhrzeit abgehakter Schritte (steps.json)" abgehakt
+- 2026-11-21: Umsetzungsplan: "Task 3: Prüfungen mit Zwischenstand, für Agenten im Worktree" abgehakt

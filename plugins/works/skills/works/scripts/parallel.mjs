@@ -11,6 +11,7 @@ import {
 import { filesForTask } from './files.mjs';
 import { loadDesign, needsDesign } from './design.mjs';
 import { knowledgeSummary } from './knowledge.mjs';
+import { checksFor } from './checks.mjs';
 
 export const LINK_FILE = '.works.link';
 const lanesFile = (root) => path.join(worksDir(root), 'lanes.json');
@@ -276,7 +277,9 @@ export function lanePrompt(root, t, lane, cli) {
     `3. Fortschritt festhalten: \`${w} check ${t.id} <Nr>\` für erfüllte Kriterien, \`${w} check ${t.id} <Nr> --section=Umsetzungsplan\` für Schritte, \`${w} log ${t.id} "..."\` für wichtige Schritte.`,
     `4. Commits im Branch mit der ID, zum Beispiel \`feat(${t.id}): ...\`. Am Ende darf nichts uncommittet bleiben.`,
     `5. Ist etwas unklar oder musst du eine Entscheidung treffen, die der Nutzer treffen sollte: \`${w} question ${t.id} "..."\`, nicht raten, und mit dieser Frage als Ergebnis zurückkommen.`,
-    `6. Tests und Prüfungen des Projekts im Worktree ausführen, soweit vorhanden.`,
+    checksFor(loadConfig(root), t).length
+      ? `6. Prüfungen mit \`${w} checks run ${t.id}\` ausführen (sie laufen in diesem Worktree). Fehler und Funde beheben und erneut prüfen. Skill-Prüfungen selbst ausführen und mit \`${w} checks record ${t.id} <name> --status=ok|warn|fail --note="..."\` eintragen.`
+      : `6. Tests und Prüfungen des Projekts im Worktree ausführen, soweit vorhanden.`,
     `7. Zum Schluss: \`${w} handoff ${t.id} --text "..."\` (Stand, was offen ist), dann \`${w} set ${t.id} status=review --reason="Agent fertig"\`.`,
     '',
     'Antworte am Ende mit: was umgesetzt ist, welche Kriterien erfüllt sind, Commits, offene Punkte oder Fragen.',

@@ -250,6 +250,16 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     has(fs.readFileSync(path.join(proj, '.works', '.gitignore'), 'utf8'), 'steps.json', '.works/.gitignore');
   });
 
+  await step('Live: Zwischenstand der Prüfungen', () => {
+    const dir = path.join('.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')));
+    fs.writeFileSync(path.join(proj, 'peek.js'), "process.stdout.write(require('fs').readFileSync(process.argv[2], 'utf8'))\n");
+    w(['checks', 'set', `peek=node peek.js ${path.join(dir, 'checks.json')}`]);
+    w(['checks', 'run', 'W-0001']);
+    const res = JSON.parse(fs.readFileSync(path.join(proj, dir, 'checks.json'), 'utf8'));
+    expect(/"running":\s*"peek"/.test(res.results.peek.output), `running fehlt während des Laufs: ${res.results.peek.output.slice(0, 200)}`);
+    expect(!('running' in res) && res.results.peek.at, 'running nach dem Lauf nicht entfernt oder at fehlt');
+  });
+
   if (hasGit) {
     await step('Dateien: Commits mit ID, works file, Hinweis beim Edit', () => {
       git(['add', '-A']); git(['commit', '-q', '-m', 'chore: start']);
@@ -278,6 +288,13 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const l2 = lanes.find((l) => l.task === nid);
       has(w(['parallel', 'prompt', nid]).out, l2.path);
       w(['log', nid, 'Aus dem Worktree'], { cwd: l2.path });
+      w(['checks', 'set', 'where=node -p process.cwd()']);
+      has(w(['parallel', 'prompt', nid]).out, 'checks run', 'Agenten-Auftrag');
+      w(['checks', 'run', nid], { cwd: l2.path });
+      const nd = fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith(nid));
+      const wr = JSON.parse(fs.readFileSync(path.join(proj, '.works', 'tasks', nd, 'checks.json'), 'utf8')).results.where.output.trim();
+      expect(fs.realpathSync(wr) === fs.realpathSync(l2.path), `Prüfung lief in ${wr} statt im Worktree`);
+      w(['checks', 'remove', 'where']);
       has(fs.readFileSync(path.join(proj, '.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith(nid)), 'task.md'), 'utf8'), 'Aus dem Worktree', 'Hauptprojekt');
       expect(w(['done', nid], { cwd: l2.path, ok: false }).code !== 0, 'done im Worktree war erlaubt');
       fs.appendFileSync(path.join(l2.path, 'src', 'web', 'page.tsx'), 'export const d = 4;\n');
