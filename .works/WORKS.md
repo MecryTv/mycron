@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 14:03 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 14:10 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 0 | 0 | 0 | 0 | 0 | 0 | 9 | 0 |
+| 1 | 0 | 0 | 0 | 0 | 0 | 9 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 1
 
 ## Kritisch (P1)
 
@@ -20,7 +20,9 @@ _Keine Einträge._
 
 ## Geplant und Backlog
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0010](tasks/W-0010-design-funde-in-board-css-ueberarbeiten/task.md) | Design-Funde in board.css überarbeiten | Design | P4 Niedrig | Backlog | S |  |  |  |
 
 ## Zuletzt erledigt
 
