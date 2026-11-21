@@ -153,6 +153,7 @@ Befehle, die vor dem Abschluss laufen, in `config.json` unter `checks`. `checks_
 works checks detect            Vorschlag aus package.json und tsconfig.json
 works checks detect --save     Vorschlag speichern, nur nach Rückfrage beim Nutzer
 works checks set test="npm test" build=     setzen oder mit leerem Wert entfernen
+works checks set bot="npm run check" --cwd "Discord Bot"     mit Arbeitsordner relativ zum Projekt, statt "cd ... &&" im Befehl
 works checks run W-0034        alle Prüfungen ausführen, Ergebnis in checks.json der Aufgabe
 works checks record W-0034 audit --status warn --note "restore.ts:88 ..."
 works checks ack W-0034 audit --reason "bewusst so gelassen"

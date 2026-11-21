@@ -799,6 +799,13 @@ dialog .err { color: var(--danger); font-size: 13px; min-height: 0; }
 .ck-out { margin-left: 30px; font-size: 12px; }
 .ck-out pre { margin: 6px 0 0; max-height: 220px; overflow: auto; padding: 8px 10px; border-radius: 6px; background: var(--sunken); white-space: pre-wrap; }
 .ck-edit .input { height: 32px; }
+/* Prüfung bearbeiten: oben Name, Ordner, Entfernen, darunter der Befehl in voller Breite */
+.ck-edit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 130px) auto; gap: 6px; }
+.ck-edit [data-ckk] { grid-column: 1; grid-row: 1; }
+.ck-edit [data-ckd] { grid-column: 2; grid-row: 1; }
+.ck-edit [data-ckrm] { grid-column: 3; grid-row: 1; }
+.ck-edit [data-ckv] { grid-column: 1 / -1; grid-row: 2; }
+.ck-edit + .ck-edit { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 
 /* Werkzeuge, Vorlagen */
 .switch.small { padding: 8px 12px; }

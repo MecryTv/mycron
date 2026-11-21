@@ -2186,13 +2186,21 @@
       $('#ckAdd', body).onclick = () => { ckBox.insertAdjacentHTML('beforeend', ckRow('', '')); bindRm(); };
       $('#ckSave', body).onclick = async () => {
         const checks = {};
-        $$('.ck-edit', ckBox).forEach((r) => { const k = $('[data-ckk]', r).value.trim(); const v = $('[data-ckv]', r).value.trim(); if (k && v) checks[k] = v; });
+        $$('.ck-edit', ckBox).forEach((r) => {
+          const k = $('[data-ckk]', r).value.trim(); const v = $('[data-ckv]', r).value.trim(); const d = $('[data-ckd]', r).value.trim();
+          if (k && v) checks[k] = d ? { cmd: v, cwd: d } : v;
+        });
         if (await run(() => act('checksSave', { checks }), (x) => x.message)) renderSide();
       };
     }
   }
 
-  const ckRow = (k, v) => '<div class="ck-edit add-row"><input class="input mono" data-ckk value="' + esc(k) + '" placeholder="name" style="flex:0 0 110px" maxlength="30" aria-label="Name"><input class="input mono" data-ckv value="' + esc(v) + '" placeholder="Befehl, etwa npm test" maxlength="300" aria-label="Befehl"><button class="btn small ghost icon" data-ckrm aria-label="Entfernen">×</button></div>';
+  // v: Befehl als Text oder { cmd, cwd } mit Arbeitsordner relativ zum Projekt.
+  const ckRow = (k, v) => {
+    const cmd = v && typeof v === 'object' ? v.cmd || '' : v || '';
+    const cwd = v && typeof v === 'object' ? v.cwd || '' : '';
+    return '<div class="ck-edit add-row"><input class="input mono" data-ckk value="' + esc(k) + '" placeholder="name" style="flex:0 0 110px" maxlength="30" aria-label="Name"><input class="input mono" data-ckv value="' + esc(cmd) + '" placeholder="Befehl, etwa npm test" maxlength="300" aria-label="Befehl"><input class="input mono" data-ckd value="' + esc(cwd) + '" placeholder="Ordner" style="flex:0 0 120px" maxlength="200" aria-label="Arbeitsordner, relativ zum Projekt" title="Arbeitsordner relativ zum Projekt, leer für das Projekt selbst"><button class="btn small ghost icon" data-ckrm aria-label="Entfernen">×</button></div>';
+  };
 
   // ---------- Vorlagen nutzen und bearbeiten ----------
 

@@ -29,7 +29,7 @@ Liegt unter `.works/config.json`. Fehlende Felder werden mit Standardwerten erg�
 | `sprints` | `[]` | Sprints mit `id`, `title`, `goal`, `start`, `end`, `capacity`, `status`, `tasks`, nach Abschluss `result` und `carry` |
 | `sprint_settings` | `{ "length_days": 14, "capacity": 20, "points": { "S": 1, "M": 2, "L": 4, "XL": 8 } }` | Standardlänge, Kapazität und Punkte je Aufwand |
 | `views` | `[]` | Gespeicherte Ansichten aus dem Board: `name`, `filter`, `view`, `sort` |
-| `checks` | `{}` | Prüfungen vor dem Abschluss, Name zu Befehl, `skill:code-audit` für Skills |
+| `checks` | `{}` | Prüfungen vor dem Abschluss, Name zu Befehl, `skill:code-audit` für Skills. Statt des Befehls auch `{ "cmd": "npm run check", "cwd": "Discord Bot" }` mit Arbeitsordner relativ zum Projekt (bei parallelen Aufgaben relativ zum Worktree), nie außerhalb davon |
 | `checks_by_type` | `{}` | Welche Prüfungen je Typ gelten, ohne Eintrag alle |
 | `time_tracking` | `true` | Zeiterfassung über die Hooks |
 | `effort_mode` | `"fixed"` | `measured` lässt Zeitleiste, Graph und Sprint mit gemessenen Dauern rechnen |
