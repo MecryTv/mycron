@@ -49,7 +49,7 @@ Vorschlag 3 vom 2026-11-21. Fragt Claude nach einer Erlaubnis für ein Werkzeug,
 - [x] Registrierung in hooks.json und install-hooks
 - [x] Board: Kachel, Jetzt-Box, Tagesliste, Wartet auf dich, Reiter und Titel
 - [x] Browser-Benachrichtigung auf Wunsch
-- [ ] Doku (hooks.md, board.md), Selbsttest mit Browser, Linux
+- [x] Doku (hooks.md, board.md), Selbsttest mit Browser, Linux
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -61,6 +61,10 @@ Vorschlag 3 vom 2026-11-21. Fragt Claude nach einer Erlaubnis für ein Werkzeug,
 ![Live-Ansicht im Testprojekt, während Claude auf eine Freigabe für npm install wa](assets/2026-11-21-live-ansicht-im-testprojekt-waehrend-nachher.png)
 Beschreibung: Live-Ansicht im Testprojekt, während Claude auf eine Freigabe für npm install wartet: gelbe Kachel, Freigabe als erster Punkt unter Wartet auf dich, Jetzt-Box mit Hinweis und Knopf für die Browser-Benachrichtigung, Pille im Kopf
 Art: nachher · Hinzugefügt: 2026-11-21
+
+![Vorher: Live-Ansicht im Testprojekt, während Claude auf eine Freigabe für npm in](assets/2026-11-21-vorher-live-ansicht-im-testprojekt-vorher.png)
+Beschreibung: Vorher: Live-Ansicht im Testprojekt, während Claude auf eine Freigabe für npm install wartet. Das Board zeigt fälschlich Claude arbeitet gerade, Wartet auf dich enthält die Freigabe nicht
+Art: vorher · Hinzugefügt: 2026-11-21
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
@@ -87,3 +91,5 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "Browser-Benachrichtigung nur nach Klick des Nutzers, gemerkt im Browser" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Reiter Live und Fenstertitel zeigen die wartende Freigabe auch in anderen Ansichten" abgehakt
 - 2026-11-21: PermissionRequest-Hook (permission.mjs) markiert den laufenden Aufruf als wartend; Board zeigt Kachel, Jetzt-Box, Tagesliste, Wartet auf dich, Pille, Reiter, Titel und optional Browser-Benachrichtigung. Selbsttest Windows mit Browser 22/22.
+- 2026-11-21: Umsetzungsplan: "Doku (hooks.md, board.md), Selbsttest mit Browser, Linux" abgehakt
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-vorher-live-ansicht-im-testprojekt-vorher.png (vorher)
