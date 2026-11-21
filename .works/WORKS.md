@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 14:31 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 14:43 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 0 | 0 | 0 | 0 | 0 | 0 | 10 | 0 |
+| 7 | 0 | 0 | 0 | 0 | 0 | 10 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 6 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -20,7 +20,15 @@ _Keine Einträge._
 
 ## Geplant und Backlog
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0015](tasks/W-0015-neues-plugin-feierabend-und-guten-morgen/task.md) | Neues Plugin: Feierabend und Guten Morgen | Feature | P2 Hoch | Backlog | M |  |  |  |
+| [W-0011](tasks/W-0011-live-ansicht-diff-zu-einem-schritt-im/task.md) | Live-Ansicht: Diff zu einem Schritt im Verlauf | Feature | P3 Mittel | Backlog | M |  |  |  |
+| [W-0012](tasks/W-0012-board-konflikt-radar-fuer-aufgaben-mit/task.md) | Board: Konflikt-Radar für Aufgaben mit denselben Dateien | Feature | P3 Mittel | Backlog | M |  |  |  |
+| [W-0013](tasks/W-0013-live-ansicht-hinweis-bei-stillstand/task.md) | Live-Ansicht: Hinweis bei Stillstand einer Aufgabe | Feature | P3 Mittel | Backlog | S |  |  |  |
+| [W-0014](tasks/W-0014-werkzeuge-pruefungs-gesundheit-ueber/task.md) | Werkzeuge: Prüfungs-Gesundheit über alle Aufgaben | Feature | P3 Mittel | Backlog | M |  |  |  |
+| [W-0016](tasks/W-0016-neues-plugin-entwurf-werkzeug-fuer/task.md) | Neues Plugin: Entwurf-Werkzeug für Gestaltungsaufgaben | Feature | P3 Mittel | Backlog | M |  |  |  |
+| [W-0017](tasks/W-0017-neues-plugin-ci-waechter-fuer-github/task.md) | Neues Plugin: CI-Wächter für GitHub Actions | Feature | P3 Mittel | Backlog | S |  |  |  |
 
 ## Zuletzt erledigt
 
