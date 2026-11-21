@@ -22,6 +22,10 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 - Konsequenzen:
 -->
 
+- 2026-11-21: Vorhandene Schnittstelle /api/diff um live=1 erweitert (liveFileDiff in git.mjs), kein neuer Endpunkt. Reihenfolge: uncommitteter Stand gegen HEAD im Worktree der Aufgabe (checkDir), neue unverfolgte Datei mit ganzem Inhalt, sonst der Diff der Aufgabe wie im Reiter Code.
+- 2026-11-21: Nur relative Pfade ohne .., Live-Diff nur mit Bearbeitungsrecht (403 im Leselink), weil er auch Uncommittetes zeigt.
+- 2026-11-21: Aufklappbar sind Einträge der Werkzeuge Edit, MultiEdit, Write und NotebookEdit; der Schalter ist ein echter Button (Tastatur). Aufgeklappte Diffs bleiben beim Neuzeichnen offen.
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 

@@ -563,6 +563,22 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
     const badOnly = await fetch(url + '/api/action', { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'checksRun', id: 'W-0001', only: ['../x'] }) });
     expect(badOnly.status === 400, `Ungültiger Name in only: ${badOnly.status}`);
+    // Diff im Verlauf (W-0011): Stand der Datei gegen den letzten Commit, Pfade außerhalb des Projekts abgelehnt.
+    if (hasGit) {
+      const src = path.join(proj, 'src', 'bot', 'backup.ts');
+      const before = fs.readFileSync(src, 'utf8');
+      fs.appendFileSync(src, 'export const liveDiff = 42;\n');
+      const ld = await api('GET', '/api/diff?id=W-0001&file=src/bot/backup.ts&live=1');
+      fs.writeFileSync(src, before);
+      expect(ld.source === 'uncommitted' && /\+export const liveDiff = 42;/.test(ld.diff), `Live-Diff: ${JSON.stringify(ld).slice(0, 200)}`);
+      // Neue, noch nicht verfolgte Datei: ganzer Inhalt als hinzugefügt.
+      fs.writeFileSync(path.join(proj, 'src', 'neu-im-verlauf.ts'), 'export const neu = 1;\n');
+      const nd = await api('GET', '/api/diff?id=W-0001&file=src/neu-im-verlauf.ts&live=1');
+      fs.rmSync(path.join(proj, 'src', 'neu-im-verlauf.ts'));
+      expect(nd.source === 'new' && /\+export const neu = 1;/.test(nd.diff), `Neue Datei im Live-Diff: ${JSON.stringify(nd).slice(0, 200)}`);
+      const out = await fetch(url + '/api/diff?id=W-0001&file=../geheim.txt&live=1', { headers: { 'X-Works-Token': token } });
+      expect(out.status === 400, `Pfad außerhalb des Projekts: ${out.status}`);
+    }
     await api('POST', '/api/action', { action: 'checksSave', checks: {} });
     // W-0002 hat keinen Umsetzungsplan: Die Live-Ansicht darf dafür kein NaN oder "Schritt 0 von 0" zeigen.
     w(['start', 'W-0002']);
@@ -575,6 +591,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       ? { status: 'fail', cmd: 'node -v', ms: 40, output: 'The system cannot find the path specified.\n', at, ...(i === 0 ? { hist: ['ok', 'fail', 'ok', 'fail'].map((s) => ({ s, ms: 40, at, fp: 'x' })) } : {}) }
       // m10 bestanden, aber deutlich langsamer als sonst (W-0009).
       : { status: 'ok', cmd: 'node -v', ms: 48000, output: '', at, hist: [21000, 22000, 20000, 48000].map((ms) => ({ s: 'ok', ms, at })) }])) }));
+    // Eine frische Dateiänderung für den Diff im Verlauf (W-0011), vor der Freigabe, damit sie diese nicht ersetzt.
+    hook('post-tool.mjs', { cwd: proj, session_id: 's9', tool_name: 'Edit', tool_input: { file_path: path.join(proj, 'src', 'bot', 'backup.ts') }, tool_response: {} });
     // Claude wartet auf eine Freigabe für W-0002: Desktop zeigt das, der Stop-Hook beendet es vor der Handyprüfung.
     hook('permission.mjs', { cwd: proj, session_id: 's9', tool_name: 'Bash', tool_input: { command: 'npm install -D vitest' } });
     if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }));
@@ -680,6 +698,13 @@ async function browserCheck(url, log, between = async () => {}) {
     if (!/Verbrauch heute .*Tokens, ca\. [\d,]+ \$/.test(use.replace(/\s+/g, ' '))) errs.push(`Live: Verbrauch heute fehlt (${use})`);
     if (!/Freigabe für einen Befehl/.test(perm.first)) errs.push(`Live: Freigabe nicht erster Punkt in Wartet auf dich (${perm.first})`);
     if (!perm.pulse || !/^Freigabe/.test(perm.title)) errs.push(`Live: Reiter oder Titel ohne Freigabe (${perm.title})`);
+    // Diff im Verlauf (W-0011): Verlauf aller Aufgaben, ein Dateieintrag klappt seinen Diff auf.
+    await p.click('#viewLive [data-lv-feed="1"]'); await p.waitForTimeout(300);
+    if (!(await p.$('#viewLive [data-lv-diff]'))) errs.push('Live: kein aufklappbarer Dateieintrag im Verlauf');
+    else {
+      await p.click('#viewLive [data-lv-diff]');
+      try { await p.waitForSelector('#viewLive .lv-fdiff .lv-fdiff-head', { timeout: 10000 }); } catch { errs.push('Live: Diff im Verlauf erscheint nicht'); }
+    }
     // Erneut prüfen (W-0006): Knopf für alle Fehlschläge und je Gruppe. Der Klick lässt die neun roten Prüfungen neu laufen,
     // sie bestehen diesmal (node -v), die Fehlergruppe verschwindet.
     const rr = await p.evaluate(() => ({ all: (document.querySelector('#viewLive .lv-ckg-acts [data-lv-rerun]') || {}).innerText || '', n: document.querySelectorAll('#viewLive [data-lv-rerun]').length }));

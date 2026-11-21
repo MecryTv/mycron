@@ -1,6 +1,8 @@
 // Git-Daten zu einer Aufgabe: Branch, Commits mit der Aufgaben-ID, geänderte Dateien und Diffs.
 // Alle Aufrufe ohne Shell, mit festen Argumenten und Zeitlimit.
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const MAX_DIFF_LINES = 400;
 
@@ -110,4 +112,25 @@ export async function fileDiff(root, task, file, { uncommitted = false } = {}) {
   }
   const lines = r.out.split('\n');
   return { diff: lines.slice(0, MAX_DIFF_LINES).join('\n'), truncated: lines.length > MAX_DIFF_LINES };
+}
+
+// Diff für den Verlauf der Live-Ansicht: zuerst der uncommittete Stand gegen den letzten Commit, im Worktree
+// der Aufgabe, falls sie parallel läuft (dir). Ist die Datei dort unverändert, der Diff der Aufgabe wie im Reiter Code.
+export async function liveFileDiff(root, task, file, dir = root) {
+  const r = await git(dir, ['diff', 'HEAD', '--', file]);
+  if (r.ok && r.out.trim()) {
+    const lines = r.out.split('\n');
+    return { diff: lines.slice(0, MAX_DIFF_LINES).join('\n'), truncated: lines.length > MAX_DIFF_LINES, source: 'uncommitted' };
+  }
+  // Neue Datei, die Git noch nicht verfolgt (oder noch gar kein Commit): ganzer Inhalt als hinzugefügt.
+  const tracked = await git(dir, ['ls-files', '--error-unmatch', '--', file]);
+  const abs = path.join(dir, file);
+  if (!tracked.ok && fs.existsSync(abs) && fs.statSync(abs).isFile()) {
+    const text = fs.readFileSync(abs, 'utf8');
+    if (text.slice(0, 8000).includes('\0')) return { diff: '', source: 'binary' };
+    const lines = text.replace(/\n$/, '').split('\n');
+    return { diff: '@@ neue Datei @@\n' + lines.slice(0, MAX_DIFF_LINES).map((l) => '+' + l).join('\n'), truncated: lines.length > MAX_DIFF_LINES, source: 'new' };
+  }
+  const c = await fileDiff(root, task, file);
+  return c.error ? { diff: '', source: 'none' } : { ...c, source: 'task' };
 }

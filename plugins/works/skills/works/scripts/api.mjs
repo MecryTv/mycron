@@ -285,9 +285,16 @@ export async function codeOf(root, taskId) {
   return codeInfo(root, findTaskSafe(root, taskId));
 }
 
-export async function diffOf(root, taskId, file, uncommitted) {
-  const { fileDiff } = await import('./git.mjs');
+export async function diffOf(root, taskId, file, uncommitted, live = false) {
+  const { fileDiff, liveFileDiff } = await import('./git.mjs');
   if (typeof file !== 'string' || !file || file.length > 500 || file.includes('\0')) bad('Ungültige Datei.');
+  if (live) {
+    // Diff im Verlauf der Live-Ansicht: nur Pfade im Projekt, relativ und ohne "..".
+    if (path.isAbsolute(file) || /^[a-z]:/i.test(file) || file.split(/[\\/]/).includes('..')) bad('Ungültige Datei.');
+    const { checkDir } = await import('./checks.mjs');
+    const task = findTaskSafe(root, taskId);
+    return liveFileDiff(root, task, file, checkDir(root, task));
+  }
   const r = await fileDiff(root, findTaskSafe(root, taskId), file, { uncommitted });
   if (r.error) throw new ApiError(404, r.error);
   return r;
