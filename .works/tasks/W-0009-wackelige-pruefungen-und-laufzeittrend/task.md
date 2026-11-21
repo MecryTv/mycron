@@ -92,3 +92,4 @@ Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 - 2026-11-21: Umsetzungsplan: "Doku board.md, Selbsttest mit Browser, Linux" abgehakt
 - 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
 - 2026-11-21: Nach Review korrigiert, siehe decisions.md (Branch fix/review-w0006-w0009).
+- 2026-11-21: Nutzer hat die Definition von wackelig bestätigt.

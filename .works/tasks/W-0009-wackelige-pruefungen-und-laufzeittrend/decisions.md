@@ -12,3 +12,4 @@
 - 2026-11-21: wackelig und Trend rechnet der Server (board.mjs, flakyOf und trendOf in checks.mjs), das Board zeigt nur an. So sind die Regeln im Selbsttest prüfbar.
 - 2026-11-21: In der Zeile einer Prüfung steht rechts nur noch die Dauer, der Zustand steckt im Symbol und steht für Screenreader als versteckter Text da. Damit bleibt Platz für den Befehl und den Verlauf.
 - 2026-11-21 (Review): Korrektur. Wackelig zählt nur Wechsel zwischen Läufen auf demselben Codestand (`fp` je Lauf im Verlauf). Der normale Ablauf "kaputt gemacht, repariert" ergibt sonst schon zwei Wechsel und wäre fälschlich wackelig.
+- 2026-11-21: Nutzer bestätigt die Definition: wackelig erst ab zwei Wechseln ohne Codeänderung dazwischen.
