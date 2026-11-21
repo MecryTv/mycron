@@ -162,7 +162,11 @@ works checks ack W-0034 audit --reason "bewusst so gelassen"
 
 Für Claude: Prüfungen nie ohne Zustimmung einrichten. Beim ersten Abschluss in einem Projekt ohne `checks` den Vorschlag aus `works checks detect` zeigen und fragen.
 
-Im Board zeigt der Abschluss-Dialog jede Prüfung mit Ergebnis, Dauer und bei Fehlern die letzten Zeilen der Ausgabe. "Claude beheben lassen" schreibt einen Kommentar an Claude, "Als bekannt markieren" quittiert einen Fund.
+Läuft die Aufgabe parallel in einem Worktree, laufen ihre Prüfungen dort und nicht im Hauptprojekt, auch wenn `works checks run` im Hauptprojekt aufgerufen wird. Der Fingerabdruck des Arbeitsstands kommt dann ebenfalls aus dem Worktree.
+
+Während eines Laufs steht in `checks.json`, welche Prüfung gerade läuft (`running`, `runningSince`), jedes Ergebnis hat seine Uhrzeit (`at`). Daraus zeigt die Live-Ansicht laufende Prüfungen mit Laufzeit.
+
+Im Board zeigt der Abschluss-Dialog jede Prüfung mit Ergebnis, Dauer und bei Fehlern die letzten Zeilen der Ausgabe. "Claude beheben lassen" schreibt einen Kommentar an Claude, "Als bekannt markieren" quittiert einen Fund. Dieselben Knöpfe gibt es in der Live-Ansicht in der Spalte Prüfungen.
 
 ## Wochenbericht
 

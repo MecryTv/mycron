@@ -4,7 +4,7 @@ Ein Skill wird nur geladen, wenn Claude ihn für relevant hält. Hooks sorgen da
 
 ## Installation über das Plugin mycron
 
-Wird works als Plugin aus dem Marketplace mycron installiert, bringt es SessionStart, UserPromptSubmit, PostToolUse, SubagentStop und Stop Hook selbst mit (`plugins/works/hooks/hooks.json`). Sie sind aktiv, solange das Plugin aktiviert ist, und werden mit jedem Plugin-Update automatisch aktualisiert. `works install-hooks --claude` ist dann nicht nötig und meldet das auch so.
+Wird works als Plugin aus dem Marketplace mycron installiert, bringt es SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStop und Stop Hook selbst mit (`plugins/works/hooks/hooks.json`). Sie sind aktiv, solange das Plugin aktiviert ist, und werden mit jedem Plugin-Update automatisch aktualisiert. `works install-hooks --claude` ist dann nicht nötig und meldet das auch so.
 
 Pro Projekt einrichten muss man nur den Git pre-commit Hook:
 
@@ -64,11 +64,17 @@ Datei: `hooks/prompt-submit.mjs`.
 
 Merkt sich für die Zeiterfassung, wann eine Anfrage beginnt, und zeigt im Board "Claude arbeitet". Liegen Anweisungen für die aktive Aufgabe vor, kommen sie als Kontext mit. Nur wenn eine Aufgabe mit `works start` aktiv ist.
 
+## PreToolUse
+
+Datei: `hooks/pre-tool.mjs`, ohne Matcher, Timeout 5 Sekunden.
+
+Meldet jeden Werkzeugaufruf, bevor er läuft: `current` in `.works/activity.json` bekommt den Aufruf mit `running: true`, die Liste der letzten Aufrufe bleibt unverändert. Damit zeigt die Live-Ansicht während eines langen Befehls wie `npm test` den Befehl selbst und seine Laufzeit statt des Aufrufs davor. Der Hook schreibt sonst nichts und gibt nichts aus. Er kostet pro Werkzeugaufruf etwa 0,2 Sekunden (Start von Node, unter Windows gemessen). Abschalten mit `"live_activity": false`.
+
 ## PostToolUse
 
 Datei: `hooks/post-tool.mjs`, ohne Matcher, Timeout 5 Sekunden.
 
-Schreibt nach jedem Werkzeugaufruf eine kurze Zeile in `.works/activity.json` (zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test"), die das Board auf der aktiven Karte zeigt. Inhalte von Dateien oder Befehlsausgaben werden nicht gespeichert, nur Werkzeug, Dateiname oder die ersten Zeichen des Befehls. Liegt eine neue Anweisung des Nutzers vor, kommt sie hier als Kontext an Claude, sodass sie schon während der Antwort ankommt. Claude soll sie berücksichtigen, sobald es sinnvoll ist.
+Schreibt nach jedem Werkzeugaufruf eine kurze Zeile in `.works/activity.json` (zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test"), die das Board auf der aktiven Karte und in der Live-Ansicht zeigt, und hält in `.works/steps.json` fest, wann Schritte des Umsetzungsplans der Aufgabe abgehakt wurden. Inhalte von Dateien oder Befehlsausgaben werden nicht gespeichert, nur Werkzeug, Dateiname oder die ersten Zeichen des Befehls. Liegt eine neue Anweisung des Nutzers vor, kommt sie hier als Kontext an Claude, sodass sie schon während der Antwort ankommt. Claude soll sie berücksichtigen, sobald es sinnvoll ist.
 
 Außerdem merkt sich der Hook bei Edit, Write und NotebookEdit, welche Datei für welche Aufgabe geändert wurde (`.works/files.jsonl`, lokal). Wird eine Datei in einer Sitzung zum ersten Mal geändert und haben andere Aufgaben dort Entscheidungen getroffen oder laufen gerade, bekommt Claude einmalig einen Hinweis mit den Aufgaben und ihren Entscheidungen.
 
@@ -99,6 +105,9 @@ Nur für die Installation als Skill-Ordner:
     ],
     "UserPromptSubmit": [
       { "hooks": [{ "type": "command", "command": "node \"$HOME/.claude/skills/works/hooks/prompt-submit.mjs\"", "timeout": 10 }] }
+    ],
+    "PreToolUse": [
+      { "hooks": [{ "type": "command", "command": "node \"$HOME/.claude/skills/works/hooks/pre-tool.mjs\"", "timeout": 5 }] }
     ],
     "PostToolUse": [
       { "hooks": [{ "type": "command", "command": "node \"$HOME/.claude/skills/works/hooks/post-tool.mjs\"", "timeout": 5 }] }

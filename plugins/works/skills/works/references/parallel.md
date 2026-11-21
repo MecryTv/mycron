@@ -35,7 +35,7 @@ Für Agenten ungeeignet und deshalb ausgelassen: unvollständige Aufgaben, offen
    works parallel prompt W-0012
    ```
    Den Text unverändert als Auftrag an den Agenten geben. Er enthält Worktree, Branch, Beschreibung, Kriterien, Plan, Übergabe, Projektwissen und die Regeln für den Agenten. Keine Worktree-Isolation des Agent-Werkzeugs zusätzlich verwenden, der Worktree steht schon.
-3. Während die Agenten laufen: `works parallel status` zeigt Commits und offene Dateien je Bahn. Anweisungen des Nutzers aus dem Board gehen an den Agenten der jeweiligen Aufgabe.
+3. Während die Agenten laufen: `works parallel status` zeigt Commits und offene Dateien je Bahn. Anweisungen des Nutzers aus dem Board gehen an den Agenten der jeweiligen Aufgabe. Sind Prüfungen eingerichtet, startet der Agent sie laut Auftrag mit `works checks run <ID>`; sie laufen in seinem Worktree, und die Live-Ansicht zeigt ihren Stand.
 4. Ergebnis prüfen, wenn ein Agent fertig ist: Antwort lesen, `works show <ID>` (Häkchen, Übergabe, Fragen), Diff im Branch ansehen. Hat der Agent Fragen notiert, sie dem Nutzer stellen.
 5. Abschließen je Aufgabe:
    ```

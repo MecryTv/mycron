@@ -18,6 +18,8 @@ Verwaltet alle Aufgaben eines Projekts in `.works/`. Jede Aufgabe hat einen eige
   reports/            gespeicherte Berichte
   templates/          Vorlagen für neue Aufgaben (JSON)
   time.jsonl          Zeiterfassung und Tokenverbrauch aus den Hooks
+  activity.json       laufende und letzte Werkzeugaufrufe für die Live-Ansicht (lokal)
+  steps.json          Uhrzeit abgehakter Schritte des Umsetzungsplans (lokal)
   wissen.md           Projektwissen: Fakten und Regeln, die Claude vor der Arbeit liest
   tasks/W-0012-slug/  task.md, decisions.md, comments.md, checks.json, assets/, docs/, design/
   archive/            erledigte und verworfene Aufgaben
@@ -81,6 +83,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Erledigte Aufgabe muss nachgebessert werden | `works reopen <ID> --reason "..."` | `references/workflow.md` |
 | TODO-Kommentare im Code, GitHub Issues | `works scan`, `works gh-import` | `references/workflow.md` |
 | Bericht, Changelog | `works report`, `works changelog` | `references/cli.md` |
+| "Wie weit ist Claude?", live mitverfolgen, Prüfungen ansehen | Live-Board starten wie unten, Ansicht Live nennen (Reiter Live, Taste 7) | `references/board.md` |
 | Übersicht im Browser, Board, "ich will selbst Aufgaben anlegen" | `works board --serve --detach` und die URL nennen. Läuft schon ein aktueller Server, wird nur seine URL ausgegeben. Dort kann der Nutzer alles selbst bearbeiten. Für eine reine Ansicht `works board` | `references/board.md` |
 | Board zeigt altes Design, Board neu starten | `works board --restart` | `references/board.md` |
 | "Arbeite die Warteschlange ab", Reihenfolge vorgeben | `works queue` lesen, oberste startbare Aufgabe starten, nach `done` mit der nächsten weitermachen | `references/board.md` |
