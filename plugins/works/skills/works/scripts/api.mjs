@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import {
+import { readText,
   loadTasks, loadConfig, saveConfig, worksDir, getSection, stripComments, imageLinks, checkboxes,
   isBlocked, openBlockers, openQuestions, relFromWorks, exists,
   STATUSES, OPEN_STATUSES, STATUS_LABEL, PRIORITIES, PRIO_LABEL, TYPES, TYPE_LABEL, EFFORTS, RISKS,
@@ -210,7 +210,7 @@ export function taskDetail(root, taskId) {
     questions,
     history,
     assets: assetsOf(t),
-    decisions: exists(decFile) ? stripComments(fs.readFileSync(decFile, 'utf8')).replace(/\n{3,}/g, '\n\n').trim() : '',
+    decisions: exists(decFile) ? stripComments(readText(decFile)).replace(/\n{3,}/g, '\n\n').trim() : '',
     blockedBy: (t.blocked_by || []).map(ref),
     blocks: (t.blocks || []).map(ref),
     related: (t.related || []).map(ref),
@@ -247,7 +247,7 @@ export function reportsInfo(root) {
 export function ideasList(root) {
   const file = path.join(worksDir(root), 'ideas.md');
   if (!exists(file)) return [];
-  return fs.readFileSync(file, 'utf8').split('\n').map((l) => {
+  return readText(file).split('\n').map((l) => {
     const m = l.match(/^- (~~)?\[(I-\d+)\] (\d{4}-\d{2}-\d{2}): (.*?)(~~(.*))?$/);
     if (!m) return null;
     const raw = m[4];

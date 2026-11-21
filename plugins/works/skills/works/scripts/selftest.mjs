@@ -172,6 +172,27 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     has(w(['design', 'show', 'W-0004']).out, 'Gewählt: A');
   });
 
+  // Git mit core.autocrlf=true checkt .works unter Windows mit CRLF aus. works muss das genauso lesen wie LF.
+  // W-0001 hat Kriterien und einen Kommentar, W-0004 ist eine Gestaltungsaufgabe (dort prüft die DoD decisions.md).
+  await step('Windows-Zeilenenden (CRLF) in .works', () => {
+    const wd = path.join(proj, '.works');
+    const dirOf = (id) => path.join(wd, 'tasks', fs.readdirSync(path.join(wd, 'tasks')).find((d) => d.startsWith(id + '-')));
+    w(['decisions', 'W-0004', '--add=Zeilenenden', '--decision=LF', '--why=einheitlich']);
+    w(['idea', 'Idee mit CRLF']);
+    w(['know', 'add', '--area=Repo', '--title=Zeilenenden', '--text=CRLF lesen']);
+    const crlf = (f) => { if (fs.existsSync(f)) fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/\r?\n/g, '\r\n')); };
+    for (const id of ['W-0001', 'W-0004']) for (const f of ['task.md', 'decisions.md', 'comments.md']) crlf(path.join(dirOf(id), f));
+    for (const f of ['ideas.md', 'wissen.md']) crlf(path.join(wd, f));
+    const dod = w(['dod', 'W-0001'], { ok: false }).out;
+    expect(!dod.includes('Abschnitt ist leer') && /Akzeptanzkriterien sind abgehakt \(\d+\/1\)/.test(dod), `Kriterien mit CRLF nicht erkannt: ${dod.split('\n').slice(0, 3).join(' | ')}`);
+    expect(/\[x\] decisions\.md enthält Entscheidungen/.test(w(['dod', 'W-0004'], { ok: false }).out), 'Entscheidungen mit CRLF nicht erkannt');
+    has(w(['comments', 'W-0001']).out, 'Rollen', 'Kommentare mit CRLF');
+    has(w(['ideas']).out, 'Idee mit CRLF', 'Ideen mit CRLF');
+    has(w(['know', 'search', 'Zeilenenden']).out, 'CRLF lesen', 'Projektwissen mit CRLF');
+    w(['log', 'W-0001', 'Nach CRLF']);
+    expect(!fs.readFileSync(path.join(dirOf('W-0001'), 'task.md'), 'utf8').includes('\r'), 'task.md hat nach einer Änderung gemischte Zeilenenden');
+  });
+
   await step('Import: CSV, Markdown, Trello, Excel, Word, Duplikate', () => {
     const fx = path.join(base, 'fx'); fs.mkdirSync(fx);
     fs.writeFileSync(path.join(fx, 'l.csv'), 'ID,Title,Description,Status,Priority,Labels,Estimate\nA-1,Anmeldung per Discord,Ohne Passwort,Todo,High,web,3\nA-2,Alte Seite weg,,Done,Low,,1\n');

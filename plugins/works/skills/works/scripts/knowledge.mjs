@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { worksDir, exists, today } from './lib.mjs';
+import { readText, worksDir, exists, today } from './lib.mjs';
 
 export const knowledgeFile = (root) => path.join(worksDir(root), 'wissen.md');
 const HEAD = '# Projektwissen\n\nWas Claude in diesem Projekt wissen muss. Claude liest die passenden Einträge vor der Arbeit. Bearbeiten im Board unter Wissen oder mit works know.\n';
@@ -14,7 +14,7 @@ export function loadKnowledge(root) {
   const out = [];
   let area = 'Allgemein';
   let cur = null;
-  for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
+  for (const line of readText(f).split('\n')) {
     const a = line.match(/^## (.+)$/);
     if (a) { area = a[1].trim(); cur = null; continue; }
     const h = line.match(/^### (.+)$/);

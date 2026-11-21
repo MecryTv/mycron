@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { worksDir, readJson, writeJson, exists, loadTasks, stripComments } from './lib.mjs';
+import { readText, worksDir, readJson, writeJson, exists, loadTasks, stripComments } from './lib.mjs';
 
 const editsFile = (root) => path.join(worksDir(root), 'files.jsonl');
 const cacheFile = (root) => path.join(worksDir(root), '.filemap.json');
@@ -88,7 +88,7 @@ function simpleHash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 
 function decisionTitles(task) {
   const f = path.join(task._dir, 'decisions.md');
   if (!exists(f)) return [];
-  return (stripComments(fs.readFileSync(f, 'utf8')).match(/^### E\d+:.*$/gm) || []).map((l) => l.replace(/^### /, '').trim()).slice(0, 6);
+  return (stripComments(readText(f)).match(/^### E\d+:.*$/gm) || []).map((l) => l.replace(/^### /, '').trim()).slice(0, 6);
 }
 
 // Alle Aufgaben, die eine Datei geändert haben, neueste zuerst.

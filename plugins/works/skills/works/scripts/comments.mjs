@@ -2,7 +2,7 @@
 // Format pro Eintrag: <!-- c:2026-10-31T21:14:00 Nutzer --> gefolgt vom Text in Markdown.
 import fs from 'node:fs';
 import path from 'node:path';
-import { exists, loadState, saveState } from './lib.mjs';
+import { readText, exists, loadState, saveState } from './lib.mjs';
 
 const ENTRY_RE = /<!-- c:(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}) (Nutzer|Claude) -->\n([\s\S]*?)(?=\n<!-- c:|\s*$)/g;
 
@@ -11,7 +11,7 @@ export function commentsFile(task) { return path.join(task._dir, 'comments.md');
 export function loadComments(task) {
   const file = commentsFile(task);
   if (!exists(file)) return [];
-  const text = fs.readFileSync(file, 'utf8');
+  const text = readText(file);
   const out = [];
   let m;
   ENTRY_RE.lastIndex = 0;

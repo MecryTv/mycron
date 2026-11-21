@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { exists, readJson, writeJson, slugify, stripComments, today, nowStamp } from './lib.mjs';
+import { readText, exists, readJson, writeJson, slugify, stripComments, today, nowStamp } from './lib.mjs';
 
 const IMAGE = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
 const ALLOWED = [...IMAGE, '.html', '.htm', '.md', '.pdf'];
@@ -45,7 +45,7 @@ export function parseColors(v) {
 
 export function setDirection(task, { text, file, source = '', colors = [], fonts = [], notes = '' }) {
   const d = ensure(task);
-  const body = file ? fs.readFileSync(file, 'utf8') : String(text || '');
+  const body = file ? readText(file) : String(text || '');
   if (!body.trim() && !colors.length) throw new Error('Leere Designrichtung. --file oder --text angeben.');
   fs.mkdirSync(designDir(task), { recursive: true });
   fs.writeFileSync(path.join(designDir(task), 'richtung.md'), body.trim() + '\n');
@@ -78,7 +78,7 @@ export function removeVariant(task, name) {
 }
 
 export function addBrainstorm(task, { file, text, source = 'superpowers', title = '' }) {
-  const body = file ? fs.readFileSync(file, 'utf8') : String(text || '');
+  const body = file ? readText(file) : String(text || '');
   if (!body.trim()) throw new Error('Leeres Brainstorming.');
   const d = ensure(task);
   const n = d.brainstorm.length + 1;
@@ -101,7 +101,7 @@ export function chooseVariant(task, name, reason = '') {
   const dec = path.join(task._dir, 'decisions.md');
   const line = `\n- ${today()}: Variante ${name} „${v.title}“ gewählt${reason ? `, Grund: ${reason}` : ''}. Datei: design/${v.file}${d.variants.length > 1 ? `. Nicht gewählt: ${d.variants.filter((x) => x.name !== name).map((x) => `${x.name} ${x.title}`).join(', ')}` : ''}\n`;
   if (exists(dec)) {
-    let s = fs.readFileSync(dec, 'utf8');
+    let s = readText(dec);
     if (!/^## Gewählter Entwurf/m.test(s)) s = s.replace(/\s*$/, '\n\n## Gewählter Entwurf\n');
     fs.writeFileSync(dec, s.replace(/(## Gewählter Entwurf\n)/, `$1${line}`));
   } else fs.writeFileSync(dec, `# Entscheidungen ${task.id}\n\n## Gewählter Entwurf\n${line}`);
@@ -112,7 +112,7 @@ export function chooseVariant(task, name, reason = '') {
 export function designDetail(root, task, relFromWorks) {
   const d = loadDesign(task);
   if (!d) return null;
-  const read = (f) => { try { return stripComments(fs.readFileSync(path.join(designDir(task), f), 'utf8')).trim(); } catch { return ''; } };
+  const read = (f) => { try { return stripComments(readText(path.join(designDir(task), f))).trim(); } catch { return ''; } };
   const rel = (f) => relFromWorks(root, path.join(designDir(task), f));
   return {
     direction: d.direction ? { ...d.direction, text: read(d.direction.file) } : null,
