@@ -35,5 +35,9 @@
       "at": "2026-11-21 11:02"
     }
   ],
-  "chosen": null
+  "chosen": {
+    "name": "A",
+    "at": "2026-11-21 11:04",
+    "reason": "Gemeinsame Ursache sofort sichtbar, eine Aktion je Fehlergruppe; vom Nutzer gewählt"
+  }
 }

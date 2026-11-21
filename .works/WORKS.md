@@ -1,6 +1,6 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 11:02 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 11:04 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 

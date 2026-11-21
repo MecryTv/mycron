@@ -51,3 +51,7 @@ Bei 51 Prüfungen und 45 Fehlschlägen listete die Live-Ansicht jeden Eintrag ei
 
 ### Verworfene Varianten
 <!-- Was wurde gezeigt oder erwogen und warum nicht genommen? -->
+
+## Gewählter Entwurf
+
+- 2026-11-21: Variante A „Fehlergruppen“ gewählt, Grund: Gemeinsame Ursache sofort sichtbar, eine Aktion je Fehlergruppe; vom Nutzer gewählt. Datei: design/A-fehlergruppen.png. Nicht gewählt: B Prüfmatrix

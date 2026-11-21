@@ -50,7 +50,11 @@ Wunsch des Nutzers vom 2026-11-21: Bei vielen Befunden soll die Live-Ansicht bes
 - [ ] Bei wenigen Prüfungen (bis etwa 8) bleibt die bisherige Liste
 
 ## Umsetzungsplan
-- [ ] 
+- [ ] Wartet auf dich je Aufgabe und Art zusammenfassen, höchstens vier Zeilen
+- [ ] Prüfungsspalte ab 9 Prüfungen kompakt: Zähler, Streifen, Fehlergruppen, Funde, bestandene, alle aufklappbar
+- [ ] Laufzustand kompakt: laufende Prüfung und bestandene
+- [ ] Browserprüfung im Selbsttest mit 10 Prüfungen
+- [ ] Doku board.md
 
 ## Betroffene Dateien
 
@@ -89,3 +93,9 @@ Art: vorher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Entwurf A „Fehlergruppen“ angehängt
 - 2026-11-21: Entwurf B „Prüfmatrix“ angehängt
 - 2026-11-21: Dokument übernommen: Klickbarer Entwurf (beide Varianten, Zustand nach und während des Laufs)
+- 2026-11-21: Entwurf A „Fehlergruppen“ gewählt. Grund: Gemeinsame Ursache sofort sichtbar, eine Aktion je Fehlergruppe; vom Nutzer gewählt
+- 2026-11-21: Umsetzungsplan: "Wartet auf dich je Aufgabe und Art zusammenfassen, höchstens vier Zeilen" ergänzt
+- 2026-11-21: Umsetzungsplan: "Prüfungsspalte ab 9 Prüfungen kompakt: Zähler, Streifen, Fehlergruppen, Funde, bestandene, alle aufklappbar" ergänzt
+- 2026-11-21: Umsetzungsplan: "Laufzustand kompakt: laufende Prüfung und bestandene" ergänzt
+- 2026-11-21: Umsetzungsplan: "Browserprüfung im Selbsttest mit 10 Prüfungen" ergänzt
+- 2026-11-21: Umsetzungsplan: "Doku board.md" ergänzt
