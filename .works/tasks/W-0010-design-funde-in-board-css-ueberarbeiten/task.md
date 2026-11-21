@@ -41,17 +41,17 @@ Angelegt am 2026-11-21 auf Wunsch des Nutzers. Die Design-Prüfung (impeccable d
 <!-- Kurzbeschreibung des Ergebnisses. -->
 
 ## Akzeptanzkriterien
-- [ ] Darstellung ist auf Mobil, Tablet und Desktop korrekt
-- [ ] Kontraste erfüllen WCAG AA
-- [ ] Bedienung per Tastatur ist möglich
-- [ ] Jede der sechs Stellen ist neu gestaltet oder mit Begründung als gewollt markiert
-- [ ] impeccable detect meldet für board.css nichts mehr, das nicht bewusst markiert ist
-- [ ] Farben mit Bedeutung (Status, Priorität) bleiben erkennbar
+- [x] Darstellung ist auf Mobil, Tablet und Desktop korrekt
+- [x] Kontraste erfüllen WCAG AA
+- [x] Bedienung per Tastatur ist möglich
+- [x] Jede der sechs Stellen ist neu gestaltet oder mit Begründung als gewollt markiert
+- [x] impeccable detect meldet für board.css nichts mehr, das nicht bewusst markiert ist
+- [x] Farben mit Bedeutung (Status, Priorität) bleiben erkennbar
 
 ## Umsetzungsplan
 - [x] Stellen im Board ansehen, Bedeutung je Streifen klären
-- [ ] Entwurf mit Alternativen zeigen, Wahl abwarten
-- [ ] Umsetzen oder markieren, Selbsttest mit Browser
+- [x] Entwurf mit Alternativen zeigen, Wahl abwarten
+- [x] Umsetzen oder markieren, Selbsttest mit Browser
 
 ## Betroffene Dateien
 - plugins/works/skills/works/scripts/board/board.css: Zeilen 2, 153, 195, 293, 431, 474 (Stand 2026-11-21)
@@ -63,6 +63,14 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 ![Vorher im Entwurf: 3 px Streifen links an Karten (Priorität), Ablauf, Verlauf un](assets/2026-11-21-vorher-im-entwurf-3-px-streifen-links-vorher.png)
 Beschreibung: Vorher im Entwurf: 3 px Streifen links an Karten (Priorität), Ablauf, Verlauf und Meldungen
 Art: vorher · Hinzugefügt: 2026-11-21
+
+![Nachher im Board: Prioritäten als Chips mit Form (Raute P1, Punkt P2/P3, Ring P4](assets/2026-11-21-nachher-im-board-prioritaeten-als-chips-nachher.png)
+Beschreibung: Nachher im Board: Prioritäten als Chips mit Form (Raute P1, Punkt P2/P3, Ring P4), Flussleiste mit Punkten statt Streifen, keine Farbstreifen links an Karten
+Art: nachher · Hinzugefügt: 2026-11-21
+
+![Nachher: Verlauf unter Aktivität mit farbigem Punkt vor der Zeit, Meldung mit Pf](assets/2026-11-21-nachher-verlauf-nachher.png)
+Beschreibung: Nachher: Verlauf unter Aktivität mit farbigem Punkt vor der Zeit, Meldung mit Pfeil-Symbol, P1-Karte mit Raute und getönter Kante
+Art: nachher · Hinzugefügt: 2026-11-21
 
 ## Offene Fragen
 
@@ -76,3 +84,15 @@ Art: vorher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Entwurf A „Feinschliff Board: A Punkte und Chips, B Obere Kante, Schriften“ angehängt
 - 2026-11-21: Umsetzungsplan: "Stellen im Board ansehen, Bedeutung je Streifen klären" abgehakt
 - 2026-11-21: Asset hinzugefügt: assets/2026-11-21-vorher-im-entwurf-3-px-streifen-links-vorher.png (vorher)
+- 2026-11-21: Entwurf A „Feinschliff Board: A Punkte und Chips, B Obere Kante, Schriften“ gewählt. Grund: Nutzer: A und Geist (Streifen durch Punkte und Chips ersetzen, Schrift Geist behalten)
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-nachher-im-board-prioritaeten-als-chips-nachher.png (nachher)
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-nachher-verlauf-nachher.png (nachher)
+- 2026-11-21: Umsetzungsplan: "Entwurf mit Alternativen zeigen, Wahl abwarten" abgehakt
+- 2026-11-21: Umsetzungsplan: "Umsetzen oder markieren, Selbsttest mit Browser" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Darstellung ist auf Mobil, Tablet und Desktop korrekt" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Kontraste erfüllen WCAG AA" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Bedienung per Tastatur ist möglich" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Jede der sechs Stellen ist neu gestaltet oder mit Begründung als gewollt markiert" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "impeccable detect meldet für board.css nichts mehr, das nicht bewusst markiert ist" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Farben mit Bedeutung (Status, Priorität) bleiben erkennbar" abgehakt
+- 2026-11-21: Variante A umgesetzt, Geist markiert, toter Meilenstein-Block entfernt. impeccable detect meldet nichts mehr. Selbsttest Windows mit Browser 23/23.

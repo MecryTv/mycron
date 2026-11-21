@@ -54,7 +54,7 @@ Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Se
 - Hinweise darunter: offene P1, blockierte, überfällige, Aufgaben mit offenen Fragen und unvollständig erfasste. Ein Klick filtert.
 - Filter: Priorität, Typ, Tag, Meilenstein, Archiv und Verworfene. Im Meilenstein-Filter lassen sich auch Meilensteine anlegen; ist einer gewählt, erscheint "Meilenstein bearbeiten".
 - Fortschritt: Anteil erledigter Aufgaben in Prozent, Balken für erledigt, in Arbeit und Review sowie noch offen, erfüllte Akzeptanzkriterien, Bilanz der letzten 7 Tage, eine Prognose aus dem Tempo der letzten 4 Wochen und ein Verlaufsdiagramm über 8 Wochen (angelegte gegen erledigte Aufgaben). Die Anzeige folgt den Filtern: Ist ein Meilenstein gewählt, zeigt sie dessen Fortschritt samt Zieldatum. Verworfene Aufgaben zählen nicht mit, erledigte im Archiv schon.
-- Spalten mit Karten. Karten zeigen ID, Typ, Aufwand, Priorität, Titel, letztes Bild, Fortschritt der Akzeptanzkriterien, Blockaden, Fälligkeit, offene Fragen, Meilenstein und Tags.
+- Spalten mit Karten. Karten zeigen ID, Typ, Aufwand, Priorität (als Chip mit Farbe und Form: Raute P1, Punkt P2 und P3, Ring P4; P1-Karten haben zusätzlich eine getönte Kante), Titel, letztes Bild, Fortschritt der Akzeptanzkriterien, Blockaden, Fälligkeit, offene Fragen, Meilenstein und Tags.
 
 ## Ansichten
 

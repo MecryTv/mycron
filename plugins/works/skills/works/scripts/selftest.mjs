@@ -612,6 +612,9 @@ async function browserCheck(url, log, between = async () => {}) {
     const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
     p.on('pageerror', (e) => errs.push(e.message));
     await p.goto(url + '/'); await p.waitForSelector('.card', { timeout: 15000 });
+    // Priorität als Chip mit Form statt Farbstreifen links (W-0010).
+    const prio = await p.evaluate(() => { const c = document.querySelector('.card'); const chip = c.querySelector('.card-top .prio'); return { stripe: getComputedStyle(c, '::before').content, bg: chip ? getComputedStyle(chip).backgroundColor : '', shape: chip ? getComputedStyle(chip, '::before').content : '' }; });
+    if (prio.stripe !== 'none' || !prio.bg || /rgba\(0, 0, 0, 0\)|transparent/.test(prio.bg) || prio.shape === 'none') errs.push(`Board: Prioritäts-Chip statt Streifen fehlt (${JSON.stringify(prio)})`);
     await p.click('.card'); await p.waitForTimeout(500);
     for (const k of ['2', '3', '4', '5', '6', '7', '1']) { await p.keyboard.press('Escape'); await p.keyboard.press(k); await p.waitForTimeout(250); }
     const liveText = async (pg, who) => {
