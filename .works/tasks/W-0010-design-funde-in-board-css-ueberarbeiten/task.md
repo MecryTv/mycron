@@ -3,13 +3,13 @@ id: W-0010
 title: Design-Funde in board.css überarbeiten
 type: design
 priority: P4
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0010-design-funde-in-board-css
 tags: [ui, board, design]
@@ -114,3 +114,4 @@ Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 - 2026-11-21: Asset hinzugefügt: assets/2026-11-21-nachher-obere-kante-nachher.png (nachher)
 - 2026-11-21: Asset hinzugefügt: assets/2026-11-21-nachher-obere-kante-verlauf-nachher.png (nachher)
 - 2026-11-21: Auf Variante B (obere Kante) umgestellt. Detektor meldet nichts. Selbsttest Windows mit Browser 23/23.
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
