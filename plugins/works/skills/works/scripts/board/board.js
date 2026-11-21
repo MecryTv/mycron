@@ -2389,6 +2389,7 @@
     ask: lvSvg('<path d="M6 6a2 2 0 1 1 3 1.7c-.6.4-1 .8-1 1.5"/><path d="M8 11.6v.1"/>'),
     chk: lvSvg('<path d="M8 2.5l4.5 1.8v3.6c0 2.8-2 4.6-4.5 5.6-2.5-1-4.5-2.8-4.5-5.6V4.3z"/>'),
     perm: lvSvg('<rect x="4" y="7.4" width="8" height="5.8" rx="1.2"/><path d="M5.8 7.4V5.6a2.2 2.2 0 0 1 4.4 0v1.8"/>'),
+    trend: lvSvg('<path d="M2.5 11.5l4-4 2.5 2.5 4.5-5"/><path d="M10 5h3.5v3.5"/>'),
   };
   const lvSi = (st) => '<span class="lv-si ' + st + '" aria-hidden="true">' + (LV_IC[st === 'ack' ? 'ok' : st] || '') + '</span>';
   const lvPad = (n) => String(n).padStart(2, '0');
@@ -2600,17 +2601,25 @@
     return '<ul class="checks">' + t.checks.list.map((x) => {
       const st = lvCheckState(t, x);
       const r = t.checks.results[x.name] || {};
-      const right = st === 'run' ? 'läuft ' + lvSince(t.checks.runningSince, 'sec') : r.ms && (st === 'ok' || st === 'fail') ? LV_CK[st] + ', ' + lvMs(r.ms) : LV_CK[st] || st;
+      const right = st === 'run' ? 'läuft ' + lvSince(t.checks.runningSince, 'sec') : r.ms && (st === 'ok' || st === 'fail') ? '<span class="sr">' + LV_CK[st] + ', </span>' + lvMs(r.ms) + lvTrendMark(r) : LV_CK[st] || st;
       let extra = '';
       if (st === 'warn') {
         extra = '<div class="ck-note">' + md(r.note || '') + (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fix="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">Claude beheben lassen</button><button type="button" class="btn small" data-lv-ack="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">Als bekannt markieren</button></div>' : '') + '</div>';
+      } else if (st === 'ok' && (r.flaky || r.trend)) {
+        extra = '<div class="ck-acts">' + lvFlaky(r) + lvTrendText(r) + '</div>';
       } else if (st === 'fail') {
-        const acts = lvRerunBtn(t, [x.name], 'Erneut prüfen', 'btn link') + (r.output ? '<details class="ck-out" data-out="' + esc(t.id + ':' + x.name) + '"><summary>Ausgabe</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>' : '');
+        const acts = lvFlaky(r) + lvRerunBtn(t, [x.name], 'Erneut prüfen', 'btn link') + (r.output ? '<details class="ck-out" data-out="' + esc(t.id + ':' + x.name) + '"><summary>Ausgabe</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>' : '');
         if (acts) extra = '<div class="ck-acts">' + acts + '</div>';
       }
-      return '<li class="ck ' + (cls[st] || '') + '"><div class="ck-row"><span class="ck-ic" aria-hidden="true">' + ch[st] + '</span><span class="ck-name">' + esc(x.name) + '</span><span class="mono muted ck-cmd">' + esc(x.cmd) + '</span><span class="muted num ck-ms">' + right + '</span></div>' + extra + '</li>';
+      return '<li class="ck ' + (cls[st] || '') + '"><div class="ck-row"><span class="ck-ic" aria-hidden="true">' + ch[st] + '</span><span class="ck-name">' + esc(x.name) + '</span><span class="mono muted ck-cmd">' + esc(x.cmd) + '</span>' + lvHist(r) + '<span class="muted num ck-ms">' + right + '</span></div>' + extra + '</li>';
     }).join('') + '</ul>';
   }
+
+  // Verlauf je Prüfung: ein Strich je Lauf, neuester rechts. Erst ab zwei Läufen sinnvoll.
+  const lvHist = (r) => (r.hist && r.hist.length > 1 ? '<span class="lv-hist" title="Letzte ' + r.hist.length + ' Läufe, neuester rechts" aria-hidden="true">' + r.hist.map((h) => '<i class="' + (h.s === 'ok' ? 'ok' : 'fail') + '"></i>').join('') + '</span>' : '');
+  const lvFlaky = (r) => (r.flaky ? '<span class="lv-flaky" title="In den letzten ' + r.flaky.runs + ' Läufen mal bestanden, mal fehlgeschlagen">wackelig, ' + r.flaky.fails + ' von ' + r.flaky.runs + ' rot</span>' : '');
+  const lvTrendMark = (r) => (r.trend ? ' <span class="lv-trend ' + r.trend.dir + '" title="Sonst meist ' + lvMs(r.trend.usual) + '">' + (r.trend.dir === 'up' ? '↑' : '↓') + '</span>' : '');
+  const lvTrendText = (r) => (r.trend ? '<span>Dauerte ' + lvMs(r.trend.ms) + ', sonst meist ' + lvMs(r.trend.usual) + '.</span>' : '');
 
   // Erneut prüfen: startet nur die genannten Prüfungen neu. Während eines Laufs (oder bis er beginnt) gibt es keinen Knopf.
   const lvRerunning = new Set();
@@ -2653,8 +2662,8 @@
       const key = t.id + ':' + msg;
       const shown = lvExpanded.has(key) ? list : list.slice(0, 10);
       const names = list.map((i) => i.x.name);
-      h += '<div class="lv-errgrp"><div class="eh">' + lvSi('fail') + '<span>' + (list.length === 1 ? esc(names[0]) + ' fehlgeschlagen' : list.length + ' Prüfungen, gleiche Meldung') + '</span></div><div class="lv-msg">' + esc(msg) + '</div>' +
-        (list.length > 1 ? '<div class="lv-names">' + shown.map((i) => '<span>' + esc(i.x.name) + '</span>').join('') + (list.length > shown.length ? '<button type="button" data-lv-more="' + esc(key) + '">+' + (list.length - shown.length) + ' weitere</button>' : '') + '</div>' : '') +
+      h += '<div class="lv-errgrp"><div class="eh">' + lvSi('fail') + '<span>' + (list.length === 1 ? esc(names[0]) + ' fehlgeschlagen' : list.length + ' Prüfungen, gleiche Meldung') + '</span>' + (list.length === 1 ? lvFlaky(list[0].r) : '') + '</div><div class="lv-msg">' + esc(msg) + '</div>' +
+        (list.length > 1 ? '<div class="lv-names">' + shown.map((i) => '<span' + (i.r.flaky ? ' class="fl" title="wackelig"' : '') + '>' + esc(i.x.name) + '</span>').join('') + (list.length > shown.length ? '<button type="button" data-lv-more="' + esc(key) + '">+' + (list.length - shown.length) + ' weitere</button>' : '') + '</div>' : '') +
         (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fixall="' + esc(t.id) + '" data-names="' + esc(names.join(', ')) + '">Claude beheben lassen</button>' + lvRerunBtn(t, names, 'Erneut prüfen') + '</div>' : '') +
         '<details class="ck-out" data-out="' + esc(key) + '"><summary>Ausgabe von ' + esc(names[0]) + '</summary><pre>' + esc(String(list[0].r.output || '').split('\n').slice(-40).join('\n')) + '</pre></details></div>';
     }
@@ -2662,6 +2671,10 @@
       h += '<div class="lv-errgrp warn"><div class="eh">' + lvSi('warn') + '<span>Fund in ' + esc(i.x.name) + '</span></div><div class="ck-note">' + md(i.r.note || '') + '</div>' +
         (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fix="' + esc(i.x.name) + '" data-lv-task="' + esc(t.id) + '">Claude beheben lassen</button><button type="button" class="btn small" data-lv-ack="' + esc(i.x.name) + '" data-lv-task="' + esc(t.id) + '">Als bekannt markieren</button></div>' : '') + '</div>';
     }
+    const fl = items.filter((i) => i.r.flaky);
+    if (fl.length) h += '<div class="lv-infoline">' + lvSi('warn') + '<span><b>' + fl.length + ' wackelig</b> (in den letzten Läufen mal bestanden, mal fehlgeschlagen, markiert mit ~): ' + esc(fl.map((i) => i.x.name).join(', ')) + '</span></div>';
+    const slow = items.filter((i) => i.r.trend && i.r.trend.dir === 'up');
+    if (slow.length) h += '<div class="lv-infoline">' + lvSi('trend') + '<span><b>Langsamer als sonst:</b> ' + slow.map((i) => esc(i.x.name) + ' ' + lvMs(i.r.trend.ms) + ' statt meist ' + lvMs(i.r.trend.usual)).join(', ') + '</span></div>';
     const ok = of('ok', 'ack');
     if (ok.length) h += '<div class="lv-okline">' + lvSi('ok') + '<span>' + ok.length + ' bestanden' + (ok.length <= 6 ? ': ' + esc(ok.map((i) => i.x.name).join(', ')) : '') + '</span></div>';
     return h + '<details class="lv-all" data-out="' + esc(t.id + ':alle') + '"><summary>Alle ' + items.length + ' Prüfungen anzeigen</summary>' + lvAllList(t) + '</details>';

@@ -12,7 +12,7 @@ import { runningVersion } from './server-control.mjs';
 import { activeSprint, lastClosedSprint, sprintStats, sprintSettings } from './sprint.mjs';
 import { loadComments } from './comments.mjs';
 import { effortDays } from './timelog.mjs';
-import { configuredChecks, checksFor, loadResults } from './checks.mjs';
+import { configuredChecks, checksFor, loadResults, flakyOf, trendOf } from './checks.mjs';
 import { designSummary } from './design.mjs';
 import { loadActivity, pendingInstructions, stampSteps } from './live.mjs';
 import { loadKnowledge } from './knowledge.mjs';
@@ -49,7 +49,9 @@ function liveChecks(config, t) {
   if (!list.length) return null;
   const r = loadResults(t) || {};
   const fresh = !!r.running && Date.now() - Date.parse(r.runningSince) < STALE_RUN_MS;
-  return { list, results: r.results || {}, running: fresh ? r.running : '', runningSince: fresh ? r.runningSince : '', at: r.at || '' };
+  // wackelig und Laufzeittrend fertig berechnet, damit das Board nur noch anzeigt.
+  const results = Object.fromEntries(Object.entries(r.results || {}).map(([k, v]) => [k, { ...v, flaky: flakyOf(v.hist), trend: trendOf(v.hist) }]));
+  return { list, results, running: fresh ? r.running : '', runningSince: fresh ? r.runningSince : '', at: r.at || '' };
 }
 
 export function boardData(root) {

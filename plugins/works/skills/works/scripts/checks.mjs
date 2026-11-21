@@ -59,6 +59,36 @@ export function detectChecks(root) {
 }
 
 export function resultFile(task) { return path.join(task._dir, 'checks.json'); }
+
+// Verlauf je Prüfung: die letzten fünf Läufe mit Ergebnis und Dauer. Ein geänderter Befehl beginnt von vorn.
+const HIST = 5;
+function histOf(r, c) {
+  if (!r || r.cmd !== c.cmd || (r.cwd || '') !== c.cwd) return [];
+  if (Array.isArray(r.hist)) return r.hist;
+  return r.status === 'ok' || r.status === 'fail' ? [{ s: r.status, ms: r.ms || 0, at: r.at || '' }] : [];
+}
+
+// Wackelig: in den letzten Läufen mindestens zweimal zwischen bestanden und fehlgeschlagen gewechselt.
+// Ein einzelner Wechsel heißt nur "seit kurzem rot" oder "repariert".
+export function flakyOf(hist = []) {
+  let flips = 0;
+  for (let i = 1; i < hist.length; i++) if (hist[i].s !== hist[i - 1].s) flips++;
+  return flips >= 2 ? { fails: hist.filter((h) => h.s === 'fail').length, runs: hist.length } : null;
+}
+
+// Laufzeit des letzten Laufs gegen den Median der bestandenen Läufe davor. Nur bestandene Läufe zählen,
+// ein Fehlschlag bricht oft früh ab. Deutlich heißt: mindestens 1,5-mal so lang oder kurz und mindestens 5 Sekunden Unterschied.
+export function trendOf(hist = []) {
+  const last = hist[hist.length - 1];
+  const prev = hist.slice(0, -1).filter((h) => h.s === 'ok').map((h) => h.ms).sort((a, b) => a - b);
+  if (!last || last.s !== 'ok' || !prev.length) return null;
+  const m = prev.length;
+  const usual = m % 2 ? prev[(m - 1) / 2] : Math.round((prev[m / 2 - 1] + prev[m / 2]) / 2);
+  if (Math.abs(last.ms - usual) < 5000) return null;
+  if (last.ms >= usual * 1.5) return { dir: 'up', ms: last.ms, usual };
+  if (last.ms * 1.5 <= usual) return { dir: 'down', ms: last.ms, usual };
+  return null;
+}
 export function loadResults(task) { return readJson(resultFile(task), null); }
 
 // Fingerabdruck des Arbeitsstands: HEAD plus noch nicht committete Änderungen außerhalb von .works.
@@ -113,7 +143,9 @@ export async function runChecks(root, config, task, { only = null, onStart = nul
     writeJson(resultFile(task), { at: prev.at || new Date().toISOString(), fingerprint: prev.fingerprint || '', results, running: c.name, runningSince: new Date().toISOString() });
     const wd = checkCwd(dir, c);
     const r = wd.error ? { ok: false, ms: 0, output: wd.error } : await runOne(wd.dir, c.cmd);
-    results[c.name] = { status: r.ok ? 'ok' : 'fail', cmd: c.cmd, cwd: c.cwd, ms: r.ms, output: r.output, at: new Date().toISOString() };
+    const at = new Date().toISOString();
+    const status = r.ok ? 'ok' : 'fail';
+    results[c.name] = { status, cmd: c.cmd, cwd: c.cwd, ms: r.ms, output: r.output, at, hist: [...histOf(results[c.name], c), { s: status, ms: r.ms, at }].slice(-HIST) };
   }
   const data = { at: new Date().toISOString(), fingerprint: workFingerprint(dir), results };
   writeJson(resultFile(task), data);

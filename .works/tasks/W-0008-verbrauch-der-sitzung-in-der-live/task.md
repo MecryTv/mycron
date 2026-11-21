@@ -45,7 +45,7 @@ Vorschlag 5 vom 2026-11-21. works erfasst Tokens schon (time.jsonl, Hooks Stop u
 - [x] Test: liveUsage mit Cache, boardData mit Verbrauch heute und je Aufgabe, Export ohne
 - [x] liveUsage in usage.mjs, Daten in board.mjs, Export bereinigen
 - [x] Board: Zeile in der Kachel, Kopf der Mitte
-- [ ] Doku board.md, Selbsttest mit Browser, Linux
+- [x] Doku board.md, Selbsttest mit Browser, Linux
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -84,3 +84,4 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "time.jsonl wird nur neu gelesen, wenn sie sich geändert hat" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Export und Leselink-Schnappschuss enthalten keinen Verbrauch" abgehakt
 - 2026-11-21: liveUsage mit Cache in usage.mjs, meta.usage und task.usage in board.mjs, Export bereinigt, Anzeige in Kachel und Kopf. Selbsttest Windows mit Browser 22/22.
+- 2026-11-21: Umsetzungsplan: "Doku board.md, Selbsttest mit Browser, Linux" abgehakt
