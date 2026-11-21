@@ -1086,6 +1086,18 @@ dialog:has(.tbl.imp) { width: min(1100px, calc(100vw - 32px)); }
 .lv-feed .f-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: baseline; gap: 6px; }
 .lv-feed .f-what .mono { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
 .lv-feed .f-verb { flex: none; }
+/* Diff im Verlauf (W-0011) */
+.lv-fbtn { border: 0; background: none; padding: 2px 4px; margin: -2px -4px; border-radius: 6px; font: inherit; color: inherit; text-align: left; cursor: pointer; width: calc(100% + 8px); }
+.lv-fbtn:hover { background: var(--raised); }
+.lv-fbtn .chev { width: 12px; height: 12px; flex: none; align-self: center; stroke: var(--muted); fill: none; stroke-width: 2; transition: transform .15s; }
+.lv-fbtn[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.lv-feed li .lv-fdiff { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 0; }
+.lv-feed li .lv-fdiff .diff { border-top: 0; max-height: 260px; overflow: auto; }
+.lv-fdiff-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 6px 10px; font-size: 12px; background: var(--raised); border-bottom: 1px solid var(--line); }
+.lv-fdiff-head .add { color: var(--ok); }
+.lv-fdiff-head .del { color: var(--danger); }
+.lv-fdiff-head .btn.link { margin-left: auto; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .lv-fbtn .chev { transition: none; } }
 .lv-feed li.k-step .f-verb { font-weight: 600; }
 .lv-feed .fi { flex: none; align-self: center; width: 14px; height: 14px; display: inline-grid; place-items: center; border-radius: 50%; }
 .lv-feed .fi svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }

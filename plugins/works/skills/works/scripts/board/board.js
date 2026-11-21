@@ -2593,7 +2593,7 @@
 
   function lvFeed(list, onlyId) {
     const items = [];
-    for (const r of (meta.activity && meta.activity.recent) || []) items.push({ at: r.at, task: r.task, verb: r.verb, what: r.what, err: r.ok === false, kind: 'tool' });
+    for (const r of (meta.activity && meta.activity.recent) || []) items.push({ at: r.at, task: r.task, verb: r.verb, what: r.what, err: r.ok === false, kind: 'tool', file: LV_FILE_TOOLS.includes(r.tool) ? r.what : '' });
     for (const t of list) {
       for (const s of t.plan || []) if (s.done && s.at) items.push({ at: s.at, task: t.id, verb: 'Schritt erledigt', what: s.text, kind: 'step' });
       if (t.checks) {
@@ -2604,13 +2604,37 @@
     }
     return items.filter((x) => !onlyId || x.task === onlyId).sort((x, y) => Date.parse(y.at) - Date.parse(x.at)).slice(0, 7);
   }
+  // Diff im Verlauf: aufgeklappte Einträge und ihr Inhalt, bleiben über das Neuzeichnen erhalten.
+  const LV_FILE_TOOLS = ['Edit', 'MultiEdit', 'Write', 'NotebookEdit'];
+  const lvDiffs = new Map();
+  async function lvToggleDiff(b) {
+    const key = b.dataset.lvDiff;
+    if (lvDiffs.has(key)) { lvDiffs.delete(key); renderLive(); return; }
+    lvDiffs.set(key, '<p class="muted diff-more">Lädt …</p>');
+    renderLive();
+    let html;
+    try {
+      const r = await api('GET', 'api/diff?id=' + encodeURIComponent(b.dataset.task) + '&file=' + encodeURIComponent(b.dataset.file) + '&live=1');
+      const add = (r.diff.match(/^\+(?!\+\+ )/gm) || []).length;
+      const del = (r.diff.match(/^-(?!-- )/gm) || []).length;
+      const what = { uncommitted: 'Stand jetzt gegen den letzten Commit', new: 'Neue Datei, noch nicht im Git', task: 'Keine offene Änderung, gezeigt: Änderungen der Aufgabe', binary: 'Binärdatei, kein Text-Diff' }[r.source] || 'Keine Änderung gefunden';
+      html = '<div class="lv-fdiff-head">' + (r.diff ? '<span class="add">+' + add + '</span><span class="del">−' + del + '</span>' : '') + '<span class="muted">' + what + '</span><button type="button" class="btn link" data-lv-code="' + esc(b.dataset.task) + '">Im Detailpanel</button></div>' +
+        (r.diff ? '<div class="diff">' + diffHtml(r.diff) + (r.truncated ? '<p class="muted diff-more">Gekürzt. Vollständig im Detailpanel oder mit git diff.</p>' : '') + '</div>' : '');
+    } catch (err) { html = '<p class="muted diff-more">' + esc(err.message || err) + '</p>'; }
+    if (lvDiffs.has(key)) { lvDiffs.set(key, html); renderLive(); }
+  }
   function lvFeedHtml(items, withId) {
     if (!items.length) return '<p class="lv-empty">Noch keine Einträge.</p>';
     return '<ol class="lv-feed' + (withId ? ' with-id' : '') + '">' + items.map((x) => {
       const key = x.at + x.task + x.verb + x.what;
       const ic = x.err ? '<span class="fi err">' + LV_IC.fail + '</span>' : x.kind === 'step' || x.ok ? '<span class="fi ok">' + LV_IC.ok + '</span>' : x.kind === 'check' ? '<span class="fi chk">' + LV_IC.chk + '</span>' : '';
-      return '<li class="k-' + x.kind + (liveSeen && !liveSeen.has(key) ? ' new' : '') + '"><span class="f-time">' + lvTime(x.at, true) + '</span>' + (withId ? '<span class="f-id">' + esc(x.task || '–') + '</span>' : '') +
-        '<span class="f-what">' + ic + '<span class="f-verb">' + esc(x.verb) + '</span><span class="mono">' + esc(x.what) + '</span>' + (x.err ? '<span class="f-err">Fehler</span>' : '') + '</span></li>';
+      // Einträge mit einer geänderten Datei klappen ihren Diff auf (W-0011), nur im lokalen Board.
+      const canDiff = EDIT && x.file && x.task;
+      const open = canDiff && lvDiffs.has(key);
+      const inner = ic + (canDiff ? '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>' : '') + '<span class="f-verb">' + esc(x.verb) + '</span><span class="mono">' + esc(x.what) + '</span>' + (x.err ? '<span class="f-err">Fehler</span>' : '');
+      return '<li class="k-' + x.kind + (canDiff ? ' k-file' : '') + (liveSeen && !liveSeen.has(key) ? ' new' : '') + '"><span class="f-time">' + lvTime(x.at, true) + '</span>' + (withId ? '<span class="f-id">' + esc(x.task || '–') + '</span>' : '') +
+        (canDiff ? '<button type="button" class="f-what lv-fbtn" data-lv-diff="' + esc(key) + '" data-task="' + esc(x.task) + '" data-file="' + esc(x.file) + '" aria-expanded="' + open + '" title="Änderung an dieser Datei zeigen">' + inner + '</button>' : '<span class="f-what">' + inner + '</span>') +
+        (open ? '<div class="lv-fdiff">' + lvDiffs.get(key) + '</div>' : '') + '</li>';
     }).join('') + '</ol>';
   }
 
@@ -2854,6 +2878,10 @@
     if (op) { openTask(op.dataset.lvOpen); return; }
     const more = e.target.closest('[data-lv-more]');
     if (more) { lvExpanded.add(more.dataset.lvMore); renderLive(); return; }
+    const lc = e.target.closest('[data-lv-code]');
+    if (lc) { const id = lc.dataset.lvCode; openTask(id).then(() => { detailTab = 'code'; renderDetail(); }); return; }
+    const ld = e.target.closest('[data-lv-diff]');
+    if (ld) { lvToggleDiff(ld); return; }
     const fa = e.target.closest('[data-lv-fixall]');
     if (fa) {
       const id = fa.dataset.lvFixall;

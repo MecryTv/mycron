@@ -259,7 +259,9 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         if (p === '/api/estimates') return json(res, 200, estimatesInfo(root));
         if (p === '/api/reports') return json(res, 200, reportsInfo(root));
         if (p === '/api/code') return json(res, 200, await codeOf(root, String(q.get('id') || '').toUpperCase()));
-        if (p === '/api/diff') return json(res, 200, await diffOf(root, String(q.get('id') || '').toUpperCase(), q.get('file'), q.get('uncommitted') === '1'));
+        // Der Live-Diff (Verlauf der Live-Ansicht) zeigt auch Uncommittetes und ist nur für den Besitzer.
+        if (p === '/api/diff' && q.get('live') === '1' && level !== 'edit') return json(res, 403, { error: 'Nur für den Besitzer des Boards.' });
+        if (p === '/api/diff') return json(res, 200, await diffOf(root, String(q.get('id') || '').toUpperCase(), q.get('file'), q.get('uncommitted') === '1', q.get('live') === '1'));
         if (level !== 'edit' && ['/api/share', '/api/export', '/api/checks', '/api/template-draft'].includes(p)) return json(res, 403, { error: 'Nur für den Besitzer des Boards.' });
         if (p === '/api/share') return json(res, 200, shareInfo());
         if (p === '/api/checks') return json(res, 200, checksInfo(root));
