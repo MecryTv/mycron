@@ -72,6 +72,9 @@ Fehler: Port 4747 ist nicht verfügbar (EADDRINUSE). Anderen Port mit --port wä
 ## Offene Fragen
 
 ## Übergabe
+Stand: 2026-11-21 10:30
+
+Stand 2026-11-21: Fix auf fix/w-0002-board-start-im-hintergrund (fa9f06c, aaa13e8), alle 6 Kriterien erfüllt, Selbsttest Windows und Linux 20/20, im echten Fall (RL Nexus auf 4747) startet das Board ohne --port auf 4748. Offen: Merge in main und works done W-0002 nach Entscheidung des Nutzers. main ist 6 Commits vor GitHub (CI-Fix aus W-0001, W-0003), nicht gepusht.
 
 ## Verlauf
 - 2026-11-20: Aufgabe angelegt
@@ -86,3 +89,4 @@ Fehler: Port 4747 ist nicht verfügbar (EADDRINUSE). Anderen Port mit --port wä
 - 2026-11-21: Akzeptanzkriterien: "Ein Neustart (--restart) oder ein Update-Neustart behält den Port aus server.json" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Selbsttest prüft den Start im Hintergrund bei belegtem Port" abgehakt
 - 2026-11-21: startDetached übergibt --port nur bei festem Port; Selbsttest-Schritt rot ohne, grün mit Korrektur; Windows und Linux 20/20; in mycron mit RL Nexus auf 4747 startet das Board ohne --port auf 4748
+- 2026-11-21: Übergabe aktualisiert

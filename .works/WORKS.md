@@ -12,7 +12,7 @@ Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 1 · P4 Niedri
 
 ## Aktive Aufgabe
 
-[W-0002](tasks/W-0002-board-start-im-hintergrund-weicht-nicht/task.md) Board-Start im Hintergrund weicht nicht auf freien Port aus (In Arbeit), letzte Übergabe 2026-11-21 09:51
+[W-0002](tasks/W-0002-board-start-im-hintergrund-weicht-nicht/task.md) Board-Start im Hintergrund weicht nicht auf freien Port aus (In Arbeit), letzte Übergabe 2026-11-21 10:30
 
 ## Kritisch (P1)
 
