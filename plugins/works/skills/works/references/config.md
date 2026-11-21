@@ -24,7 +24,7 @@ Liegt unter `.works/config.json`. Fehlende Felder werden mit Standardwerten erg�
 | `hooks.session_start` | `true` | SessionStart Hook in diesem Projekt aktiv |
 | `hooks.stop_reminder` | `true` | Stop Hook in diesem Projekt aktiv |
 | `report.days` | `7` | Standardzeitraum für `works report` |
-| `handoff_stale_days` | `3` | Ab wann `doctor` eine laufende Aufgabe ohne Aktualisierung meldet |
+| `handoff_stale_days` | `3` | Ab wann `doctor` eine laufende Aufgabe ohne Aktualisierung meldet und das Board sie als still zeigt (Hinweis "seit 3 Tagen still", Etikett an der Karte, Punkt unter Wartet auf dich). Im Board zählen Antworten, Dateiänderungen, abgehakte Schritte und Änderungen an der task.md als Aktivität. `0` schaltet den Hinweis im Board ab |
 | `queue`, `queue_settings` | `[]`, siehe board.md | Warteschlange des Nutzers und Ablauf danach (`auto_next`, `ask_before`, `skip_blocked`) |
 | `sprints` | `[]` | Sprints mit `id`, `title`, `goal`, `start`, `end`, `capacity`, `status`, `tasks`, nach Abschluss `result` und `carry` |
 | `sprint_settings` | `{ "length_days": 14, "capacity": 20, "points": { "S": 1, "M": 2, "L": 4, "XL": 8 } }` | Standardlänge, Kapazität und Punkte je Aufwand |

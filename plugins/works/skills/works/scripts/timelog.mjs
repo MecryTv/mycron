@@ -121,3 +121,43 @@ export function fmtDuration(ms) {
   if (m < 60) return `${m} min`;
   return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
 }
+
+// Letzte Aktivität je Aufgabe: Antworten (time.jsonl) und Dateiänderungen (files.jsonl).
+// Das Board fragt bei jeder Aktualisierung, gelesen wird nur, wenn sich eine der Dateien geändert hat.
+let lastCache = null;
+export function lastActivity(root) {
+  const files = [timeFile(root), path.join(worksDir(root), 'files.jsonl')];
+  const key = root + '|' + files.map((f) => { try { const s = fs.statSync(f); return `${s.size}:${s.mtimeMs}`; } catch { return '-'; } }).join('|');
+  if (lastCache && lastCache.key === key) return lastCache.data;
+  const last = {};
+  for (const f of files) {
+    if (!exists(f)) continue;
+    for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
+      let e; try { e = JSON.parse(line); } catch { continue; }
+      if (e && e.task && e.t && (!last[e.task] || e.t > last[e.task])) last[e.task] = e.t;
+    }
+  }
+  lastCache = { key, data: last };
+  return last;
+}
+
+// Aufgaben in Arbeit, an denen seit handoff_stale_days Tagen (Standard 3, 0 schaltet den Hinweis ab) nichts passiert ist:
+// keine Antwort, keine Dateiänderung, kein abgehakter Schritt, keine Änderung an der task.md.
+// handoff: ob eine Übergabe in der task.md steht. now nur für Tests.
+export function staleTasks(root, config, tasks, now = Date.now()) {
+  const limit = config.handoff_stale_days === undefined ? 3 : Number(config.handoff_stale_days);
+  if (!(limit > 0)) return {};
+  const last = lastActivity(root);
+  let steps = {};
+  try { steps = JSON.parse(fs.readFileSync(path.join(worksDir(root), 'steps.json'), 'utf8')) || {}; } catch { /* keine Schritte */ }
+  const out = {};
+  for (const t of tasks) {
+    if (t.status !== 'in-arbeit') continue;
+    const seen = [last[t.id], ...Object.values(steps[t.id] || {}), t.updated ? new Date(`${t.updated}T00:00:00`).toISOString() : '', t._mtime ? new Date(t._mtime).toISOString() : ''].filter(Boolean).sort();
+    const since = seen[seen.length - 1];
+    if (!since) continue;
+    const days = Math.floor((now - Date.parse(since)) / 86400000);
+    if (days >= limit) out[t.id] = { days, since, handoff: !!(getSection(t._body, 'Übergabe') || '').replace(/<!--[\s\S]*?-->/g, '').trim() };
+  }
+  return out;
+}
