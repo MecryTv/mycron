@@ -1,18 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 13:18 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 13:26 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 1 | 0 | 0 | 0 | 6 | 0 |
+| 2 | 0 | 0 | 0 | 0 | 0 | 7 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 3 · P4 Niedrig: 0
-
-## Aktive Aufgabe
-
-[W-0006](tasks/W-0006-fehlgeschlagene-pruefungen-aus-der-live/task.md) Fehlgeschlagene Prüfungen aus der Live-Ansicht erneut prüfen (In Arbeit), letzte Übergabe 2026-11-21 10:30
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 2 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -20,9 +16,7 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
-|---|---|---|---|---|---|---|---|---|
-| [W-0006](tasks/W-0006-fehlgeschlagene-pruefungen-aus-der-live/task.md) | Fehlgeschlagene Prüfungen aus der Live-Ansicht erneut prüfen | Feature | P3 Mittel | In Arbeit | S |  |  |  |
+_Keine Einträge._
 
 ## Geplant und Backlog
 
@@ -40,6 +34,7 @@ _Keine Einträge._
 | [W-0003](tasks/W-0003-markdown-mit-windows-zeilenenden-wird/task.md) | Markdown mit Windows-Zeilenenden wird nicht erkannt | Bug | P2 Hoch | 2026-11-21 |
 | [W-0004](tasks/W-0004-live-ansicht-viele-pruefungen-und-funde/task.md) | Live-Ansicht: viele Prüfungen und Funde übersichtlich zeigen | Design | P2 Hoch | 2026-11-21 |
 | [W-0005](tasks/W-0005-arbeitsordner-je-pruefung-und/task.md) | Arbeitsordner je Prüfung und Prüfbefehle mit Anführungszeichen unter Windows | Feature | P2 Hoch | 2026-11-21 |
+| [W-0006](tasks/W-0006-fehlgeschlagene-pruefungen-aus-der-live/task.md) | Fehlgeschlagene Prüfungen aus der Live-Ansicht erneut prüfen | Feature | P3 Mittel | 2026-11-21 |
 | [W-0007](tasks/W-0007-live-ansicht-zeigt-wenn-claude-auf-eine/task.md) | Live-Ansicht zeigt, wenn Claude auf eine Freigabe wartet | Feature | P2 Hoch | 2026-11-21 |
 
 ## Ideen

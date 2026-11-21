@@ -3,13 +3,13 @@ id: W-0006
 title: Fehlgeschlagene Prüfungen aus der Live-Ansicht erneut prüfen
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0006-fehlgeschlagene-pruefungen
 tags: [ui, board, checks]
@@ -69,7 +69,7 @@ Art: nachher · Hinzugefügt: 2026-11-21
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -91,3 +91,4 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Akzeptanzkriterien: "Nur im lokalen Board, nicht im Leselink" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Die API lehnt ungültige Namen ab" abgehakt
 - 2026-11-21: API checksRun mit only, Knöpfe an Fehlergruppe, roter Zeile und für alle; Selbsttest mit Klick im Browser 22/22.
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
