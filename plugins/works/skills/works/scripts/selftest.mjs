@@ -431,6 +431,27 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       has(h, 'Format JSON', 'Hinweis');
     });
 
+    await step('Konflikt-Radar: offene Aufgaben mit gleichen Dateien', async () => {
+      // Zwei offene Aufgaben ändern dieselbe Datei, eine dritte (Backlog, nicht in der Warteschlange) zählt nicht.
+      const idOf = (out) => (out.match(/Angelegt: (W-\d+)/) || [])[1];
+      const a = idOf(w(['new', '--type', 'feature', '--title', 'Konflikt A', '--status', 'in-arbeit']).out);
+      const b = idOf(w(['new', '--type', 'feature', '--title', 'Konflikt B', '--status', 'review']).out);
+      const c = idOf(w(['new', '--type', 'feature', '--title', 'Konflikt C']).out);
+      const t = new Date().toISOString();
+      fs.appendFileSync(path.join(proj, '.works', 'files.jsonl'), [a, b, c].map((id) => JSON.stringify({ t, task: id, file: 'src/geteilt.ts' })).join('\n') + '\n');
+      const { boardData } = await import('./board.mjs');
+      const d = boardData(proj);
+      const ca = d.tasks.find((x) => x.id === a).conflicts;
+      const cc = d.tasks.find((x) => x.id === c).conflicts;
+      expect(ca && ca.length === 1 && ca[0].id === b && ca[0].files.includes('src/geteilt.ts'), `Konflikt für ${a}: ${JSON.stringify(ca)}`);
+      expect(!cc, `Backlog-Aufgabe ${c} zählt beim Konflikt-Radar: ${JSON.stringify(cc)}`);
+      // works parallel plan nutzt dieselbe Dateierkennung.
+      const { taskFiles } = await import('./files.mjs');
+      const { loadTasks, loadConfig } = await import('./lib.mjs');
+      expect(taskFiles(proj, loadConfig(proj), loadTasks(proj).find((x) => x.id === a)).includes('src/geteilt.ts'), 'taskFiles kennt die Datei nicht');
+      for (const id of [a, b, c]) w(['drop', id, '--reason=Selbsttest']);
+    });
+
     await step('Parallelarbeit: plan, start, CLI im Worktree, finish --merge, abort', () => {
       // W-0002 hat eben backup.ts bearbeitet und kollidiert deshalb mit W-0001. Das muss plan erkennen.
       w(['set', 'W-0001', 'status=geplant']); w(['set', 'W-0002', 'status=geplant']);

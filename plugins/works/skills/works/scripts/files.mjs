@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { readText, worksDir, readJson, writeJson, exists, loadTasks, stripComments } from './lib.mjs';
+import { readText, worksDir, readJson, writeJson, exists, loadTasks, stripComments, getSection } from './lib.mjs';
 
 const editsFile = (root) => path.join(worksDir(root), 'files.jsonl');
 const cacheFile = (root) => path.join(worksDir(root), '.filemap.json');
@@ -149,4 +149,36 @@ export function editHint(root, config, task, file, session) {
   const line = (x) => `- ${x.id} ${x.title} (${x.status || 'unbekannt'}${x.commits ? `, ${x.commits} Commit${x.commits === 1 ? '' : 's'}` : ''})${x.decisions.length ? `. Entscheidungen: ${x.decisions.join('; ')}` : ''}`;
   return `works: ${file} wurde auch in anderen Aufgaben geändert:\n${list.slice(0, 4).map(line).join('\n')}\n`
     + 'Prüfe kurz, ob deine Änderung diesen Entscheidungen oder laufender Arbeit widerspricht (works show <ID>, decisions.md). Bei Widerspruch den Nutzer fragen.';
+}
+
+// Dateien, die eine Aufgabe in ihrer Beschreibung, im Umsetzungsplan oder im Kontext nennt.
+export function mentionedFiles(t) {
+  const text = stripComments(`${getSection(t._body, 'Beschreibung') || ''}\n${getSection(t._body, 'Umsetzungsplan') || ''}\n${getSection(t._body, 'Kontext') || ''}`);
+  return [...new Set((text.match(/(?:[\w@.-]+\/)+[\w@.-]+\.[a-z0-9]{1,6}\b/gi) || []).map((s) => s.replace(/^\.\//, '')))];
+}
+
+// Dateien einer Aufgabe: aus Commits mit ihrer ID, aus Änderungen in files.jsonl und aus der task.md.
+// Gemeinsame Grundlage für works parallel plan und den Konflikt-Radar im Board.
+export function taskFiles(root, config, t, { map = gitMap(root, config), edits = readEdits(root) } = {}) {
+  const set = new Set(Object.keys(map.byTask[t.id] || {}));
+  for (const e of edits) if (e.task === t.id && e.file) set.add(e.file);
+  for (const f of mentionedFiles(t)) set.add(f);
+  return [...set];
+}
+
+// Konflikt-Radar: welche der übergebenen Aufgaben dieselben Dateien ändern. Ergebnis je ID, meiste Treffer zuerst.
+export function fileConflicts(root, config, tasks) {
+  const map = gitMap(root, config);
+  const edits = readEdits(root);
+  const sets = tasks.map((t) => [t.id, new Set(taskFiles(root, config, t, { map, edits }))]);
+  const out = {};
+  for (let i = 0; i < sets.length; i++) for (let j = i + 1; j < sets.length; j++) {
+    const [a, A] = sets[i]; const [b, B] = sets[j];
+    const files = [...A].filter((f) => B.has(f)).sort();
+    if (!files.length) continue;
+    (out[a] = out[a] || []).push({ id: b, files });
+    (out[b] = out[b] || []).push({ id: a, files });
+  }
+  for (const list of Object.values(out)) list.sort((x, y) => y.files.length - x.files.length || x.id.localeCompare(y.id));
+  return out;
 }

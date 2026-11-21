@@ -157,6 +157,7 @@
     if (state.signal === 'questions' && !t.questions.length) return false;
     if (state.signal === 'incomplete' && !t.incomplete) return false;
     if (state.signal === 'stale' && !t.stale) return false;
+    if (state.signal === 'conflict' && !t.conflicts) return false;
     if (state.q) {
       const hay = (t.id + ' ' + t.title + ' ' + t.tags.join(' ') + ' ' + t.milestone + ' ' + (meta.typeLabel[t.type] || '')).toLowerCase();
       if (!state.q.split(/\s+/).every((w) => hay.includes(w))) return false;
@@ -216,9 +217,10 @@
       ['overdue', 'überfällig', open.filter((t) => t.overdue).length, true],
       ['questions', 'mit offenen Fragen', open.filter((t) => t.questions.length).length, false],
       ['incomplete', 'unvollständig erfasst', open.filter((t) => t.incomplete).length, false],
+      ['conflict', 'mit gleichen Dateien', tasks.filter((t) => t.conflicts).length, 'warn'],
       ['stale', 'seit ' + meta.staleDays + (meta.staleDays === 1 ? ' Tag' : ' Tagen') + ' still', tasks.filter((t) => t.stale).length, false],
     ];
-    $('#signals').innerHTML = sig.filter((s) => s[2] > 0).map((s) => '<button class="signal' + (s[3] ? ' hot' : '') + '" data-sig="' + s[0] + '" aria-pressed="' + (state.signal === s[0] || (s[0] === 'p1' && state.prios.size === 1 && state.prios.has('P1'))) + '"><b>' + s[2] + '</b> ' + esc(s[1]) + '</button>').join('')
+    $('#signals').innerHTML = sig.filter((s) => s[2] > 0).map((s) => '<button class="signal' + (s[3] === true ? ' hot' : s[3] ? ' ' + s[3] : '') + '" data-sig="' + s[0] + '" aria-pressed="' + (state.signal === s[0] || (s[0] === 'p1' && state.prios.size === 1 && state.prios.has('P1'))) + '"><b>' + s[2] + '</b> ' + esc(s[1]) + '</button>').join('')
       || '<span class="signal calm">Keine Blockaden, nichts überfällig</span>';
     $$('#signals .signal[data-sig]').forEach((b) => b.onclick = () => {
       const s = b.dataset.sig;
@@ -357,7 +359,11 @@
   }
   // Symbole für Etiketten an Karten (Stillstand, gleiche Dateien).
   const cfSvg = (p) => '<svg viewBox="0 0 16 16" aria-hidden="true">' + p + '</svg>';
-  const CF_IC = { still: cfSvg('<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/>') };
+  const CF_IC = { still: cfSvg('<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/>'), conflict: cfSvg('<path d="M8 2.5l6 10.5H2z"/><path d="M8 7v2.5M8 11.4v.1"/>') };
+  const cfConflict = (t) => {
+    const c = t.conflicts[0];
+    return '<span class="cflag conflict" title="' + esc(t.conflicts.map((x) => x.id + ': ' + x.files.join(', ')).join('\n')) + '">' + CF_IC.conflict + 'Gleiche Dateien wie ' + esc(c.id) + (t.conflicts.length > 1 ? ' und ' + (t.conflicts.length - 1) + ' weitere' : '') + '</span>';
+  };
 
   function changeColor(c) {
     if (c.kind === 'moved' || c.kind === 'added') return statusVar(c.to);
@@ -393,6 +399,7 @@
       '<div class="title">' + esc(t.title) + '</div>' +
       (t.thumb ? '<img loading="lazy" src="' + esc(t.thumb) + '" alt="' + esc(t.thumbAlt) + '">' : '') +
       liveBlock(t) +
+      (t.conflicts ? cfConflict(t) : '') +
       (t.stale ? '<span class="cflag still">' + CF_IC.still + 'Seit ' + t.stale.days + (t.stale.days === 1 ? ' Tag' : ' Tagen') + ' still' + (t.stale.handoff ? '' : ', keine Übergabe') + '</span>' : '') +
       (meta2.length ? '<div class="card-meta">' + meta2.join('') + '</div>' : '') +
       (tags.length ? '<div class="card-meta">' + tags.join('') + '</div>' : '') +
@@ -2030,7 +2037,7 @@
     if (f.type) p.push(meta.typeLabel[f.type] || f.type);
     if (f.tag) p.push('#' + f.tag);
     if (f.ms) p.push('Meilenstein ' + f.ms);
-    if (f.signal) p.push({ blocked: 'nur blockierte', unblocked: 'ohne blockierte', overdue: 'überfällig', questions: 'mit offenen Fragen', incomplete: 'unvollständig', stale: 'still' }[f.signal] || f.signal);
+    if (f.signal) p.push({ blocked: 'nur blockierte', unblocked: 'ohne blockierte', overdue: 'überfällig', questions: 'mit offenen Fragen', incomplete: 'unvollständig', stale: 'still', conflict: 'mit gleichen Dateien' }[f.signal] || f.signal);
     if (f.q) p.push('Suche „' + f.q + '“');
     if (v.view && v.view !== 'board') p.push('Ansicht ' + (VIEW_LABEL[v.view] || v.view));
     if (v.sort) p.push('sortiert nach ' + v.sort.key);
@@ -2519,6 +2526,7 @@
         if (warns.length) out.push({ id: t.id, ic: 'warn', text: t.id + ': ' + (warns.length === 1 ? 'Fund in ' + warns[0].name : warns.length + ' Funde') });
       }
       if (t.status === 'in-arbeit' && t.questions.length) out.push({ id: t.id, ic: 'ask', text: t.id + ': ' + (t.questions.length === 1 ? '1 offene Frage' : t.questions.length + ' offene Fragen') });
+      for (const c of t.conflicts || []) if (t.id < c.id) out.push({ id: t.id, ic: 'warn', text: t.id + ' und ' + c.id + ' ändern ' + c.files[0].split('/').pop() + (c.files.length > 1 ? ' und ' + (c.files.length - 1) + ' weitere' : '') });
       if (t.stale) out.push({ id: t.id, ic: 'wait', text: t.id + ' seit ' + t.stale.days + (t.stale.days === 1 ? ' Tag' : ' Tagen') + ' still' });
     }
     return out;

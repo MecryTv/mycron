@@ -8,7 +8,7 @@ import {
   worksDir, readJson, writeJson, exists, loadTasks, loadConfig, isBlocked, getSection, stripComments,
   checkboxes, openQuestions, OPEN_STATUSES, slugify, BRANCH_PREFIX,
 } from './lib.mjs';
-import { filesForTask } from './files.mjs';
+import { taskFiles } from './files.mjs';
 import { loadDesign, needsDesign } from './design.mjs';
 import { knowledgeSummary } from './knowledge.mjs';
 import { checksFor } from './checks.mjs';
@@ -44,10 +44,6 @@ function lanesDir(root, config) {
 }
 
 // Dateipfade, die in Beschreibung und Plan erwähnt werden, zum Beispiel src/commands/backup.ts.
-function mentionedFiles(t) {
-  const text = stripComments(`${getSection(t._body, 'Beschreibung') || ''}\n${getSection(t._body, 'Umsetzungsplan') || ''}\n${getSection(t._body, 'Kontext') || ''}`);
-  return [...new Set((text.match(/(?:[\w@.-]+\/)+[\w@.-]+\.[a-z0-9]{1,6}\b/gi) || []).map((s) => s.replace(/^\.\//, '')))];
-}
 const dirOf = (f) => f.split('/').slice(0, -1).join('/');
 
 const EFF = { S: 1, M: 2, L: 3, XL: 4 };
@@ -97,8 +93,7 @@ export function planParallel(root, { ids = [], max } = {}) {
 
   // Paarweise Konflikte
   const info = new Map(ok.map((t) => {
-    const hist = filesForTask(root, config, t.id).files.map((f) => f.file);
-    const files = [...new Set([...hist, ...mentionedFiles(t)])];
+    const files = taskFiles(root, config, t);
     return [t.id, { files, dirs: new Set(files.map(dirOf).filter(Boolean)) }];
   }));
   const dependsOn = (a, b, seen = new Set()) => {
