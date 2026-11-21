@@ -35,18 +35,18 @@ Neuer Skill 1 vom 2026-11-21, vom Nutzer gewünscht, als eigenes Plugin im Marke
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] "Feierabend" schreibt Übergaben für alle Aufgaben in Arbeit, stoppt das Board und fasst den Tag zusammen
-- [ ] "Guten Morgen" liest den Stand von gestern, startet das Board und nennt die nächste Aufgabe
-- [ ] Ohne .works im Projekt gibt es einen verständlichen Hinweis statt eines Fehlers
-- [ ] Das Plugin steht im Marketplace mycron und lässt sich installieren
-- [ ] Nichts wird ungefragt gepusht
+- [x] "Feierabend" schreibt Übergaben für alle Aufgaben in Arbeit, stoppt das Board und fasst den Tag zusammen
+- [x] "Guten Morgen" liest den Stand von gestern, startet das Board und nennt die nächste Aufgabe
+- [x] Ohne .works im Projekt gibt es einen verständlichen Hinweis statt eines Fehlers
+- [x] Das Plugin steht im Marketplace mycron und lässt sich installieren
+- [x] Nichts wird ungefragt gepusht
 
 ## Umsetzungsplan
-- [ ] Ablauf und Auslöser festlegen (Skill-Beschreibung)
-- [ ] Plugin-Gerüst im Marketplace mycron
-- [ ] Skill Feierabend
-- [ ] Skill Guten Morgen
-- [ ] Test in einem Testprojekt, Doku, README
+- [x] Ablauf und Auslöser festlegen (Skill-Beschreibung)
+- [x] Plugin-Gerüst im Marketplace mycron
+- [x] Skill Feierabend
+- [x] Skill Guten Morgen
+- [x] Test in einem Testprojekt, Doku, README
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -61,9 +61,26 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Stand: 2026-11-21 14:53
+
+Branch feature/w-0015-feierabend. Fertig: plugins/feierabend (plugin.json, README, skills/feierabend/SKILL.md), Eintrag in .claude-plugin/marketplace.json. Läuft: Test von feierabend mit Skill in scratchpad/fa-skill, Baseline guten-morgen ohne Skill in scratchpad/gm-base (beide ohne Board). Nächster Schritt: Testergebnisse auswerten, skills/guten-morgen/SKILL.md schreiben und testen, README angleichen, dann done, Merge, Push. Wichtig: Test-Agenten dürfen kein Board starten (Nutzerwunsch).
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
 - 2026-11-21: decisions.md angelegt
 - 2026-11-21: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-21: Umsetzungsplan: "Ablauf und Auslöser festlegen (Skill-Beschreibung)" abgehakt
+- 2026-11-21: Umsetzungsplan: "Plugin-Gerüst im Marketplace mycron" abgehakt
+- 2026-11-21: Baseline ohne Skill: Feierabend schreibt Übergaben, sichert .works nicht, ignoriert Board, nennt Erledigtes nicht; works handoff stellt die aktive Aufgabe um. Plugin-Gerüst, Marketplace-Eintrag, README und Skill feierabend geschrieben.
+- 2026-11-21: Übergabe aktualisiert
+- 2026-11-21: Test feierabend mit Skill: alle sechs Schritte eingehalten (Übergaben inkl. aktiver zuletzt, nur .works committet, kein Push, Board gestoppt, Nachricht in der Form, eine Frage zu uncommittetem Code). Reihenfolge für Morgen zuerst danach korrigiert: aktive Aufgabe vor Warteschlange.
+- 2026-11-21: Test guten-morgen mit Skill, Übergabe passt nicht zum Repo: Abweichung (fehlender Branch, fehlende Datei) genannt, nicht angefangen, zwei nummerierte Fragen, Nachricht in der Form.
+- 2026-11-21: Test guten-morgen mit Skill, Übergabe passt: ohne Rückfrage W-0003 gestartet, Branch passte, Nachricht in der Form. Lücke: Aufgabe im Review übersehen, weil Schritt 1 sie nicht abfragte; works list --status review ergänzt.
+- 2026-11-21: Umsetzungsplan: "Skill Feierabend" abgehakt
+- 2026-11-21: Umsetzungsplan: "Skill Guten Morgen" abgehakt
+- 2026-11-21: Umsetzungsplan: "Test in einem Testprojekt, Doku, README" abgehakt
+- 2026-11-21: Akzeptanzkriterien: ""Feierabend" schreibt Übergaben für alle Aufgaben in Arbeit, stoppt das Board und fasst den Tag zusammen" abgehakt
+- 2026-11-21: Akzeptanzkriterien: ""Guten Morgen" liest den Stand von gestern, startet das Board und nennt die nächste Aufgabe" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Ohne .works im Projekt gibt es einen verständlichen Hinweis statt eines Fehlers" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Das Plugin steht im Marketplace mycron und lässt sich installieren" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Nichts wird ungefragt gepusht" abgehakt

@@ -1,6 +1,6 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 14:48 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 14:58 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
@@ -12,7 +12,7 @@ Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 6 · P4 Niedri
 
 ## Aktive Aufgabe
 
-[W-0015](tasks/W-0015-neues-plugin-feierabend-und-guten-morgen/task.md) Neues Plugin: Feierabend und Guten Morgen (In Arbeit), letzte Übergabe 2026-11-21 10:30
+[W-0015](tasks/W-0015-neues-plugin-feierabend-und-guten-morgen/task.md) Neues Plugin: Feierabend und Guten Morgen (In Arbeit), letzte Übergabe 2026-11-21 14:53
 
 ## Kritisch (P1)
 

@@ -1,11 +1,18 @@
 {
   "name": "mycron",
-  "owner": { "name": "MecryTv" },
+  "owner": {
+    "name": "MecryTv"
+  },
   "plugins": [
     {
       "name": "works",
       "source": "./plugins/works",
       "description": "Aufgabenverwaltung in .works/ mit Prioritäten, Bildern, Designentscheidungen und Übergaben"
+    },
+    {
+      "name": "feierabend",
+      "source": "./plugins/feierabend",
+      "description": "Feierabend und Guten Morgen: Übergaben schreiben, Board stoppen, Tag zusammenfassen und am nächsten Morgen dort weitermachen (braucht works)"
     }
   ]
 }
