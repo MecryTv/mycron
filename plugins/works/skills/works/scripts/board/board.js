@@ -2708,8 +2708,10 @@
     const by = (p) => list.filter((t) => phaseOf(t) === p).length;
     const fertig = by('review') + by('erledigt');
     const seg = list.map((t) => '<i class="' + ({ erledigt: 'done', review: 'review', umsetzung: 'cur', pruefung: 'check' }[phaseOf(t)] || '') + '" title="' + esc(t.id) + '"></i>').join('');
-    const t2 = list.length ? '<h3>Fortschritt heute</h3><div class="big">' + fertig + ' von ' + list.length + ' <small>fertig</small></div><div class="lv-seg" aria-hidden="true">' + seg + '</div><div class="sub">' + by('erledigt') + ' erledigt · ' + by('review') + ' im Review · ' + (by('umsetzung') + by('pruefung')) + ' in Arbeit · ' + by('queue') + ' warten</div>'
-      : '<h3>Fortschritt heute</h3><div class="big">Nichts geplant</div><div class="sub">Keine Aufgabe in Arbeit, im Review oder in der Warteschlange</div>';
+    const u = meta.usage;
+    const useLine = u && u.today && u.today.tokens ? '<div class="lv-usage" title="Geschätzt nach den Preisen in config.json, aktualisiert nach jeder Antwort">Verbrauch heute <b>' + fmtTok(u.today.tokens) + '</b> Tokens, ca. <b>' + fmtMoney(u.today.cost, u.currency) + '</b></div>' : '';
+    const t2 = (list.length ? '<h3>Fortschritt heute</h3><div class="big">' + fertig + ' von ' + list.length + ' <small>fertig</small></div><div class="lv-seg" aria-hidden="true">' + seg + '</div><div class="sub">' + by('erledigt') + ' erledigt · ' + by('review') + ' im Review · ' + (by('umsetzung') + by('pruefung')) + ' in Arbeit · ' + by('queue') + ' warten</div>'
+      : '<h3>Fortschritt heute</h3><div class="big">Nichts geplant</div><div class="sub">Keine Aufgabe in Arbeit, im Review oder in der Warteschlange</div>') + useLine;
     const lanes = list.filter((t) => lvLanes().has(t.id) && t.status === 'in-arbeit');
     const t3 = '<h3>Parallel</h3>' + (lanes.length ? '<div class="big">' + (lanes.length === 1 ? '1 Agent' : lanes.length + ' Agenten') + '</div>' + lanes.map((t) => '<div class="sub">' + esc(t.id) + ' · ' + esc(lvStatus(t).text) + '</div>').join('') : '<div class="big">Kein Agent aktiv</div><div class="sub">Alles läuft in der Hauptsitzung</div>');
     const att = lvAttention(list);
@@ -2725,6 +2727,7 @@
     const s = lvSteps(t);
     let h = '<div class="lv-ftop"><span class="r-id">' + esc(t.id) + '</span><span class="r-prio" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span><span>' + esc(meta.typeLabel[t.type] || t.type) + '</span>' +
       (t.branch ? '<span class="mono">' + esc(t.branch) + '</span>' : '') + (lvLanes().has(t.id) ? '<span class="tag lv-agent">Agent im eigenen Worktree</span>' : '') +
+      (t.usage && t.usage.tokens ? '<span class="lv-cost" title="Verbrauch dieser Aufgabe bisher, geschätzt nach den Preisen in config.json">' + fmtTok(t.usage.tokens) + ' Tokens, ca. ' + fmtMoney(t.usage.cost, meta.usage && meta.usage.currency) + '</span>' : '') +
       '<button type="button" class="btn link" data-lv-open="' + esc(t.id) + '">Details</button></div><h2 class="lv-title">' + esc(t.title) + '</h2>' + lvPhases(t);
     if (phaseOf(t) === 'queue') return h + '<p class="lv-empty">Noch nicht gestartet. ' + esc(lvStatus(t).text) + '.</p>';
     const feed = lvFeed(list, livePrefs.feedAll ? '' : t.id);

@@ -136,6 +136,30 @@ export function projectUsage(root, config, tasks, days = 30) {
   };
 }
 
+// Verbrauch für die Live-Ansicht: heute (lokaler Tag) und je Aufgabe. Das Board fragt bei jeder Aktualisierung,
+// gelesen wird time.jsonl aber nur, wenn sie sich geändert hat (Größe, Änderungszeit), der Tag wechselt oder die Preise.
+let liveCache = null;
+export function liveUsage(root, config) {
+  let st = null;
+  try { st = fs.statSync(timeFile(root)); } catch { /* noch keine Datei */ }
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const since = start.toISOString();
+  const key = [root, st ? `${st.size}:${st.mtimeMs}` : '-', since, JSON.stringify(config.prices || {})].join('|');
+  if (liveCache && liveCache.key === key) return liveCache.data;
+  const table = priceTable(config);
+  const day = zero();
+  const byTask = {};
+  for (const e of readUsage(root)) {
+    const c = costOf(e, e.model, table);
+    if (e.t >= since) { add(day, e); day.cost += c; }
+    if (e.task) { const a = byTask[e.task] || (byTask[e.task] = zero()); add(a, e); a.cost += c; }
+  }
+  const tok = (x) => x.in + x.out + x.cw + x.cr;
+  const data = { currency: table.currency, today: { tokens: tok(day), cost: day.cost }, byTask: Object.fromEntries(Object.entries(byTask).map(([k, v]) => [k, { tokens: tok(v), cost: v.cost }])) };
+  liveCache = { key, data };
+  return data;
+}
+
 export function fmtTokens(n) {
   if (n >= 1e6) return `${(n / 1e6).toFixed(1).replace('.', ',')} Mio`;
   if (n >= 1e3) return `${Math.round(n / 1e3)} k`;

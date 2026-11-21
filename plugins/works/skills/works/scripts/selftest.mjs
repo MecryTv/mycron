@@ -345,10 +345,27 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     fs.writeFileSync(cf, JSON.stringify({ ...cj, running: 'peek', runningSince: new Date().toISOString() }));
     expect(runningOf() === 'peek', 'frisches running fehlt');
     fs.writeFileSync(cf, JSON.stringify(cj));
+    // Verbrauch (W-0008): heute und je Aufgabe aus time.jsonl. Ohne Änderung an der Datei wird nicht neu gelesen.
+    const { liveUsage } = await import('./usage.mjs');
+    const { loadConfig } = await import('./lib.mjs');
+    const u1 = liveUsage(proj, loadConfig(proj));
+    expect(liveUsage(proj, loadConfig(proj)) === u1, 'liveUsage liest time.jsonl ohne Änderung neu');
+    const ub = boardData(proj);
+    const dayBefore = ub.meta.usage.today.tokens;
+    const taskBefore = (ub.tasks.find((t) => t.id === 'W-0001').usage || { tokens: 0 }).tokens;
+    const old = new Date(Date.now() - 2 * 86400000).toISOString();
+    fs.appendFileSync(path.join(proj, '.works', 'time.jsonl'), [
+      { t: new Date().toISOString(), ev: 'usage', task: 'W-0001', s: 'u', model: 'claude-sonnet-5-5', in: 1000, out: 500, cw: 0, cr: 0 },
+      { t: old, ev: 'usage', task: 'W-0001', s: 'u', model: 'claude-sonnet-5-5', in: 7000, out: 0, cw: 0, cr: 0 },
+    ].map((x) => JSON.stringify(x)).join('\n') + '\n');
+    const ua = boardData(proj);
+    const ut = ua.tasks.find((t) => t.id === 'W-0001').usage;
+    expect(ua.meta.usage.today.tokens === dayBefore + 1500 && ut && ut.tokens === taskBefore + 8500 && ua.meta.usage.today.cost > 0, `Verbrauch: ${JSON.stringify(ua.meta.usage)} ${JSON.stringify(ut)}`);
+    expect(!('usage' in other), 'Aufgabe außerhalb der Tagesliste hat usage');
     // Der Export geht an Leute außerhalb: keine Befehlszeilen und kein Live-Stand aus der Live-Ansicht.
     const { buildSnapshot } = await import('./export.mjs');
     const snap = buildSnapshot(proj, { images: false }).html;
-    expect(!snap.includes('works check W-0001 1') && !snap.includes('"plan":['), 'Export enthält Live-Daten (Befehle oder Schritte)');
+    expect(!snap.includes('works check W-0001 1') && !snap.includes('"plan":[') && !snap.includes('"today":{"tokens"'), 'Export enthält Live-Daten (Befehle, Schritte oder Verbrauch)');
     w(['checks', 'remove', 'peek']);
     expect(boardData(proj).tasks.find((t) => t.id === 'W-0001').checks === null, 'ohne Prüfungen ist checks nicht null');
   });
@@ -563,6 +580,9 @@ async function browserCheck(url, log, between = async () => {}) {
     }));
     if (!/wartet auf deine Freigabe/.test(perm.tile) || !/npm install -D vitest/.test(perm.tile)) errs.push(`Live: Kachel zeigt keine Freigabe (${perm.tile.replace(/\n/g, ' ')})`);
     if (!perm.now) errs.push('Live: Jetzt-Box zeigt keine Freigabe');
+    // Verbrauch (W-0008): Der Stop-Hook hat heute Tokens erfasst, die Kachel Fortschritt zeigt sie.
+    const use = await p.evaluate(() => (document.querySelector('#viewLive .lv-usage') || {}).innerText || '');
+    if (!/Verbrauch heute .*Tokens, ca\. [\d,]+ \$/.test(use.replace(/\s+/g, ' '))) errs.push(`Live: Verbrauch heute fehlt (${use})`);
     if (!/Freigabe für einen Befehl/.test(perm.first)) errs.push(`Live: Freigabe nicht erster Punkt in Wartet auf dich (${perm.first})`);
     if (!perm.pulse || !/^Freigabe/.test(perm.title)) errs.push(`Live: Reiter oder Titel ohne Freigabe (${perm.title})`);
     // Erneut prüfen (W-0006): Knopf für alle Fehlschläge und je Gruppe. Der Klick lässt die neun roten Prüfungen neu laufen,
