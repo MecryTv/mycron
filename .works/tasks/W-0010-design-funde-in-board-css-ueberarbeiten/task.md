@@ -3,7 +3,7 @@ id: W-0010
 title: Design-Funde in board.css überarbeiten
 type: design
 priority: P4
-status: backlog
+status: in-arbeit
 effort: S
 risk:
 created: 2026-11-21
@@ -11,7 +11,7 @@ updated: 2026-11-21
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0010-design-funde-in-board-css
 tags: [ui, board, design]
 blocked_by: []
 blocks: []
@@ -49,7 +49,7 @@ Angelegt am 2026-11-21 auf Wunsch des Nutzers. Die Design-Prüfung (impeccable d
 - [ ] Farben mit Bedeutung (Status, Priorität) bleiben erkennbar
 
 ## Umsetzungsplan
-- [ ] Stellen im Board ansehen, Bedeutung je Streifen klären
+- [x] Stellen im Board ansehen, Bedeutung je Streifen klären
 - [ ] Entwurf mit Alternativen zeigen, Wahl abwarten
 - [ ] Umsetzen oder markieren, Selbsttest mit Browser
 
@@ -60,7 +60,9 @@ Angelegt am 2026-11-21 auf Wunsch des Nutzers. Die Design-Prüfung (impeccable d
 Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
-<!-- Ist-Zustand mit --kind ist oder vorher, Ergebnis mit --kind nachher. -->
+![Vorher im Entwurf: 3 px Streifen links an Karten (Priorität), Ablauf, Verlauf un](assets/2026-11-21-vorher-im-entwurf-3-px-streifen-links-vorher.png)
+Beschreibung: Vorher im Entwurf: 3 px Streifen links an Karten (Priorität), Ablauf, Verlauf und Meldungen
+Art: vorher · Hinzugefügt: 2026-11-21
 
 ## Offene Fragen
 
@@ -69,3 +71,8 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
 - 2026-11-21: decisions.md angelegt
+- 2026-11-21: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-21: Brainstorming angehängt
+- 2026-11-21: Entwurf A „Feinschliff Board: A Punkte und Chips, B Obere Kante, Schriften“ angehängt
+- 2026-11-21: Umsetzungsplan: "Stellen im Board ansehen, Bedeutung je Streifen klären" abgehakt
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-vorher-im-entwurf-3-px-streifen-links-vorher.png (vorher)
