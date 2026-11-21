@@ -3,13 +3,13 @@ id: W-0007
 title: Live-Ansicht zeigt, wenn Claude auf eine Freigabe wartet
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0007-live-ansicht-zeigt-wenn
 tags: [ui, board, hooks]
@@ -70,7 +70,7 @@ Art: vorher · Hinzugefügt: 2026-11-21
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -93,3 +93,4 @@ Art: vorher · Hinzugefügt: 2026-11-21
 - 2026-11-21: PermissionRequest-Hook (permission.mjs) markiert den laufenden Aufruf als wartend; Board zeigt Kachel, Jetzt-Box, Tagesliste, Wartet auf dich, Pille, Reiter, Titel und optional Browser-Benachrichtigung. Selbsttest Windows mit Browser 22/22.
 - 2026-11-21: Umsetzungsplan: "Doku (hooks.md, board.md), Selbsttest mit Browser, Linux" abgehakt
 - 2026-11-21: Asset hinzugefügt: assets/2026-11-21-vorher-live-ansicht-im-testprojekt-vorher.png (vorher)
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
