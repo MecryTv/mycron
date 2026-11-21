@@ -64,9 +64,9 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - [x] Plan freigeben und auf eigenem Branch loslegen? (Frage vom 2026-11-20 noch offen) Antwort: Freigegeben am 2026-11-21: umsetzen wie besprochen, eigener Branch, ein Commit pro Task, nichts pushen.
 
 ## Übergabe
-Stand: 2026-11-20 23:03
+Stand: 2026-11-21 09:21
 
-Stand 2026-11-20: Entwurf (Variante A gewählt), Design-Dokument (freigegeben) und Umsetzungsplan liegen unter docs/superpowers/. Noch kein Code geändert, kein Branch, nichts committet (docs/ und .works/ sind untracked). Nächster Schritt: Nutzer bestätigt den Plan, dann Branch anlegen, docs/ und .works/ committen, mit Task 1 (PreToolUse-Hook) beginnen. Ausführung native, pro Task ein Commit, am Ende frischer Reviewer über den Branch. Nichts pushen.
+Stand 2026-11-21: Alle sechs Tasks des Plans umgesetzt und committet auf feature/w-0001-live-ansicht-im-works-board (43a05f2..5754834), works selftest 18/18 grün. Live-Ansicht im eingebauten Browser an einem Testprojekt geprüft (1440 px hell/dunkel, 375 px ohne seitliches Scrollen, laufende Prüfung, Fund, Leerlauf). Die --browser-Prüfung im Selbsttest ist geschrieben, aber hier nicht gelaufen (Playwright ohne Browser). Offen: Abschluss-Review des Branches durch frischen Reviewer, danach ggf. Fixes, dann works done. Nichts gepusht, nicht gemergt. Protokoll mit Entscheidungen: .superpowers/sdd/2026-11-20-live-tracking/progress.md (lokal, git-ignoriert).
 
 ## Verlauf
 - 2026-11-20: Aufgabe angelegt
@@ -97,3 +97,5 @@ Stand 2026-11-20: Entwurf (Variante A gewählt), Design-Dokument (freigegeben) u
 - 2026-11-21: Umsetzungsplan: "Task 4: Live-Daten in boardData" abgehakt
 - 2026-11-21: Umsetzungsplan: "Task 5: Ansicht Live im Board" abgehakt
 - 2026-11-21: Umsetzungsplan: "Task 6: Dokumentation" abgehakt
+- 2026-11-21: Übergabe aktualisiert
+- 2026-11-21: Alle sechs Tasks umgesetzt, Selbsttest 18/18, Abschluss-Review läuft

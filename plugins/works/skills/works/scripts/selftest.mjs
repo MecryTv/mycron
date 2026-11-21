@@ -278,6 +278,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     fs.writeFileSync(cf, JSON.stringify({ ...cj, running: 'peek', runningSince: new Date().toISOString() }));
     expect(runningOf() === 'peek', 'frisches running fehlt');
     fs.writeFileSync(cf, JSON.stringify(cj));
+    // Der Export geht an Leute außerhalb: keine Befehlszeilen und kein Live-Stand aus der Live-Ansicht.
+    const { buildSnapshot } = await import('./export.mjs');
+    const snap = buildSnapshot(proj, { images: false }).html;
+    expect(!snap.includes('works check W-0001 1') && !snap.includes('"plan":['), 'Export enthält Live-Daten (Befehle oder Schritte)');
     w(['checks', 'remove', 'peek']);
     expect(boardData(proj).tasks.find((t) => t.id === 'W-0001').checks === null, 'ohne Prüfungen ist checks nicht null');
   });
@@ -411,7 +415,7 @@ async function browserCheck(url, log, between = async () => {}) {
     for (const k of ['2', '3', '4', '5', '6', '7', '1']) { await p.keyboard.press('Escape'); await p.keyboard.press(k); await p.waitForTimeout(250); }
     const liveText = async (pg, who) => {
       await pg.keyboard.press('Escape'); await pg.keyboard.press('7'); await pg.waitForTimeout(400);
-      const v = await pg.evaluate(() => { const el = document.querySelector('#viewLive'); return { run: !!(el && el.querySelector('.run')), text: el ? el.innerText : '' }; });
+      const v = await pg.evaluate(() => { const el = document.querySelector('#viewLive'); return { run: !!(el && el.querySelector('.lv-run')), text: el ? el.innerText : '' }; });
       if (!v.run) errs.push(`${who}Live: Tagesliste fehlt`);
       if (/NaN|Schritt 0 von 0/.test(v.text)) errs.push(`${who}Live: NaN oder Schritt 0 von 0`);
       return v.text;

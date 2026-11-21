@@ -446,6 +446,7 @@
     if (state.view === 'timeline') renderTimeline();
     if (state.view === 'table') renderTable();
     if (state.view === 'live') renderLive();
+    liveDeadline = nextLiveDeadline();
   }
 
   // ---------- Drag and Drop ----------
@@ -2339,7 +2340,8 @@
     }
     const s = e.target.closest('[data-instr-send]');
     if (s) {
-      const inp = $('[data-instr-in="' + CSS.escape(s.dataset.instrSend) + '"]');
+      // Das Feld neben dem Knopf nehmen: Detailpanel und Live-Ansicht können gleichzeitig ein Feld für dieselbe Aufgabe haben.
+      const inp = s.parentElement.querySelector('[data-instr-in="' + CSS.escape(s.dataset.instrSend) + '"]');
       if (inp && await sendInstruction(s.dataset.instrSend, inp.value)) inp.value = '';
     }
   }, true);
@@ -2386,6 +2388,18 @@
   // Zeitangabe, die der Sekundentakt weiterzählt.
   function lvSince(iso, fmt) { return '<span class="num" data-since="' + esc(iso) + '" data-fmt="' + (fmt || 'clock') + '">' + lvSinceText(iso, fmt) + '</span>'; }
   function liveFollowClaude() { liveFollow = true; livePrefs.focus = ''; store.set(LIVE_KEY, livePrefs); }
+  // Frische-Grenzen laufen auch ohne neue Daten ab, etwa nach einem Abbruch mit Esc, bei dem kein Stop-Hook läuft.
+  // Der Sekundentakt lädt dann einmal neu; der Server wertet ein veraltetes running dabei selbst aus.
+  let liveDeadline = Infinity;
+  function nextLiveDeadline() {
+    const a = meta.activity;
+    const times = [];
+    if (a && a.busy && a.current) times.push(Date.parse(a.current.at) + LIVE_FRESH_MS);
+    if (a && a.lanes) for (const e of Object.values(a.lanes)) times.push(Date.parse(e.at) + LIVE_FRESH_MS);
+    for (const t of tasks) if (t.checks && t.checks.running) times.push(Date.parse(t.checks.runningSince) + 11 * 60000);
+    const future = times.filter((x) => x > Date.now());
+    return future.length ? Math.min(...future) + 1000 : Infinity;
+  }
   const lvFresh = (e) => !!e && Date.now() - Date.parse(e.at) < LIVE_FRESH_MS;
   const lvLanes = () => new Set((meta.lanes || []).map((l) => l.task));
 
@@ -2547,7 +2561,7 @@
       let extra = '';
       if (st === 'warn') {
         extra = '<div class="ck-note">' + md(r.note || '') + (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fix="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">Claude beheben lassen</button><button type="button" class="btn small" data-lv-ack="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">Als bekannt markieren</button></div>' : '') + '</div>';
-      } else if (st === 'fail' && r.output) extra = '<details class="ck-out"><summary>Ausgabe</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>';
+      } else if (st === 'fail' && r.output) extra = '<details class="ck-out" data-out="' + esc(t.id + ':' + x.name) + '"><summary>Ausgabe</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>';
       return '<li class="ck ' + (cls[st] || '') + '"><div class="ck-row"><span class="ck-ic" aria-hidden="true">' + ch[st] + '</span><span class="ck-name">' + esc(x.name) + '</span><span class="mono muted ck-cmd">' + esc(x.cmd) + '</span><span class="muted num ck-ms">' + right + '</span></div>' + extra + '</li>';
     }).join('') + '</ul>';
   }
@@ -2656,6 +2670,7 @@
     const inp = $('#lvInstr', box);
     const keep = inp ? { v: inp.value, s: inp.selectionStart, task: inp.dataset.instrIn } : null;
     const openGroups = $$('details.lv-ckg[open] summary b', box).map((b) => b.textContent);
+    const openOut = $$('details.ck-out[open]', box).map((d) => d.dataset.out);
     box.innerHTML = '<section class="lv-sum" aria-label="Überblick">' + lvTilesHtml(list) + '</section>' +
       '<div class="lv-grid"><section class="lv-panel lv-runbox" aria-label="Aufgaben heute"><div class="lv-head"><h2>Heute</h2><span class="meta">' + list.length + (list.length === 1 ? ' Aufgabe' : ' Aufgaben') + '</span></div>' +
       (list.length ? '<ul class="lv-run">' + list.map((t) => {
@@ -2668,6 +2683,7 @@
       '<section class="lv-panel lv-focus" aria-label="Gewählte Aufgabe">' + lvFocusHtml(ft, list) + '</section>' +
       '<section class="lv-panel lv-checks" aria-label="Prüfungen">' + lvChecksHtml(list, focusId) + '</section></div>';
     $$('details.lv-ckg', box).forEach((d) => { const b = $('summary b', d); if (b && openGroups.includes(b.textContent)) d.open = true; });
+    $$('details.ck-out', box).forEach((d) => { if (openOut.includes(d.dataset.out)) d.open = true; });
     const ni = $('#lvInstr', box);
     if (ni && keep && keep.task === ni.dataset.instrIn) { ni.value = keep.v; }
     if (keyEl) { const el = $(keyEl, box); if (el) { el.focus({ preventScroll: true }); if (el === ni && keep) { try { el.setSelectionRange(keep.s, keep.s); } catch (e) { /* egal */ } } } }
@@ -3309,6 +3325,7 @@
       if (d) renderBoard();
       // Zeitangaben der Live-Ansicht und der Pille im Kopf weiterzählen.
       $$('#viewLive [data-since], #busy [data-since]').forEach((el) => { el.textContent = lvSinceText(el.dataset.since, el.dataset.fmt); });
+      if (Date.now() >= liveDeadline) { liveDeadline = Infinity; reload(); }
     }, 1000);
   }
   // Ansicht nach einem Update-Neuladen wiederherstellen.
