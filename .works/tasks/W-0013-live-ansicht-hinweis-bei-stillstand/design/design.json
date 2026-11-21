@@ -1,0 +1,23 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Board-Erweiterungen W-0011 bis W-0014",
+      "file": "A-board-erweiterungen-w-0011.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Gemeinsamer Entwurf; für W-0011 oben A Aufklappen oder B Seitenleiste wählen",
+      "at": "2026-11-21 14:46"
+    }
+  ],
+  "brainstorm": [
+    {
+      "file": "brainstorm.md",
+      "source": "superpowers",
+      "title": "Board-Erweiterungen",
+      "at": "2026-11-21 14:46"
+    }
+  ],
+  "chosen": null
+}

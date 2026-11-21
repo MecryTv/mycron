@@ -12,7 +12,7 @@ due:
 completed:
 milestone:
 branch:
-tags: [skill, plugin, design]
+tags: [skill, plugin, entwurf]
 blocked_by: []
 blocks: []
 related: []
@@ -64,3 +64,4 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
 - 2026-11-21: decisions.md angelegt
+- 2026-11-21: tags: [skill, plugin, design] → [skill, plugin, entwurf]

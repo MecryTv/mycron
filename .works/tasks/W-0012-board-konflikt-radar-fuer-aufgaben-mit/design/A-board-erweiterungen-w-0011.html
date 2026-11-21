@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Board-Erweiterungen Entwurf</title>
+<link rel="stylesheet" href="file:///D:/Development/mycron/plugins/works/skills/works/scripts/board/board.css">
+<style>
+@font-face { font-family: "Geist"; src: url("file:///D:/Development/mycron/plugins/works/skills/works/scripts/board/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+/* Entwurfsrahmen, nicht Teil des Designs */
+.frame { padding: 10px 24px 12px; background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--accent) 7%, var(--surface)) 0 12px, color-mix(in srgb, var(--accent) 11%, var(--surface)) 12px 24px); border-bottom: 1px dashed var(--accent); display: grid; gap: 8px; }
+.frame-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.frame-label { font-size: 12px; font-weight: 600; color: var(--accent); letter-spacing: .02em; }
+.fgrp { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+.segc { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); padding: 2px; gap: 2px; }
+.segc button { white-space: nowrap; border: 0; background: none; height: 28px; padding: 0 10px; border-radius: 7px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
+.segc button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.segc .rec { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 4px; background: color-mix(in srgb, var(--ok) 22%, transparent); }
+.spacer { flex: 1; }
+
+.stage { padding: 18px 24px 48px; display: grid; gap: 26px; max-width: 1280px; }
+.sec { display: grid; gap: 10px; }
+.sec > header { display: grid; gap: 2px; }
+.sec > header h2 { margin: 0; font-size: 15px; font-weight: 650; }
+.sec > header p { margin: 0; font-size: 13px; color: var(--text-2); max-width: 110ch; }
+.sec > header .id { color: var(--accent); font-weight: 650; margin-right: 6px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.w-box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
+.w-box h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.cols3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .grid2, .cols3 { grid-template-columns: minmax(0, 1fr); } .stage, .frame { padding-left: 16px; padding-right: 16px; } }
+
+/* ===== Neu: Etiketten an Karten (W-0012, W-0013) ===== */
+.cflag { display: inline-flex; align-items: center; gap: 6px; justify-self: start; max-width: 100%; height: 22px; padding: 0 8px; border-radius: 11px; font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cflag svg { width: 12px; height: 12px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cflag.conflict { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--text); }
+.cflag.conflict svg { color: var(--warn); }
+.cflag.still { background: var(--sunken); color: var(--text-2); }
+.signal.warn b { color: var(--warn); }
+.signal.warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+
+/* ===== Neu: Diff im Verlauf (W-0011) ===== */
+.lv-feed li.k-file { cursor: pointer; border-radius: 6px; }
+.lv-feed li.k-file:hover { background: var(--raised); }
+.lv-feed li.k-file .chev { width: 12px; height: 12px; flex: none; transition: transform .15s; stroke: var(--muted); fill: none; stroke-width: 2; }
+.lv-feed li.k-file[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.lv-feed li .lv-fdiff { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.lv-feed li .lv-fdiff .diff { border-top: 0; max-height: 260px; overflow: auto; }
+.lv-fdiff-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; font-size: 12px; background: var(--raised); border-bottom: 1px solid var(--line); }
+.lv-fdiff-head .add { color: var(--ok); } .lv-fdiff-head .del { color: var(--danger); }
+.lv-fdiff-head .btn.link { margin-left: auto; font-size: 12px; }
+.sidesheet { border-left: 1px solid var(--line); background: var(--surface); border-radius: 12px; border: 1px solid var(--line); display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 380px; overflow: hidden; }
+.sidesheet header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.sidesheet header .mono { font-weight: 600; }
+.sidesheet .diff { border-top: 0; }
+
+/* ===== Neu: Prüfungs-Gesundheit (W-0014) ===== */
+.hth-tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; padding: 2px; gap: 2px; background: var(--surface); }
+.hth-tabs button { border: 0; background: none; height: 28px; padding: 0 10px; border-radius: 7px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
+.hth-tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.hth { width: 100%; border-collapse: collapse; font-size: 13px; }
+.hth th { text-align: left; font-size: 12px; font-weight: 500; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.hth td { padding: 7px 8px; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); vertical-align: middle; }
+.hth td.num, .hth th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.hth .nm { font-weight: 600; font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
+.hth .bar { display: inline-block; width: 70px; height: 6px; border-radius: 3px; background: var(--sunken); vertical-align: middle; margin-right: 6px; overflow: hidden; }
+.hth .bar i { display: block; height: 100%; background: var(--danger); }
+.hth .flk { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 10px; font-size: 11.5px; font-weight: 600; background: color-mix(in srgb, var(--warn) 18%, transparent); }
+.hth .slow { color: var(--warn); font-weight: 600; }
+.hth-wrap { overflow-x: auto; }
+@media (max-width: 640px) { .hth .opt { display: none; } }
+</style>
+</head>
+<body>
+<div class="frame" role="region" aria-label="Entwurfsrahmen, nicht Teil des Designs">
+  <div class="frame-row">
+    <span class="frame-label">ENTWURF W-0011 BIS W-0014</span>
+    <span class="fgrp">Diff im Verlauf (W-0011)<span class="segc" role="group"><button data-k="diff" data-val="A">A Aufklappen<span class="rec">Empfehlung</span></button><button data-k="diff" data-val="B">B Seitenleiste</button></span></span>
+    <span class="spacer"></span>
+    <button class="btn small" id="theme" type="button">Dunkel</button>
+  </div>
+</div>
+
+<main class="stage">
+  <section class="sec">
+    <header><h2><span class="id">W-0012 + W-0013</span>Hinweise im Board</h2>
+      <p>Zwei neue Hinweise in der Zeile unter der Flussleiste, wie heute „offen mit P1“: Ein Klick filtert auf die betroffenen Aufgaben. Die Karten selbst tragen ein Etikett. Konflikt heißt: zwei offene Aufgaben haben dieselben Dateien geändert (aus files.jsonl). Still heißt: seit 3 Tagen kein Werkzeugaufruf, kein Schritt und kein Verlaufseintrag (Schwelle in config.json).</p></header>
+    <div class="signals">
+      <button class="signal hot"><b>1</b> offen mit P1</button>
+      <button class="signal warn" aria-pressed="false"><b>2</b> mit gleichen Dateien</button>
+      <button class="signal"><b>1</b> seit 3 Tagen still</button>
+      <button class="signal"><b>1</b> mit offenen Fragen</button>
+    </div>
+    <div class="cols3">
+      <section class="col" style="--c:var(--s-in-arbeit)">
+        <div class="col-head"><span class="dot"></span><h2>In Arbeit</h2><span class="n">3</span></div>
+        <div class="cards">
+          <article class="card" data-prio="P2"><div class="card-top"><span class="id">W-0012</span><span>Feature</span><span class="effort">M</span><span class="prio">P2</span></div><div class="title">Konflikt-Radar für Aufgaben mit denselben Dateien</div>
+            <span class="cflag conflict" title="Beide ändern: scripts/board/board.js, scripts/board/board.css"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5l6 10.5H2z"/><path d="M8 7v2.5M8 11.4v.1"/></svg>Gleiche Dateien wie W-0015</span></article>
+          <article class="card" data-prio="P3"><div class="card-top"><span class="id">W-0013</span><span>Feature</span><span class="effort">S</span><span class="prio">P3</span></div><div class="title">Hinweis bei Stillstand einer Aufgabe</div>
+            <span class="cflag still"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/></svg>Seit 4 Tagen still, keine Übergabe</span></article>
+        </div>
+      </section>
+      <section class="col" style="--c:var(--s-review)">
+        <div class="col-head"><span class="dot"></span><h2>Review</h2><span class="n">1</span></div>
+        <div class="cards">
+          <article class="card" data-prio="P2"><div class="card-top"><span class="id">W-0015</span><span>Feature</span><span class="effort">M</span><span class="prio">P2</span></div><div class="title">Feierabend und Guten Morgen</div>
+            <span class="cflag conflict" title="Beide ändern: scripts/board/board.js, scripts/board/board.css"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5l6 10.5H2z"/><path d="M8 7v2.5M8 11.4v.1"/></svg>Gleiche Dateien wie W-0012</span></article>
+        </div>
+      </section>
+      <div class="w-box">
+        <h3>In der Live-Ansicht unter „Wartet auf dich“</h3>
+        <ul class="lv-attn">
+          <li><button type="button"><span class="lv-si warn"><svg viewBox="0 0 16 16"><path d="M8 4.2v4.4"/><path d="M8 11.5v.1"/></svg></span><span class="t">W-0012 und W-0015 ändern board.js</span></button></li>
+          <li><button type="button"><span class="lv-si wait"></span><span class="t">W-0013 seit 4 Tagen still</span></button></li>
+          <li><button type="button"><span class="lv-si review"><svg viewBox="0 0 16 16"><path d="M1.8 8s2.3-4.2 6.2-4.2S14.2 8 14.2 8s-2.3 4.2-6.2 4.2S1.8 8 1.8 8z"/><circle cx="8" cy="8" r="1.8"/></svg></span><span class="t">W-0015 abnehmen</span></button></li>
+        </ul>
+        <p style="margin:0;font-size:12.5px;color:var(--text-2)">Der Konflikt-Hinweis nennt die Datei, die am häufigsten betroffen ist. Die vollständige Liste steht im Tooltip und im Detailpanel der Aufgabe.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <header><h2><span class="id">W-0011</span>Diff zu einem Schritt im Verlauf</h2>
+      <p id="diffNote"></p></header>
+    <div class="grid2" id="diffStage"></div>
+  </section>
+
+  <section class="sec">
+    <header><h2><span class="id">W-0014</span>Prüfungs-Gesundheit unter Werkzeuge</h2>
+      <p>Neuer Abschnitt unter Werkzeuge, ausgewertet über die Prüfungsergebnisse aller Aufgaben (letzte fünf Läufe je Aufgabe). Drei Sortierungen: am häufigsten rot, am langsamsten, wackelig. Bei 51 Prüfungen zeigt er die ersten 10, „Alle anzeigen“ klappt den Rest auf. Auf dem Handy fallen die Spalten Läufe und Verlauf weg.</p></header>
+    <div class="w-box">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><h3 style="margin-right:auto">Prüfungen im Projekt <span class="muted" style="font-weight:400">51 Prüfungen, 23 Aufgaben</span></h3>
+        <div class="hth-tabs" role="group"><button data-sort="red" aria-pressed="true">Oft rot</button><button data-sort="slow" aria-pressed="false">Langsam</button><button data-sort="flaky" aria-pressed="false">Wackelig</button></div></div>
+      <div class="hth-wrap"><table class="hth"><thead><tr><th>Prüfung</th><th class="num opt">Läufe</th><th>Rot</th><th class="num">Median</th><th class="opt">Letzte Läufe</th><th></th></tr></thead><tbody id="hthBody"></tbody></table></div>
+      <button class="btn link" style="justify-self:start">Alle 51 anzeigen</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const S = { diff: 'A', sort: 'red' };
+  const DIFF = '<div class="diff"><div class="diff-body mono"><div class="dl dh">@@ -84,7 +84,9 @@ export function grantXp(member, msg) {</div><div class="dl">   if (!msg.guild) return 0;</div><div class="dl dd">-  const xp = member.xp + 15;</div><div class="dl da">+  const base = member.xp ?? 0;</div><div class="dl da">+  const xp = base + xpFor(msg);</div><div class="dl da">+  if (cooldown.has(member.id)) return base;</div><div class="dl">   await saveXp(member.id, xp);</div><div class="dl">   return xp;</div></div></div>';
+  const feed = (open) => '<ol class="lv-feed">' +
+    '<li class="k-tool"><span class="f-time">14:12</span><span class="f-what"><span class="f-verb">Befehl</span><span class="mono">npm test</span></span></li>' +
+    '<li class="k-file" role="button" tabindex="0" aria-expanded="' + open + '"><span class="f-time">14:09</span><span class="f-what"><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg><span class="f-verb">Bearbeitet</span><span class="mono">src/modules/levels.ts</span></span>' +
+    (open && S.diff === 'A' ? '<div class="lv-fdiff"><div class="lv-fdiff-head"><span class="add">+3</span><span class="del">−1</span><span class="muted">Stand jetzt gegen den letzten Commit</span><button class="btn link" type="button">Ganze Datei im Detailpanel</button></div>' + DIFF + '</div>' : '') + '</li>' +
+    '<li class="k-file" role="button" tabindex="0" aria-expanded="false"><span class="f-time">14:02</span><span class="f-what"><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg><span class="f-verb">Schreibt</span><span class="mono">src/modules/levels.test.ts</span></span></li>' +
+    '<li class="k-step"><span class="f-time">13:58</span><span class="f-what"><span class="fi ok"><svg viewBox="0 0 16 16"><path d="M3.5 8.4l2.9 2.9 6.1-6.6"/></svg></span><span class="f-verb">Schritt erledigt</span><span class="mono">Ursache der leeren XP-Werte finden</span></span></li></ol>';
+  const NOTE = {
+    A: '<b>A Aufklappen:</b> Einträge mit einer Datei („Bearbeitet“, „Schreibt“) bekommen einen Pfeil. Ein Klick klappt den Diff direkt unter dem Eintrag auf, höchstens 260 px hoch, darüber scrollt er. „Ganze Datei im Detailpanel“ öffnet den vorhandenen Reiter Code und Commits. Gut, um nebenbei kurz hineinzusehen.',
+    B: '<b>B Seitenleiste:</b> Ein Klick öffnet rechts eine Leiste mit dem ganzen Diff der Datei. Mehr Platz für große Änderungen, verdeckt aber einen Teil der Live-Ansicht, solange sie offen ist.',
+  };
+  function renderDiff() {
+    $('#diffNote').innerHTML = NOTE[S.diff] + ' Gezeigt wird der aktuelle Stand der Datei gegen den letzten Commit (bei Aufgaben im Worktree aus dem Worktree), nicht der einzelne Werkzeugaufruf, weil der nirgends gespeichert ist. Im Leselink sind die Einträge nicht klickbar.';
+    $('#diffStage').innerHTML = S.diff === 'A'
+      ? '<div class="w-box"><h3>Verlauf in der Mitte der Live-Ansicht</h3>' + feed(true) + '</div><div></div>'
+      : '<div class="w-box"><h3>Verlauf in der Mitte der Live-Ansicht</h3>' + feed(false).replace('aria-expanded="false"><span class="f-time">14:09', 'aria-expanded="true"><span class="f-time">14:09') + '</div><aside class="sidesheet"><header><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2.5h5l3 3v8H4z"/></svg><span class="mono">src/modules/levels.ts</span><span class="add" style="color:var(--ok)">+3</span><span style="color:var(--danger)">−1</span><button class="btn small ghost" style="margin-left:auto">Schließen</button></header>' + DIFF + '</aside>';
+  }
+  const CK = [
+    ['bot-db', 23, 9, 4200, 'ofofo', true], ['bot-music', 23, 6, 3800, 'oofof', true], ['test', 18, 5, 31000, 'ooofo', false], ['e2e', 12, 4, 30000, 'oooof', false],
+    ['web-build', 23, 1, 48000, 'ooooo', false, 21000], ['bot-levels', 23, 3, 9000, 'ooffo', false], ['typecheck', 23, 0, 14000, 'ooooo', false], ['lint', 23, 0, 6000, 'ooooo', false],
+  ];
+  function renderHth() {
+    const by = { red: (a, b) => b[2] / b[1] - a[2] / a[1], slow: (a, b) => b[3] - a[3], flaky: (a, b) => (b[5] - a[5]) || (b[2] - a[2]) };
+    const rows = [...CK].sort(by[S.sort]).slice(0, 7);
+    $('#hthBody').innerHTML = rows.map((c) => {
+      const pct = Math.round(c[2] / c[1] * 100);
+      return '<tr><td class="nm">' + c[0] + '</td><td class="num opt">' + c[1] + '</td><td><span class="bar"><i style="width:' + pct + '%"></i></span>' + pct + ' %</td><td class="num' + (c[6] ? ' slow' : '') + '">' + Math.round(c[3] / 1000) + ' s' + (c[6] ? ' ↑' : '') + '</td><td class="opt"><span class="lv-hist">' + [...c[4]].map((x) => '<i class="' + (x === 'o' ? 'ok' : 'fail') + '"></i>').join('') + '</span></td><td>' + (c[5] ? '<span class="flk">wackelig</span>' : '') + '</td></tr>';
+    }).join('');
+    document.querySelectorAll('[data-sort]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sort === S.sort)));
+  }
+  function render() { renderDiff(); renderHth(); document.querySelectorAll('[data-k]').forEach((b) => b.setAttribute('aria-pressed', String(S[b.dataset.k] === b.dataset.val))); }
+  document.addEventListener('click', (e) => {
+    const k = e.target.closest('[data-k]'); if (k) { S[k.dataset.k] = k.dataset.val; render(); return; }
+    const s = e.target.closest('[data-sort]'); if (s) { S.sort = s.dataset.sort; renderHth(); }
+  });
+  let theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const applyTheme = () => { document.documentElement.dataset.theme = theme; $('#theme').textContent = theme === 'dark' ? 'Hell' : 'Dunkel'; };
+  $('#theme').onclick = () => { theme = theme === 'dark' ? 'light' : 'dark'; applyTheme(); };
+  applyTheme();
+  render();
+})();
+</script>
+</body>
+</html>

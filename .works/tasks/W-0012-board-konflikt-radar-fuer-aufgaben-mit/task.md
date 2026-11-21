@@ -64,3 +64,5 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
 - 2026-11-21: decisions.md angelegt
+- 2026-11-21: Brainstorming angehängt
+- 2026-11-21: Entwurf A „Board-Erweiterungen W-0011 bis W-0014“ angehängt
