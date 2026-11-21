@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Board-Feinschliff Entwurf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Instrument+Sans:wdth,wght@75..100,400..700&display=swap" rel="stylesheet">
+<!-- Echte Board-Styles, damit der Entwurf aussieht wie das Board. -->
+<link rel="stylesheet" href="file:///D:/Development/mycron/plugins/works/skills/works/scripts/board/board.css">
+<style>
+@font-face { font-family: "Geist"; src: url("file:///D:/Development/mycron/plugins/works/skills/works/scripts/board/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+:root[data-font="instrument"] { --font: "Instrument Sans", ui-sans-serif, system-ui, sans-serif; }
+:root[data-font="plex"] { --font: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; }
+body { font-family: var(--font); }
+
+/* Entwurfsrahmen, nicht Teil des Designs */
+.frame { padding: 10px 24px 12px; background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--accent) 7%, var(--surface)) 0 12px, color-mix(in srgb, var(--accent) 11%, var(--surface)) 12px 24px); border-bottom: 1px dashed var(--accent); display: grid; gap: 8px; font-family: "Geist", system-ui, sans-serif; }
+.frame-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.frame-label { font-size: 12px; font-weight: 600; color: var(--accent); letter-spacing: .02em; }
+.fgrp { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+.segc { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); padding: 2px; gap: 2px; }
+.segc button { white-space: nowrap; border: 0; background: none; height: 28px; padding: 0 10px; border-radius: 7px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
+.segc button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.segc .rec { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 4px; background: color-mix(in srgb, var(--ok) 22%, transparent); }
+.frame-notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 18px; font-size: 12.5px; color: var(--text-2); }
+.frame-notes b { color: var(--text); }
+.spacer { flex: 1; }
+@media (max-width: 1000px) { .frame-notes { grid-template-columns: 1fr; } }
+
+/* Bühne */
+.stage { padding: 18px 24px 48px; display: grid; gap: 18px; max-width: 1280px; }
+.stage h4 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: none; }
+.row2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.cols2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.cols2 .col { min-width: 0; }
+.w10box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.toastbox { display: grid; gap: 8px; max-width: 380px; }
+.toastbox .toast { animation: none; }
+.msrow { display: flex; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 860px) { .row2, .cols2 { grid-template-columns: minmax(0, 1fr); } .stage, .frame { padding-left: 16px; padding-right: 16px; } }
+
+/* ===== Variante A: Punkte und Chips ===== */
+/* Karten: kein Streifen, Priorität als farbiger Chip mit Form; P1 zusätzlich mit getönter Kante. */
+[data-v="A"] .card::before { display: none; }
+[data-v="A"] .card { padding-left: 12px; }
+[data-v="A"] .card-top .prio { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 10px; background: color-mix(in srgb, var(--pc) 14%, transparent); color: color-mix(in srgb, var(--pc) 80%, var(--text)); }
+[data-v="A"] .card-top .prio::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pc); }
+[data-v="A"] .card[data-prio="P1"] .card-top .prio::before { border-radius: 1px; transform: rotate(45deg); }
+[data-v="A"] .card[data-prio="P4"] .card-top .prio::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--pc); }
+[data-v="A"] .card[data-prio="P1"] { border-color: color-mix(in srgb, var(--p1) 40%, var(--line)); }
+/* Ablauf: Punkt vor dem Status statt Streifen. */
+[data-v="A"] .flow .seg::before { position: static; width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+[data-v="A"] .flow .seg { flex-direction: row; align-items: center; gap: 7px; }
+/* Verlauf: Punkt vor der Zeit statt Kante. */
+[data-v="A"] .feed li { border-left: 0; padding-left: 12px; }
+[data-v="A"] .feed li .time { display: inline-flex; align-items: center; gap: 7px; }
+[data-v="A"] .feed li .time::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cc); flex: none; }
+/* Meldungen: Symbol links statt Kante. */
+[data-v="A"] .toast { border-left: 1px solid var(--line); grid-template-columns: 20px minmax(0, 1fr); column-gap: 10px; }
+[data-v="A"] .toast > * { grid-column: 2; }
+[data-v="A"] .toast::before { content: "✓"; grid-column: 1; grid-row: 1 / span 3; align-self: start; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: color-mix(in srgb, var(--cc) 18%, transparent); color: var(--cc); }
+[data-v="A"] .toast.err::before { content: "!"; }
+[data-v="A"] .toast.chg::before { content: "→"; }
+
+/* ===== Variante B: Obere Kante ===== */
+[data-v="B"] .card::before { left: 10px; right: 10px; top: 0; bottom: auto; width: auto; height: 2px; border-radius: 0 0 2px 2px; }
+[data-v="B"] .card { padding-left: 12px; }
+[data-v="B"] .flow .seg::before { top: auto; bottom: 0; left: 0; right: 0; width: auto; height: 3px; }
+[data-v="B"] .feed li { border-left: 0; padding-left: 12px; }
+[data-v="B"] .feed li .time { display: inline-flex; align-items: center; gap: 7px; }
+[data-v="B"] .feed li .time::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cc); flex: none; }
+[data-v="B"] .toast { border-left: 1px solid var(--line); border-top: 2px solid var(--cc); }
+
+/* Meilenstein: in A und B mit transform statt width (sieht gleich aus, ruckelt nicht). */
+[data-v="A"] .ms .track span, [data-v="B"] .ms .track span { width: 100% !important; transform-origin: left; transform: scaleX(var(--s)); transition: transform .6s cubic-bezier(.2,.7,.2,1); }
+</style>
+</head>
+<body>
+<div class="frame" role="region" aria-label="Entwurfsrahmen, nicht Teil des Designs">
+  <div class="frame-row">
+    <span class="frame-label">ENTWURF W-0010</span>
+    <span class="fgrp">Farbstreifen<span class="segc" role="group" aria-label="Variante"><button data-k="v" data-val="before">Heute</button><button data-k="v" data-val="A">A Punkte und Chips<span class="rec">Empfehlung</span></button><button data-k="v" data-val="B">B Obere Kante</button></span></span>
+    <span class="fgrp">Schrift<span class="segc" role="group" aria-label="Schrift"><button data-k="font" data-val="geist">Geist (heute)<span class="rec">Empfehlung</span></button><button data-k="font" data-val="instrument">Instrument Sans</button><button data-k="font" data-val="plex">IBM Plex Sans</button></span></span>
+    <span class="spacer"></span>
+    <button class="btn small" id="theme" type="button">Dunkel</button>
+  </div>
+  <div class="frame-notes" id="notes"></div>
+</div>
+
+<main class="stage" id="stage">
+  <section>
+    <h4>Ablauf (Zahl je Status, oben im Board)</h4>
+    <div class="flow" role="list">
+      <button class="seg" style="--c:var(--s-backlog);--w:2" role="listitem"><span class="n">2</span><span class="l">Backlog</span></button>
+      <button class="seg zero" style="--c:var(--s-geplant);--w:0.0001" role="listitem"><span class="n">0</span><span class="l">Geplant</span></button>
+      <button class="seg" style="--c:var(--s-in-arbeit);--w:3" role="listitem"><span class="n">3</span><span class="l">In Arbeit</span></button>
+      <button class="seg" style="--c:var(--s-review);--w:1" role="listitem"><span class="n">1</span><span class="l">Review</span></button>
+      <button class="seg" style="--c:var(--s-erledigt);--w:4" role="listitem"><span class="n">4</span><span class="l">Erledigt</span></button>
+    </div>
+  </section>
+
+  <div class="row2">
+    <section>
+      <h4>Karten (der Streifen zeigt heute die Priorität)</h4>
+      <div class="cols2">
+        <section class="col" style="--c:var(--s-in-arbeit)">
+          <div class="col-head"><span class="dot"></span><h2>In Arbeit</h2><span class="n">3</span></div>
+          <div class="cards">
+            <article class="card" data-prio="P1" style="--pc:var(--p1)"><div class="card-top"><span class="id">W-0153</span><span>Bug</span><span class="effort">S</span><span class="prio">P1</span></div><div class="title">Backup bricht bei Foren mit über 1000 Threads ab</div></article>
+            <article class="card" data-prio="P2" style="--pc:var(--p2)"><div class="card-top"><span class="id">W-0152</span><span>Verbesserung</span><span class="effort">M</span><span class="prio">P2</span></div><div class="title">Kleinigkeiten aus dem Review von W-0151</div></article>
+            <article class="card" data-prio="P3" style="--pc:var(--p3)"><div class="card-top"><span class="id">W-0150</span><span>Feature</span><span class="effort">M</span><span class="prio">P3</span></div><div class="title">Rangkarten mit Saisonfarben</div></article>
+          </div>
+        </section>
+        <section class="col" style="--c:var(--s-review)">
+          <div class="col-head"><span class="dot"></span><h2>Review</h2><span class="n">2</span></div>
+          <div class="cards">
+            <article class="card changed" data-prio="P2" style="--pc:var(--p2);--cc:var(--s-review)"><span class="change">In Arbeit → Review</span><div class="card-top"><span class="id">W-0151</span><span>Feature</span><span class="effort">L</span><span class="prio">P2</span></div><div class="title">Levelsystem mit XP je Nachricht</div></article>
+            <article class="card" data-prio="P4" style="--pc:var(--p4)"><div class="card-top"><span class="id">W-0147</span><span>Aufgabe</span><span class="effort">S</span><span class="prio">P4</span></div><div class="title">Alte Rollen-Namen aufräumen</div></article>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section>
+      <h4>Verlauf (Aktivität) und Meldungen</h4>
+      <div class="w10box">
+        <ol class="feed">
+          <li style="--cc:var(--s-review)"><span class="time">21.11. 14:02, Board</span><span><strong>W-0151</strong> Levelsystem mit XP je Nachricht</span><span class="flowline"><span class="st" style="--c:var(--s-in-arbeit)">In Arbeit</span> → <span class="st" style="--c:var(--s-review)">Review</span></span></li>
+          <li style="--cc:var(--s-backlog)"><span class="time">21.11. 13:47, Claude</span><span><strong>W-0154</strong> Slash-Befehl /backup status</span><span class="flowline">Neu in <span class="st" style="--c:var(--s-backlog)">Backlog</span></span></li>
+          <li style="--cc:var(--p1)"><span class="time">21.11. 13:30, Claude</span><span><strong>W-0153</strong> Backup bricht bei großen Foren ab</span><span class="flowline">Priorität P3 → P1</span></li>
+          <li style="--cc:var(--danger)"><span class="time">21.11. 12:58, Board</span><span><strong>W-0149</strong> Testaufgabe</span><span class="flowline">Verworfen</span></li>
+        </ol>
+      </div>
+      <div class="toastbox" style="margin-top:14px">
+        <div class="toast"><div class="what">Gespeichert</div></div>
+        <div class="toast chg" style="--cc:var(--s-review)"><div class="what">W-0151 Levelsystem mit XP je Nachricht</div><div class="flowline"><span class="st" style="--c:var(--s-in-arbeit)">In Arbeit</span> → <span class="st" style="--c:var(--s-review)">Review</span></div></div>
+        <div class="toast err"><div class="what">Nicht gespeichert</div><div class="why">Der Titel darf nicht leer sein.</div></div>
+      </div>
+    </section>
+  </div>
+
+  <section>
+    <h4>Meilensteine (Balken füllt sich beim Laden)</h4>
+    <div class="msrow">
+      <button class="ms"><span class="t"><small>M1</small>Backups für alle Server</span><span class="pct">60 %</span><span class="sub">3 von 5 erledigt, fällig 30.11.</span><span class="track"><span style="width:60%;--s:.6"></span></span></button>
+      <button class="ms"><span class="t"><small>M2</small>Ranglisten</span><span class="pct">25 %</span><span class="sub">1 von 4 erledigt</span><span class="track"><span style="width:25%;--s:.25"></span></span></button>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const S = { v: 'A', font: 'geist' };
+  const NOTES = {
+    before: '<b>Heute:</b> Ein 3 px Streifen links an Karten (Priorität), Ablauf-Abschnitten (Status), Verlaufseinträgen und Meldungen. Der Streifen an den Karten wiederholt nur, was oben rechts schon als „P2“ steht.',
+    A: '<b>A Punkte und Chips:</b> Kein Streifen mehr. Die Priorität wird ein farbiger Chip mit Form (P1 Raute, P2 und P3 Punkt, P4 Ring), damit sie nicht nur an der Farbe hängt. P1-Karten bekommen eine leicht getönte Kante, damit Dringendes aus der Ferne auffällt. Ablauf und Verlauf zeigen einen farbigen Punkt, Meldungen ein kleines Symbol (✓, →, !).',
+    B: '<b>B Obere Kante:</b> Die Farbe wandert an die Oberkante: eine feine Linie oben an Karten und Meldungen, ein Balken unten an den Ablauf-Abschnitten. Wirkt ruhiger als heute, bleibt aber eine reine Farbkennung. Verlauf wie in A mit Punkt.',
+  };
+  const FONTS = {
+    geist: '<b>Schrift Geist (Empfehlung: behalten):</b> Liegt schon im Plugin, sehr gut lesbar bei 12 bis 14 px, ruhige Ziffern für IDs und Zeiten. Der Detektor mag sie nur, weil sie verbreitet ist. Vorschlag: als bewusst gewählt markieren.',
+    instrument: '<b>Instrument Sans:</b> Etwas mehr Charakter (engere Formen, eigene Ziffern), variable Breite. Müsste als Datei ins Plugin (Lizenz OFL, rund 70 KB).',
+    plex: '<b>IBM Plex Sans:</b> Technischer, eigenständiger Auftritt, breitere Laufweite, dadurch passt etwas weniger auf eine Karte. Müsste ebenfalls als Datei ins Plugin (Lizenz OFL).',
+  };
+  function render() {
+    $('#stage').dataset.v = S.v;
+    document.documentElement.dataset.font = S.font;
+    $('#notes').innerHTML = '<p>' + NOTES[S.v] + '</p><p>' + FONTS[S.font] + '</p><p><b>Meilenstein-Balken:</b> In A und B füllt sich der Balken per transform statt über die Breite. Sieht gleich aus, ruckelt aber nicht. Keine Wahl nötig.</p>';
+    document.querySelectorAll('[data-k]').forEach((b) => b.setAttribute('aria-pressed', String(S[b.dataset.k] === b.dataset.val)));
+  }
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) { S[b.dataset.k] = b.dataset.val; render(); } });
+  let theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const applyTheme = () => { document.documentElement.dataset.theme = theme; $('#theme').textContent = theme === 'dark' ? 'Hell' : 'Dunkel'; };
+  $('#theme').onclick = () => { theme = theme === 'dark' ? 'light' : 'dark'; applyTheme(); };
+  applyTheme();
+  render();
+})();
+</script>
+</body>
+</html>

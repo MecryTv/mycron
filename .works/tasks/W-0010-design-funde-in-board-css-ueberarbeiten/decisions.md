@@ -27,6 +27,8 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 - 2026-11-21: Der gemeldete Meilenstein-Balken (`.ms .track`) gehört zu einem Block, den das Board nicht mehr verwendet (Meilensteine sind ein Auswahlfeld). Der Block `.milestones`/`.ms` ist gelöscht statt umgebaut.
 - 2026-11-21: Die kleinen Quadrate im Prioritätsfilter (`.pdot`) bleiben, sie stehen immer neben dem Text P1 bis P4.
 
+- 2026-11-21: Nutzer wählt nach dem Umsetzen doch Variante B (obere Kante), sie gefällt ihm besser. Umgestellt: feine 2 px Linie oben an Karten (Prioritätsfarbe) und Meldungen (Farbe der Meldung), 2 px Balken unten an den Abschnitten der Flussleiste, Priorität wieder als farbiger Text ohne Chip, keine getönte P1-Kante. Der Verlauf behält den Punkt vor der Zeit. Mit 3 px meldete der Detektor den Balken der Flussleiste noch, mit 2 px nicht mehr, passend zu Karten und Meldungen.
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 
@@ -58,5 +60,7 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 <!-- Was wurde gezeigt oder erwogen und warum nicht genommen? -->
 
 ## Gewählter Entwurf
+
+- 2026-11-21: Variante B „Feinschliff Board: B Obere Kante (gleicher Entwurf, Variante B)“ gewählt, Grund: Nutzer: Design mit der oberen Kante gefällt besser, Schrift Geist bleibt. Datei: design/B-feinschliff-board-b-obere.html. Nicht gewählt: A Feinschliff Board: A Punkte und Chips, B Obere Kante, Schriften
 
 - 2026-11-21: Variante A „Feinschliff Board: A Punkte und Chips, B Obere Kante, Schriften“ gewählt, Grund: Nutzer: A und Geist (Streifen durch Punkte und Chips ersetzen, Schrift Geist behalten). Datei: design/A-feinschliff-board-a-punkte.html

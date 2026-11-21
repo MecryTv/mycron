@@ -63,7 +63,7 @@
   function toast(html, kind, onClick, color) {
     const box = $('#toasts');
     const el = document.createElement('div');
-    el.className = 'toast' + (kind === 'err' ? ' err' : color ? ' chg' : '');
+    el.className = 'toast' + (kind === 'err' ? ' err' : '');
     if (color) el.style.setProperty('--cc', color);
     el.innerHTML = html;
     el.onclick = () => { el.remove(); if (onClick) onClick(); };

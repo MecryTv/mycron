@@ -150,7 +150,7 @@ h1 .dim { color: var(--muted); font-weight: 500; }
   background: color-mix(in srgb, var(--c) 16%, var(--surface)); color: var(--text);
   transition: flex-grow .5s cubic-bezier(.2,.7,.2,1), background-color .2s;
 }
-.flow .seg::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--c); }
+.flow .seg::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--c); }
 .flow .seg:hover { background: color-mix(in srgb, var(--c) 26%, var(--surface)); }
 .flow .seg .n { font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .flow .seg .l { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -275,18 +275,15 @@ h1 .dim { color: var(--muted); font-weight: 500; }
 }
 .card:hover { border-color: var(--line-strong); }
 .card.dragging { opacity: .45; }
-.card[data-prio="P1"] { --pc: var(--p1); border-color: color-mix(in srgb, var(--p1) 40%, var(--line)); }
+.card::before { content: ""; position: absolute; left: 10px; right: 10px; top: 0; height: 2px; border-radius: 0 0 2px 2px; background: var(--pc); }
+.card[data-prio="P1"] { --pc: var(--p1); }
 .card[data-prio="P2"] { --pc: var(--p2); }
 .card[data-prio="P3"] { --pc: var(--p3); }
 .card.closed { opacity: .8; }
 .card.closed .title { color: var(--text-2); }
 .card-top { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .card-top .id { font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
-/* Priorität als Chip: Farbe plus Form (Raute P1, Punkt P2 und P3, Ring P4), damit sie nicht nur an der Farbe hängt. */
-.card-top .prio { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 10px; font-weight: 650; font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--pc) 14%, transparent); color: color-mix(in srgb, var(--pc) 80%, var(--text)); }
-.card-top .prio::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pc); }
-.card[data-prio="P1"] .card-top .prio::before { border-radius: 1px; transform: rotate(45deg); }
-.card[data-prio="P4"] .card-top .prio::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--pc); }
+.card-top .prio { margin-left: auto; font-weight: 650; color: var(--pc); font-variant-numeric: tabular-nums; }
 .effort { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 18px; padding: 0 5px; border-radius: 4px; background: var(--sunken); color: var(--text-2); font-size: 11px; font-weight: 600; }
 .card .title { font-weight: 600; font-size: 14px; line-height: 1.35; color: var(--text); overflow-wrap: anywhere; }
 .card img { width: 100%; height: 108px; object-fit: cover; object-position: top; border-radius: 6px; border: 1px solid var(--line); background: var(--sunken); }
@@ -458,13 +455,9 @@ dialog .err { color: var(--danger); font-size: 13px; min-height: 0; }
 /* Hinweise */
 .toasts { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 60; width: min(380px, calc(100vw - 32px)); }
 .toast {
-  --cc: var(--accent); display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 2px 10px; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line);
-  box-shadow: var(--shadow-pop); font-size: 13px; cursor: pointer; animation: tin .22s ease-out;
+  --cc: var(--accent); display: grid; gap: 2px; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line);
+  border-top: 2px solid var(--cc); box-shadow: var(--shadow-pop); font-size: 13px; cursor: pointer; animation: tin .22s ease-out;
 }
-.toast > * { grid-column: 2; }
-.toast::before { content: "✓"; grid-column: 1; grid-row: 1 / span 3; align-self: start; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: color-mix(in srgb, var(--cc) 18%, transparent); color: var(--cc); }
-.toast.chg::before { content: "→"; }
-.toast.err::before { content: "!"; }
 .toast.err { --cc: var(--danger); }
 .toast .what { font-weight: 600; }
 .toast .why { color: var(--muted); font-size: 12px; }
