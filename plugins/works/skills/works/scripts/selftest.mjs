@@ -453,6 +453,17 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     await api('POST', '/api/action', { action: 'checksSave', checks: saved });
     const cfgChecks = JSON.parse(fs.readFileSync(path.join(proj, '.works', 'config.json'), 'utf8')).checks;
     expect(cfgChecks.api0 && cfgChecks.api0.cwd === 'sub dir' && cfgChecks.api13 === 'node -v', `checksSave: ${JSON.stringify(cfgChecks).slice(0, 200)}`);
+    // Erneut prüfen (W-0006): Nur die genannten Prüfungen laufen, die übrigen Ergebnisse bleiben stehen.
+    await api('POST', '/api/action', { action: 'checksSave', checks: { rok: 'node -v', rbad: 'node fehlt-absichtlich.js' } });
+    w(['checks', 'run', 'W-0001']);
+    const ckF = ['tasks', 'archive'].map((d) => path.join(proj, '.works', d)).flatMap((d) => (fs.existsSync(d) ? fs.readdirSync(d).filter((x) => x.startsWith('W-0001-')).map((x) => path.join(d, x, 'checks.json')) : []))[0];
+    const r0 = JSON.parse(fs.readFileSync(ckF, 'utf8')).results;
+    expect(r0.rok.status === 'ok' && r0.rbad.status === 'fail', `Ausgangslage: ${JSON.stringify(r0).slice(0, 200)}`);
+    await api('POST', '/api/action', { action: 'checksRun', id: 'W-0001', only: ['rbad'] });
+    const r1 = JSON.parse(fs.readFileSync(ckF, 'utf8')).results;
+    expect(r1.rok.at === r0.rok.at && r1.rbad.at !== r0.rbad.at, 'checksRun mit only hat nicht nur rbad laufen lassen');
+    const badOnly = await fetch(url + '/api/action', { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'checksRun', id: 'W-0001', only: ['../x'] }) });
+    expect(badOnly.status === 400, `Ungültiger Name in only: ${badOnly.status}`);
     await api('POST', '/api/action', { action: 'checksSave', checks: {} });
     // W-0002 hat keinen Umsetzungsplan: Die Live-Ansicht darf dafür kein NaN oder "Schritt 0 von 0" zeigen.
     w(['start', 'W-0002']);
@@ -474,8 +485,15 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   // Läuft auf 4747 schon das Board eines anderen Projekts, muss der Start im Hintergrund ausweichen.
   await step('Board im Hintergrund: freier Port, Neustart, fester Port', async () => {
     const { default: net } = await import('node:net');
+    // Den Port selbst belegen. Gibt ihn gerade ein anderer Prozess frei (etwa ein Board, das noch herunterfährt),
+    // bis zu fünf Sekunden warten; ein dauerhaft fremd belegter Port zählt auch als belegt.
     const blocker = net.createServer();
-    await new Promise((r) => { blocker.once('error', r); blocker.listen(4747, '127.0.0.1', r); }); // schon belegt zählt auch
+    let held = false;
+    for (let i = 0; i < 20 && !held; i++) {
+      held = await new Promise((r) => { blocker.once('error', () => r(false)); blocker.listen(4747, '127.0.0.1', () => r(true)); });
+      if (!held) await new Promise((r) => setTimeout(r, 250));
+    }
+    if (!held) log('        Port 4747 ist dauerhaft von einem anderen Programm belegt.');
     try {
       const out = w(['board', '--serve', '--detach']).out;
       const port = (out.match(/127\.0\.0\.1:(\d+)/) || [])[1];
@@ -547,6 +565,14 @@ async function browserCheck(url, log, between = async () => {}) {
     if (!perm.now) errs.push('Live: Jetzt-Box zeigt keine Freigabe');
     if (!/Freigabe für einen Befehl/.test(perm.first)) errs.push(`Live: Freigabe nicht erster Punkt in Wartet auf dich (${perm.first})`);
     if (!perm.pulse || !/^Freigabe/.test(perm.title)) errs.push(`Live: Reiter oder Titel ohne Freigabe (${perm.title})`);
+    // Erneut prüfen (W-0006): Knopf für alle Fehlschläge und je Gruppe. Der Klick lässt die neun roten Prüfungen neu laufen,
+    // sie bestehen diesmal (node -v), die Fehlergruppe verschwindet.
+    const rr = await p.evaluate(() => ({ all: (document.querySelector('#viewLive .lv-ckg-acts [data-lv-rerun]') || {}).innerText || '', n: document.querySelectorAll('#viewLive [data-lv-rerun]').length }));
+    if (!/Alle 9 fehlgeschlagenen erneut prüfen/.test(rr.all) || rr.n < 2) errs.push(`Live: Knöpfe zum erneuten Prüfen fehlen (${rr.n}, ${rr.all})`);
+    else {
+      await p.click('#viewLive .lv-ckg-acts [data-lv-rerun]');
+      try { await p.waitForFunction(() => !document.querySelector('#viewLive .lv-errgrp:not(.warn)'), null, { timeout: 30000 }); } catch { errs.push('Live: Erneut prüfen hat die Fehlergruppe nicht aufgelöst'); }
+    }
     await p.keyboard.press('1'); await p.waitForTimeout(250);
     await p.click('#btnTools'); await p.waitForTimeout(800);
     await between();
