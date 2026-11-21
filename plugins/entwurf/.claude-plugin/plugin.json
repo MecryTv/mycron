@@ -1,0 +1,6 @@
+{
+  "name": "entwurf",
+  "description": "Entwurf-Werkzeug: Entwurfsseiten mit den echten Styles des Projekts, Varianten und hell/dunkel umschaltbar, Screenshots in drei Breiten mit installiertem Chrome samt Prüfung auf seitliches Scrollen und Fehler, Anhängen an works-Aufgaben",
+  "author": { "name": "MecryTv" },
+  "repository": "https://github.com/MecryTv/mycron"
+}

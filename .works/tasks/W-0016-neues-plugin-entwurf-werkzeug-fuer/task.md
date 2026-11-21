@@ -3,7 +3,7 @@ id: W-0016
 title: "Neues Plugin: Entwurf-Werkzeug für Gestaltungsaufgaben"
 type: feature
 priority: P3
-status: backlog
+status: in-arbeit
 effort: M
 risk:
 created: 2026-11-21
@@ -11,7 +11,7 @@ updated: 2026-11-21
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0016-neues-plugin-entwurf-werkzeug
 tags: [skill, plugin, entwurf]
 blocked_by: []
 blocks: []
@@ -35,18 +35,24 @@ Neuer Skill 2 vom 2026-11-21, vom Nutzer gewünscht, als eigenes Plugin im Marke
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Ein Skill führt durch Entwurf, Varianten-Rahmen, Screenshots in drei Breiten und das Anhängen an die Aufgabe
-- [ ] Ein Hilfsskript macht Screenshots mit installiertem Chrome und meldet seitliches Scrollen und Seitenfehler
-- [ ] Funktioniert mit und ohne works (ohne works nur Dateien und Screenshots)
-- [ ] Das Plugin steht im Marketplace mycron
+- [x] Ein Skill führt durch Entwurf, Varianten-Rahmen, Screenshots in drei Breiten und das Anhängen an die Aufgabe
+- [x] Ein Hilfsskript macht Screenshots mit installiertem Chrome und meldet seitliches Scrollen und Seitenfehler
+- [x] Funktioniert mit und ohne works (ohne works nur Dateien und Screenshots)
+- [x] Das Plugin steht im Marketplace mycron
 
 ## Umsetzungsplan
-- [ ] Ablauf und Auslöser festlegen
-- [ ] Plugin-Gerüst, Vorlage für die Entwurfsseite
-- [ ] Screenshot-Skript
-- [ ] Test an einer echten Gestaltungsaufgabe, Doku
+- [x] Ablauf und Auslöser festlegen
+- [x] Plugin-Gerüst, Vorlage für die Entwurfsseite
+- [x] Screenshot-Skript
+- [x] Test an einer echten Gestaltungsaufgabe, Doku
 
 ## Betroffene Dateien
+- `plugins/entwurf/skills/entwurf/scripts/entwurf.mjs`: shots (Screenshots, Prüfung) und inline (Einbetten)
+- `plugins/entwurf/skills/entwurf/scripts/test.mjs`: Test für beide Teile
+- `plugins/entwurf/skills/entwurf/vorlage.html`: Entwurfsseite mit Umschaltrahmen
+- `plugins/entwurf/skills/entwurf/SKILL.md`: Ablauf und Fallen
+- `plugins/entwurf/.claude-plugin/plugin.json`, `plugins/entwurf/README.md`
+- `.claude-plugin/marketplace.json`, `README.md`: Eintrag im Marketplace
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
 
 ## Designentscheidungen
@@ -65,3 +71,5 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-21: Aufgabe angelegt
 - 2026-11-21: decisions.md angelegt
 - 2026-11-21: tags: [skill, plugin, design] → [skill, plugin, entwurf]
+- 2026-11-21: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-21: Plugin entwurf fertig: entwurf.mjs shots/inline, vorlage.html, SKILL.md. Test Windows mit Playwright und Linux (Docker, System-Chromium) grün. Skill per Agent ohne und mit Skill an W-0018 in einer Testkopie geprüft, eingebettete Entwürfe unter der Board-CSP im Browser geprüft. Fund: file://-CSS lädt im Board-iframe nicht, ältere Entwürfe erscheinen dort ungestylt.

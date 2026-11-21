@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Entwurf: TITEL</title>
+<!-- Echte Styles: dieselbe(n) CSS-Datei(en), die die echte Oberfläche lädt, ganz und unverändert.
+     Pfad relativ zu dieser Datei oder als file:///. Für das works-Board bettet `entwurf.mjs inline` sie ein. -->
+<link rel="stylesheet" href="PFAD/ZUR/PROJEKT.css">
+<style>
+/* Varianten-Styles hier, nur für ihre Variante: html[data-v="B"] .klasse { ... }
+   Eigene Klassen immer mit Präfix ew-, damit nichts mit dem Projekt-CSS kollidiert. */
+
+/* Rahmen des Entwurfs, nicht Teil des Designs */
+.ew-frame { position: sticky; top: 0; z-index: 2147483000; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 16px; font: 13px/1.45 system-ui, sans-serif; background: #fff6cc; color: #3d3200; border-bottom: 1px dashed #a88a00; }
+:root[data-theme="dark"] .ew-frame { background: #2a2400; color: #f5e9a8; border-color: #8a7300; }
+.ew-frame b { font-weight: 600; }
+.ew-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid currentColor; border-radius: 9px; }
+.ew-seg button { font: inherit; color: inherit; background: none; border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.ew-seg button[aria-pressed="true"] { background: #3d3200; color: #fff6cc; }
+:root[data-theme="dark"] .ew-seg button[aria-pressed="true"] { background: #f5e9a8; color: #2a2400; }
+.ew-seg button:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.ew-note { flex-basis: 100%; margin: 0; }
+.ew-note:empty { display: none; }
+:root[data-frame="0"] .ew-frame { display: none; }
+</style>
+</head>
+<body>
+<div class="ew-frame" role="region" aria-label="Entwurfsrahmen">
+  <b>Entwurf: TITEL</b>
+  <span class="ew-seg" id="ew-variants" role="group" aria-label="Variante"></span>
+  <span class="ew-seg" role="group" aria-label="Farbschema"><button type="button" data-ew-theme="light">Hell</button><button type="button" data-ew-theme="dark">Dunkel</button></span>
+  <p class="ew-note" id="ew-note"></p>
+</div>
+
+<!-- Je Variante ein Abschnitt. Markup aus dem echten Code übernehmen, mit denselben Klassen wie die Oberfläche.
+     data-ew-note erscheint oben im Rahmen: was die Variante anders macht, in ein bis zwei Sätzen. -->
+<section data-ew-variant="A" data-ew-note="A: WAS DIESE VARIANTE MACHT">
+</section>
+
+<section data-ew-variant="B" data-ew-note="B: WAS DIESE VARIANTE MACHT">
+</section>
+
+<script>
+// ?v=B wählt die Variante, ?theme=dark das Farbschema, ?frame=0 blendet den Rahmen aus (so macht entwurf.mjs die Screenshots).
+// <html data-v="B"> setzt die Startvariante (entwurf.mjs inline --variant B). Das Farbschema wirkt über data-theme; reagiert das
+// Projekt-CSS nur auf prefers-color-scheme, schaltet der Knopf nichts um, die Screenshots stimmen trotzdem (Schema wird emuliert).
+(() => {
+  const q = new URLSearchParams(location.search);
+  const root = document.documentElement;
+  const parts = [...document.querySelectorAll('[data-ew-variant]')];
+  let v = q.get('v') || root.dataset.v || (parts[0] && parts[0].dataset.ewVariant);
+  let theme = q.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  if (q.get('frame') === '0') root.dataset.frame = '0';
+  const seg = document.getElementById('ew-variants');
+  for (const p of parts) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.ewV = p.dataset.ewVariant;
+    b.textContent = p.dataset.ewVariant;
+    seg.append(b);
+  }
+  function render() {
+    root.dataset.v = v;
+    root.dataset.theme = theme;
+    for (const p of parts) p.style.display = p.dataset.ewVariant === v ? '' : 'none';
+    document.querySelectorAll('[data-ew-v]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ewV === v)));
+    document.querySelectorAll('[data-ew-theme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ewTheme === theme)));
+    const cur = parts.find((p) => p.dataset.ewVariant === v);
+    document.getElementById('ew-note').textContent = cur ? cur.dataset.ewNote || '' : '';
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ew-v], [data-ew-theme]');
+    if (!b) return;
+    if (b.dataset.ewV) v = b.dataset.ewV; else theme = b.dataset.ewTheme;
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
