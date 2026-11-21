@@ -1,0 +1,34 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Erledigt eingeklappt",
+      "file": "A-erledigt-eingeklappt.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Laufende und offene wie bisher, Erledigtes in einer aufklappbaren Zeile mit kompakten Einträgen",
+      "at": "2026-11-21 16:40"
+    },
+    {
+      "name": "B",
+      "title": "Erledigt kompakt",
+      "file": "B-erledigt-kompakt.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Laufende und offene wie bisher, darunter Erledigt immer sichtbar, je eine Zeile",
+      "at": "2026-11-21 16:40"
+    },
+    {
+      "name": "C",
+      "title": "Gruppen mit Anzahl",
+      "file": "C-gruppen-mit-anzahl.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "In Arbeit, Offen, Erledigt mit Anzahl; vom Erledigten die letzten fünf, Rest hinter einem Knopf",
+      "at": "2026-11-21 16:40"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": null
+}
