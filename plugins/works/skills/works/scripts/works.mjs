@@ -931,7 +931,10 @@ async function cmdBoard() {
     }
     generateIndex(root);
     if (flags.detach || flags.restart) {
-      const pid = startDetached(root, { cli: newestCli(), port, host, takeover: !!(info || legacy.length) });
+      // Fest ist der Port nur, wenn er vorgegeben ist oder ein Server dieses Projekts ihn schon hatte.
+      // Sonst darf der Hintergrundprozess ausweichen, etwa wenn ein anderes Projekt 4747 belegt.
+      const fixed = !!(flags.port || info || legacy.length);
+      const pid = startDetached(root, { cli: newestCli(), port: fixed ? port : 0, host, takeover: !!(info || legacy.length) });
       const started = await waitForServer(root, info ? info.pid : null);
       if (!started) fail(`Board-Server startet nicht (PID ${pid}). Details in .works/server.log`);
       out(`Live-Board läuft: ${serverUrl(started)}`);

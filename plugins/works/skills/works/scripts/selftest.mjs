@@ -409,6 +409,25 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   });
   w(['board', '--stop'], { ok: false });
 
+  // Läuft auf 4747 schon das Board eines anderen Projekts, muss der Start im Hintergrund ausweichen.
+  await step('Board im Hintergrund: freier Port, Neustart, fester Port', async () => {
+    const { default: net } = await import('node:net');
+    const blocker = net.createServer();
+    await new Promise((r) => { blocker.once('error', r); blocker.listen(4747, '127.0.0.1', r); }); // schon belegt zählt auch
+    try {
+      const out = w(['board', '--serve', '--detach']).out;
+      const port = (out.match(/127\.0\.0\.1:(\d+)/) || [])[1];
+      expect(port && port !== '4747', `Start bei belegtem Port 4747: ${out.split('\n')[0]}`);
+      has(w(['board', '--restart']).out, `:${port}/`, 'Neustart behält den Port');
+      w(['board', '--stop']);
+      const fixed = w(['board', '--serve', '--detach', '--port=4747'], { ok: false });
+      expect(fixed.code !== 0, `Belegter ausdrücklicher Port wurde nicht abgelehnt: ${fixed.out.split('\n')[0]}`);
+    } finally {
+      blocker.close();
+      w(['board', '--stop'], { ok: false });
+    }
+  });
+
   const failed = results.filter((r) => !r.ok);
   log(`\n${results.length - failed.length} von ${results.length} Prüfungen bestanden${failed.length ? `, ${failed.length} fehlgeschlagen` : ''}.`);
   if (!keep) { try { cleanupWorktrees(proj); fs.rmSync(base, { recursive: true, force: true }); } catch { /* Windows hält Dateien manchmal kurz fest */ } }

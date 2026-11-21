@@ -34,7 +34,7 @@ Ohne `--detach` läuft der Server im Vordergrund, bis er mit Strg+C beendet wird
 
 Optionen:
 
-- `--port 4800`: fester Port. Ohne Angabe wird ab 4747 der nächste freie Port gesucht.
+- `--port 4800`: fester Port. Ohne Angabe wird ab 4747 der nächste freie Port gesucht, auch mit `--detach`, etwa wenn ein anderes Projekt 4747 belegt. Neustarts behalten den Port des bisherigen Servers.
 - `--host 0.0.0.0`: im lokalen Netz erreichbar machen. Nur auf ausdrücklichen Wunsch, weil dann jeder im Netz, der die Seite öffnet, Aufgaben ändern kann.
 
 ## Demo zum Ausprobieren

@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 10:23 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 10:31 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 |
+| 0 | 0 | 1 | 0 | 0 | 0 | 2 | 0 |
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 1 · P4 Niedrig: 0
+
+## Aktive Aufgabe
+
+[W-0002](tasks/W-0002-board-start-im-hintergrund-weicht-nicht/task.md) Board-Start im Hintergrund weicht nicht auf freien Port aus (In Arbeit), letzte Übergabe 2026-11-21 10:30
 
 ## Kritisch (P1)
 
@@ -16,13 +20,13 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0002](tasks/W-0002-board-start-im-hintergrund-weicht-nicht/task.md) | Board-Start im Hintergrund weicht nicht auf freien Port aus | Bug | P3 Mittel | In Arbeit | S |  |  |  |
 
 ## Geplant und Backlog
 
-| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
-|---|---|---|---|---|---|---|---|---|
-| [W-0002](tasks/W-0002-board-start-im-hintergrund-weicht-nicht/task.md) | Board-Start im Hintergrund weicht nicht auf freien Port aus | Bug | P3 Mittel | Backlog | S |  |  |  |
+_Keine Einträge._
 
 ## Zuletzt erledigt
 
