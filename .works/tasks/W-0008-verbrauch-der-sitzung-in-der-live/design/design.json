@@ -1,0 +1,23 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Live-Ansicht Ergänzungen W-0006 bis W-0009",
+      "file": "A-live-ansicht-ergaenzungen-w.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Gemeinsamer Entwurf, Varianten oben im Rahmen umschaltbar",
+      "at": "2026-11-21 12:40"
+    }
+  ],
+  "brainstorm": [
+    {
+      "file": "brainstorm.md",
+      "source": "superpowers",
+      "title": "Live-Ansicht Ergänzungen",
+      "at": "2026-11-21 12:40"
+    }
+  ],
+  "chosen": null
+}

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Live-Ansicht Ergänzungen</title>
+<!-- Echte Board-Styles, damit der Entwurf aussieht wie das Board. -->
+<link rel="stylesheet" href="file:///D:/Development/mycron/plugins/works/skills/works/scripts/board/board.css">
+<style>
+@font-face { font-family: "Geist"; src: url("file:///D:/Development/mycron/plugins/works/skills/works/scripts/board/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+/* Entwurfsrahmen, nicht Teil des Designs */
+.frame { padding: 10px 24px 12px; background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--accent) 7%, var(--surface)) 0 12px, color-mix(in srgb, var(--accent) 11%, var(--surface)) 12px 24px); border-bottom: 1px dashed var(--accent); display: grid; gap: 8px; }
+.frame-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.frame-label { font-size: 12px; font-weight: 600; color: var(--accent); letter-spacing: .02em; }
+.fgrp { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); padding: 2px; gap: 2px; }
+.seg button { white-space: nowrap; border: 0; background: none; height: 28px; padding: 0 10px; border-radius: 7px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.seg .rec { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 4px; background: color-mix(in srgb, var(--ok) 22%, transparent); }
+.frame-notes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 18px; font-size: 12.5px; color: var(--text-2); }
+.frame-notes b { color: var(--text); }
+.spacer { flex: 1; }
+@media (max-width: 1100px) { .frame-notes { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .frame, .view { padding-left: 16px; padding-right: 16px; } .frame-notes { grid-template-columns: 1fr; } }
+
+/* ===== Neu: W-0007 Freigabe ===== */
+.lv-dot.perm { background: var(--warn); }
+.lv-si.perm { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
+.lv-tile.perm { border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); background: color-mix(in srgb, var(--warn) 9%, var(--surface)); }
+.lv-now.perm { background: color-mix(in srgb, var(--warn) 9%, var(--raised)); border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+.lv-now .n-hint { font-size: 12.5px; color: var(--text-2); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.lv-permbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 12px 16px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--warn) 60%, var(--line)); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); }
+.lv-permbar .lv-si { width: 28px; height: 28px; } .lv-permbar .lv-si svg { width: 15px; height: 15px; }
+.lv-permbar b { font-size: 14px; }
+.lv-permbar p { margin: 0; font-size: 13px; color: var(--text-2); min-width: 0; overflow-wrap: anywhere; }
+.lv-permbar .tm { font-size: 12px; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .lv-permbar { grid-template-columns: auto minmax(0, 1fr); } .lv-permbar .tm { grid-column: 2; } }
+
+/* ===== Neu: W-0008 Verbrauch ===== */
+.lv-usage { font-size: 12px; color: var(--text-2); display: flex; gap: 6px; align-items: baseline; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-top: 6px; margin-top: 2px; border-top: 1px dashed var(--line); }
+.lv-usage b { color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; }
+.lv-ftop .lv-cost { font-variant-numeric: tabular-nums; color: var(--text-2); }
+@media (min-width: 1201px) { .lv-sum.five { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.lv-ubar { display: flex; gap: 2px; height: 8px; border-radius: 3px; overflow: hidden; background: var(--sunken); }
+.lv-ubar i { display: block; }
+
+/* ===== Neu: W-0009 Verlauf je Prüfung ===== */
+.lv-hist { display: inline-flex; gap: 2px; flex: none; }
+.lv-hist i { width: 5px; height: 12px; border-radius: 2px; background: var(--sunken); }
+.lv-hist i.ok { background: color-mix(in srgb, var(--ok) 75%, transparent); }
+.lv-hist i.fail { background: var(--danger); }
+.lv-hist i.warn { background: var(--warn); }
+.lv-flaky { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 10px; font-size: 11.5px; font-weight: 600; background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--text); white-space: nowrap; }
+.lv-trend { color: var(--warn); font-weight: 600; white-space: nowrap; }
+.ck-acts { margin-left: 30px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 12.5px; color: var(--text-2); }
+.ck-acts .ck-out { margin-left: 0; flex-basis: 100%; }
+.lv-names span.fl::after { content: " ~"; color: var(--warn); font-weight: 700; }
+.lv-infoline { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+.lv-infoline .lv-si { width: 16px; height: 16px; margin-top: 1px; } .lv-infoline .lv-si svg { width: 10px; height: 10px; }
+
+/* ===== Neu: W-0006 Erneut prüfen ===== */
+.btn.small.busy { gap: 8px; }
+.btn.small.busy::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: spin .8s linear infinite; }
+.lv-ckg-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+</style>
+</head>
+<body>
+<div class="frame" role="region" aria-label="Entwurfsrahmen, nicht Teil des Designs">
+  <div class="frame-row">
+    <span class="frame-label">ENTWURF W-0006 BIS W-0009</span>
+    <span class="fgrp">Freigabe (W-0007)<span class="seg" role="group" aria-label="Freigabe"><button data-k="perm" data-v="off">Aus</button><button data-k="perm" data-v="A">A Kacheln<span class="rec">Empfehlung</span></button><button data-k="perm" data-v="B">B Hinweisband</button></span></span>
+    <span class="fgrp">Verbrauch (W-0008)<span class="seg" role="group" aria-label="Verbrauch"><button data-k="use" data-v="A">A In Kachel und Kopf<span class="rec">Empfehlung</span></button><button data-k="use" data-v="B">B Eigene Kachel</button></span></span>
+    <span class="fgrp">Prüfungen<span class="seg" role="group" aria-label="Anzahl Prüfungen"><button data-k="many" data-v="0">6 Prüfungen</button><button data-k="many" data-v="1">51 Prüfungen</button></span></span>
+    <span class="spacer"></span>
+    <button class="btn small" id="theme" type="button">Dunkel</button>
+  </div>
+  <div class="frame-notes" id="notes"></div>
+</div>
+<main class="view live-view" id="stage"></main>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const svg = (p) => '<svg viewBox="0 0 16 16" aria-hidden="true">' + p + '</svg>';
+  const IC = {
+    ok: svg('<path d="M3.5 8.4l2.9 2.9 6.1-6.6"/>'), fail: svg('<path d="M5 5l6 6M11 5l-6 6"/>'), warn: svg('<path d="M8 4.2v4.4"/><path d="M8 11.5v.1"/>'),
+    cur: svg('<circle cx="8" cy="8" r="2.8" fill="currentColor" stroke="none"/>'), review: svg('<path d="M1.8 8s2.3-4.2 6.2-4.2S14.2 8 14.2 8s-2.3 4.2-6.2 4.2S1.8 8 1.8 8z"/><circle cx="8" cy="8" r="1.8"/>'),
+    ask: svg('<path d="M6 6a2 2 0 1 1 3 1.7c-.6.4-1 .8-1 1.5"/><path d="M8 11.6v.1"/>'),
+    perm: svg('<rect x="4" y="7.4" width="8" height="5.8" rx="1.2"/><path d="M5.8 7.4V5.6a2.2 2.2 0 0 1 4.4 0v1.8"/>'),
+    trend: svg('<path d="M2.5 11.5l4-4 2.5 2.5 4.5-5"/><path d="M10 5h3.5v3.5"/>'),
+  };
+  const si = (st) => '<span class="lv-si ' + st + '" aria-hidden="true">' + (IC[st] || '') + '</span>';
+  const LBL = { ok: 'bestanden', fail: 'fehlgeschlagen', warn: 'Fund', run: 'läuft', wait: 'wartet' };
+  const S = { perm: 'A', use: 'A', many: '0', rerun: '' };
+  const CMD = 'npm install -D vitest@3';
+
+  // Wenige Prüfungen: Verlauf der letzten 5 Läufe, älteste links.
+  function few() {
+    return [
+      { n: 'typecheck', cmd: 'npm run -s typecheck', st: 'ok', ms: 14000, h: 'ooooo' },
+      { n: 'lint', cmd: 'npm run -s lint', st: 'ok', ms: 6000, h: 'ooooo' },
+      { n: 'test', cmd: 'npm test', st: 'fail', ms: 31000, h: 'ofoof', out: 'FAIL src/modules/levels.test.ts > vergibt XP nach Nachricht\nAssertionError: expected 0 to be 15' },
+      { n: 'build', cmd: 'npm run -s build', st: 'ok', ms: 48000, h: 'ooooo', slow: 21000 },
+      { n: 'e2e', cmd: 'npm run -s e2e', st: 'fail', ms: 30000, h: 'oooof', out: 'Timeout 30000ms exceeded while waiting for selector "#rank-card"' },
+      { n: 'audit', cmd: 'skill:code-audit', st: 'warn', note: 'Bot-Token wird in src/log.ts Zeile 41 ins Debug-Log geschrieben.' },
+    ];
+  }
+  const NAMES = ['bot-tsc', 'bot-admin', 'bot-apply', 'bot-help', 'bot-antivillain', 'bot-automod', 'bot-card', 'bot-clips', 'bot-community', 'bot-dashboard', 'bot-db', 'bot-gallery', 'bot-image', 'bot-levels', 'bot-leveldesign', 'bot-studio', 'bot-lft', 'bot-logging', 'bot-matchups', 'bot-messages', 'bot-moderation', 'bot-presence', 'bot-prime', 'bot-rankroles', 'bot-rolelists', 'bot-serverbackup', 'bot-absences', 'bot-epicname', 'bot-epiclogin', 'bot-events', 'bot-giveaways', 'bot-invites', 'bot-music', 'bot-polls', 'bot-reminders', 'bot-reports', 'bot-roles', 'bot-rules', 'bot-shop', 'bot-stats', 'bot-streams', 'bot-suggestions', 'bot-teams', 'bot-tickets', 'bot-tournaments', 'bot-verify', 'bot-voice', 'bot-welcome', 'web-build', 'web-lint', 'audit'];
+  const PATH = 'The system cannot find the path specified.';
+  function many() {
+    return NAMES.map((n) => {
+      if (n === 'audit') return { n, st: 'warn', note: 'Bot-Token wird in src/log.ts Zeile 41 ins Debug-Log geschrieben.' };
+      if (['bot-tsc', 'bot-admin', 'bot-apply', 'web-lint'].includes(n)) return { n, st: 'ok', ms: 15000, h: 'ooooo' };
+      if (n === 'web-build') return { n, st: 'ok', ms: 48000, h: 'ooooo', slow: 21000 };
+      if (n === 'bot-db') return { n, st: 'fail', out: 'AssertionError: expected 3 rows, got 2', h: 'ofofo' };
+      if (n === 'bot-music') return { n, st: 'fail', out: PATH, h: 'oofof' };
+      return { n, st: 'fail', out: PATH, h: 'oooof' };
+    });
+  }
+  const flaky = (c) => c.h && /o/.test(c.h) && (c.h.match(/f/g) || []).length >= 2;
+  const hist = (c) => c.h ? '<span class="lv-hist" title="Letzte 5 Läufe, neuester rechts">' + [...c.h].map((x) => '<i class="' + (x === 'o' ? 'ok' : 'fail') + '"></i>').join('') + '</span>' : '';
+  const sec = (ms) => Math.round(ms / 1000) + ' s';
+
+  // Erneut prüfen: betroffene Prüfungen gehen in den Zustand "läuft"/"wartet".
+  function applyRerun(list) {
+    if (!S.rerun) return list;
+    const hit = (c) => c.st === 'fail' && (S.rerun === 'all' || S.rerun === c.n || (S.rerun === 'path' && c.out === PATH));
+    let first = true;
+    return list.map((c) => { if (!hit(c)) return c; const st = first ? 'run' : 'wait'; first = false; return { ...c, st, was: 'fail' }; });
+  }
+  const count = (list, st) => list.filter((c) => c.st === st).length;
+
+  function tiles(list) {
+    const perm = S.perm !== 'off';
+    const t1 = perm
+      ? '<button type="button" class="lv-tile lv-tile-btn perm"><h3><i class="lv-dot perm" aria-hidden="true"></i>Claude wartet auf deine Freigabe</h3><div class="big">W-0152 <small>Schritt 3 von 5</small></div><div class="sub">Befehl <span class="mono">' + CMD + '</span>, seit 0:42</div></button>'
+      : '<button type="button" class="lv-tile lv-tile-btn"><h3><i class="lv-dot" aria-hidden="true"></i>Claude arbeitet gerade</h3><div class="big">W-0152 <small>Schritt 3 von 5</small></div><div class="sub">Datei bearbeiten <span class="mono">src/modules/levels.test.ts</span>, seit 0:04</div></button>';
+    const useLine = S.use === 'A' ? '<div class="lv-usage" title="Geschätzt nach den Preisen in config.json">Verbrauch heute <b>2,4 Mio</b> Tokens, ca. <b>6,12 $</b></div>' : '';
+    const t2 = '<article class="lv-tile"><h3>Fortschritt heute</h3><div class="big">2 von 4 <small>fertig</small></div><div class="lv-seg" aria-hidden="true"><i class="done"></i><i class="review"></i><i class="cur"></i><i class="cur"></i></div><div class="sub">1 erledigt · 1 im Review · 2 in Arbeit · 0 warten</div>' + useLine + '</article>';
+    const t3 = '<article class="lv-tile"><h3>Parallel</h3><div class="big">Kein Agent aktiv</div><div class="sub">Alles läuft in der Hauptsitzung</div></article>';
+    const fails = count(list, 'fail'), warns = count(list, 'warn');
+    const att = [];
+    if (perm) att.push(['perm', 'W-0152: Freigabe für einen Befehl']);
+    if (fails) att.push(['fail', 'W-0152: ' + fails + ' Prüfungen fehlgeschlagen']);
+    if (warns) att.push(['warn', 'W-0152: Fund in audit']);
+    att.push(['review', 'W-0151 abnehmen'], ['ask', 'W-0150: 1 offene Frage']);
+    const rest = att.length - 4;
+    const t4 = '<article class="lv-tile attn"><h3>Wartet auf dich</h3><div class="big">' + att.length + ' <small>Punkte</small></div><ul class="lv-attn">' + att.slice(0, 4).map((a) => '<li><button type="button">' + si(a[0]) + '<span class="t">' + esc(a[1]) + '</span></button></li>').join('') + '</ul>' + (rest > 0 ? '<span class="sub">und ' + rest + (rest === 1 ? ' weiterer Punkt' : ' weitere Punkte') + '</span>' : '') + '</article>';
+    const t5 = S.use === 'B' ? '<article class="lv-tile"><h3>Verbrauch heute</h3><div class="big">6,12 $ <small>geschätzt</small></div><div class="lv-ubar" aria-hidden="true"><i style="flex:2.8;background:var(--s-in-arbeit)"></i><i style="flex:1.9;background:var(--s-review)"></i><i style="flex:0.9;background:var(--ok)"></i><i style="flex:0.52;background:var(--line-strong)"></i></div><div class="sub">2,4 Mio Tokens · W-0152 2,80 $ · W-0151 1,90 $</div></article>' : '';
+    return '<section class="lv-sum' + (S.use === 'B' ? ' five' : '') + '" aria-label="Überblick">' + t1 + t2 + t3 + t4 + t5 + '</section>';
+  }
+
+  function permbar() {
+    if (S.perm !== 'B') return '';
+    return '<div class="lv-permbar" role="status">' + si('perm') + '<div><b>Claude wartet auf deine Freigabe</b><p>W-0152 möchte einen Befehl ausführen: <span class="mono">' + CMD + '</span>. Bestätige oder lehne im Claude-Fenster ab.</p></div><span class="tm">seit 0:42</span></div>';
+  }
+
+  function runlist() {
+    const perm = S.perm !== 'off';
+    const rows = [
+      ['W-0152', 'P2', 'Kleinigkeiten aus dem Review von W-0151', perm ? 'perm' : 'cur', perm ? 'Wartet auf deine Freigabe' : 'Schritt 3 von 5: Tests für das Levelsystem ergänzen', 0.4, true],
+      ['W-0150', 'P3', 'Rangkarten mit Saisonfarben', 'cur', 'Schritt 1 von 4: Farben je Saison festlegen', 0.1],
+      ['W-0151', 'P2', 'Levelsystem mit XP je Nachricht', 'review', 'Wartet auf deine Abnahme'],
+      ['W-0148', 'P3', 'Willkommensnachricht mit Regeln', 'ok', 'Heute erledigt'],
+    ];
+    return '<section class="lv-panel lv-runbox" aria-label="Aufgaben heute"><div class="lv-head"><h2>Heute</h2><span class="meta">4 Aufgaben</span></div><ul class="lv-run">' + rows.map((r) => '<li><button type="button" aria-current="' + !!r[6] + '">' + si(r[3]) +
+      '<span class="r-top"><span class="r-id">' + r[0] + '</span><span class="r-prio" style="color:var(--' + r[1].toLowerCase() + ')">' + r[1] + '</span></span><span class="r-title">' + esc(r[2]) + '</span><span class="r-sub">' + esc(r[4]) + '</span>' +
+      (r[5] != null ? '<span class="lv-bar r-bar" style="--s:' + r[5] + '"><i></i></span>' : '') + '</button></li>').join('') + '</ul></section>';
+  }
+
+  function focus() {
+    const perm = S.perm !== 'off';
+    const cost = S.use === 'A' ? '<span class="lv-cost" title="Geschätzt nach den Preisen in config.json">1,1 Mio Tokens, ca. 2,80 $</span>' : '';
+    const steps = [['Ursache der leeren XP-Werte finden', 'ok', '09:12'], ['Rangkarte mit Saisonfarbe zeichnen', 'ok', '09:31'], ['Tests für das Levelsystem ergänzen', 'cur', 'seit 9 min'], ['Doku im Admin-Handbuch ergänzen', 'wait', ''], ['Prüfungen laufen lassen', 'wait', '']];
+    const now = perm
+      ? '<div class="lv-now perm"><span class="n-label"><i class="lv-dot perm" aria-hidden="true"></i>Wartet auf deine Freigabe</span><span class="n-what">Befehl <span class="mono">' + CMD + '</span></span><span class="n-meta">seit 0:42 · Schritt 3: Tests für das Levelsystem ergänzen</span><span class="n-hint">Bestätige oder lehne im Claude-Fenster ab.<button type="button" class="btn link">Mich im Browser benachrichtigen</button></span></div>'
+      : '<div class="lv-now"><span class="n-label"><i class="lv-dot" aria-hidden="true"></i>Gerade jetzt</span><span class="n-what">Datei bearbeiten <span class="mono">src/modules/levels.test.ts</span></span><span class="n-meta">seit 0:04 · Schritt 3: Tests für das Levelsystem ergänzen</span></div>';
+    const feed = [['09:52', 'Befehl', 'npm test', 'err'], ['09:49', 'Datei bearbeiten', 'src/modules/levels.ts', ''], ['09:31', 'Schritt erledigt', 'Rangkarte mit Saisonfarbe zeichnen', 'ok'], ['09:28', 'Befehl', 'npm run -s build', '']];
+    return '<section class="lv-panel lv-focus" aria-label="Gewählte Aufgabe"><div class="lv-ftop"><span class="r-id">W-0152</span><span class="r-prio" style="color:var(--p2)">P2</span><span>Verbesserung</span><span class="mono">feature/w-0152-review-kleinigkeiten</span>' + cost + '<button type="button" class="btn link">Details</button></div>' +
+      '<h2 class="lv-title">Kleinigkeiten aus dem Review von W-0151</h2>' +
+      '<ol class="lv-phases"><li class="done"><span class="ph-name">Gestartet</span><span class="ph-sub">heute</span></li><li class="cur" style="--p:50%;--phc:var(--s-in-arbeit)" aria-current="step"><span class="ph-name">Umsetzung</span><span class="ph-sub">2 von 5 Schritten</span></li><li class="warn"><span class="ph-name">Prüfungen</span><span class="ph-sub">2 fehlgeschlagen, 1 Fund</span></li><li><span class="ph-name">Review</span><span class="ph-sub"></span></li><li><span class="ph-name">Erledigt</span><span class="ph-sub"></span></li></ol>' +
+      '<div class="lv-cols"><div class="lv-col"><div class="lv-head"><h3>Umsetzungsplan</h3><span class="meta">2 von 5 erledigt</span></div><ol class="lv-steps">' + steps.map((s) => '<li class="' + (s[1] === 'ok' ? 'done' : s[1] === 'cur' ? 'cur' : 'todo') + '">' + si(s[1]) + '<span class="s-t">' + esc(s[0]) + '</span><span class="s-time">' + s[2] + '</span></li>').join('') + '</ol></div>' +
+      '<div class="lv-col">' + now + '<div class="lv-head"><h3>Verlauf</h3></div><ol class="lv-feed">' + feed.map((f) => '<li class="k-tool"><span class="f-time">' + f[0] + '</span><span class="f-what">' + (f[3] === 'err' ? '<span class="fi err">' + IC.fail + '</span>' : f[3] === 'ok' ? '<span class="fi ok">' + IC.ok + '</span>' : '') + '<span class="f-verb">' + f[1] + '</span><span class="mono">' + esc(f[2]) + '</span>' + (f[3] === 'err' ? '<span class="f-err">Fehler</span>' : '') + '</span></li>').join('') + '</ol></div></div></section>';
+  }
+
+  // Wenige Prüfungen: eine Zeile je Prüfung, mit Verlauf und Trend.
+  function checksFew(list) {
+    const fails = count(list, 'fail'), running = list.some((c) => c.st === 'run');
+    const btnAll = fails >= 2 ? '<div class="lv-ckg-acts"><button type="button" class="btn small" data-rerun="all">Fehlgeschlagene erneut prüfen (' + fails + ')</button></div>'
+      : running && S.rerun === 'all' ? '<div class="lv-ckg-acts"><button type="button" class="btn small busy" disabled>Prüft erneut</button></div>' : '';
+    const cls = { ok: 'ok', warn: 'warn', fail: 'bad', run: 'running', wait: '' };
+    const ch = { ok: '✓', warn: '!', fail: '×', run: '', wait: '' };
+    const rows = list.map((c) => {
+      // Der Zustand steckt im Symbol links, rechts reicht die Dauer. Für Screenreader steht er als versteckter Text da.
+      let right = c.st === 'run' ? 'läuft 0:03' : c.st === 'wait' ? 'wartet' : c.ms ? '<span class="sr">' + LBL[c.st] + ', </span>' + sec(c.ms) : LBL[c.st];
+      if (c.slow && c.st === 'ok') right = '<span class="sr">bestanden, </span><span class="lv-trend" title="Sonst meist ' + sec(c.slow) + '">' + sec(c.ms) + ' ↑</span>';
+      let extra = '';
+      if (c.st === 'warn') extra = '<div class="ck-note">' + esc(c.note) + '<div class="row-btns"><button type="button" class="btn small primary">Claude beheben lassen</button><button type="button" class="btn small">Als bekannt markieren</button></div></div>';
+      else if (c.st === 'fail') extra = '<div class="ck-acts">' + (flaky(c) ? '<span class="lv-flaky" title="In den letzten 5 Läufen mal bestanden, mal nicht">wackelig, ' + (c.h.match(/f/g) || []).length + ' von 5 rot</span>' : '') + '<button type="button" class="btn link" data-rerun="' + c.n + '">Erneut prüfen</button><details class="ck-out"><summary>Ausgabe</summary><pre>' + esc(c.out) + '</pre></details></div>';
+      else if (c.slow && c.st === 'ok') extra = '<div class="ck-acts">Dauerte ' + sec(c.ms) + ', sonst meist ' + sec(c.slow) + '.</div>';
+      return '<li class="ck ' + cls[c.st] + '"><div class="ck-row"><span class="ck-ic" aria-hidden="true">' + ch[c.st] + '</span><span class="ck-name">' + c.n + '</span><span class="mono muted ck-cmd">' + esc(c.cmd) + '</span>' + hist(c) + '<span class="muted num ck-ms">' + right + '</span></div>' + extra + '</li>';
+    }).join('');
+    const note = running ? 'Prüft erneut, ' + (list.filter((c) => c.was && c.st !== 'run' && c.st !== 'wait').length) + ' von ' + list.filter((c) => c.was).length + ' fertig' : fails + ' fehlgeschlagen, 1 Fund, Entscheidung nötig';
+    return '<div class="lv-ckg hl"><div class="lv-ckg-head">' + si(running ? 'run' : 'fail') + '<b>W-0152</b><span class="t">Kleinigkeiten aus dem Review von W-0151</span></div><p class="lv-ckg-note">' + note + '</p>' + btnAll + '<ul class="checks">' + rows + '</ul></div>';
+  }
+
+  // Viele Prüfungen: Zusammenfassung wie bisher, ergänzt um Erneut prüfen, wackelig und langsamer.
+  function checksMany(list) {
+    const of = (st) => list.filter((c) => c.st === st);
+    const parts = [['fail', 'fehlgeschlagen'], ['warn', 'Fund'], ['ok', 'bestanden'], ['run', 'läuft'], ['wait', 'wartet']];
+    let h = '<div class="lv-counts">' + parts.map(([st, l]) => of(st).length ? '<span class="c-' + st + '"><b>' + of(st).length + '</b> ' + l + '</span>' : '').join('') + '</div>' +
+      '<div class="lv-strip" aria-hidden="true">' + list.map((c) => '<i class="' + c.st + '"></i>').join('') + '</div>';
+    const fails = of('fail');
+    if (fails.length >= 2) h += '<div class="lv-ckg-acts"><button type="button" class="btn small" data-rerun="all">Alle ' + fails.length + ' fehlgeschlagenen erneut prüfen</button></div>';
+    const run = of('run')[0];
+    if (run) h += '<div class="lv-runline">' + si('run') + '<b>' + run.n + '</b><span class="mono">npm run -s check:' + run.n.replace(/^bot-/, '') + '</span><span class="tm">läuft 0:03</span></div><div class="lv-okline">' + si('wait') + '<span>Prüft erneut: noch ' + of('wait').length + ' in der Reihe</span></div>';
+    const groups = new Map();
+    for (const c of fails) { if (!groups.has(c.out)) groups.set(c.out, []); groups.get(c.out).push(c); }
+    for (const [msg, g] of [...groups].sort((a, b) => b[1].length - a[1].length)) {
+      const key = msg === PATH ? 'path' : g[0].n;
+      const show = g.slice(0, 10);
+      h += '<div class="lv-errgrp"><div class="eh">' + si('fail') + '<span>' + (g.length === 1 ? g[0].n + ' fehlgeschlagen' : g.length + ' Prüfungen, gleiche Meldung') + '</span>' + (g.length === 1 && flaky(g[0]) ? '<span class="lv-flaky">wackelig, ' + (g[0].h.match(/f/g) || []).length + ' von 5 rot</span>' : '') + '</div><div class="lv-msg">' + esc(msg) + '</div>' +
+        (g.length > 1 ? '<div class="lv-names">' + show.map((c) => '<span' + (flaky(c) ? ' class="fl" title="wackelig"' : '') + '>' + c.n + '</span>').join('') + (g.length > 10 ? '<button type="button">+' + (g.length - 10) + ' weitere</button>' : '') + '</div>' : '') +
+        '<div class="row-btns"><button type="button" class="btn small primary">Claude beheben lassen</button><button type="button" class="btn small" data-rerun="' + key + '">Erneut prüfen</button></div></div>';
+    }
+    for (const c of of('warn')) h += '<div class="lv-errgrp warn"><div class="eh">' + si('warn') + '<span>Fund in ' + c.n + '</span></div><div class="ck-note">' + esc(c.note) + '</div><div class="row-btns"><button type="button" class="btn small primary">Claude beheben lassen</button><button type="button" class="btn small">Als bekannt markieren</button></div></div>';
+    const fl = list.filter((c) => c.st === 'fail' && flaky(c));
+    if (fl.length) h += '<div class="lv-infoline">' + si('warn') + '<span><b>' + fl.length + ' wackelig</b> (mal grün, mal rot in den letzten 5 Läufen): ' + fl.map((c) => c.n).join(', ') + '. Markiert mit ~.</span></div>';
+    const slow = list.filter((c) => c.slow && c.st === 'ok');
+    if (slow.length) h += '<div class="lv-infoline">' + si('trend') + '<span><b>Langsamer als sonst:</b> ' + slow.map((c) => c.n + ' ' + sec(c.ms) + ' statt meist ' + sec(c.slow)).join(', ') + '</span></div>';
+    const ok = of('ok');
+    if (ok.length) h += '<div class="lv-okline">' + si('ok') + '<span>' + ok.length + ' bestanden: ' + ok.map((c) => c.n).join(', ') + '</span></div>';
+    return '<div class="lv-ckg hl"><div class="lv-ckg-head">' + si(run ? 'run' : 'fail') + '<b>W-0152</b><span class="t">Kleinigkeiten aus dem Review von W-0151</span></div>' + h + '<details class="lv-all"><summary>Alle ' + list.length + ' Prüfungen anzeigen</summary></details></div>';
+  }
+
+  function checks(list) {
+    const fails = count(list, 'fail');
+    return '<section class="lv-panel lv-checks" aria-label="Prüfungen"><div class="lv-head"><h2>Prüfungen</h2><span class="meta">' + [list.some((c) => c.st === 'run') ? '1 läuft' : '', fails ? fails + ' fehlgeschlagen' : '', '1 Fund'].filter(Boolean).join(', ') + '</span></div><div class="lv-body">' + (S.many === '1' ? checksMany(list) : checksFew(list)) + '</div></section>';
+  }
+
+  const NOTES = {
+    perm: {
+      off: '<b>W-0007 Freigabe:</b> Ausgeschaltet zum Vergleich, so sieht es heute aus. Claude steht, das Board zeigt trotzdem „arbeitet gerade“.',
+      A: '<b>W-0007 Freigabe, A Kacheln:</b> Die erste Kachel und die Jetzt-Box färben sich gelb und nennen den Befehl. „Wartet auf dich“ führt die Freigabe als ersten Punkt. Der Reiter Live bekommt einen gelben Punkt, der Fenstertitel ein „Freigabe“. Benachrichtigung im Browser nur auf Wunsch.',
+      B: '<b>W-0007 Freigabe, B Hinweisband:</b> Wie A, dazu ein breites Band über der ganzen Live-Ansicht. Fällt sofort auf, schiebt aber den Rest um eine Zeile nach unten, solange Claude wartet.',
+    },
+    use: {
+      A: '<b>W-0008 Verbrauch, A:</b> Eine Zeile „Verbrauch heute“ unten in der Kachel Fortschritt und der Stand der gewählten Aufgabe im Kopf der Mitte. Kein zusätzlicher Platz nötig.',
+      B: '<b>W-0008 Verbrauch, B:</b> Eine fünfte Kachel mit Kosten, Tokens und einem Balken je Aufgabe. Auffälliger, macht die Kacheln aber schmaler. Unter 1200 px rutscht sie in die nächste Zeile.',
+    },
+    rerun: '<b>W-0006 Erneut prüfen:</b> Knopf an jeder Fehlergruppe, an jeder roten Zeile und einer für alle Fehlschläge. Es laufen nur die roten Prüfungen noch einmal, die grünen bleiben stehen. Zum Ausprobieren anklicken.',
+    flaky: '<b>W-0009 Wackelig und Laufzeit:</b> Fünf kleine Striche zeigen die letzten Läufe. „wackelig“ heißt: in den letzten 5 Läufen mal grün, mal mindestens zweimal rot. „langsamer“ erscheint, wenn ein Lauf deutlich länger dauert als sonst.',
+  };
+
+  function render() {
+    const base = S.many === '1' ? many() : few();
+    const list = applyRerun(base);
+    $('#stage').innerHTML = permbar() + tiles(list) + '<div class="lv-grid">' + runlist() + focus() + checks(list) + '</div>';
+    $('#notes').innerHTML = '<p>' + NOTES.perm[S.perm] + '</p><p>' + NOTES.use[S.use] + '</p><p>' + NOTES.rerun + '</p><p>' + NOTES.flaky + '</p>';
+    document.querySelectorAll('[data-k]').forEach((b) => b.setAttribute('aria-pressed', String(S[b.dataset.k] === b.dataset.v)));
+    document.title = (S.perm !== 'off' ? 'Freigabe · ' : '') + 'Live-Ansicht Ergänzungen';
+  }
+  document.addEventListener('click', (e) => {
+    const k = e.target.closest('[data-k]'); if (k) { S[k.dataset.k] = k.dataset.v; if (k.dataset.k === 'many') S.rerun = ''; render(); return; }
+    const r = e.target.closest('[data-rerun]'); if (r) { S.rerun = S.rerun ? '' : r.dataset.rerun; render(); }
+  });
+  let theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const applyTheme = () => { document.documentElement.dataset.theme = theme; $('#theme').textContent = theme === 'dark' ? 'Hell' : 'Dunkel'; };
+  $('#theme').onclick = () => { theme = theme === 'dark' ? 'light' : 'dark'; applyTheme(); };
+  applyTheme();
+  render();
+})();
+</script>
+</body>
+</html>
