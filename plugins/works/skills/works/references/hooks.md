@@ -76,7 +76,7 @@ Datei: `hooks/permission.mjs`, ohne Matcher, Timeout 5 Sekunden.
 
 Läuft, wenn Claude Code den Nutzer gleich um eine Freigabe für einen Werkzeugaufruf bittet. Markiert den laufenden Aufruf in `.works/activity.json` mit `perm: true` und `permSince`, damit die Live-Ansicht "Claude wartet auf deine Freigabe" mit Befehl und Wartezeit zeigt. Der Hook gibt nichts aus und entscheidet nie über die Freigabe, das bleibt beim Nutzer.
 
-Der Zustand endet mit dem nächsten PreToolUse, PostToolUse, Stop oder UserPromptSubmit. Eine Ablehnung und der Moment der Freigabe selbst melden keinen Hook: Nach einer Freigabe steht die Anzeige deshalb bis zum Ende dieses Aufrufs auf "wartet", nach einer Ablehnung bis zur nächsten Nachricht. Spätestens nach 60 Minuten gilt sie als veraltet. Abschalten mit `"live_activity": false`.
+Der Zustand endet mit dem nächsten PreToolUse oder PostToolUse desselben Agenten, mit Stop oder UserPromptSubmit. Aufrufe eines anderen Agenten (anderes `agent_id` in der Hook-Eingabe) landen im Verlauf, ersetzen die wartende Freigabe aber nicht. Eine Ablehnung und der Moment der Freigabe selbst melden keinen Hook: Nach einer Freigabe steht die Anzeige deshalb bis zum Ende dieses Aufrufs auf "wartet", nach einer Ablehnung bis zur nächsten Nachricht. Spätestens nach 60 Minuten gilt sie als veraltet. Abschalten mit `"live_activity": false`.
 
 ## PostToolUse
 

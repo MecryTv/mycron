@@ -92,3 +92,4 @@ Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 - 2026-11-21: Akzeptanzkriterien: "Die API lehnt ungültige Namen ab" abgehakt
 - 2026-11-21: API checksRun mit only, Knöpfe an Fehlergruppe, roter Zeile und für alle; Selbsttest mit Klick im Browser 22/22.
 - 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
+- 2026-11-21: Nach Review korrigiert, siehe decisions.md (Branch fix/review-w0006-w0009).

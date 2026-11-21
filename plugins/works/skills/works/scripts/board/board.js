@@ -2301,7 +2301,7 @@
   // ---------- Runde 3: Hilfen ----------
 
   const fmtTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' Mio' : n >= 1e3 ? Math.round(n / 1e3) + ' k' : String(n || 0));
-  const fmtMoney = (v, cur) => (v > 0 && v < 0.1 ? v.toFixed(3) : (v || 0).toFixed(2)).replace('.', ',') + ' ' + (!cur || cur === 'USD' ? '$' : cur);
+  const fmtMoney = (v, cur) => (v > 0 && v < 0.1 ? v.toFixed(3) : (v || 0).toFixed(2)).replace('.', ',') + ' ' + (!cur || cur === 'USD' ? '$' : esc(cur));
   const timeOf = (iso) => { try { return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
 
   function undoToast(msg, key) {
@@ -2425,7 +2425,10 @@
     const a = meta.activity;
     if (!a) return null;
     if (a.busy && a.current && a.current.perm && lvFresh(a.current)) return a.current;
-    return Object.values(a.lanes || {}).find((e) => e.perm && lvFresh(e)) || null;
+    // Nur Agenten, deren Bahn noch läuft. Einträge beendeter Bahnen bleiben sonst bis zu 60 Minuten stehen.
+    const lanes = lvLanes();
+    const e = Object.entries(a.lanes || {}).find(([id, x]) => lanes.has(id) && x.perm && lvFresh(x));
+    return e ? e[1] : null;
   }
   const LV_PERM = { Bash: 'einen Befehl', Edit: 'eine Änderung', MultiEdit: 'eine Änderung', NotebookEdit: 'eine Änderung', Write: 'eine neue Datei', WebFetch: 'einen Webzugriff', WebSearch: 'eine Websuche' };
   const lvNotifyOn = () => notifySet.on && notifySet.perm && 'Notification' in window && Notification.permission === 'granted';
@@ -2624,11 +2627,13 @@
   // Erneut prüfen: startet nur die genannten Prüfungen neu. Während eines Laufs (oder bis er beginnt) gibt es keinen Knopf.
   const lvRerunning = new Set();
   function lvRerunBtn(t, names, label, cls = 'btn small') {
+    // Skill-Prüfungen wie code-audit führt Claude aus, ein erneuter Lauf würde sie nur zurücksetzen.
+    names = names.filter((n) => t.checks.list.some((x) => x.name === n && !x.skill));
     if (!EDIT || !names.length || t.checks.running || lvRerunning.has(t.id)) return '';
     return '<button type="button" class="' + cls + '" data-lv-rerun="' + esc(t.id) + '" data-names="' + esc(names.join(',')) + '">' + esc(label) + '</button>';
   }
   function lvRerunAll(t, many) {
-    const fails = t.checks.list.filter((x) => lvCheckState(t, x) === 'fail').map((x) => x.name);
+    const fails = t.checks.list.filter((x) => !x.skill && lvCheckState(t, x) === 'fail').map((x) => x.name);
     const b = fails.length >= 2 ? lvRerunBtn(t, fails, many ? 'Alle ' + fails.length + ' fehlgeschlagenen erneut prüfen' : 'Fehlgeschlagene erneut prüfen (' + fails.length + ')') : '';
     return b ? '<div class="lv-ckg-acts">' + b + '</div>' : '';
   }

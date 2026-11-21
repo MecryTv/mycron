@@ -15,7 +15,7 @@ try {
   const root = findRoot(input.cwd || process.cwd());
   if (root && loadConfig(root).live_activity !== false) {
     const { task, lane } = callTarget(root, input);
-    recordActivity(root, task, input.tool_name || '', input.tool_input || {}, true, lane ? lane.path : '', { running: true, perm: true });
+    recordActivity(root, task, input.tool_name || '', input.tool_input || {}, true, lane ? lane.path : '', { running: true, perm: true, agent: input.agent_id || '' });
   }
 } catch (e) { process.stderr.write(`works permission: ${e.message}\n`); }
 process.exit(0);
