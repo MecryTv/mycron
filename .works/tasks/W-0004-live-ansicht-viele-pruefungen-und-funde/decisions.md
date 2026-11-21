@@ -9,18 +9,15 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 Bei 51 Prüfungen und 45 Fehlschlägen listete die Live-Ansicht jeden Eintrag einzeln, in „Wartet auf dich“ und in der Prüfungsspalte. Zwei Ansätze als Entwurf: A gruppiert Fehlschläge nach gleicher Meldung (44 gleiche Pfadfehler werden eine Karte mit einer Aktion), B zeigt alle Prüfungen als Kachelraster mit Filter und Details auf Klick. Für beide: „Wartet auf dich“ fasst je Aufgabe zusammen (höchstens vier Zeilen), kompakte Darstellung erst ab etwa 9 Prüfungen. Empfehlung A, weil die gemeinsame Ursache sofort sichtbar ist. Wahl steht aus.
 
 ## Entscheidungen
-<!-- Pro Entscheidung ein Block. Neue Blöcke mit `works decisions <ID> --add "Titel" ...` oder von Hand im gleichen Format:
-
-### E1: Titel
-- Datum:
-- Quelle: Brainstorm | UI UX Pro Max | Gespräch | Analyse
+### E1: Fehlergruppen ab 9 Prüfungen
+- Datum: 2026-11-21
+- Quelle: Gespräch
 - Kontext:
-- Entscheidung:
-- Begründung:
+- Entscheidung: Ab 9 Prüfungen je Aufgabe Zusammenfassung mit Zählern, Streifen und Fehlergruppen nach gleicher erster Ausgabezeile; darunter die bisherige Liste
+- Begründung: Bei 45 Fehlschlägen mit derselben Ursache ist eine Karte mit einer Aktion lesbarer als 45 Zeilen; kleine Listen bleiben unverändert vertraut
 - Verworfene Alternativen:
-  - Alternative: Grund
+  - B Prüfmatrix: Ursache erst nach mehreren Klicks sichtbar
 - Konsequenzen:
--->
 
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->

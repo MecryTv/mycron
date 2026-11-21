@@ -41,20 +41,20 @@ Wunsch des Nutzers vom 2026-11-21: Bei vielen Befunden soll die Live-Ansicht bes
 <!-- Kurzbeschreibung des Ergebnisses. -->
 
 ## Akzeptanzkriterien
-- [ ] Darstellung ist auf Mobil, Tablet und Desktop korrekt
-- [ ] Kontraste erfüllen WCAG AA
-- [ ] Bedienung per Tastatur ist möglich
-- [ ] Wartet auf dich zeigt Funde je Aufgabe zusammengefasst statt einer Zeile pro Prüfung
-- [ ] Die Kacheln oben bleiben auch bei vielen Funden niedrig
-- [ ] Die Prüfungsspalte bleibt bei 50 Prüfungen übersichtlich und zeigt zuerst, was fehlgeschlagen ist
-- [ ] Bei wenigen Prüfungen (bis etwa 8) bleibt die bisherige Liste
+- [x] Darstellung ist auf Mobil, Tablet und Desktop korrekt
+- [x] Kontraste erfüllen WCAG AA
+- [x] Bedienung per Tastatur ist möglich
+- [x] Wartet auf dich zeigt Funde je Aufgabe zusammengefasst statt einer Zeile pro Prüfung
+- [x] Die Kacheln oben bleiben auch bei vielen Funden niedrig
+- [x] Die Prüfungsspalte bleibt bei 50 Prüfungen übersichtlich und zeigt zuerst, was fehlgeschlagen ist
+- [x] Bei wenigen Prüfungen (bis etwa 8) bleibt die bisherige Liste
 
 ## Umsetzungsplan
-- [ ] Wartet auf dich je Aufgabe und Art zusammenfassen, höchstens vier Zeilen
-- [ ] Prüfungsspalte ab 9 Prüfungen kompakt: Zähler, Streifen, Fehlergruppen, Funde, bestandene, alle aufklappbar
-- [ ] Laufzustand kompakt: laufende Prüfung und bestandene
-- [ ] Browserprüfung im Selbsttest mit 10 Prüfungen
-- [ ] Doku board.md
+- [x] Wartet auf dich je Aufgabe und Art zusammenfassen, höchstens vier Zeilen
+- [x] Prüfungsspalte ab 9 Prüfungen kompakt: Zähler, Streifen, Fehlergruppen, Funde, bestandene, alle aufklappbar
+- [x] Laufzustand kompakt: laufende Prüfung und bestandene
+- [x] Browserprüfung im Selbsttest mit 10 Prüfungen
+- [x] Doku board.md
 
 ## Betroffene Dateien
 
@@ -73,6 +73,10 @@ Art: vorher · Hinzugefügt: 2026-11-21
 ![Prüfungsspalte während eines Laufs: 'Läuft, 1 von 51 fertig', bot-tsc bestanden,](assets/2026-11-21-pruefungsspalte-waehrend-eines-laufs-vorher.png)
 Beschreibung: Prüfungsspalte während eines Laufs: 'Läuft, 1 von 51 fertig', bot-tsc bestanden, bot-admin läuft, darunter viele Zeilen 'noch nicht gelaufen'.
 Art: vorher · Hinzugefügt: 2026-11-21
+
+![Live-Ansicht nachher im Testprojekt mit 51 Prüfungen (1600 px): Wartet auf dich ](assets/2026-11-21-live-ansicht-nachher-im-testprojekt-mit-nachher.png)
+Beschreibung: Live-Ansicht nachher im Testprojekt mit 51 Prüfungen (1600 px): Wartet auf dich mit 4 zusammengefassten Zeilen, Prüfungsspalte mit Zählern und Streifen, W-0003 läuft (bot-db), W-0004 mit Karte '44 Prüfungen, gleiche Meldung', Karte für bot-levels, Fund in audit, '5 bestanden' und 'Alle 51 Prüfungen anzeigen'.
+Art: nachher · Hinzugefügt: 2026-11-21
 
 ## Offene Fragen
 
@@ -99,3 +103,18 @@ Art: vorher · Hinzugefügt: 2026-11-21
 - 2026-11-21: Umsetzungsplan: "Laufzustand kompakt: laufende Prüfung und bestandene" ergänzt
 - 2026-11-21: Umsetzungsplan: "Browserprüfung im Selbsttest mit 10 Prüfungen" ergänzt
 - 2026-11-21: Umsetzungsplan: "Doku board.md" ergänzt
+- 2026-11-21: Akzeptanzkriterien: "Darstellung ist auf Mobil, Tablet und Desktop korrekt" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Kontraste erfüllen WCAG AA" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Bedienung per Tastatur ist möglich" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Wartet auf dich zeigt Funde je Aufgabe zusammengefasst statt einer Zeile pro Prüfung" abgehakt
+- 2026-11-21: Umsetzungsplan: "Wartet auf dich je Aufgabe und Art zusammenfassen, höchstens vier Zeilen" abgehakt
+- 2026-11-21: Umsetzungsplan: "Prüfungsspalte ab 9 Prüfungen kompakt: Zähler, Streifen, Fehlergruppen, Funde, bestandene, alle aufklappbar" abgehakt
+- 2026-11-21: Umsetzungsplan: "Laufzustand kompakt: laufende Prüfung und bestandene" abgehakt
+- 2026-11-21: Umsetzungsplan: "Browserprüfung im Selbsttest mit 10 Prüfungen" abgehakt
+- 2026-11-21: Umsetzungsplan: "Doku board.md" abgehakt
+- 2026-11-21: Asset hinzugefügt: assets/2026-11-21-live-ansicht-nachher-im-testprojekt-mit-nachher.png (nachher)
+- 2026-11-21: Variante A umgesetzt; selftest --browser Windows 20/20, Linux 20/20; Sichtprüfung mit 51 Prüfungen auf 1600 px und 390 px
+- 2026-11-21: Akzeptanzkriterien: "Die Kacheln oben bleiben auch bei vielen Funden niedrig" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Die Prüfungsspalte bleibt bei 50 Prüfungen übersichtlich und zeigt zuerst, was fehlgeschlagen ist" abgehakt
+- 2026-11-21: Akzeptanzkriterien: "Bei wenigen Prüfungen (bis etwa 8) bleibt die bisherige Liste" abgehakt
+- 2026-11-21: Entscheidung E1 dokumentiert: Fehlergruppen ab 9 Prüfungen

@@ -73,9 +73,11 @@ Oben vier Kacheln:
 - **Claude arbeitet gerade**: Aufgabe, Schritt im Umsetzungsplan und der laufende Werkzeugaufruf mit Laufzeit, zum Beispiel "Befehl npm test, seit 1:12". Zwischen zwei Aufrufen steht "Claude denkt nach" mit dem letzten Aufruf, nach dem Ende einer Antwort "Claude wartet seit 14:03". Ein Klick lässt die Ansicht wieder Claude folgen.
 - **Fortschritt heute**: wie viele Aufgaben der Tagesliste fertig sind (Review oder erledigt), mit einem Segment je Aufgabe.
 - **Parallel**: Agenten in eigenen Worktrees und woran sie gerade sind.
-- **Wartet auf dich**: Aufgaben im Review, Funde und Fehlschläge in Prüfungen, offene Fragen an Aufgaben in Arbeit. Ein Klick wählt die Aufgabe.
+- **Wartet auf dich**: Aufgaben im Review, Funde und Fehlschläge in Prüfungen, offene Fragen an Aufgaben in Arbeit, je Aufgabe und Art eine Zeile ("W-0152: 45 Prüfungen fehlgeschlagen"), höchstens vier Zeilen, darunter "und N weitere Punkte". Ein Klick wählt die Aufgabe.
 
 Darunter links die Tagesliste: Aufgaben in Arbeit (die der Hauptsitzung zuerst, dann Agenten), im Review, in der Warteschlange und heute erledigte. In der Mitte die gewählte Aufgabe mit Phasenleiste (Gestartet, Umsetzung, Prüfungen, Review, Erledigt), Umsetzungsplan mit der Uhrzeit jedes abgehakten Schritts, Akzeptanzkriterien, "Gerade jetzt", Verlauf (diese Aufgabe oder alle) und dem Feld "Anweisung an Claude". Rechts alle Prüfungen der Tagesliste: laufende mit Laufzeit, Funde mit "Claude beheben lassen" und "Als bekannt markieren", Fehlschläge mit den letzten Zeilen der Ausgabe, noch nicht gelaufene als kurze Zeile, bestandene eingeklappt.
+
+Hat eine Aufgabe mehr als 8 Prüfungen, zeigt die Spalte eine Zusammenfassung statt einer Zeile je Prüfung: Zähler (fehlgeschlagen, Fund, bestanden, läuft, offen) und einen Streifen mit einem Strich je Prüfung, darunter die gerade laufende Prüfung mit Laufzeit. Fehlschläge mit derselben ersten Zeile der Ausgabe stehen zusammen auf einer Karte ("44 Prüfungen, gleiche Meldung") mit den ersten zehn Namen, der Ausgabe der ersten und einem Knopf "Claude beheben lassen", der einen Kommentar für die ganze Gruppe schreibt. Funde stehen einzeln, bestandene als eine Zeile. "Alle N Prüfungen anzeigen" klappt die komplette Liste auf. Aufgeklappte Ausgaben und Listen bleiben bei Aktualisierungen offen.
 
 Die Phase "Prüfungen" hängt daran, ob gerade eine Prüfung läuft, nicht am Status. Prüfungen laufen oft erst bei der Abnahme im Review.
 

@@ -2461,12 +2461,12 @@
     const out = [];
     for (const t of list) {
       if (t.status === 'review') out.push({ id: t.id, ic: 'review', text: t.id + ' abnehmen' });
+      // Je Aufgabe und Art eine Zeile, auch bei Dutzenden fehlgeschlagener Prüfungen.
       if (t.status !== 'erledigt' && t.checks) {
-        for (const x of t.checks.list) {
-          const st = lvCheckState(t, x);
-          if (st === 'warn') out.push({ id: t.id, ic: 'warn', text: t.id + ': Fund in ' + x.name });
-          if (st === 'fail') out.push({ id: t.id, ic: 'fail', text: t.id + ': ' + x.name + ' fehlgeschlagen' });
-        }
+        const fails = t.checks.list.filter((x) => lvCheckState(t, x) === 'fail');
+        const warns = t.checks.list.filter((x) => lvCheckState(t, x) === 'warn');
+        if (fails.length) out.push({ id: t.id, ic: 'fail', text: t.id + ': ' + (fails.length === 1 ? fails[0].name + ' fehlgeschlagen' : fails.length + ' Prüfungen fehlgeschlagen') });
+        if (warns.length) out.push({ id: t.id, ic: 'warn', text: t.id + ': ' + (warns.length === 1 ? 'Fund in ' + warns[0].name : warns.length + ' Funde') });
       }
       if (t.status === 'in-arbeit' && t.questions.length) out.push({ id: t.id, ic: 'ask', text: t.id + ': ' + (t.questions.length === 1 ? '1 offene Frage' : t.questions.length + ' offene Fragen') });
     }
@@ -2566,14 +2566,52 @@
     }).join('') + '</ul>';
   }
 
+  // Ab dieser Anzahl Prüfungen einer Aufgabe zeigt die Spalte eine Zusammenfassung statt einer Zeile je Prüfung.
+  const LV_MANY = 8;
+  const lvExpanded = new Set();
+  const lvFirstLine = (out) => { const l = String(out || '').split('\n').map((s) => s.trim()).find(Boolean); return l ? l.slice(0, 240) : 'Keine Ausgabe'; };
+  function lvAllList(t) {
+    return '<div class="lv-alllist">' + t.checks.list.map((x) => '<div>' + lvSi(lvCheckState(t, x)) + '<span title="' + esc(x.cmd) + '">' + esc(x.name) + '</span></div>').join('') + '</div>';
+  }
+  function lvCompact(t) {
+    const c = t.checks;
+    const items = c.list.map((x) => ({ x, st: lvCheckState(t, x), r: c.results[x.name] || {} }));
+    const of = (...st) => items.filter((i) => st.includes(i.st));
+    const parts = [[['fail'], 'fehlgeschlagen'], [['warn'], 'Fund'], [['ok', 'ack'], 'bestanden'], [['run'], 'läuft'], [['manual'], 'trägt Claude ein'], [['wait'], 'offen']];
+    let h = '<div class="lv-counts">' + parts.map(([st, l]) => { const n = of(...st).length; return n ? '<span class="c-' + st[0] + '"><b>' + n + '</b> ' + l + '</span>' : ''; }).join('') + '</div>' +
+      '<div class="lv-strip" aria-hidden="true">' + items.map((i) => '<i class="' + i.st + '" title="' + esc(i.x.name + ': ' + (LV_CK[i.st] || i.st)) + '"></i>').join('') + '</div>';
+    const run = of('run')[0];
+    if (run) h += '<div class="lv-runline">' + lvSi('run') + '<b>' + esc(run.x.name) + '</b><span class="mono">' + esc(run.x.cmd) + '</span><span class="tm">läuft ' + lvSince(c.runningSince, 'sec') + '</span></div>';
+    // Fehlschläge mit derselben ersten Zeile der Ausgabe gehören zusammen, meist haben sie dieselbe Ursache.
+    const groups = new Map();
+    for (const i of of('fail')) { const k = lvFirstLine(i.r.output); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); }
+    for (const [msg, list] of [...groups].sort((a, b) => b[1].length - a[1].length)) {
+      const key = t.id + ':' + msg;
+      const shown = lvExpanded.has(key) ? list : list.slice(0, 10);
+      const names = list.map((i) => i.x.name);
+      h += '<div class="lv-errgrp"><div class="eh">' + lvSi('fail') + '<span>' + (list.length === 1 ? esc(names[0]) + ' fehlgeschlagen' : list.length + ' Prüfungen, gleiche Meldung') + '</span></div><div class="lv-msg">' + esc(msg) + '</div>' +
+        (list.length > 1 ? '<div class="lv-names">' + shown.map((i) => '<span>' + esc(i.x.name) + '</span>').join('') + (list.length > shown.length ? '<button type="button" data-lv-more="' + esc(key) + '">+' + (list.length - shown.length) + ' weitere</button>' : '') + '</div>' : '') +
+        (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fixall="' + esc(t.id) + '" data-names="' + esc(names.join(', ')) + '">Claude beheben lassen</button></div>' : '') +
+        '<details class="ck-out" data-out="' + esc(key) + '"><summary>Ausgabe von ' + esc(names[0]) + '</summary><pre>' + esc(String(list[0].r.output || '').split('\n').slice(-40).join('\n')) + '</pre></details></div>';
+    }
+    for (const i of of('warn')) {
+      h += '<div class="lv-errgrp warn"><div class="eh">' + lvSi('warn') + '<span>Fund in ' + esc(i.x.name) + '</span></div><div class="ck-note">' + md(i.r.note || '') + '</div>' +
+        (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fix="' + esc(i.x.name) + '" data-lv-task="' + esc(t.id) + '">Claude beheben lassen</button><button type="button" class="btn small" data-lv-ack="' + esc(i.x.name) + '" data-lv-task="' + esc(t.id) + '">Als bekannt markieren</button></div>' : '') + '</div>';
+    }
+    const ok = of('ok', 'ack');
+    if (ok.length) h += '<div class="lv-okline">' + lvSi('ok') + '<span>' + ok.length + ' bestanden' + (ok.length <= 6 ? ': ' + esc(ok.map((i) => i.x.name).join(', ')) : '') + '</span></div>';
+    return h + '<details class="lv-all" data-out="' + esc(t.id + ':alle') + '"><summary>Alle ' + items.length + ' Prüfungen anzeigen</summary>' + lvAllList(t) + '</details>';
+  }
+
   function lvChecksHtml(list, focusId) {
     // Ohne Ergebnis abgeschlossene Aufgaben haben nichts zu zeigen.
     const groups = list.filter((t) => t.checks && phaseOf(t) !== 'queue' && !(t.status === 'erledigt' && !lvChecks(t).finished));
     const order = (t) => { const c = lvChecks(t); return c.running ? 0 : c.warn || c.fail ? 1 : !c.finished ? 3 : c.ok === c.total ? 4 : 2; };
     groups.sort((a, b) => order(a) - order(b));
     const running = groups.filter((t) => t.checks.running).length;
-    const finds = groups.reduce((n, t) => { const c = lvChecks(t); return n + c.warn + c.fail; }, 0);
-    let h = '<div class="lv-head"><h2>Prüfungen</h2><span class="meta">' + ([running ? running + ' läuft' : '', finds ? finds + (finds === 1 ? ' Fund' : ' Funde') : ''].filter(Boolean).join(', ') || (groups.length ? 'alles ruhig' : '')) + '</span></div><div class="lv-body">';
+    const fails = groups.reduce((n, t) => n + lvChecks(t).fail, 0);
+    const warns = groups.reduce((n, t) => n + lvChecks(t).warn, 0);
+    let h = '<div class="lv-head"><h2>Prüfungen</h2><span class="meta">' + ([running ? running + ' läuft' : '', fails ? fails + ' fehlgeschlagen' : '', warns ? warns + (warns === 1 ? ' Fund' : ' Funde') : ''].filter(Boolean).join(', ') || (groups.length ? 'alles ruhig' : '')) + '</span></div><div class="lv-body">';
     if (!meta.hasChecks) return h + '<p class="lv-empty">Noch keine Prüfungen eingerichtet. Unter Werkzeuge lassen sich Befehle wie Tests oder Build hinterlegen, sie laufen dann vor dem Abschluss.</p></div>';
     if (!groups.length) return h + '<p class="lv-empty">Heute ist noch keine Aufgabe mit Prüfungen in Arbeit.</p></div>';
     h += groups.map((t) => {
@@ -2581,9 +2619,12 @@
       const agent = lvLanes().has(t.id) ? '<span class="tag lv-agent">Agent</span>' : '';
       const head = (ic, note) => '<div class="lv-ckg-head">' + lvSi(ic) + '<b>' + esc(t.id) + '</b><span class="t">' + esc(t.title) + '</span>' + agent + '</div>' + (note ? '<p class="lv-ckg-note">' + note + '</p>' : '');
       if (!c.running && !c.finished) return '<div class="lv-ckg">' + head('wait', 'Laufen, sobald die Aufgabe abgeschlossen wird: ' + esc(t.checks.list.map((x) => x.name).join(', ')) + '.') + '</div>';
-      if (!c.running && c.ok === c.total) return '<details class="lv-ckg"><summary class="lv-ckg-head">' + lvSi('ok') + '<b>' + esc(t.id) + '</b><span class="t">Alle ' + c.total + ' bestanden' + (t.checks.at ? ', ' + lvTime(t.checks.at) : '') + '</span>' + agent + '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>' + lvChecksList(t) + '</details>';
+      const many = t.checks.list.length > LV_MANY;
+      if (!c.running && c.ok === c.total) return '<details class="lv-ckg"><summary class="lv-ckg-head">' + lvSi('ok') + '<b>' + esc(t.id) + '</b><span class="t">Alle ' + c.total + ' bestanden' + (t.checks.at ? ', ' + lvTime(t.checks.at) : '') + '</span>' + agent + '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>' + (many ? lvAllList(t) : lvChecksList(t)) + '</details>';
+      const icon = c.running ? 'run' : c.fail ? 'fail' : c.warn ? 'warn' : 'ok';
+      if (many) return '<div class="lv-ckg' + (t.id === focusId ? ' hl' : '') + '">' + head(icon, '') + lvCompact(t) + '</div>';
       const note = c.running ? 'Läuft, ' + c.finished + ' von ' + c.total + ' fertig' : (c.warn || c.fail) ? lvFinds(c) + ', Entscheidung nötig' : c.finished + ' von ' + c.total + ' gelaufen';
-      return '<div class="lv-ckg' + (t.id === focusId ? ' hl' : '') + '">' + head(c.running ? 'run' : c.fail ? 'fail' : c.warn ? 'warn' : 'ok', note) + lvChecksList(t) + '</div>';
+      return '<div class="lv-ckg' + (t.id === focusId ? ' hl' : '') + '">' + head(icon, note) + lvChecksList(t) + '</div>';
     }).join('');
     return h + '</div>';
   }
@@ -2607,7 +2648,10 @@
     const lanes = list.filter((t) => lvLanes().has(t.id) && t.status === 'in-arbeit');
     const t3 = '<h3>Parallel</h3>' + (lanes.length ? '<div class="big">' + (lanes.length === 1 ? '1 Agent' : lanes.length + ' Agenten') + '</div>' + lanes.map((t) => '<div class="sub">' + esc(t.id) + ' · ' + esc(lvStatus(t).text) + '</div>').join('') : '<div class="big">Kein Agent aktiv</div><div class="sub">Alles läuft in der Hauptsitzung</div>');
     const att = lvAttention(list);
-    const t4 = '<h3>Wartet auf dich</h3>' + (att.length ? '<div class="big">' + att.length + '</div><ul class="lv-attn">' + att.map((x, i) => '<li><button type="button" data-lv-focus="' + esc(x.id) + '" data-lk="att' + i + '">' + lvSi(x.ic) + '<span class="t">' + esc(x.text) + '</span></button></li>').join('') + '</ul>' : '<div class="big">Nichts</div><div class="sub">Claude braucht gerade nichts von dir</div>');
+    // Höchstens vier Zeilen, damit die Kacheln niedrig bleiben.
+    const attRest = att.length - 4;
+    const t4 = '<h3>Wartet auf dich</h3>' + (att.length ? '<div class="big">' + att.length + ' <small>' + (att.length === 1 ? 'Punkt' : 'Punkte') + '</small></div><ul class="lv-attn">' + att.slice(0, 4).map((x, i) => '<li><button type="button" data-lv-focus="' + esc(x.id) + '" data-lk="att' + i + '">' + lvSi(x.ic) + '<span class="t">' + esc(x.text) + '</span></button></li>').join('') + '</ul>' +
+      (attRest > 0 ? '<span class="sub">und ' + attRest + (attRest === 1 ? ' weiterer Punkt' : ' weitere Punkte') + '</span>' : '') : '<div class="big">Nichts</div><div class="sub">Claude braucht gerade nichts von dir</div>');
     return '<button type="button" class="lv-tile lv-tile-btn" data-lv-follow data-lk="follow" title="Ansicht folgt Claude">' + t1 + '</button><article class="lv-tile">' + t2 + '</article><article class="lv-tile">' + t3 + '</article><article class="lv-tile' + (att.length ? ' attn' : '') + '">' + t4 + '</article>';
   }
 
@@ -2670,7 +2714,7 @@
     const inp = $('#lvInstr', box);
     const keep = inp ? { v: inp.value, s: inp.selectionStart, task: inp.dataset.instrIn } : null;
     const openGroups = $$('details.lv-ckg[open] summary b', box).map((b) => b.textContent);
-    const openOut = $$('details.ck-out[open]', box).map((d) => d.dataset.out);
+    const openOut = $$('details[data-out][open]', box).map((d) => d.dataset.out);
     box.innerHTML = '<section class="lv-sum" aria-label="Überblick">' + lvTilesHtml(list) + '</section>' +
       '<div class="lv-grid"><section class="lv-panel lv-runbox" aria-label="Aufgaben heute"><div class="lv-head"><h2>Heute</h2><span class="meta">' + list.length + (list.length === 1 ? ' Aufgabe' : ' Aufgaben') + '</span></div>' +
       (list.length ? '<ul class="lv-run">' + list.map((t) => {
@@ -2683,7 +2727,7 @@
       '<section class="lv-panel lv-focus" aria-label="Gewählte Aufgabe">' + lvFocusHtml(ft, list) + '</section>' +
       '<section class="lv-panel lv-checks" aria-label="Prüfungen">' + lvChecksHtml(list, focusId) + '</section></div>';
     $$('details.lv-ckg', box).forEach((d) => { const b = $('summary b', d); if (b && openGroups.includes(b.textContent)) d.open = true; });
-    $$('details.ck-out', box).forEach((d) => { if (openOut.includes(d.dataset.out)) d.open = true; });
+    $$('details[data-out]', box).forEach((d) => { if (openOut.includes(d.dataset.out)) d.open = true; });
     const ni = $('#lvInstr', box);
     if (ni && keep && keep.task === ni.dataset.instrIn) { ni.value = keep.v; }
     if (keyEl) { const el = $(keyEl, box); if (el) { el.focus({ preventScroll: true }); if (el === ni && keep) { try { el.setSelectionRange(keep.s, keep.s); } catch (e) { /* egal */ } } } }
@@ -2702,10 +2746,20 @@
     if (rv) { openReview(rv.dataset.lvReview); return; }
     const op = e.target.closest('[data-lv-open]');
     if (op) { openTask(op.dataset.lvOpen); return; }
+    const more = e.target.closest('[data-lv-more]');
+    if (more) { lvExpanded.add(more.dataset.lvMore); renderLive(); return; }
+    const fa = e.target.closest('[data-lv-fixall]');
+    if (fa) {
+      const id = fa.dataset.lvFixall;
+      const msg = (fa.closest('.lv-errgrp').querySelector('.lv-msg') || {}).textContent || '';
+      const r = await run(() => act('comment', { id, text: 'Bitte die fehlgeschlagenen Prüfungen beheben und danach erneut prüfen (works checks run ' + id + '):\n\nPrüfungen: ' + fa.dataset.names + '\nMeldung: ' + msg }), 'Auftrag an Claude als Kommentar gespeichert');
+      if (r) fa.disabled = true;
+      return;
+    }
     const fx = e.target.closest('[data-lv-fix]');
     if (fx) {
       const id = fx.dataset.lvTask;
-      const note = (fx.closest('.ck').querySelector('.ck-note') || {}).innerText || '';
+      const note = (fx.closest('.ck, .lv-errgrp').querySelector('.ck-note') || {}).innerText || '';
       const r = await run(() => act('comment', { id, text: 'Bitte den Fund aus der Prüfung ' + fx.dataset.lvFix + ' beheben und die Prüfung danach neu eintragen:\n\n' + note.replace(/Claude beheben lassen|Als bekannt markieren/g, '').trim() }), 'Auftrag an Claude als Kommentar gespeichert');
       if (r) fx.disabled = true;
       return;

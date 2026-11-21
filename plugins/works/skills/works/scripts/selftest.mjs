@@ -405,7 +405,16 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     has(w(['list']).out, 'Aus dem Upload');
     // W-0002 hat keinen Umsetzungsplan: Die Live-Ansicht darf dafür kein NaN oder "Schritt 0 von 0" zeigen.
     w(['start', 'W-0002']);
+    // Viele Prüfungen: zehn eingerichtet, neun mit derselben Meldung fehlgeschlagen. Die Live-Ansicht fasst sie zusammen.
+    const many = Array.from({ length: 10 }, (_, i) => `m${i + 1}`);
+    w(['checks', 'set', ...many.map((n) => `${n}=node -v`)]);
+    const d2 = path.join(proj, '.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((x) => x.startsWith('W-0002-')));
+    const at = new Date().toISOString();
+    fs.writeFileSync(path.join(d2, 'checks.json'), JSON.stringify({ at, fingerprint: '', results: Object.fromEntries(many.map((n, i) => [n, i < 9
+      ? { status: 'fail', cmd: 'node -v', ms: 40, output: 'The system cannot find the path specified.\n', at }
+      : { status: 'ok', cmd: 'node -v', ms: 900, output: '', at }])) }));
     if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }));
+    w(['checks', 'remove', ...many]);
   });
   w(['board', '--stop'], { ok: false });
 
@@ -468,6 +477,12 @@ async function browserCheck(url, log, between = async () => {}) {
       return v.text;
     };
     await liveText(p, '');
+    const many = await p.evaluate(() => ({
+      groups: [...document.querySelectorAll('#viewLive .lv-errgrp')].map((g) => g.innerText),
+      attn: document.querySelectorAll('#viewLive .lv-attn li').length,
+    }));
+    if (!many.groups.some((g) => /9 Prüfungen/.test(g) && /cannot find the path/.test(g))) errs.push(`Live: keine Fehlergruppe für 9 gleiche Fehlschläge (${many.groups.length} Gruppen)`);
+    if (many.attn > 4) errs.push(`Live: Wartet auf dich zeigt ${many.attn} Zeilen statt höchstens 4`);
     await p.keyboard.press('1'); await p.waitForTimeout(250);
     await p.click('#btnTools'); await p.waitForTimeout(800);
     await between();
