@@ -23,6 +23,7 @@
     <button data-view="timeline" aria-pressed="false">Zeitleiste</button>
     <button data-view="graph" aria-pressed="false">Abhängigkeiten</button>
     <button data-view="table" aria-pressed="false">Tabelle</button>
+    <button data-view="live" aria-pressed="false" data-live><i class="lv-dot" id="livePulse" hidden aria-hidden="true"></i>Live</button>
   </nav>
   <label class="search">
     <span class="sr">Aufgaben durchsuchen</span>
@@ -69,6 +70,7 @@
 <main class="view queue-view" id="viewQueue" tabindex="-1" data-only="queue" hidden></main>
 <main class="view tl-view" id="viewTimeline" tabindex="-1" data-only="timeline" hidden></main>
 <main class="view table-view" id="viewTable" tabindex="-1" data-only="table" hidden></main>
+<main class="view live-view" id="viewLive" tabindex="-1" data-only="live" hidden></main>
 <div class="bulk" id="bulk" hidden role="toolbar" aria-label="Mehrere Aufgaben bearbeiten"></div>
 
 <aside class="panel" id="panel" aria-label="Aufgabendetails" hidden>
@@ -82,6 +84,7 @@
 
 <dialog id="dialog"><form method="dialog" id="dialogForm"></form></dialog>
 <div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="sr" aria-live="polite" id="liveSay"></div>
 
 <div class="palette" id="palette" hidden>
   <div class="pal-box" role="dialog" aria-modal="true" aria-label="Schnellsuche">

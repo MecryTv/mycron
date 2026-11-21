@@ -354,6 +354,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     has(w(['board', '--serve', '--detach', `--port=${port}`]).out, `:${port}`);
     const url = `http://127.0.0.1:${port}`;
     const html = await (await fetch(url + '/')).text();
+    has(html, 'data-view="live"', 'Seite'); has(html, 'id="viewLive"', 'Seite');
     const token = (html.match(/"token":"([a-f0-9]{20,})"/) || [])[1];
     expect(token, 'Kein Token in der Seite');
     const data = await (await fetch(url + '/data.json')).json();
@@ -374,7 +375,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(up.ok && uj.candidates.length === 1, `Import-Upload: ${uj.error || uj.candidates.length}`);
     await api('POST', '/api/action', { action: 'importApply', token: uj.token, only: [1] });
     has(w(['list']).out, 'Aus dem Upload');
-    if (browser) await browserCheck(url, log);
+    // W-0002 hat keinen Umsetzungsplan: Die Live-Ansicht darf dafür kein NaN oder "Schritt 0 von 0" zeigen.
+    w(['start', 'W-0002']);
+    if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }));
   });
   w(['board', '--stop'], { ok: false });
 
@@ -394,7 +397,8 @@ function free(port) {
   }));
 }
 
-async function browserCheck(url, log) {
+// between: läuft zwischen Desktop- und Handyprüfung, hier setzt der Stop-Hook Claude auf untätig.
+async function browserCheck(url, log, between = async () => {}) {
   let pw;
   try { pw = createRequire(path.join(process.cwd(), 'x.js'))('playwright'); } catch { try { pw = createRequire(import.meta.url)('playwright'); } catch { log('        Playwright nicht gefunden, Browserprüfung übersprungen.'); return; } }
   const b = await pw.chromium.launch();
@@ -404,13 +408,25 @@ async function browserCheck(url, log) {
     p.on('pageerror', (e) => errs.push(e.message));
     await p.goto(url + '/'); await p.waitForSelector('.card', { timeout: 15000 });
     await p.click('.card'); await p.waitForTimeout(500);
-    for (const k of ['2', '3', '4', '5', '6', '1']) { await p.keyboard.press('Escape'); await p.keyboard.press(k); await p.waitForTimeout(250); }
+    for (const k of ['2', '3', '4', '5', '6', '7', '1']) { await p.keyboard.press('Escape'); await p.keyboard.press(k); await p.waitForTimeout(250); }
+    const liveText = async (pg, who) => {
+      await pg.keyboard.press('Escape'); await pg.keyboard.press('7'); await pg.waitForTimeout(400);
+      const v = await pg.evaluate(() => { const el = document.querySelector('#viewLive'); return { run: !!(el && el.querySelector('.run')), text: el ? el.innerText : '' }; });
+      if (!v.run) errs.push(`${who}Live: Tagesliste fehlt`);
+      if (/NaN|Schritt 0 von 0/.test(v.text)) errs.push(`${who}Live: NaN oder Schritt 0 von 0`);
+      return v.text;
+    };
+    await liveText(p, '');
+    await p.keyboard.press('1'); await p.waitForTimeout(250);
     await p.click('#btnTools'); await p.waitForTimeout(800);
+    await between();
     const m = await b.newPage({ viewport: { width: 390, height: 844 } });
     m.on('pageerror', (e) => errs.push('mobil: ' + e.message));
     await m.goto(url + '/'); await m.waitForSelector('.card');
     const wide = await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     if (wide) errs.push('mobil: seitliches Scrollen');
+    if (!(await liveText(m, 'mobil ')).includes('Claude wartet')) errs.push('mobil Live: "Claude wartet" fehlt nach dem Stop-Hook');
+    if (await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) errs.push('mobil Live: seitliches Scrollen');
   } finally { await b.close(); }
   if (errs.length) throw new Error(`Browser: ${errs.join(' | ')}`);
 }

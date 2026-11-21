@@ -48,7 +48,7 @@ Im works-Board soll man live verfolgen können, wie weit Claude mit den Aufgaben
 - [x] Task 2: Uhrzeit abgehakter Schritte (steps.json)
 - [x] Task 3: Prüfungen mit Zwischenstand, für Agenten im Worktree
 - [x] Task 4: Live-Daten in boardData
-- [ ] Task 5: Ansicht Live im Board
+- [x] Task 5: Ansicht Live im Board
 - [ ] Task 6: Dokumentation
 
 ## Betroffene Dateien
@@ -95,3 +95,4 @@ Stand 2026-11-20: Entwurf (Variante A gewählt), Design-Dokument (freigegeben) u
 - 2026-11-21: Umsetzungsplan: "Task 2: Uhrzeit abgehakter Schritte (steps.json)" abgehakt
 - 2026-11-21: Umsetzungsplan: "Task 3: Prüfungen mit Zwischenstand, für Agenten im Worktree" abgehakt
 - 2026-11-21: Umsetzungsplan: "Task 4: Live-Daten in boardData" abgehakt
+- 2026-11-21: Umsetzungsplan: "Task 5: Ansicht Live im Board" abgehakt
