@@ -3,13 +3,13 @@ id: W-0001
 title: Live-Ansicht im works-Board
 type: feature
 priority: P3
-status: review
+status: erledigt
 effort: L
 risk:
 created: 2026-11-20
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0001-live-ansicht-im-works-board
 tags: [ui, board, hooks]
@@ -19,7 +19,6 @@ related: []
 source: manuell
 incomplete: false
 ---
-
 
 # Live-Ansicht im works-Board
 
@@ -71,9 +70,7 @@ Art: nachher · Hinzugefügt: 2026-11-21
 - [x] Plan freigeben und auf eigenem Branch loslegen? (Frage vom 2026-11-20 noch offen) Antwort: Freigegeben am 2026-11-21: umsetzen wie besprochen, eigener Branch, ein Commit pro Task, nichts pushen.
 
 ## Übergabe
-Stand: 2026-11-21 09:49
-
-Stand 2026-11-21: Umgesetzt auf feature/w-0001-live-ansicht-im-works-board (43a05f2..HEAD), alle 7 Kriterien erfüllt, selftest --browser 18/18 (Playwright mit installiertem Chrome). Abschluss-Review (frischer Reviewer) eingearbeitet: Senden-Knopf, Frische-Grenzen ohne neue Daten, Fehlerausgabe bleibt offen, Export ohne Live-Daten, Browserprüfung. code-audit: nur eine Nebensache (Leselink zeigt 40 statt 12 Befehle). Vorher/Nachher-Screenshots angehängt. Offen: Abnahme durch den Nutzer, dann works done; Merge in main nur auf Wunsch, nichts gepusht. Kleinere Punkte aus dem Review sind im Abschlussbericht der Sitzung aufgeführt.
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-20: Aufgabe angelegt
@@ -118,6 +115,7 @@ Stand 2026-11-21: Umgesetzt auf feature/w-0001-live-ansicht-im-works-board (43a0
 - 2026-11-21: Abschluss-Review umgesetzt (Senden-Knopf, Frische-Grenzen ohne neue Daten, Fehlerausgabe bleibt offen, Export ohne Live-Daten, Browserprüfung mit Chrome); selftest --browser 18/18; Kriterien im Browser am Testprojekt geprüft
 - 2026-11-21: Status: in-arbeit → review (Grund: Umsetzung fertig, Abschluss-Review eingearbeitet, wartet auf Abnahme)
 - 2026-11-21: Übergabe aktualisiert
+- 2026-11-21: Abgeschlossen (Status: review → erledigt), DoD bestätigt
 
 ## Übergabe
 Stand: 2026-11-21 09:51

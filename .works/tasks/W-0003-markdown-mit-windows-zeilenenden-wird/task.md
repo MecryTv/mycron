@@ -3,13 +3,13 @@ id: W-0003
 title: Markdown mit Windows-Zeilenenden wird nicht erkannt
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: fix/w-0003-markdown-mit-windows
 tags: [lib, windows]
@@ -74,6 +74,7 @@ Neue Funktion `readText(file)` in lib.mjs, die beim Lesen `\r\n` und `\r` in `\n
 ## Offene Fragen
 
 ## Übergabe
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -88,3 +89,5 @@ Neue Funktion `readText(file)` in lib.mjs, die beim Lesen `\r\n` und `\r` in `\n
 - 2026-11-21: Akzeptanzkriterien: "Nach einer Änderung durch works enthält die task.md keine gemischten Zeilenenden" abgehakt
 - 2026-11-21: Akzeptanzkriterien: "Selbsttest prüft eine Aufgabe mit CRLF-Zeilenenden" abgehakt
 - 2026-11-21: readText in lib.mjs, 25 Lesestellen umgestellt; Selbsttest-Schritt CRLF rot ohne, grün mit Korrektur; Windows und Linux-Container 19/19
+- 2026-11-21: Lokal in main gemergt (b3c86f9), selftest --browser auf main 19/19
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
