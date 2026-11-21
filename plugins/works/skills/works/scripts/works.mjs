@@ -1706,6 +1706,7 @@ function cmdInstallHooks() {
     add('SessionStart', 'session-start.mjs', 'startup|resume|clear|compact');
     add('Stop', 'stop-reminder.mjs');
     add('UserPromptSubmit', 'prompt-submit.mjs');
+    add('PreToolUse', 'pre-tool.mjs');
     add('PostToolUse', 'post-tool.mjs');
     add('SubagentStop', 'subagent-stop.mjs');
     if (!flags['dry-run']) writeJson(file, settings);

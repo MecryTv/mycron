@@ -217,6 +217,19 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(fs.readFileSync(path.join(proj, '.works', 'time.jsonl'), 'utf8').includes('"agent:x"'), 'SubagentStop hat nichts erfasst');
   });
 
+  await step('Live: Jetzt-Anzeige mit PreToolUse', () => {
+    const actF = path.join(proj, '.works', 'activity.json');
+    const n0 = JSON.parse(fs.readFileSync(actF, 'utf8')).recent.length;
+    const call = { cwd: proj, session_id: 's1', tool_name: 'Bash', tool_input: { command: 'npm test' } };
+    hook('pre-tool.mjs', call);
+    let a = JSON.parse(fs.readFileSync(actF, 'utf8'));
+    expect(a.current.running === true && a.current.what === 'npm test' && a.recent.length === n0, `PreToolUse: ${JSON.stringify(a.current)}`);
+    hook('post-tool.mjs', { ...call, tool_response: {} });
+    a = JSON.parse(fs.readFileSync(actF, 'utf8'));
+    expect(!a.current.running && a.recent[0].what === 'npm test' && a.recent.length === n0 + 1, 'PostToolUse nach PreToolUse');
+    has(fs.readFileSync(path.join(HERE, '..', '..', '..', 'hooks', 'hooks.json'), 'utf8'), 'pre-tool.mjs', 'hooks.json');
+  });
+
   if (hasGit) {
     await step('Dateien: Commits mit ID, works file, Hinweis beim Edit', () => {
       git(['add', '-A']); git(['commit', '-q', '-m', 'chore: start']);

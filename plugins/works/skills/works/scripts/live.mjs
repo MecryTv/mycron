@@ -2,7 +2,8 @@
 // activity.json: letzter Werkzeugaufruf und eine kurze Liste davor. instructions.json: wartende Anweisungen.
 import fs from 'node:fs';
 import path from 'node:path';
-import { worksDir, readJson, writeJson, nowStamp } from './lib.mjs';
+import { worksDir, readJson, writeJson, nowStamp, loadState } from './lib.mjs';
+import { loadLanes } from './parallel.mjs';
 
 const actFile = (root) => path.join(worksDir(root), 'activity.json');
 const insFile = (root) => path.join(worksDir(root), 'instructions.json');
@@ -23,20 +24,27 @@ export function describeTool(root, name, input = {}) {
   return { verb: VERB[name] || name, what };
 }
 
+const inside = (p, dir) => { if (!p || !dir) return false; const r = path.relative(dir, path.resolve(String(p))); return r === '' || (!r.startsWith('..') && !path.isAbsolute(r)); };
+
+// Zu welcher Aufgabe gehört ein Werkzeugaufruf? Liegt er im Worktree einer parallelen Aufgabe
+// (Pfad, Arbeitsordner oder Befehl), zählt er für diese Bahn, sonst für die aktive Aufgabe.
+export function callTarget(root, input = {}) {
+  const ti = input.tool_input || {};
+  const target = ti.file_path || ti.notebook_path || ti.path || '';
+  const cmd = String(ti.command || '');
+  const lane = loadLanes(root).find((l) => inside(target, l.path) || inside(input.cwd, l.path) || (cmd && cmd.includes(l.path))) || null;
+  return { task: lane ? lane.task : (loadState(root).active || ''), lane };
+}
+
 // lane: Pfad des Worktrees einer parallelen Aufgabe. Dann zählt der Aufruf für diese Bahn, nicht für die Hauptsitzung.
-export function recordActivity(root, task, tool, input, ok = true, lane = '') {
+// running: Aufruf beginnt gerade (PreToolUse). Er wird nur als aktueller Aufruf gezeigt, in recent landet er erst, wenn er fertig ist.
+export function recordActivity(root, task, tool, input, ok = true, lane = '', { running = false } = {}) {
   const a = readJson(actFile(root), null) || { recent: [] };
   const d = describeTool(lane || root, tool, input);
-  const entry = { at: new Date().toISOString(), task: task || '', tool, verb: d.verb, what: d.what, ok, ...(lane ? { lane: true } : {}) };
-  if (lane) {
-    a.lanes = { ...(a.lanes || {}), [task]: entry };
-    a.recent = [entry, ...(a.recent || [])].slice(0, 24);
-    writeJson(actFile(root), a);
-    return;
-  }
-  a.current = entry;
-  a.busy = true;
-  a.recent = [entry, ...(a.recent || [])].slice(0, 24);
+  const entry = { at: new Date().toISOString(), task: task || '', tool, verb: d.verb, what: d.what, ok, ...(lane ? { lane: true } : {}), ...(running ? { running: true } : {}) };
+  if (lane) a.lanes = { ...(a.lanes || {}), [task]: entry };
+  else { a.current = entry; a.busy = true; }
+  if (!running) a.recent = [entry, ...(a.recent || [])].slice(0, 40);
   writeJson(actFile(root), a);
 }
 
