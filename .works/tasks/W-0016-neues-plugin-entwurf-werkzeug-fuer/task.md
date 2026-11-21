@@ -3,13 +3,13 @@ id: W-0016
 title: "Neues Plugin: Entwurf-Werkzeug für Gestaltungsaufgaben"
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-21
 due:
-completed:
+completed: 2026-11-21
 milestone:
 branch: feature/w-0016-neues-plugin-entwurf-werkzeug
 tags: [skill, plugin, entwurf]
@@ -65,7 +65,7 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-21. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -73,3 +73,4 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-21: tags: [skill, plugin, design] → [skill, plugin, entwurf]
 - 2026-11-21: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-21: Plugin entwurf fertig: entwurf.mjs shots/inline, vorlage.html, SKILL.md. Test Windows mit Playwright und Linux (Docker, System-Chromium) grün. Skill per Agent ohne und mit Skill an W-0018 in einer Testkopie geprüft, eingebettete Entwürfe unter der Board-CSP im Browser geprüft. Fund: file://-CSS lädt im Board-iframe nicht, ältere Entwürfe erscheinen dort ungestylt.
+- 2026-11-21: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

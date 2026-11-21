@@ -1,18 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 16:14 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-21 16:15 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 0 | 0 | 1 | 0 | 0 | 0 | 16 | 0 |
+| 0 | 0 | 0 | 0 | 0 | 0 | 17 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 1 · P4 Niedrig: 0
-
-## Aktive Aufgabe
-
-[W-0016](tasks/W-0016-neues-plugin-entwurf-werkzeug-fuer/task.md) Neues Plugin: Entwurf-Werkzeug für Gestaltungsaufgaben (In Arbeit), letzte Übergabe 2026-11-21 14:53
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -20,9 +16,7 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
-|---|---|---|---|---|---|---|---|---|
-| [W-0016](tasks/W-0016-neues-plugin-entwurf-werkzeug-fuer/task.md) | Neues Plugin: Entwurf-Werkzeug für Gestaltungsaufgaben | Feature | P3 Mittel | In Arbeit | M |  |  |  |
+_Keine Einträge._
 
 ## Geplant und Backlog
 
