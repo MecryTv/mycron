@@ -327,6 +327,35 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     w(['checks', 'remove', 'quote', 'folder', 'outside']);
   });
 
+  await step('Prüfungen: Verlauf, wackelig, Laufzeit', async () => {
+    const { flakyOf, trendOf } = await import('./checks.mjs');
+    const h = (s) => [...s].map((x) => ({ s: x === 'o' ? 'ok' : 'fail', ms: 1000 }));
+    expect(JSON.stringify(flakyOf(h('ofoof'))) === '{"fails":2,"runs":5}', `wackelig ofoof: ${JSON.stringify(flakyOf(h('ofoof')))}`);
+    expect(flakyOf(h('ofo')) && !flakyOf(h('oooof')) && !flakyOf(h('ffffo')) && !flakyOf(h('ooooo')), 'wackelig: ein einzelner Wechsel zählt nicht');
+    const ms = (...a) => a.map((x) => ({ s: x < 0 ? 'fail' : 'ok', ms: Math.abs(x) }));
+    const up = trendOf(ms(20000, 22000, 21000, 48000));
+    expect(up && up.dir === 'up' && up.ms === 48000 && up.usual === 21000, `langsamer: ${JSON.stringify(up)}`);
+    expect(trendOf(ms(30000, 30000, 10000)).dir === 'down', 'schneller nicht erkannt');
+    expect(!trendOf(ms(10000, 12000)) && !trendOf(ms(1000, 4000)) && !trendOf(ms(20000, -60000)) && !trendOf(ms(48000)), 'Trend ohne deutliche Abweichung');
+    // Verlauf in checks.json: höchstens fünf Läufe, ein neuer Befehl beginnt von vorn.
+    w(['checks', 'set', 'hx=node -v']);
+    for (let i = 0; i < 6; i++) w(['checks', 'run', 'W-0001', '--only=hx']);
+    const cfile = path.join(proj, '.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')), 'checks.json');
+    const hist = () => JSON.parse(fs.readFileSync(cfile, 'utf8')).results.hx.hist || [];
+    expect(hist().length === 5 && hist().every((x) => x.s === 'ok' && typeof x.ms === 'number' && x.at), `Verlauf: ${JSON.stringify(hist())}`);
+    w(['checks', 'set', 'hx=node --version']);
+    w(['checks', 'run', 'W-0001', '--only=hx']);
+    expect(hist().length === 1, `Verlauf nach neuem Befehl: ${hist().length}`);
+    // Das Board bekommt wackelig und Trend fertig berechnet.
+    const cj = JSON.parse(fs.readFileSync(cfile, 'utf8'));
+    cj.results.hx = { ...cj.results.hx, status: 'fail', hist: [...h('ofoo'), { s: 'fail', ms: 900 }] };
+    fs.writeFileSync(cfile, JSON.stringify(cj));
+    const { boardData } = await import('./board.mjs');
+    const lr = boardData(proj).tasks.find((t) => t.id === 'W-0001').checks.results.hx;
+    expect(lr.flaky && lr.flaky.fails === 2 && lr.trend === null, `Board: ${JSON.stringify({ flaky: lr.flaky, trend: lr.trend })}`);
+    w(['checks', 'remove', 'hx']);
+  });
+
   await step('Live: Daten im Board', async () => {
     const { boardData } = await import('./board.mjs');
     const dir = path.join('.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')));
@@ -490,8 +519,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const d2 = path.join(proj, '.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((x) => x.startsWith('W-0002-')));
     const at = new Date().toISOString();
     fs.writeFileSync(path.join(d2, 'checks.json'), JSON.stringify({ at, fingerprint: '', results: Object.fromEntries(many.map((n, i) => [n, i < 9
-      ? { status: 'fail', cmd: 'node -v', ms: 40, output: 'The system cannot find the path specified.\n', at }
-      : { status: 'ok', cmd: 'node -v', ms: 900, output: '', at }])) }));
+      ? { status: 'fail', cmd: 'node -v', ms: 40, output: 'The system cannot find the path specified.\n', at, ...(i === 0 ? { hist: ['ok', 'fail', 'ok', 'fail'].map((s) => ({ s, ms: 40, at })) } : {}) }
+      // m10 bestanden, aber deutlich langsamer als sonst (W-0009).
+      : { status: 'ok', cmd: 'node -v', ms: 48000, output: '', at, hist: [21000, 22000, 20000, 48000].map((ms) => ({ s: 'ok', ms, at })) }])) }));
     // Claude wartet auf eine Freigabe für W-0002: Desktop zeigt das, der Stop-Hook beendet es vor der Handyprüfung.
     hook('permission.mjs', { cwd: proj, session_id: 's9', tool_name: 'Bash', tool_input: { command: 'npm install -D vitest' } });
     if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }));
@@ -571,6 +601,10 @@ async function browserCheck(url, log, between = async () => {}) {
     }));
     if (!many.groups.some((g) => /9 Prüfungen/.test(g) && /cannot find the path/.test(g))) errs.push(`Live: keine Fehlergruppe für 9 gleiche Fehlschläge (${many.groups.length} Gruppen)`);
     if (many.attn > 4) errs.push(`Live: Wartet auf dich zeigt ${many.attn} Zeilen statt höchstens 4`);
+    // Wackelig und Laufzeit (W-0009): m1 wechselt hin und her, m10 dauert 48 s statt meist 21 s.
+    const flk = await p.evaluate(() => ({ fl: [...document.querySelectorAll('#viewLive .lv-names span.fl')].map((s) => s.textContent), info: [...document.querySelectorAll('#viewLive .lv-infoline')].map((x) => x.innerText.replace(/\s+/g, ' ')) }));
+    if (!flk.fl.includes('m1') || !flk.info.some((x) => /1 wackelig/.test(x) && /m1/.test(x))) errs.push(`Live: wackelig fehlt (${JSON.stringify(flk)})`);
+    if (!flk.info.some((x) => /Langsamer als sonst: m10 48 s statt meist 21 s/.test(x))) errs.push(`Live: Laufzeittrend fehlt (${JSON.stringify(flk.info)})`);
     const perm = await p.evaluate(() => ({
       tile: (document.querySelector('#viewLive .lv-tile.perm') || {}).innerText || '',
       now: !!document.querySelector('#viewLive .lv-now.perm'),
