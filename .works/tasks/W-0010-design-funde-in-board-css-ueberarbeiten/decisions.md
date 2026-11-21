@@ -22,6 +22,11 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 - Konsequenzen:
 -->
 
+- 2026-11-21: Variante A umgesetzt. Die 3 px Streifen links an Karten, Flussleiste, Verlauf und Meldungen sind weg. Priorität als Chip mit Farbe und Form (Raute P1, Punkt P2/P3, Ring P4), P1-Karten mit getönter Kante. Flussleiste und Verlauf mit farbigem Punkt, Meldungen mit Symbol (✓ normal, → Änderung, ! Fehler; Klasse chg setzt toast() bei einer Farbe).
+- 2026-11-21: Schrift Geist bleibt (Wunsch des Nutzers) und ist in `.impeccable/config.json` als bewusst gewählt eingetragen.
+- 2026-11-21: Der gemeldete Meilenstein-Balken (`.ms .track`) gehört zu einem Block, den das Board nicht mehr verwendet (Meilensteine sind ein Auswahlfeld). Der Block `.milestones`/`.ms` ist gelöscht statt umgebaut.
+- 2026-11-21: Die kleinen Quadrate im Prioritätsfilter (`.pdot`) bleiben, sie stehen immer neben dem Text P1 bis P4.
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 
@@ -51,3 +56,7 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 
 ### Verworfene Varianten
 <!-- Was wurde gezeigt oder erwogen und warum nicht genommen? -->
+
+## Gewählter Entwurf
+
+- 2026-11-21: Variante A „Feinschliff Board: A Punkte und Chips, B Obere Kante, Schriften“ gewählt, Grund: Nutzer: A und Geist (Streifen durch Punkte und Chips ersetzen, Schrift Geist behalten). Datei: design/A-feinschliff-board-a-punkte.html

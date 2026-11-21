@@ -1,0 +1,27 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Feinschliff Board: A Punkte und Chips, B Obere Kante, Schriften",
+      "file": "A-feinschliff-board-a-punkte.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Varianten und Schriften oben im Rahmen umschaltbar",
+      "at": "2026-11-21 14:16"
+    }
+  ],
+  "brainstorm": [
+    {
+      "file": "brainstorm.md",
+      "source": "superpowers",
+      "title": "Streifen, Schrift, Balken",
+      "at": "2026-11-21 14:16"
+    }
+  ],
+  "chosen": {
+    "name": "A",
+    "at": "2026-11-21 14:17",
+    "reason": "Nutzer: A und Geist (Streifen durch Punkte und Chips ersetzen, Schrift Geist behalten)"
+  }
+}
