@@ -47,7 +47,7 @@ import { findSimilar } from './similar.mjs';
 import { taskUsage, projectUsage, liveUsage, fmtTokens, fmtCost } from './usage.mjs';
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
-import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion } from './server-control.mjs';
+import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion, lastPort } from './server-control.mjs';
 import { BOARD_VIEWS, loadPlaywright, takeShots, boardPrepare } from './shot.mjs';
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
@@ -976,7 +976,8 @@ async function cmdBoard() {
   if (flags.serve || flags.restart) {
     const host = flags.share ? '0.0.0.0' : flags.private ? '127.0.0.1' : flags.host && flags.host !== true ? String(flags.host) : (info && info.host) || '127.0.0.1';
     const hostChanged = info && info.host && info.host !== host;
-    let port = parseInt(flags.port || (info && info.port) || (legacy[0] && legacy[0].port) || 4747, 10);
+    // Ohne --port: der Port des laufenden Servers, sonst der zuletzt genutzte (W-0031), sonst 4747. Nur --port ist fest.
+    let port = parseInt(flags.port || (info && info.port) || (legacy[0] && legacy[0].port) || lastPort(root) || 4747, 10);
     // Läuft schon ein aktueller Server, keinen zweiten starten.
     if (info && info.version === current && !flags.restart && !flags.takeover && !hostChanged) {
       out(`Live-Board läuft bereits: ${serverUrl(info)}`);

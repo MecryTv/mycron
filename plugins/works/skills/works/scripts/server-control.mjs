@@ -97,6 +97,11 @@ export function readServer(root) {
 
 export function writeServer(root, info) { writeJson(serverFile(root), info); }
 
+// Letzter Port des Boards (W-0031). Ohne --port startet das Board wieder dort, damit offene Tabs sich neu verbinden.
+export function lastPortFile(root) { return path.join(worksDir(root), 'server-last.json'); }
+export function rememberPort(root, port, host) { try { writeJson(lastPortFile(root), { port, host }); } catch { /* nicht kritisch */ } }
+export function lastPort(root) { const j = readJson(lastPortFile(root), null); return j && Number(j.port) > 0 ? Number(j.port) : null; }
+
 export function clearServer(root, pid) {
   const info = readJson(serverFile(root), null);
   if (info && info.pid === pid) { try { fs.unlinkSync(serverFile(root)); } catch { /* weg */ } }
@@ -174,7 +179,7 @@ export async function stopProcess(pid, timeoutMs = 10000) {
 // Startet den Board-Server losgelöst im Hintergrund. takeover: Port übernehmen, sobald er frei ist.
 // port 0: kein fester Port, der Server nimmt 4747 oder weicht auf den nächsten freien aus.
 export function startDetached(root, { cli = newestCli(), port = 4747, host = '127.0.0.1', takeover = true } = {}) {
-  ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'steps.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json']);
+  ensureGitignore(root, ['server.json', 'server-last.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'steps.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json']);
   const log = fs.openSync(path.join(worksDir(root), 'server.log'), 'a');
   const args = [cli, 'board', '--serve', ...(port ? [`--port=${port}`] : []), `--host=${host}`];
   if (takeover) args.push('--takeover');

@@ -3,7 +3,7 @@ id: W-0031
 title: Board merkt sich seinen Port
 type: feature
 priority: P2
-status: backlog
+status: in-arbeit
 effort: S
 risk:
 created: 2026-11-22
@@ -11,7 +11,7 @@ updated: 2026-11-22
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0031-board-merkt-sich-seinen-port
 tags: [board, hub]
 blocked_by: []
 blocks: []
@@ -35,18 +35,21 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (P2). Startet ein Board ohne --p
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Startet ein Board ohne --port, nimmt es den zuletzt genutzten Port des Projekts, wenn er frei ist
-- [ ] Ist der letzte Port belegt, weicht es wie bisher auf den nächsten freien aus
-- [ ] Ein ausdrückliches --port gilt weiter und wird danach als letzter Port gemerkt
-- [ ] Der letzte Port liegt lokal in .works (nicht im Git) und gilt auch nach works board --stop und für den Start über den Hub
-- [ ] Selbsttest deckt Stopp und Neustart auf demselben Port und den belegten Fall ab
+- [x] Startet ein Board ohne --port, nimmt es den zuletzt genutzten Port des Projekts, wenn er frei ist
+- [x] Ist der letzte Port belegt, weicht es wie bisher auf den nächsten freien aus
+- [x] Ein ausdrückliches --port gilt weiter und wird danach als letzter Port gemerkt
+- [x] Der letzte Port liegt lokal in .works (nicht im Git) und gilt auch nach works board --stop und für den Start über den Hub
+- [x] Selbsttest deckt Stopp und Neustart auf demselben Port und den belegten Fall ab
 
 ## Umsetzungsplan
-<!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] 
+- [x] Selbsttest: Start mit --port, Stopp, Start ohne --port auf demselben Port; belegter letzter Port weicht aus; server-last.json in .works/.gitignore
+- [x] server-control.mjs: rememberPort, lastPort; serve.mjs merkt den Port beim Start; works.mjs nimmt ihn ohne --port
+- [x] Doku board.md, cli.md
 
 ## Betroffene Dateien
-<!-- Pfade mit kurzer Notiz, was dort passiert. -->
+- plugins/works/skills/works/scripts/server-control.mjs, serve.mjs, works.mjs
+- plugins/works/skills/works/scripts/selftest.mjs
+- plugins/works/skills/works/references/board.md, cli.md
 
 ## Designentscheidungen
 <!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
@@ -62,3 +65,5 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (P2). Startet ein Board ohne --p
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
+- 2026-11-22: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-22: Umgesetzt, Selbsttest 34/34 mit Browser

@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-22T20:50:58.596Z",
+  "fingerprint": "2f07ce888e5d:a7d078a2a927",
+  "results": {
+    "code-audit": {
+      "status": "ok",
+      "cmd": "",
+      "note": "Port nur als Zahl aus der lokalen server-last.json gelesen (Number, > 0); Datei in .works/.gitignore; ausdrückliches --port bleibt fest, gemerkter Port weicht bei Belegung aus",
+      "fingerprint": "2f07ce888e5d:a7d078a2a927",
+      "at": "2026-11-22T20:50:58.599Z"
+    }
+  }
+}

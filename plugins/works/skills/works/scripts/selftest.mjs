@@ -761,6 +761,28 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  // W-0031: Ohne --port startet ein Board auf seinem letzten Port, damit offene Tabs sich wieder verbinden.
+  await step('Board merkt sich seinen Port: Neustart ohne --port, belegter Port weicht aus', async () => {
+    if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
+    const { default: net } = await import('node:net');
+    const p1 = await highPort();
+    try {
+      has(w(['board', '--serve', '--detach', `--port=${p1}`]).out, `:${p1}/`, 'Start mit --port');
+      w(['board', '--stop']);
+      has(w(['board', '--serve', '--detach']).out, `:${p1}/`, 'Start ohne --port nach dem Stopp');
+      w(['board', '--stop']);
+      // Belegt: ausweichen wie bisher, nicht scheitern.
+      const blocker = net.createServer();
+      await new Promise((r) => blocker.listen(p1, '127.0.0.1', r));
+      try {
+        const out = w(['board', '--serve', '--detach']).out;
+        const got = (out.match(/127\.0\.0\.1:(\d+)/) || [])[1];
+        expect(got && got !== String(p1), `Belegter letzter Port nicht ausgewichen: ${out.split('\n')[0]}`);
+      } finally { blocker.close(); w(['board', '--stop'], { ok: false }); }
+      expect(fs.readFileSync(path.join(proj, '.works', '.gitignore'), 'utf8').includes('server-last.json'), 'server-last.json nicht in .works/.gitignore');
+    } finally { w(['board', '--stop'], { ok: false }); }
+  });
+
   // Ein offener Board-Tab hält /events offen und verbindet sich nach einem Neustart von selbst wieder (retry 2 s).
   // --open soll dann keinen zweiten Tab öffnen. Der Kindprozess spielt so einen Tab.
   await step('Board --open: kein zweiter Tab, wenn schon einer offen ist', async () => {
