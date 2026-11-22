@@ -43,6 +43,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `board --restart --share` / `--private` | Im lokalen Netz teilen (Leselink mit Schlüssel) oder wieder nur lokal |
 | `share [--owner] [--rotate]` | Links zum Teilen anzeigen, mit `--owner` auch den Bearbeitungslink, mit `--rotate` neue Schlüssel |
 | `export [--out datei.html] [--no-images] [--open-only]` | Schnappschuss als eine HTML-Datei mit Details und eingebetteten Bildern, Standard in `.works/reports/` |
+| `export --json [--out datei.json] [--open-only] [--archive] [--images] [--designs] [--checks] [--no-comments] [--no-history] [--no-planning] [--no-knowledge]` | Das Board als JSON-Sicherung (format works-board): Aufgaben als ihre Dateien, Planung aus config.json, Projektwissen und Ideen; Bilder und Entwürfe nur auf Wunsch. Einlesen mit `import` |
 | `sprint [start\|add\|remove\|set\|close\|list]` | Sprint planen und verfolgen, siehe planning.md |
 | `comments [<ID>]` / `comment <ID> "Text"` | Kommentare lesen (markiert als gelesen) und beantworten |
 | `views` / `list --view "Name"` / `views delete "Name"` | Gespeicherte Ansichten |
@@ -153,6 +154,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `parallel finish <ID> [--merge] [--force]` | Worktree entfernen, mit `--merge` in den Basis-Branch mergen. Status geht nach Review |
 | `parallel abort <ID> [--force]` | Worktree entfernen, Branch ohne Commits löschen, Status zurück nach Geplant |
 | `import <datei> [--format ..] [--map feld=Spalte,..] [--sheet ..] [--json] [--all]` | Vorschau mit Duplikaten, siehe import.md |
+| `import <sicherung.json> [--apply] [--mode merge\|restore] [--only 1,4]` | works-Sicherung aus `export --json`: Vorschau mit neu, geändert, gleich, nur hier. `--apply` führt zusammen (neue Aufgaben mit freien IDs, gewählte geänderte übernehmen), `--mode=restore` ersetzt den Stand und sichert ihn vorher in `.works/backups/`. Beides mit `undo` rückgängig |
 | `import <datei> --apply [--only 1,4] [--skip 3] [--status geplant] [--tags ..] [--include-done] [--keep-dups] [--include-archived]` | Anlegen |
 | `selftest [--browser] [--keep] [--verbose]` | Prüft CLI, Hooks, Import, Dateien, Parallelarbeit, Server und API in einem Wegwerfprojekt. Exit 1 bei Fehlern |
 

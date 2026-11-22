@@ -9,18 +9,6 @@ Angelegt am 2026-11-22. Diese Datei hält fest, was entschieden wurde, warum, un
 <!-- Kernaussagen aus dem Brainstorming in eigenen Worten: Problemverständnis, betrachtete Ansätze, Ergebnis. -->
 
 ## Entscheidungen
-<!-- Pro Entscheidung ein Block. Neue Blöcke mit `works decisions <ID> --add "Titel" ...` oder von Hand im gleichen Format:
-
-### E1: Titel
-- Datum:
-- Quelle: Brainstorm | UI UX Pro Max | Gespräch | Analyse
-- Kontext:
-- Entscheidung:
-- Begründung:
-- Verworfene Alternativen:
-  - Alternative: Grund
-- Konsequenzen:
--->
 ### E1: Verhalten von Export und Import (vom Nutzer am 2026-11-22 freigegeben: Passt so)
 - Datum: 2026-11-22
 - Quelle: Analyse
@@ -46,6 +34,15 @@ Angelegt am 2026-11-22. Diese Datei hält fest, was entschieden wurde, warum, un
 - Begründung: Behebt die bestehende Import-Vorschau gleich mit.
 - Verworfene Alternativen: keine
 - Konsequenzen: keine
+
+### E3: Export ohne Verlauf überschreibt keinen Verlauf
+- Datum: 2026-11-22
+- Quelle: Gespräch
+- Kontext:
+- Entscheidung: Ist in der Sicherung history aus, vergleicht der Abgleich task.md ohne Verlauf und Übergabe, und beim Zusammenführen bleiben diese Abschnitte aus dem Board erhalten
+- Begründung: Sonst gälte jede Aufgabe als geändert, und Übernehmen hätte den Verlauf im Board gelöscht (Fund aus dem code-audit)
+- Verworfene Alternativen:
+- Konsequenzen:
 
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->

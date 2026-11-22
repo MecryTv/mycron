@@ -39,7 +39,8 @@ import { rules, KINDS, dueRules, fillTitle, describe, upcoming } from './recurri
 import { serveHub, projectList, registerProject } from './hub.mjs';
 import { syncGithub, syncSettings, syncState, DEFAULT_SYNC } from './ghsync.mjs';
 import { buildIcal } from './ical.mjs';
-import { undo, undoList } from './undo.mjs';
+import { undo, undoList, snapshot, snapshotRestore } from './undo.mjs';
+import { FORMAT as BACKUP_FORMAT, exportBoard, readBackup, compareBackup, mergeBackup, restoreBackup, backupFileName } from './backup.mjs';
 import { findSimilar } from './similar.mjs';
 import { taskUsage, projectUsage, fmtTokens, fmtCost } from './usage.mjs';
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
@@ -907,6 +908,16 @@ function cmdShare() {
 
 function cmdExport() {
   const root = requireRoot();
+  if (flags.json) {
+    const d = exportBoard(root, {
+      closed: !flags['open-only'], archive: !!flags.archive, comments: !flags['no-comments'], history: !flags['no-history'],
+      checks: !!flags.checks, planning: !flags['no-planning'], knowledge: !flags['no-knowledge'], images: !!flags.images, designs: !!flags.designs,
+    });
+    const file = path.resolve(flags.out && flags.out !== true ? String(flags.out) : path.join(worksDir(root), 'reports', backupFileName(root)));
+    writeJson(file, d);
+    out(`Sicherung gespeichert: ${file} (${d.tasks.length} ${d.tasks.length === 1 ? 'Aufgabe' : 'Aufgaben'}, ${Math.max(1, Math.round(fs.statSync(file).size / 1024))} KB). Einlesen mit works import <datei>.`);
+    return;
+  }
   const snap = buildSnapshot(root, { images: !flags['no-images'], closed: !flags['open-only'] });
   const file = path.resolve(flags.out && flags.out !== true ? String(flags.out) : path.join(worksDir(root), 'reports', snapshotName(root)));
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -1782,6 +1793,7 @@ Ansehen
                                    board --restart --private wieder nur lokal
   share [--rotate] [--owner]       Links zum Teilen anzeigen oder erneuern
   export [--out datei.html] [--no-images] [--open-only]  Schnappschuss als eine HTML-Datei
+  export --json [--out datei.json] [--archive] [--images] [--designs] [--checks] [--open-only]  Sicherung als JSON
   board --status | --stop | --restart
   queue [list|add <ID> [--pos N]|remove <ID>|move <ID> <N>|order A,B,C|clear|set auto_next=true ...]
   sprint [start --title ..|add A,B|remove A|set capacity=24|close [--good ..] [--bad ..] [--change ..] [--next-capacity N]|list]
@@ -1838,6 +1850,7 @@ Dateien, Parallelarbeit, Import, Selbsttest
   import <datei> [--format auto|trello|notion|linear|csv|xlsx|docx|md|json] [--map title=Spalte,..]
          [--sheet Name] [--json] [--all] [--apply [--only 1,4 | --skip 3] [--status geplant] [--tags a,b]
          [--include-done] [--keep-dups] [--include-archived]]
+  import <sicherung.json> [--apply [--mode merge|restore] [--only 1,4]]  works-Sicherung zusammenführen oder wiederherstellen
   selftest [--browser] [--keep] [--verbose]
 
 Typen: ${TYPES.join(', ')}
@@ -2475,10 +2488,49 @@ function importSelection(r, opts) {
   });
 }
 
+// works-Sicherung (W-0021): Vorschau mit Abgleich, dann Zusammenführen oder Wiederherstellen.
+function importBackupCli(root, text, file) {
+  let d;
+  try { d = readBackup(text); } catch (e) { fail(e.message); }
+  const mode = flags.mode && flags.mode !== true ? String(flags.mode) : 'merge';
+  if (!['merge', 'restore'].includes(mode)) fail('--mode ist merge (Zusammenführen) oder restore (Wiederherstellen).');
+  const cmp = compareBackup(root, d);
+  if (!flags.apply) {
+    out(`works-Sicherung aus ${d.project || 'unbekanntem Projekt'} vom ${String(d.exported || '').slice(0, 16).replace('T', ' ')}: ${d.tasks.length} ${d.tasks.length === 1 ? 'Aufgabe' : 'Aufgaben'}.`);
+    out(`${cmp.counts.neu} neu, ${cmp.counts.geaendert} geändert, ${cmp.counts.gleich} gleich, ${cmp.counts.nurHier} nur hier.`);
+    for (const i of cmp.items) {
+      if (i.kind === 'gleich') continue;
+      const ch = (i.changes || []).map((c) => (c.from !== undefined ? `${c.label} ${c.from || '–'} → ${c.to || '–'}` : c.label)).join(', ');
+      out(`${i.kind === 'neu' ? '+' : '~'} ${String(i.n).padStart(3)}  ${i.id}${i.localId && i.localId !== i.id ? ` (hier ${i.localId})` : ''}  ${i.title}${ch ? `  [${ch}]` : ''}`);
+    }
+    for (const t of cmp.onlyHere) out(`  nur hier  ${t.id}  ${t.title}`);
+    out(`\nZusammenführen: works import ${file} --apply  (Auswahl mit --only 1,4)`);
+    out(`Wiederherstellen, ersetzt den Stand und sichert ihn vorher: works import ${file} --apply --mode=restore`);
+    return;
+  }
+  if (mode === 'restore') {
+    const r = restoreBackup(root, d);
+    snapshotRestore(root, { label: `Wiederhergestellt aus ${d.project || 'einer Sicherung'} (${r.tasks} Aufgaben)`, backup: r.backup });
+    refresh(root);
+    out(`Wiederhergestellt: ${r.tasks} ${r.tasks === 1 ? 'Aufgabe' : 'Aufgaben'}. Der vorherige Stand liegt in ${r.backup}. Rückgängig mit works undo.`);
+    return;
+  }
+  const only = flags.only ? listFlag(flags.only).map(Number) : null;
+  const r = mergeBackup(root, d, { only, snapshot: (o) => snapshot(root, o) });
+  refresh(root);
+  out(`Zusammengeführt: ${r.created.length} neu${r.created.length ? ` (${r.created.join(', ')})` : ''}, ${r.updated.length} übernommen${r.updated.length ? ` (${r.updated.join(', ')})` : ''}. Rückgängig mit works undo.`);
+}
+
 function cmdImport() {
   const root = requireRoot();
   const file = pos[0];
   if (!file || !exists(file)) fail('Datei fehlt oder nicht gefunden. Beispiel: works import trello.json [--apply]');
+  if (/\.json$/i.test(file)) {
+    const text = readText(file);
+    let isBackup = false;
+    try { isBackup = JSON.parse(text).format === BACKUP_FORMAT; } catch { /* anderes JSON, normaler Import */ }
+    if (isBackup) return importBackupCli(root, text, file);
+  }
   let r;
   try { r = importPreview(root, path.resolve(file), flags); } catch (e) { fail(e.message); }
   const pick = importSelection(r, flags);

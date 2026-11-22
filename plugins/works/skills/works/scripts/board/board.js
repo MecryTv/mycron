@@ -1710,6 +1710,124 @@
     });
   }
 
+  // ---------- Sichern und Wiederherstellen (W-0021) ----------
+
+  const bkSize = (b) => (b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB' : (b / 1048576).toFixed(1).replace('.', ',') + ' MB');
+  const BK_KEYS = ['closed', 'archive', 'comments', 'history', 'checks', 'planning', 'knowledge', 'images', 'designs'];
+
+  async function openBackup(tab) {
+    let info;
+    try { info = await api('GET', 'api/backup-info'); } catch (e) { return fail(e); }
+    const tg = (name, label, on, hint) => '<label class="toggle"><input type="checkbox" name="' + name + '"' + (on ? ' checked' : '') + '> ' + esc(label) + (hint ? '<span class="bk-hint">' + esc(hint) + '</span>' : '') + '</label>';
+    const imp = tab === 'import';
+    let pre = null;
+    const html = '<h2>Sichern und Wiederherstellen</h2>' +
+      '<div class="bk-tabs" role="tablist" aria-label="Richtung"><button type="button" role="tab" data-bk="export" aria-selected="' + !imp + '">Exportieren</button><button type="button" role="tab" data-bk="import" aria-selected="' + imp + '">Importieren</button></div>' +
+      '<div class="bk-pane" data-pane="export"' + (imp ? ' hidden' : '') + '>' +
+        '<p class="lead" style="margin:0">Das Board als eine JSON-Datei, zum Sichern oder um es in ein anderes Projekt zu übernehmen.</p>' +
+        '<div class="bk-scope">' +
+          '<fieldset><legend>Aufgaben</legend><label class="toggle"><input type="checkbox" checked disabled> Offene<span class="bk-hint">' + info.open + '</span></label>' + tg('closed', 'Erledigte und Verworfene', true, String(info.closed)) + tg('archive', 'Archiv', false, String(info.archived)) + '</fieldset>' +
+          '<fieldset><legend>Je Aufgabe</legend>' + tg('comments', 'Kommentare und Entscheidungen', true) + tg('history', 'Verlauf und Übergaben', true) + tg('checks', 'Prüfergebnisse', false) + '</fieldset>' +
+          '<fieldset><legend>Planung</legend>' + tg('planning', 'Meilensteine, Sprints, Warteschlange, Wiederkehrendes', true) + tg('knowledge', 'Projektwissen und Ideen', true) + '</fieldset>' +
+          '<fieldset><legend>Dateien</legend>' + tg('images', 'Bilder', false, info.images.n + ' · ' + bkSize(info.images.bytes)) + tg('designs', 'Entwürfe', false, info.designs.n + ' · ' + bkSize(info.designs.bytes)) + '</fieldset>' +
+        '</div>' +
+        '<div class="bk-sum"><b>' + esc(info.file) + '</b><span class="bk-hint" id="bkSize"></span></div>' +
+        '<p class="sublabel">Auch ohne Board: <span class="mono">works export --json</span></p>' +
+        '<div class="foot"><button class="btn" value="cancel" formnovalidate>Schließen</button><button type="button" class="btn primary" id="bkGo">JSON herunterladen</button></div>' +
+      '</div>' +
+      '<div class="bk-pane" data-pane="import"' + (imp ? '' : ' hidden') + '>' +
+        '<label class="imp-drop" id="bkDrop"><input type="file" id="bkFile" accept=".json,application/json" hidden><strong id="bkName">Sicherung wählen oder hierher ziehen</strong><span class="sublabel">works-Sicherung als JSON, bis 20 MB</span></label>' +
+        '<div class="bk-pane" id="bkPre"></div>' +
+        '<p class="err" role="alert"></p>' +
+        '<div class="foot"><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn primary" value="next" id="bkNext" disabled>Weiter zum Vergleich</button></div>' +
+      '</div>';
+    const next = await showDialog(html, (fd) => {
+      if (!pre) throw new Error('Bitte zuerst eine Sicherung wählen.');
+      return { r: pre, mode: fd.get('bkmode') === 'restore' ? 'restore' : 'merge' };
+    }, (f) => {
+      $$('[data-bk]', f).forEach((b) => b.onclick = () => {
+        $$('[data-bk]', f).forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+        $$('[data-pane]', f).forEach((p) => { p.hidden = p.dataset.pane !== b.dataset.bk; });
+      });
+      const size = () => {
+        const est = info.base + (f.elements.images.checked ? info.images.bytes * 1.34 : 0) + (f.elements.designs.checked ? info.designs.bytes * 1.34 : 0);
+        $('#bkSize', f).textContent = 'etwa ' + bkSize(est) + ' · ' + (info.open + (f.elements.closed.checked ? info.closed : 0) + (f.elements.archive.checked ? info.archived : 0)) + ' Aufgaben';
+      };
+      BK_KEYS.forEach((k) => { f.elements[k].onchange = size; });
+      size();
+      $('#bkGo', f).onclick = async (e) => {
+        const b = e.currentTarget; const label = b.textContent;
+        b.disabled = true; b.textContent = 'Wird erstellt …';
+        try {
+          const qs = BK_KEYS.map((k) => k + '=' + (f.elements[k].checked ? '1' : '0')).join('&');
+          const res = await fetch('api/backup?' + qs, { headers: { 'X-Works-Token': TOKEN } });
+          if (!res.ok) throw new Error('Export fehlgeschlagen (' + res.status + ').');
+          const blob = await res.blob();
+          const name = ((res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'works-board.json';
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob); a.download = name;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+          ok('Sicherung gespeichert: ' + name + ' (' + bkSize(blob.size) + ')');
+        } catch (ex) { fail(ex); }
+        b.disabled = false; b.textContent = label;
+      };
+      const inp = $('#bkFile', f); const drop = $('#bkDrop', f); const err = $('[data-pane="import"] .err', f);
+      const load = async (file) => {
+        if (!file) return;
+        pre = null; $('#bkNext', f).disabled = true; err.textContent = ''; $('#bkPre', f).innerHTML = '';
+        $('#bkName', f).textContent = file.name + ' (' + bkSize(file.size) + ')';
+        try {
+          const r = await api('POST', 'api/backup-preview?name=' + encodeURIComponent(file.name), undefined, { body: file, type: 'application/json' });
+          const c = r.counts;
+          const when = r.exported ? new Date(r.exported).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '';
+          $('#bkPre', f).innerHTML = '<div class="bk-file"><span class="ic" aria-hidden="true">JSON</span><strong>' + esc(r.name) + '</strong><span class="bk-hint">' +
+            esc([r.project ? 'Projekt ' + r.project : '', when ? 'exportiert ' + when : '', r.tasks + (r.tasks === 1 ? ' Aufgabe' : ' Aufgaben'), r.milestones ? r.milestones + ' Meilensteine' : '', r.knowledge ? r.knowledge + ' Wissenseinträge' : ''].filter(Boolean).join(' · ')) + '</span></div>' +
+            '<div class="bk-counts"><span class="bk-chip" style="--c:var(--ok)"><i></i>' + c.neu + ' neu</span><span class="bk-chip" style="--c:var(--warn)"><i></i>' + c.geaendert + ' geändert</span><span class="bk-chip"><i></i>' + c.gleich + ' gleich</span><span class="bk-chip" style="--c:var(--accent)"><i></i>' + c.nurHier + ' nur hier</span></div>' +
+            '<fieldset class="bk-mode"><legend class="sublabel">Art des Imports</legend>' +
+              '<label><input type="radio" name="bkmode" value="merge" checked><b>Zusammenführen</b><span>Neue Aufgaben anlegen, Geänderte zur Auswahl zeigen, Gleiches überspringen. Was nur hier steht, bleibt.</span></label>' +
+              '<label><input type="radio" name="bkmode" value="restore"><b>Wiederherstellen</b><span>Ersetzt Aufgaben, Planung und Projektwissen durch die Datei. Der jetzige Stand wird vorher als JSON in .works/backups gesichert.</span></label>' +
+            '</fieldset>';
+          pre = r; $('#bkNext', f).disabled = false;
+        } catch (ex) { err.textContent = ex.message; }
+      };
+      inp.onchange = () => load(inp.files[0] || null);
+      drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+      drop.ondragleave = () => drop.classList.remove('over');
+      drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) load(e.dataTransfer.files[0]); };
+    });
+    if (next) backupCompareDialog(next.r, next.mode);
+  }
+
+  async function backupCompareDialog(r, mode) {
+    const lbl = (field, v) => (field === 'status' ? L(v) : v) || '–';
+    const chg = (c) => (c.from !== undefined ? esc(c.label) + ' <del>' + esc(lbl(c.field, c.from)) + '</del> → <ins>' + esc(lbl(c.field, c.to)) + '</ins>' : esc(c.label) + ' geändert');
+    const item = (i) => '<label><input type="checkbox" class="bkc" data-n="' + i.n + '" checked><span class="t"><span class="id">' + esc(i.kind === 'neu' ? 'neu' : i.localId) + '</span>' + esc(i.title) + '</span>' +
+      '<span class="d">' + (i.kind === 'neu' ? esc([i.priority, L(i.status)].filter(Boolean).join(' · ')) : i.changes.map(chg).join(' · ')) + '</span></label>';
+    const neu = r.items.filter((i) => i.kind === 'neu'); const ge = r.items.filter((i) => i.kind === 'geaendert');
+    const restore = mode === 'restore';
+    const body = restore
+      ? '<p class="lead">Wiederherstellen ersetzt den Stand durch ' + r.tasks + (r.tasks === 1 ? ' Aufgabe' : ' Aufgaben') + ' aus der Datei, dazu Planung und Projektwissen. Vorher wird der jetzige Stand gesichert.</p>' +
+        (r.onlyHere.length ? '<div class="bk-diff"><h4>Steht nur hier und verschwindet · ' + r.onlyHere.length + '</h4>' + r.onlyHere.map((t) => '<div class="t"><span class="id">' + esc(t.id) + '</span>' + esc(t.title) + '</div>').join('') + '</div><p class="sublabel">Diese Aufgaben stecken danach nur noch in der Sicherung unter .works/backups.</p>' : '')
+      : (neu.length || ge.length
+        ? '<p class="lead">Zusammenführen: Gleiches ist ausgeblendet, was nur hier steht, bleibt.</p><div class="bk-diff">' +
+          (neu.length ? '<h4>Neu · ' + neu.length + '</h4>' + neu.map(item).join('') : '') + (ge.length ? '<h4>Geändert · ' + ge.length + '</h4>' + ge.map(item).join('') : '') + '</div>'
+        : '<div class="q-empty">Nichts zu übernehmen: Alles in der Datei steht schon genauso im Board.</div>');
+    const html = '<h2>Vergleich mit dem Board</h2>' + body + '<p class="sublabel">Unter Rückgängig lässt sich der Import als Ganzes zurücknehmen.</p>' +
+      '<p class="err" role="alert"></p><div class="foot"><button type="button" class="btn" id="bkBack" style="margin-right:auto">Zurück</button><button class="btn" value="cancel" formnovalidate>Abbrechen</button>' +
+      '<button class="btn ' + (restore ? 'danger' : 'primary') + '" value="ok" id="bkApply"' + (!restore && !neu.length && !ge.length ? ' disabled' : '') + '>' + (restore ? 'Wiederherstellen' : (neu.length + ge.length) + ' übernehmen') + '</button></div>';
+    const res = await showDialog(html, () => {
+      const only = $$('.bkc', form).filter((c) => c.checked).map((c) => +c.dataset.n);
+      if (!restore && !only.length) throw new Error('Nichts gewählt.');
+      return act('backupApply', { token: r.token, mode, only });
+    }, (f) => {
+      const count = () => { if (!restore) { const n = $$('.bkc', f).filter((c) => c.checked).length; $('#bkApply', f).textContent = n ? n + ' übernehmen' : 'Nichts gewählt'; $('#bkApply', f).disabled = !n; } };
+      $$('.bkc', f).forEach((c) => { c.onchange = count; });
+      $('#bkBack', f).onclick = () => { $('button[value="cancel"]', f).click(); setTimeout(() => openBackup('import'), 50); };
+    });
+    if (res) { if (res.undo) undoToast(res.message, res.undo); else ok(res.message); }
+  }
+
   // ---------- Prüfungen im Abschluss-Dialog ----------
 
   function checksBlock(c) {
@@ -3244,7 +3362,7 @@
       EDIT ? api('GET', 'api/undo').catch(() => []) : Promise.resolve([]), EDIT ? api('GET', 'api/share').catch(() => null) : Promise.resolve(null),
     ]);
     const h = [];
-    h.push('<div class="row-btns tools-top"><button class="btn small" data-openside="knowledge">Projektwissen' + (meta.knowledgeProposals ? ' (' + meta.knowledgeProposals + ' neu)' : '') + '</button><button class="btn small" data-openside="cleanup">Aufräumen</button>' + (EDIT ? '<button class="btn small" id="btnImport">Importieren</button>' : '') + '</div>');
+    h.push('<div class="row-btns tools-top"><button class="btn small" data-openside="knowledge">Projektwissen' + (meta.knowledgeProposals ? ' (' + meta.knowledgeProposals + ' neu)' : '') + '</button><button class="btn small" data-openside="cleanup">Aufräumen</button>' + (EDIT ? '<button class="btn small" id="btnImport">Importieren</button><button class="btn small" id="btnBackup">Sichern und Wiederherstellen</button>' : '') + '</div>');
     h.push('<details class="sec" id="parSec"><summary>Parallelarbeit <span class="meta">' + ((meta.lanes || []).length ? meta.lanes.length + ' laufen' : 'keine') + '</span></summary><div class="body" id="parBody"><p class="md">Claude prüft vor dem Abarbeiten mehrerer Aufgaben, ob sie gleichzeitig in eigenen Git-Worktrees laufen können, und startet dann je Aufgabe einen Agenten. Ist es unsicher, fragt es dich.</p><p class="muted">Lädt beim Öffnen …</p></div></details>');
     if (rec) {
       h.push('<details class="sec"><summary>Wiederkehrende Aufgaben <span class="meta">' + rec.rules.length + '</span></summary><div class="body">' +
@@ -3285,6 +3403,7 @@
 
   function bindToolsExtra(body) {
     const bi = $('#btnImport', body); if (bi) bi.onclick = () => openImport();
+    const bk = $('#btnBackup', body); if (bk) bk.onclick = () => openBackup();
     const ps = $('#parSec', body);
     if (ps) ps.addEventListener('toggle', async () => {
       if (!ps.open || ps.dataset.loaded) return;
@@ -3347,6 +3466,7 @@
     if (LIVE) c.push({ label: 'Projektwissen', run: () => openSide('knowledge') });
     if (LIVE) c.push({ label: 'Aufräumen', run: () => openSide('cleanup') });
     if (LIVE && EDIT) c.push({ label: 'Aufgaben importieren', run: () => openImport() });
+    if (LIVE && EDIT) c.push({ label: 'Sichern und Wiederherstellen (JSON)', run: () => openBackup() });
     if (EDIT) c.push({ label: 'Letzte Änderung rückgängig', hint: 'Strg+Z', run: () => run(() => act('undo', {}), (x) => x.message) });
     if (LIVE) {
       c.push({ label: 'Nächste Aufgabe vorschlagen', run: () => openSide('next') });

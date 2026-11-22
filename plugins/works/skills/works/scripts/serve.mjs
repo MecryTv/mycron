@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { worksDir, run, openInBrowser } from './lib.mjs';
 import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
-import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload } from './api.mjs';
+import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload, backupPreview } from './api.mjs';
 import { buildIcal } from './ical.mjs';
 import { registerProject } from './hub.mjs';
 import { syncSettings, syncState } from './ghsync.mjs';
@@ -15,6 +15,7 @@ import { dueRules } from './recurring.mjs';
 import { loadConfig, loadTasks } from './lib.mjs';
 import { shareKeys, rotateKeys, shareLinks, lanAddresses } from './share.mjs';
 import { buildSnapshot, snapshotName } from './export.mjs';
+import { exportBoard, backupInfo, backupFileName } from './backup.mjs';
 import { runningVersion, writeServer, clearServer, newestCli, cliVersion, OWN_CLI, startDetached, ensureGitignore } from './server-control.mjs';
 
 const MIME = {
@@ -266,7 +267,19 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         // Der Live-Diff (Verlauf der Live-Ansicht) zeigt auch Uncommittetes und ist nur für den Besitzer.
         if (p === '/api/diff' && q.get('live') === '1' && level !== 'edit') return json(res, 403, { error: 'Nur für den Besitzer des Boards.' });
         if (p === '/api/diff') return json(res, 200, await diffOf(root, String(q.get('id') || '').toUpperCase(), q.get('file'), q.get('uncommitted') === '1', q.get('live') === '1'));
-        if (level !== 'edit' && ['/api/share', '/api/export', '/api/checks', '/api/template-draft'].includes(p)) return json(res, 403, { error: 'Nur für den Besitzer des Boards.' });
+        if (level !== 'edit' && ['/api/share', '/api/export', '/api/checks', '/api/template-draft', '/api/backup', '/api/backup-info'].includes(p)) return json(res, 403, { error: 'Nur für den Besitzer des Boards.' });
+        // Sichern als JSON (W-0021): Umfang über Parameter, 1 an, 0 aus; ohne Angabe gilt der Standard von exportBoard.
+        if (p === '/api/backup-info') return json(res, 200, backupInfo(root));
+        if (p === '/api/backup') {
+          const on = (k) => (q.has(k) ? q.get(k) === '1' : undefined);
+          const opts = Object.fromEntries(['closed', 'archive', 'comments', 'history', 'checks', 'planning', 'knowledge', 'images', 'designs'].map((k) => [k, on(k)]).filter(([, v]) => v !== undefined));
+          const body = JSON.stringify(exportBoard(root, opts), null, 2);
+          res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8', ...SECURITY_HEADERS,
+            'Content-Disposition': `attachment; filename="${backupFileName(root)}"`,
+          });
+          return res.end(body);
+        }
         if (p === '/api/share') return json(res, 200, shareInfo());
         if (p === '/api/checks') return json(res, 200, checksInfo(root));
         if (p === '/api/template-draft') return json(res, 200, templateDraft(root, String(q.get('id') || '').toUpperCase()));
@@ -310,6 +323,10 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
           return;
         }
         throw new ApiError(400, 'Unbekannte Aktion.');
+      }
+      if (p === '/api/backup-preview') {
+        const data = await readBody(req, MAX_UPLOAD);
+        return json(res, 200, backupPreview(root, { name: q.get('name') || '', data }));
       }
       if (p === '/api/import') {
         const data = await readBody(req, MAX_UPLOAD);

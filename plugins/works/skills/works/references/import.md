@@ -14,6 +14,7 @@
 | Word | .docx | Tabellen mit Kopfzeile wie CSV, Aufzählungen und nummerierte Listen als Aufgaben, eingerückte Punkte darunter als Kriterien, Kontrollkästchen (☐ ☒) als offen oder erledigt, Überschriften als Tags oder Status |
 | Markdown, Text | .md, .txt | `- [ ]` und `- [x]`, Listenpunkte, `TODO:` Zeilen, eingerückte Punkte als Kriterien, Überschriften als Tags. "Text: Beschreibung" teilt Titel und Beschreibung |
 | works | JSON mit einer Liste von Kandidaten | eigene, von Claude bereinigte Liste, siehe unten |
+| works-Sicherung | JSON aus `works export --json` oder dem Board (format works-board) | eigener Weg mit Zusammenführen oder Wiederherstellen, siehe cli.md und board.md, Abschnitt Sichern und Wiederherstellen |
 
 Spalten, die keinem Feld zugeordnet sind, landen als Liste in der Beschreibung, damit nichts verloren geht. Werte werden übersetzt: Status (Done, Doing, In Bearbeitung, To Do …), Priorität (Urgent, Hoch, P1 …), Aufwand (Story Points, Stunden, Tage, S bis XL), Datum (ISO, 31.10.2026, 10/31/2026, Excel-Zahl, "31. Oktober 2026").
 

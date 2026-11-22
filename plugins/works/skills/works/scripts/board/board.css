@@ -442,7 +442,9 @@ dialog h2 { font-size: 18px; font-weight: 650; margin: 0; }
 dialog .lead { margin: -8px 0 0; color: var(--muted); font-size: 13px; }
 dialog .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 dialog .span2 { grid-column: span 2; } dialog .span4 { grid-column: 1 / -1; }
-dialog .foot { display: flex; gap: 8px; justify-content: flex-end; position: sticky; bottom: -22px; margin: 0 -24px -22px; padding: 12px 24px 18px; background: var(--surface); border-top: 1px solid var(--line); }
+dialog h2 { overflow-wrap: anywhere; }
+/* flex-wrap: drei Knöpfe passen auf dem Handy nicht nebeneinander und zogen sonst das Formular über den Dialogrand (W-0021). */
+dialog .foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; position: sticky; bottom: -22px; margin: 0 -24px -22px; padding: 12px 24px 18px; background: var(--surface); border-top: 1px solid var(--line); }
 dialog .err { color: var(--danger); font-size: 13px; min-height: 0; }
 .seg-ctl { display: flex; flex-wrap: wrap; gap: 4px; }
 .seg-ctl label { position: relative; }
@@ -956,7 +958,45 @@ a.btn { text-decoration: none; }
 .flinks .btn.link { padding: 0; }
 .imp-drop { display: grid; place-items: center; gap: 4px; padding: 26px; margin-bottom: 12px; border: 1.5px dashed var(--line-strong); border-radius: 12px; cursor: pointer; text-align: center; }
 .imp-drop.over { border-color: var(--accent); background: var(--accent-soft); }
-.imp-wrap { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin: 8px 0 12px; }
+.imp-wrap { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin: 8px 0 12px; min-width: 0; }
+
+/* Sichern und Wiederherstellen (W-0021) */
+.bk-tabs { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunken); justify-self: start; }
+.bk-tabs button { font: inherit; font-size: 13px; border: 0; background: none; color: var(--text-2); padding: 6px 14px; border-radius: 7px; cursor: pointer; }
+.bk-tabs button[aria-selected="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+.bk-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.bk-pane { display: grid; gap: 14px; min-width: 0; }
+.bk-pane[hidden] { display: none; }
+.bk-hint { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bk-scope { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+.bk-scope fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.bk-scope legend { padding: 0; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.bk-scope .toggle .bk-hint { margin-left: auto; padding-left: 8px; }
+@media (max-width: 520px) { .bk-scope { grid-template-columns: minmax(0, 1fr); } }
+.bk-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 12px; border-radius: 10px; background: var(--sunken); font-size: 13px; overflow-wrap: anywhere; }
+.bk-sum b { font-weight: 600; }
+.bk-file { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 2px 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.bk-file .ic { grid-row: span 2; width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; }
+.bk-file strong { font-size: 13.5px; overflow-wrap: anywhere; }
+.bk-mode { display: grid; gap: 8px; border: 0; margin: 0; padding: 0; min-width: 0; }
+.bk-mode label { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 2px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.bk-mode label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.bk-mode input { margin: 2px 0 0; accent-color: var(--accent); }
+.bk-mode b { font-size: 13.5px; font-weight: 600; }
+.bk-mode span { grid-column: 2; font-size: 12.5px; color: var(--text-2); }
+.bk-counts { display: flex; flex-wrap: wrap; gap: 6px; }
+.bk-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-variant-numeric: tabular-nums; background: var(--sunken); color: var(--text-2); }
+.bk-chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--muted)); }
+.bk-diff { display: grid; gap: 2px; max-height: 52vh; overflow: auto; min-width: 0; }
+.bk-diff h4 { margin: 8px 0 2px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.bk-diff label { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 2px 10px; padding: 8px 6px; border-radius: 8px; cursor: pointer; }
+.bk-diff label:hover { background: var(--raised); }
+.bk-diff input { margin: 2px 0 0; accent-color: var(--accent); }
+.bk-diff .t { font-size: 13px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.bk-diff .t .id { color: var(--muted); font-weight: 600; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.bk-diff .d { grid-column: 2; font-size: 12.5px; color: var(--text-2); }
+.bk-diff .d del { color: var(--muted); }
+.bk-diff .d ins { text-decoration: none; color: var(--text); font-weight: 500; }
 .tbl.imp { width: 100%; font-size: 13px; }
 .tbl.imp td, .tbl.imp th { padding: 6px 8px; vertical-align: top; }
 .tbl.imp td .sublabel { display: block; }

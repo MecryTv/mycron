@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-22 11:42 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-22 12:02 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 1 | 0 | 0 | 0 | 0 | 0 | 20 | 0 |
+| 0 | 0 | 1 | 0 | 0 | 0 | 20 | 0 |
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 1 · P4 Niedrig: 0
+
+## Aktive Aufgabe
+
+[W-0021](tasks/W-0021-board-als-json-exportieren-und/task.md) Board als JSON exportieren und importieren (In Arbeit), letzte Übergabe 2026-11-22 11:57
 
 ## Kritisch (P1)
 
@@ -16,13 +20,13 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0021](tasks/W-0021-board-als-json-exportieren-und/task.md) | Board als JSON exportieren und importieren | Design | P3 Mittel | In Arbeit | M |  |  |  |
 
 ## Geplant und Backlog
 
-| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
-|---|---|---|---|---|---|---|---|---|
-| [W-0021](tasks/W-0021-board-als-json-exportieren-und/task.md) | Board als JSON exportieren und importieren | Design | P3 Mittel | Backlog | M |  |  |  |
+_Keine Einträge._
 
 ## Zuletzt erledigt
 
