@@ -3,15 +3,15 @@ id: W-0020
 title: board --open öffnet nur, wenn noch kein Tab offen ist
 type: feature
 priority: P2
-status: backlog
+status: in-arbeit
 effort: S
 risk:
 created: 2026-11-21
-updated: 2026-11-21
+updated: 2026-11-22
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0020-board-open-oeffnet-nur-wenn
 tags: [board, live]
 blocked_by: []
 blocks: []
@@ -35,19 +35,29 @@ Wunsch des Nutzers vom 2026-11-21: Das Board soll selbst prüfen, ob es schon l�
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Läuft der Server ohne offenen Board-Tab, öffnet --open den Browser
-- [ ] Startet der Server neu, öffnet --open den Browser wie bisher
-- [ ] Läuft der Server und ist ein Board-Tab offen, öffnet works board --serve --detach --open keinen neuen Tab und sagt das
+- [x] Läuft der Server ohne offenen Board-Tab, öffnet --open den Browser
+- [x] Startet der Server neu, öffnet --open den Browser wie bisher
+- [x] Läuft der Server und ist ein Board-Tab offen, öffnet works board --serve --detach --open keinen neuen Tab und sagt das
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] 
+- [x] Test im Selbsttest mit einem Kindprozess als Tab (RED)
+- [x] Probelauf-Schalter WORKS_DRY_OPEN und gemeinsame Funktion openInBrowser
+- [x] Server zählt lokale Tabs, Route /tabs
+- [x] works board --open öffnet nur ohne Tab, wartet nach einem Start bis 3 s
+- [x] Doku: SKILL.md, board.md, cli.md, guten-morgen
 
 ## Betroffene Dateien
+- `plugins/works/skills/works/scripts/lib.mjs`: openInBrowser
+- `plugins/works/skills/works/scripts/serve.mjs`: localTabs, /tabs, --open im Vordergrund
+- `plugins/works/skills/works/scripts/works.mjs`: boardTabs, openBoardOnce
+- `plugins/works/skills/works/scripts/selftest.mjs`: neuer Schritt, WORKS_DRY_OPEN
+- `plugins/works/skills/works/SKILL.md`, `references/board.md`, `references/cli.md`
+- `plugins/feierabend/skills/guten-morgen/SKILL.md`: nicht mehr von Hand nachöffnen
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
 
 ## Designentscheidungen
-<!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
+Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
@@ -56,7 +66,15 @@ Wunsch des Nutzers vom 2026-11-21: Das Board soll selbst prüfen, ob es schon l�
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Stand: 2026-11-22 11:23
+
+Branch feature/w-0020-open-ohne-zweiten-tab, noch nicht committet. Code und Doku fertig, Handtest grün. Offen: neuer Selbsttest-Schritt 'Board --open: kein zweiter Tab' scheitert im vollen Selbsttest mit fetch failed auf /tabs. Diagnose (Port, Ausgabe, server.json) ist im Test eingebaut, Lauf mit --keep gestartet (Log in TEMP/w20-selftest2.log). Nächster Schritt: Ursache aus der Diagnose klären (Verdacht: Nachwirkung des Port-Schritts davor), beheben, Selbsttest grün, dann Kriterien abhaken, commit, merge, done, push, CI-Wächter, Plugin aktualisieren.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
+- 2026-11-22: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-22: decisions.md angelegt
+- 2026-11-22: Entscheidung E1 dokumentiert: Offene Tabs über den Event-Stream zählen
+- 2026-11-22: Umgesetzt: /tabs im Server, openBoardOnce in der CLI, WORKS_DRY_OPEN, Doku. Handtest mit Kindprozess als Tab: alle drei Fälle richtig. Voller Selbsttest: neuer Schritt rot mit 'fetch failed' (Port aus der Ausgabe nicht erreichbar), außerhalb des Selbsttests nicht nachstellbar; Diagnose eingebaut, Lauf mit --keep läuft.
+- 2026-11-22: Übergabe aktualisiert
+- 2026-11-22: Selbsttest 25 von 25 grün. Ursache des roten Laufs: fetch im Selbsttest nutzte nach dem Neustart eine tote Keep-Alive-Verbindung (ECONNRESET); Test fragt jetzt einmal neu.

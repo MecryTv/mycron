@@ -162,6 +162,14 @@ export function run(cmd, args, opts = {}) {
   return { ok: r.status === 0, code: r.status, stdout: r.stdout || '', stderr: r.stderr || '', error: r.error };
 }
 
+// Seite oder Datei im Standardbrowser öffnen. WORKS_DRY_OPEN meldet nur, was geöffnet würde (Selbsttest).
+export function openInBrowser(target) {
+  if (process.env.WORKS_DRY_OPEN) return `Im Browser geöffnet (Probelauf): ${target}`;
+  const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
+  run(opener, [target], { detached: true, stdio: 'ignore', windowsHide: false });
+  return `Im Browser geöffnet: ${target}`;
+}
+
 export function exists(p) {
   try { fs.accessSync(p); return true; } catch { return false; }
 }

@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 import { readText,
   SKILL_DIR, STATUSES, OPEN_STATUSES, CLOSED_STATUSES, STATUS_LABEL, PRIORITIES, PRIO_LABEL,
   TYPES, TYPE_LABEL, EFFORTS, RISKS, BRANCH_PREFIX, FIELD_ORDER, LIST_FIELDS, DEFAULT_CONFIG,
-  today, nowStamp, daysBetween, slugify, fail, warn, run, exists, readJson, writeJson,
+  today, nowStamp, daysBetween, slugify, fail, warn, run, openInBrowser, exists, readJson, writeJson,
   findRoot, requireRoot, worksDir, loadConfig, saveConfig, loadState, saveState,
   formatId, idNumber, normalizeId, parseFrontmatter, serializeFrontmatter,
   getSection, setSection, appendToSection, stripComments, checkboxes, hasContent, imageLinks,
@@ -865,6 +865,26 @@ async function waitForServer(root, oldPid, ms = 8000) {
   return null;
 }
 
+// Anzahl offener Board-Tabs auf diesem Rechner, null wenn der Server nicht antwortet.
+async function boardTabs(info) {
+  try {
+    const r = await fetch(`http://127.0.0.1:${info.port}/tabs`, { signal: AbortSignal.timeout(1500) });
+    return r.ok ? (await r.json()).tabs : null;
+  } catch { return null; }
+}
+
+// --open ohne zweiten Tab: Ist das Board schon offen, nichts öffnen. wait: so lange auf Tabs warten, die sich nach
+// einem Neustart von selbst wieder verbinden (der Event-Stream versucht es alle 2 s).
+async function openBoardOnce(info, wait = 0) {
+  const until = Date.now() + wait;
+  let tabs = await boardTabs(info);
+  while (!tabs && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 250));
+    tabs = await boardTabs(info);
+  }
+  out(tabs ? 'Das Board ist schon in einem Browser-Tab offen, kein neuer Tab.' : openInBrowser(serverUrl(info)));
+}
+
 function printShare(root, info) {
   if (!info || !['0.0.0.0', '::'].includes(info.host)) return;
   const links = shareLinks(root, info.port);
@@ -922,6 +942,7 @@ async function cmdBoard() {
     // Läuft schon ein aktueller Server, keinen zweiten starten.
     if (info && info.version === current && !flags.restart && !flags.takeover && !hostChanged) {
       out(`Live-Board läuft bereits: ${serverUrl(info)}`);
+      if (flags.open) await openBoardOnce(info);
       return;
     }
     // Veraltete oder alte Server dieses Projekts durch die aktuelle Version ersetzen.
@@ -940,10 +961,7 @@ async function cmdBoard() {
       out(`Live-Board läuft: ${serverUrl(started)}`);
       printShare(root, started);
       out('Läuft im Hintergrund weiter. Beenden mit works board --stop.');
-      if (flags.open) {
-        const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
-        run(opener, [serverUrl(started)], { detached: true, stdio: 'ignore', windowsHide: false });
-      }
+      if (flags.open) await openBoardOnce(started, 3000);
       return;
     }
     serveBoard(root, {
@@ -955,10 +973,7 @@ async function cmdBoard() {
   }
   const file = generateBoard(root);
   out(`Board erzeugt: ${file}`);
-  if (flags.open) {
-    const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
-    run(opener, [file], { detached: true, stdio: 'ignore', windowsHide: false });
-  }
+  if (flags.open) out(openInBrowser(file));
 }
 
 // ---------- Demo ----------
