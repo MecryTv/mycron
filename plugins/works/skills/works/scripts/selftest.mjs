@@ -999,6 +999,55 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     });
   }
 
+  // W-0030: In der Abnahme lassen sich Breite und Schema wählen; Entwurf und Nachher-Bild folgen beide.
+  if (browser) {
+    await step('Abnahme: Entwurf und Ergebnis in gleicher Breite und gleichem Schema', async () => {
+      if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
+      const id = (w(['new', '--type=design', '--title=Vergleich im gleichen Maßstab', '--priority=P3']).out.match(/W-\d+/) || [])[0];
+      const dir = path.join(base, 'w30');
+      fs.mkdirSync(dir, { recursive: true });
+      // Entwurf wie aus der mockups-Vorlage: liest ?theme= und meldet Schema und Breite.
+      fs.writeFileSync(path.join(dir, 'A.html'), '<!doctype html><html><body><p id="t"></p><script>const q = new URLSearchParams(location.search); document.getElementById("t").textContent = (q.get("theme") || "light") + " " + innerWidth;</script></body></html>');
+      w(['design', 'add', id, '--name', 'A', '--title', 'Variante A', '--file', path.join(dir, 'A.html')]);
+      w(['design', 'choose', id, 'A', '--reason', 'Selbsttest']);
+      const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+      for (const n of ['seite-light-1440', 'seite-dark-390']) { fs.writeFileSync(path.join(dir, `${n}.png`), png); w(['asset', id, path.join(dir, `${n}.png`), '--kind=nachher', `--name=${n}`, '--desc=Selbsttest']); }
+      w(['set', id, 'status=review']);
+      const br = await launchChromium(log);
+      if (!br) return;
+      try {
+        const port = await highPort();
+        w(['board', '--serve', '--detach', `--port=${port}`]);
+        const p = await br.newPage({ viewport: { width: 1440, height: 900 } });
+        const errs = [];
+        p.on('pageerror', (e) => errs.push(e.message));
+        await p.goto(`http://127.0.0.1:${port}/`);
+        await p.click(`.card[data-id="${id}"]`);
+        await p.click('[data-act="review"]');
+        await p.waitForSelector('dialog[open] .rv-cmp');
+        const dlg = p.locator('dialog[open]');
+        const pick = (name) => dlg.getByRole('button', { name, exact: true }).click();
+        const state = () => p.evaluate(() => { const d = document.querySelector('dialog[open]'); const f = d.querySelector('.rv-cmp iframe'); const i = d.querySelector('.rv-cmp img'); const m = d.querySelector('.rv-miss'); return { frame: f ? f.getAttribute('src') : '', img: i ? i.getAttribute('src') : '', miss: m ? m.textContent : '' }; });
+        await pick('Handy'); await pick('Dunkel');
+        let st = await state();
+        expect(st.frame.includes('theme=dark') && st.img.includes('dark-390'), `Handy dunkel: ${JSON.stringify(st)}`);
+        await pick('Tablet');
+        st = await state();
+        expect(/Kein Nachher-Bild für Tablet, dunkel/.test(st.miss) && /--widths=768 --themes=dark/.test(st.miss), `Fehlendes Bild nicht gemeldet: ${JSON.stringify(st)}`);
+        await pick('Desktop'); await pick('Hell');
+        st = await state();
+        expect(st.img.includes('light-1440'), `Desktop hell: ${JSON.stringify(st)}`);
+        const inner = p.frameLocator('dialog[open] .rv-cmp iframe').locator('#t');
+        await inner.waitFor();
+        has(await inner.textContent(), 'light 1440', 'Entwurf in gewählter Breite');
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        w(['board', '--stop'], { ok: false });
+      }
+    });
+  }
+
   // works ship (W-0026): Abschluss in einem Rutsch. Eigenes Projekt mit einem lokalen Remote.
   if (hasGit) {
     await step('works ship: anhalten bei offenen Punkten, sonst mergen, abschließen, pushen', async () => {
@@ -1042,6 +1091,15 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       git(['remote', 'set-url', 'origin', remote], sp);
       expect(rb.code !== 0 && branchNow() === 'feature/ship-test', `ship ohne erreichbaren Remote: ${rb.code} auf ${branchNow()}: ${(rb.out + rb.err).slice(0, 300)}`);
       await waitFor(async () => boardPort() === bport, `Board nach Abbruch wieder auf Port ${bport}`);
+      // Liegengebliebene Datei: Unter Windows kann ein Virenscanner frisch geschriebene Dateien kurz sperren, dann löscht
+      // git switch sie nicht und der Merge scheitert an "untracked files would be overwritten". Der Hook stellt das nach.
+      const tdirRel = path.relative(sp, tdir).split(path.sep).join('/');
+      fs.writeFileSync(path.join(tdir, 'anhang.txt'), 'Anhang nur im Branch\n');
+      git(['add', '-A'], sp); git(['commit', '-q', '-m', `works: ${id} Anhang`], sp);
+      fs.copyFileSync(path.join(tdir, 'anhang.txt'), path.join(base, 'anhang-kopie.txt'));
+      const hookPath = path.join(sp, '.git', 'hooks', 'post-checkout');
+      fs.writeFileSync(hookPath, `#!/bin/sh\n[ "$3" = 1 ] || exit 0\n[ "$(git rev-parse --abbrev-ref HEAD)" = main ] || exit 0\n[ -f "${tdirRel}/anhang.txt" ] && exit 0\nmkdir -p "${tdirRel}" && cp "${path.join(base, 'anhang-kopie.txt').split(path.sep).join('/')}" "${tdirRel}/anhang.txt"\nexit 0\n`);
+      fs.chmodSync(hookPath, 0o755);
       // Neue Zeiten in time.jsonl, noch nicht committet: Sie müssen nach dem Abschluss erhalten bleiben.
       fs.appendFileSync(path.join(sp, '.works', 'time.jsonl'), JSON.stringify({ t: new Date().toISOString(), ev: 'turn', task: id, marke: 'ship-zeit' }) + '\n');
       const r3 = w(['ship', id], { cwd: sp, ok: false });

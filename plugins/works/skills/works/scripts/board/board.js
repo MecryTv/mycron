@@ -3154,7 +3154,8 @@
   // HTML-Mockups in Desktopbreite rendern und verkleinert zeigen.
   const FRAME_W = 1024;
   const frameRO = 'ResizeObserver' in window ? new ResizeObserver((list) => list.forEach((e) => fitFrame(e.target))) : null;
-  function fitFrame(w) { const f = w.firstElementChild; if (!f) return; const k = w.clientWidth / FRAME_W; f.style.transform = 'scale(' + k + ')'; f.style.height = (w.clientHeight / k) + 'px'; }
+  // data-fw: Breite, in der der Entwurf rendert (W-0030: Desktop, Tablet, Handy in der Abnahme). Sonst 1024.
+  function fitFrame(w) { const f = w.firstElementChild; if (!f) return; const fw = +w.dataset.fw || FRAME_W; f.style.width = fw + 'px'; const k = w.clientWidth / fw; f.style.transform = 'scale(' + k + ')'; f.style.height = (w.clientHeight / k) + 'px'; }
   function scaleFrames(root) { $$('.dz-wrap', root).forEach((w) => { fitFrame(w); if (frameRO) frameRO.observe(w); }); }
 
   // ---------- Abnahme im Review ----------
@@ -3175,9 +3176,33 @@
     const pane = (x) => (!x ? '' : x.v ? '<figure class="rv-fig"><figcaption>' + esc(x.label) + '</figcaption>' + (x.v.kind === 'html' ? '<div class="rv-img dz-wrap"><iframe src="' + esc(x.v.src) + '" sandbox="allow-scripts" tabindex="-1" title="Entwurf"></iframe></div>' : '<img class="rv-img" src="' + esc(x.v.src) + '" alt="Entwurf">') + '</figure>'
       : '<figure class="rv-fig"><figcaption>' + esc(x.label) + '</figcaption><img class="rv-img" src="' + esc(x.a.src) + '" alt="' + esc(x.a.desc || x.a.alt) + '"></figure>');
     const compare = (m) => '<div class="rv-cmp">' + (m.left ? pane(m.left) : '') + (m.right ? pane({ label: 'Ergebnis' + (m.right.desc ? ': ' + m.right.desc : ''), a: m.right }) : '<div class="q-empty">Noch kein Screenshot vom Ergebnis. Claude legt ihn mit works asset --kind nachher ab.</div>') + '</div>';
+    // Gleicher Maßstab (W-0030): Breite und Schema wählen, der Entwurf rendert genau so (?theme=, ?frame=0 wie in der
+    // mockups-Vorlage), daneben das Nachher-Bild mit derselben Breite und demselben Schema im Namen (works shot: -dark-390).
+    const SIZES = [['Desktop', 1440], ['Tablet', 768], ['Handy', 390]];
+    const shotOf = (a) => { const m = String(a.src).match(/(light|dark)-(\d{3,4})(?!\d)/); return m ? { theme: m[1], width: +m[2] } : null; };
+    const afters = imgs.filter((a) => a.kind === 'nachher' && shotOf(a));
+    const scaled = !!(chosen && afters.length);
+    const start = scaled ? shotOf(afters.find((a) => shotOf(a).theme === 'light' && shotOf(a).width === 1440) || afters[0]) : null;
+    let size = start ? (SIZES.some((s) => s[1] === start.width) ? start.width : 1440) : 1440;
+    let theme = start ? start.theme : 'light';
+    const sizeLabel = () => SIZES.find((s) => s[1] === size)[0] + ', ' + (theme === 'dark' ? 'dunkel' : 'hell');
+    const mockCompare = () => {
+      const match = afters.find((a) => { const s = shotOf(a); return s.width === size && s.theme === theme; });
+      const left = chosen.kind === 'html'
+        ? '<figure class="rv-fig"><figcaption>Entwurf ' + esc(chosen.name) + ' · ' + esc(sizeLabel()) + '</figcaption><div class="rv-img dz-wrap rv-w' + size + '" data-fw="' + size + '"><iframe src="' + esc(chosen.src + (chosen.src.includes('?') ? '&' : '?') + 'theme=' + theme + '&frame=0') + '" sandbox="allow-scripts" tabindex="-1" title="Entwurf"></iframe></div></figure>'
+        : pane({ label: 'Entwurf ' + chosen.name, v: chosen });
+      const right = '<figure class="rv-fig"><figcaption>Ergebnis · ' + esc(sizeLabel()) + '</figcaption>' + (match
+        ? '<img class="rv-img rv-w' + size + '" src="' + esc(match.src) + '" alt="' + esc(match.desc || match.alt) + '">'
+        : '<div class="rv-miss"><b>Kein Nachher-Bild für ' + esc(sizeLabel()) + '</b><span>Claude legt es an, etwa mit</span><code>works shot --url=&lt;Adresse&gt; --widths=' + size + ' --themes=' + theme + ' --asset=' + esc(id) + ' --kind=nachher</code></div>') + '</figure>';
+      return '<div class="rv-cmp">' + left + right + '</div>';
+    };
+    const render = (m) => (m.id === 'mock' && scaled ? mockCompare() : compare(m));
+    const scaleCtl = scaled ? '<div class="rv-scale" id="rvScale"><span class="rv-grp" role="group" aria-label="Breite"><span>Breite</span>' + SIZES.map((s) => '<button type="button" class="sv-chip" data-rvw="' + s[1] + '" aria-pressed="' + (s[1] === size) + '">' + s[0] + '</button>').join('') + '</span>' +
+      '<span class="rv-grp" role="group" aria-label="Farbschema"><span>Schema</span><button type="button" class="sv-chip" data-rvt="light" aria-pressed="' + (theme === 'light') + '">Hell</button><button type="button" class="sv-chip" data-rvt="dark" aria-pressed="' + (theme === 'dark') + '">Dunkel</button></span></div>' : '';
     const html = '<h2>' + esc(id) + ' abnehmen</h2><p class="lead">' + esc(d.task.title) + '</p>' +
       (modes.length > 1 ? '<div class="row-btns" id="rvModes">' + modes.map((m, i) => '<button type="button" class="sv-chip" data-rvm="' + i + '" aria-pressed="' + (i === 0) + '">' + esc(m.label) + '</button>').join('') + '</div>' : '') +
-      '<div id="rvCmp">' + (modes.length ? compare(modes[0]) : '<div class="q-empty">Keine Bilder. Prüfe das Ergebnis direkt in der Anwendung.</div>') + '</div>' +
+      scaleCtl +
+      '<div id="rvCmp">' + (modes.length ? render(modes[0]) : '<div class="q-empty">Keine Bilder. Prüfe das Ergebnis direkt in der Anwendung.</div>') + '</div>' +
       '<div class="rv-bottom"><div class="field"><span>Gegenprüfen</span><ul class="dod">' + (crit.length ? crit.map((c) => '<li><label><input type="checkbox" class="rvc" data-n="' + c.n + '"' + (c.done ? ' checked' : '') + '><span>' + esc(c.text) + (c.done ? ' <span class="sublabel">Claude: erfüllt</span>' : '') + '</span></label></li>').join('') : '<li>Keine Kriterien.</li>') + '</ul></div>' +
       '<label class="field"><span>Was fehlt oder stört? Pflicht beim Zurückgeben</span><textarea class="input" name="text" rows="4" placeholder="Beschreibe, was nicht passt. Claude bekommt den Text als Kommentar."></textarea></label></div>' +
       '<p class="err" role="alert"></p><div class="foot"><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn warn" value="reject">Zurück an Claude</button><button class="btn ok" value="accept">Annehmen und abschließen</button></div>';
@@ -3188,7 +3213,11 @@
       const uncheck = $$('.rvc', form).filter((c) => !c.checked && crit.find((x) => x.n === +c.dataset.n && x.done)).map((c) => +c.dataset.n);
       return act('review', { id, text, uncheck });
     }, (f) => {
-      $$('[data-rvm]', f).forEach((b) => b.onclick = () => { $('#rvCmp', f).innerHTML = compare(modes[+b.dataset.rvm]); $$('[data-rvm]', f).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); scaleFrames(f); });
+      let cur = modes[0];
+      const show = () => { $('#rvCmp', f).innerHTML = render(cur); const sc = $('#rvScale', f); if (sc) sc.hidden = cur.id !== 'mock'; scaleFrames(f); };
+      $$('[data-rvm]', f).forEach((b) => b.onclick = () => { cur = modes[+b.dataset.rvm]; $$('[data-rvm]', f).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); show(); });
+      $$('[data-rvw]', f).forEach((b) => b.onclick = () => { size = +b.dataset.rvw; $$('[data-rvw]', f).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); show(); });
+      $$('[data-rvt]', f).forEach((b) => b.onclick = () => { theme = b.dataset.rvt; $$('[data-rvt]', f).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); show(); });
       scaleFrames(f);
     });
     if (r === 'accept') return openDod(id);

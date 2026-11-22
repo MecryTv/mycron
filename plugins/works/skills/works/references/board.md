@@ -142,7 +142,7 @@ Beim Tippen von Großbuchstaben mit der rechten Shift-Taste öffnet sich nichts,
 | Meilensteine | Im Meilenstein-Filter anlegen, gewählten Meilenstein bearbeiten, oder über die Schnellsuche | `works milestone add`, `milestone set` |
 | Nächste Aufgabe | Vorschläge mit Begründung, direkt starten | `works next`, `works start` |
 | Entwürfe wählen | Tab Entwürfe einer Gestaltungsaufgabe: Designrichtung, Varianten als Vorschau, "Groß ansehen", "Diese nehmen" mit optionalem Grund | `works design choose` |
-| Abnehmen | In Review "Abnehmen": gewählter Entwurf oder Vorher neben dem Ergebnis, Kriterien gegenprüfen. "Annehmen" öffnet die Definition of Done, "Zurück an Claude" verlangt einen Text | Kommentar an Claude, abgewählte Kriterien wieder offen, Status In Arbeit |
+| Abnehmen | In Review "Abnehmen": gewählter Entwurf oder Vorher neben dem Ergebnis, Kriterien gegenprüfen. Bei Entwurf gegen Ergebnis wählen Breite (Desktop, Tablet, Handy) und Schema (hell, dunkel) beide Seiten: Der Entwurf rendert so, daneben das Nachher-Bild mit `-light-1440`, `-dark-390` usw. im Namen; fehlt es, steht dort der Befehl zum Anlegen. "Annehmen" öffnet die Definition of Done, "Zurück an Claude" verlangt einen Text | Kommentar an Claude, abgewählte Kriterien wieder offen, Status In Arbeit |
 | Anweisung an Claude | Auf der aktiven Karte oder in der Übersicht einer Aufgabe in Arbeit | `works instruct`, Claude bekommt sie über den PostToolUse oder Stop Hook |
 | Rückgängig | Meldung nach jeder Änderung mit "Rückgängig", `Strg+Z` außerhalb von Textfeldern, Liste unter Werkzeuge, Letzte Änderungen | `works undo` |
 | Projektwissen, Aufräumen | Werkzeuge, oben | `works know`, siehe planning.md |

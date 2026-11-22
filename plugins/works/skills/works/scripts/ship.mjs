@@ -122,15 +122,42 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
 
     // 5. Merge in den Hauptbranch.
     const remote = git(repo, ['remote', 'get-url', 'origin']);
-    const back = (msg) => { git(repo, ['switch', '-q', branch]); appendTail(repo, timeTarget, tail); stop(msg); };
+    // Zurück auf den Feature-Branch. Klappt das nicht, sagt die Meldung, wo der Nutzer jetzt steht.
+    const back = (msg) => {
+      cleanLeftovers();
+      const sb = git(repo, ['switch', '-q', branch]);
+      if (sb.ok) appendTail(repo, timeTarget, tail);
+      stop(sb.ok ? msg : `${msg}\nAchtung: Zurück auf ${branch} ging nicht (${sb.err}). Du stehst auf ${git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).out}.`);
+    };
+    // Unter Windows sperrt etwa ein Virenscanner frisch geschriebene Dateien kurz. git switch lässt sie dann liegen
+    // (nur eine Warnung), und Merge oder Rückwechsel scheitern an "untracked files would be overwritten".
+    // Entfernt werden nur nicht verfolgte Dateien, die genau der Fassung im Branch entsprechen.
+    function cleanLeftovers() {
+      const files = git(repo, ['ls-files', '--others', '--exclude-standard']).out.split('\n').filter(Boolean);
+      for (const f of files) {
+        const inBranch = git(repo, ['rev-parse', '-q', '--verify', `${branch}:${f}`]);
+        if (!inBranch.ok || git(repo, ['hash-object', '--', f]).out !== inBranch.out) continue;
+        for (let i = 0; i < 10; i++) {
+          try { fs.rmSync(path.join(repo, f), { force: true }); break; } catch { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300); }
+        }
+      }
+    }
     const sw = git(repo, ['switch', '-q', base]);
     if (!sw.ok) back(`Wechsel nach ${base} fehlgeschlagen: ${sw.err}`);
+    cleanLeftovers();
     if (remote.ok && push) {
       const pull = git(repo, ['pull', '-q', '--ff-only', 'origin', base]);
       if (!pull.ok) back(`${base} lässt sich nicht vorspulen (git pull --ff-only): ${pull.err}. Erst ${base} abgleichen.`);
     }
     const merge = git(repo, ['merge', '--no-ff', branch, '-m', `Merge branch '${branch}'`]);
-    if (!merge.ok) { git(repo, ['merge', '--abort']); back(`Merge von ${branch} in ${base} hat Konflikte und wurde abgebrochen. Konflikte auf ${branch} lösen (git merge ${base}), dann ship erneut.`); }
+    if (!merge.ok) {
+      // Nur ein begonnener Merge (MERGE_HEAD) hat Konflikte; sonst hat git gar nicht erst angefangen.
+      const started = git(repo, ['rev-parse', '-q', '--verify', 'MERGE_HEAD']).ok;
+      if (started) git(repo, ['merge', '--abort']);
+      back(started
+        ? `Merge von ${branch} in ${base} hat Konflikte und wurde abgebrochen. Konflikte auf ${branch} lösen (git merge ${base}), dann ship erneut.`
+        : `Merge von ${branch} in ${base} nicht möglich: ${(merge.err || merge.out).split('\n').slice(0, 6).join('\n')}`);
+    }
     log(`ok  ${branch} mit --no-ff in ${base} gemergt`);
     // Die aufgehobenen Zeiten gleich zurückschreiben, damit sie auch bei einem Abbruch danach erhalten bleiben.
     appendTail(repo, timeTarget, tail);

@@ -81,3 +81,4 @@ Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 - 2026-11-22: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-22: Ursache CI rot unter Windows: Projektordner mit 8.3-Kurznamen (RUNNER~1), git rev-parse --show-toplevel liefert den langen Pfad, path.relative ergab Pfade außerhalb des Repos. Fix: Repo-Wurzel über --show-cdup relativ zum Projektordner. Lokal nachgestellt und geprüft mit TMP=...\LANGER~1. Meldung bei CI rot korrigiert (Board startet doch neu).
 - 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
+- 2026-11-22: Nachtrag (mit W-0030 ausgeliefert): ship meldete einen Merge-Konflikt, wo git nur an liegengebliebenen Dateien scheiterte (frisch geschriebene Dateien unter Windows kurz gesperrt), und blieb dann ohne Hinweis auf main. Jetzt: liegengebliebene Dateien gleich der Branch-Fassung entfernen, echte Ursache melden, merge --abort nur bei MERGE_HEAD, gescheiterten Rückwechsel melden. Test mit post-checkout-Hook.

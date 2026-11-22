@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-22T20:22:29.036Z",
+  "fingerprint": "b18cf99b111b:786384bc31c5",
+  "results": {
+    "code-audit": {
+      "status": "ok",
+      "cmd": "",
+      "note": "Alle Werte in der Abnahme mit esc; Entwurf bleibt im sandbox-iframe ohne allow-same-origin; Schema und Breite kommen nur aus festen Listen; keine neuen Endpunkte",
+      "fingerprint": "b18cf99b111b:786384bc31c5",
+      "at": "2026-11-22T20:22:29.039Z"
+    }
+  }
+}
