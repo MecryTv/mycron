@@ -3,13 +3,13 @@ id: W-0035
 title: Szenarien für works shot
 type: feature
 priority: P4
-status: in-arbeit
+status: erledigt
 effort: L
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0035-szenarien-fuer-works-shot
 tags: [shot, playwright]
@@ -62,8 +62,9 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (P4). Für Bilder bestimmter Zus
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
 - 2026-11-22: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
