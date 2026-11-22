@@ -3,13 +3,13 @@ id: W-0028
 title: "Hub: Browser-Hinweis, wenn Claude auf eine Freigabe wartet"
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0028-hub-browser-hinweis-wenn
 tags: [ui, hub, board]
@@ -78,7 +78,7 @@ Art: nachher · Hinzugefügt: 2026-11-22
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
@@ -93,3 +93,4 @@ Art: nachher · Hinzugefügt: 2026-11-22
 - 2026-11-22: Asset hinzugefügt: assets/2026-11-22-hub-glocke-light-768-nachher.png (nachher)
 - 2026-11-22: Entscheidung E1 dokumentiert: Hinweis bei wartender Freigabe
 - 2026-11-22: Umgesetzt nach Entwurf B, Selbsttest 32/32 mit Browser
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
