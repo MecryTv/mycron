@@ -1033,6 +1033,26 @@ dialog:has(.tbl.imp) { width: min(1100px, calc(100vw - 32px)); }
 .lv-run .r-title { font-weight: 600; font-size: 13.5px; line-height: 1.3; overflow-wrap: anywhere; }
 .lv-run .r-sub { font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
 .lv-run .r-bar { margin-top: 4px; }
+/* Heute Erledigtes eingeklappt, aufgeklappt einzeilig (W-0019) */
+.lv-fold { margin: 4px 6px 8px; border-top: 1px solid var(--line); padding-top: 4px; }
+.lv-run + .lv-fold { margin-top: 0; }
+.lv-fold > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--text-2); transition: background-color .15s; }
+.lv-fold > summary::-webkit-details-marker { display: none; }
+.lv-fold > summary:hover { background: var(--raised); }
+.lv-fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.lv-fold > summary b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.lv-fold > summary .chev { margin-left: auto; width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; flex: none; color: var(--muted); transition: transform .2s; }
+.lv-fold[open] > summary .chev { transform: rotate(180deg); }
+.lv-mini { list-style: none; margin: 0; padding: 0 0 4px; display: grid; }
+.lv-mini button { width: 100%; display: grid; grid-template-columns: 16px auto minmax(0, 1fr); align-items: center; gap: 8px; border: 0; background: none; text-align: left; padding: 5px 8px; border-radius: 6px; font: inherit; font-size: 12.5px; color: var(--text-2); cursor: pointer; min-height: 30px; transition: background-color .15s; }
+.lv-mini button:hover { background: var(--raised); color: var(--text); }
+.lv-mini button[aria-current="true"] { background: var(--accent-soft); color: var(--text); }
+.lv-mini button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.lv-mini .lv-si { width: 16px; height: 16px; }
+.lv-mini .lv-si svg { width: 10px; height: 10px; }
+.lv-mini .r-id { font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lv-mini .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (pointer: coarse) { .lv-mini button { min-height: 40px; } }
 .lv-focus { padding: 16px 18px 18px; display: grid; gap: 16px; }
 .lv-title { font-size: 20px; font-weight: 650; letter-spacing: -.01em; line-height: 1.25; margin: 0; overflow-wrap: anywhere; }
 .lv-phases { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
@@ -1097,7 +1117,7 @@ dialog:has(.tbl.imp) { width: min(1100px, calc(100vw - 32px)); }
 .lv-fdiff-head .add { color: var(--ok); }
 .lv-fdiff-head .del { color: var(--danger); }
 .lv-fdiff-head .btn.link { margin-left: auto; font-size: 12px; }
-@media (prefers-reduced-motion: reduce) { .lv-fbtn .chev { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .lv-fbtn .chev, .lv-fold > summary .chev { transition: none; } }
 .lv-feed li.k-step .f-verb { font-weight: 600; }
 .lv-feed .fi { flex: none; align-self: center; width: 14px; height: 14px; display: inline-grid; place-items: center; border-radius: 50%; }
 .lv-feed .fi svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }

@@ -21,5 +21,9 @@
     }
   ],
   "brainstorm": [],
-  "chosen": null
+  "chosen": {
+    "name": "B",
+    "at": "2026-11-22 11:28",
+    "reason": "Nutzer am 2026-11-22 im Superpowers-Begleiter: eigener Dialog Sichern und Wiederherstellen"
+  }
 }

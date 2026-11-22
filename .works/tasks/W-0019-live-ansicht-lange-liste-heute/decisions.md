@@ -51,3 +51,7 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 
 ### Verworfene Varianten
 <!-- Was wurde gezeigt oder erwogen und warum nicht genommen? -->
+
+## Gewählter Entwurf
+
+- 2026-11-22: Variante A „Erledigt eingeklappt“ gewählt, Grund: Nutzer am 2026-11-22 im Superpowers-Begleiter: Erledigtes eingeklappt. Datei: design/A-erledigt-eingeklappt.html. Nicht gewählt: B Erledigt kompakt, C Gruppen mit Anzahl
