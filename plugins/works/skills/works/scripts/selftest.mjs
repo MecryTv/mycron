@@ -868,13 +868,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const act = (body, t = token) => get('/api/hub', { method: 'POST', headers: { ...(t ? { 'X-Works-Token': t } : {}), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       expect((await act({ op: 'stop', path: other }, '')).status === 403, 'Stoppen ohne Token war erlaubt');
       expect((await act({ op: 'stop', path: path.join(base, 'gibt-es-nicht') })).status === 400, 'Unbekanntes Projekt nicht abgelehnt');
-      // Projekt hinzufügen: nur Ordner mit .works/config.json.
-      expect((await act({ op: 'add', path: home })).status === 400, 'Ordner ohne works als Projekt angenommen');
-      const third = path.join(base, 'drittes');
-      fs.cpSync(path.join(other, '.works'), path.join(third, '.works'), { recursive: true });
-      expect((await act({ op: 'add', path: third })).ok, 'Projekt hinzufügen');
-      has(await (await get('/hub?part=1')).text(), 'drittes', 'Hub nach Projekt hinzufügen');
+      // W-0032: Projekt hinzufügen gibt es nicht mehr (der Hub zeigt nur laufende Boards).
+      expect((await act({ op: 'add', path: other })).status === 400, 'Aktion add noch erlaubt');
       expect((await act({ op: 'rm', path: other })).status === 400, 'Unbekannte Aktion nicht abgelehnt');
+      has(part, 'data-board-url=', 'Hub (Board-Adresse an den Karten)');
       // Ein Tab am zweiten Board reicht: --open im ersten Projekt öffnet keinen weiteren.
       const tabsB = async () => { try { return (await (await fetch(`http://127.0.0.1:${b}/tabs`)).json()).tabs; } catch { return -1; } };
       tab = spawn(process.execPath, [tabJs, b], { stdio: 'ignore' });
@@ -886,6 +883,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       // Stoppen und Starten über den Hub. Der neue Start nimmt den Standardport, deshalb zuletzt und ohne Tab-Zählung.
       expect((await act({ op: 'stop', path: other })).ok, 'Stoppen über den Hub');
       await waitFor(async () => (await boards()).length === 1, 'zweites Board stoppt');
+      // W-0032: Gestoppte Boards verschwinden aus dem Hub, eine Gestoppt-Liste gibt es nicht mehr.
+      const solo = await (await get('/hub?part=1')).text();
+      expect(!solo.includes('zweites') && !solo.includes('Gestoppt') && !solo.includes('Projekt hinzufügen'), `Hub zeigt gestoppte Boards: ${solo.slice(0, 200)}`);
       expect((await act({ op: 'start', path: other })).ok, 'Starten über den Hub');
       await waitFor(async () => (await boards()).length === 2, 'zweites Board startet');
       // works hub zeigt dieselbe Seite.
@@ -973,6 +973,44 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         await p.reload();
         await p.waitForSelector('[data-notify]:not([hidden])');
         expect(await p.locator('#hubAsk').isHidden(), 'Einladung nach dem Neuladen wieder da');
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        w(['board', '--stop'], { ok: false });
+        w(['board', '--stop'], { cwd: other, ok: false });
+      }
+    });
+  }
+
+  // W-0032: Läuft nur noch ein Board, schließt sich der Hub; bei zwei oder mehr kommt er zurück.
+  if (browser) {
+    await step('Hub schließt sich bei einem Board und kommt bei zweien zurück', async () => {
+      if (!fs.existsSync(path.join(other, '.works', 'config.json'))) { fs.mkdirSync(other, { recursive: true }); w(['init'], { cwd: other }); }
+      if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eine Karte']); }
+      const br = await launchChromium(log);
+      if (!br) return;
+      try {
+        const a = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`]).out);
+        const pb = await highPort();
+        w(['board', '--serve', '--detach', `--port=${pb}`], { cwd: other });
+        const p = await br.newPage({ viewport: { width: 1280, height: 900 } });
+        const errs = [];
+        p.on('pageerror', (e) => errs.push(e.message));
+        await p.goto(`http://127.0.0.1:${a}/hub`);
+        await p.waitForSelector('.hub-bc');
+        expect(await p.locator('.hub-bc').count() === 2, 'Hub zeigt nicht beide Boards');
+        // Zweites Board endet: der Hub-Tab zeigt das verbliebene Board.
+        w(['board', '--stop'], { cwd: other });
+        await p.waitForURL(new RegExp(`:${a}/$`), { timeout: 15000 });
+        await p.waitForSelector('.card');
+        // Wieder zwei Boards: zurück zum Hub.
+        w(['board', '--serve', '--detach', `--port=${pb}`], { cwd: other });
+        await p.waitForURL(/\/hub$/, { timeout: 15000 });
+        await p.waitForSelector('.hub-bc');
+        // Endet das Board, das den Hub ausliefert, geht der Tab zum verbliebenen.
+        w(['board', '--stop']);
+        await p.waitForURL(new RegExp(`:${pb}/$`), { timeout: 30000 });
+        await p.waitForSelector('.card');
         expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
       } finally {
         await br.close();

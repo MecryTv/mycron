@@ -86,8 +86,9 @@ export function hubInfos() {
   let current = null;
   try { current = cliVersion(newestCli()); } catch { /* unbekannt */ }
   const infos = [];
-  for (const p of projectList()) { try { infos.push(projectInfo(p, current)); } catch { /* Projekt nicht lesbar */ } }
-  return infos.sort((a, b) => (!!b.server - !!a.server) || (b.p1.length - a.p1.length) || String(b.last).localeCompare(String(a.last)));
+  // Nur laufende Boards (W-0032): gestoppte verschwinden aus dem Hub, ihre Aufgaben werden gar nicht erst geladen.
+  for (const p of projectList()) { if (!readServer(p.path)) continue; try { infos.push(projectInfo(p, current)); } catch { /* Projekt nicht lesbar */ } }
+  return infos.filter((i) => i.server).sort((a, b) => (b.p1.length - a.p1.length) || String(b.last).localeCompare(String(a.last)));
 }
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -121,7 +122,7 @@ function boardCard(i, self) {
   const isSelf = self && i.path === self;
   // Wartende Freigabe mit Kennung (Projekt und Zeitpunkt): Der Browser meldet jede genau einmal (W-0028).
   const perm = i.perm ? ` data-perm="${esc(`${rootIdOf(i.path)}:${i.perm.permSince || i.perm.at}`)}" data-perm-name="${esc(i.name)}" data-perm-what="${esc(i.perm.what || i.perm.verb)}" data-url="${esc(url)}?from=hub"` : '';
-  return `<article class="hub-bc"${perm}>
+  return `<article class="hub-bc" data-board-url="${esc(url)}"${isSelf ? ' data-self' : ''}${perm}>
 <header><span class="hub-dot hub-on"></span><h3>${esc(i.name)}</h3><span class="hub-m hub-path">${esc(i.path.replace(os.homedir(), '~'))}</span>
 <span class="hub-chips">${isSelf ? '<span class="hub-chip">dieses Board</span>' : ''}${ci}${i.outdated ? '<span class="hub-chip hub-old">Version veraltet</span>' : '<span class="hub-chip">Version aktuell</span>'}</span></header>
 ${liveLine(i)}
@@ -134,17 +135,12 @@ ${liveLine(i)}
 </article>`;
 }
 
-function stoppedRow(i) {
-  return `<div class="hub-offrow"><span class="hub-dot hub-off"></span><b>${esc(i.name)}</b><span class="hub-m">${i.open} offen${i.p1.length ? ` · ${i.p1.length} P1` : ''} · zuletzt geändert ${ago(i.last)}</span><span class="hub-acts"><button class="btn small" type="button" data-op="start" data-path="${esc(i.path)}" data-name="${esc(i.name)}">Board starten</button></span></div>`;
-}
-
 const BELL_ICON = '<svg class="hub-bell-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>';
 const THEME_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" style="width:15px;height:15px"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>';
 
 // Inhalt der Seite (Kopf und Liste). Wird alle 5 s neu geholt.
 export function hubBody(infos, { self = '' } = {}) {
   const on = infos.filter((i) => i.server);
-  const off = infos.filter((i) => !i.server);
   const sum = (f) => infos.reduce((a, i) => a + f(i), 0);
   const cost = sum((i) => (i.usage ? i.usage.cost : 0));
   const tokens = sum((i) => (i.usage ? i.usage.tokens : 0));
@@ -152,16 +148,14 @@ export function hubBody(infos, { self = '' } = {}) {
   const perms = sum((i) => (i.perm ? 1 : 0));
   const kpi = (n, l, cls = '') => `<div class="hub-kpi${cls}"><b>${esc(n)}</b><span>${esc(l)}</span></div>`;
   return `<header class="hub-hd"><div class="hub-wrap">
-<div class="hub-hdtop"><h1 class="hub-mark"><i>w</i>works <small>HUB</small></h1><span class="hub-m">${on.length === 1 ? '1 Board läuft' : `${on.length} Boards laufen`} · ${off.length} gestoppt · aktualisiert ${hhmm(new Date().toISOString())}</span>
-<span class="hub-right"><button class="btn small" type="button" data-op="add">Projekt hinzufügen</button><button class="btn small hub-bell" type="button" data-notify aria-pressed="false" hidden>${BELL_ICON}<span>Hinweise aus</span></button><button class="btn small icon" type="button" data-theme-toggle aria-label="Farbschema wechseln" title="Farbschema wechseln">${THEME_ICON}</button></span></div>
+<div class="hub-hdtop"><h1 class="hub-mark"><i>w</i>works <small>HUB</small></h1><span class="hub-m">${on.length === 1 ? '1 Board läuft' : `${on.length} Boards laufen`} · aktualisiert ${hhmm(new Date().toISOString())}</span>
+<span class="hub-right"><button class="btn small hub-bell" type="button" data-notify aria-pressed="false" hidden>${BELL_ICON}<span>Hinweise aus</span></button><button class="btn small icon" type="button" data-theme-toggle aria-label="Farbschema wechseln" title="Farbschema wechseln">${THEME_ICON}</button></span></div>
 <div class="hub-ask" id="hubAsk" role="region" aria-label="Hinweise einschalten" hidden>${BELL_ICON}<p>Benachrichtigen, wenn Claude in einem Projekt auf deine Freigabe wartet?<small>Der Browser fragt dann einmal nach der Erlaubnis. Der Hinweis kommt nur, wenn dieser Tab im Hintergrund liegt.</small></p><span class="hub-ask-acts"><button class="btn small primary" type="button" data-notify-on>Einschalten</button><button class="btn small ghost" type="button" data-notify-later>Nicht jetzt</button></span></div>
 <div class="hub-kpis">${kpi(sum((i) => i.open), 'offene Aufgaben')}${kpi(sum((i) => i.p1.length), 'P1 kritisch')}${kpi(perms, 'wartet auf Freigabe', perms ? ' hub-warnk' : '')}${kpi(sum((i) => i.review), 'im Review')}${kpi(fmtCost(cost, cur), `Verbrauch heute · ${fmtTokens(tokens)} Tokens`)}</div>
 </div></header>
 <main class="hub-wrap">
 <div class="hub-sec"><h2>Laufende Boards</h2><span class="hub-m">${on.length}</span></div>
 ${on.length ? `<div class="hub-cards">${on.map((i) => boardCard(i, self)).join('')}</div>` : '<p class="hub-m">Gerade läuft kein Board.</p>'}
-${off.length ? `<div class="hub-sec"><h2>Gestoppt</h2><span class="hub-m">${off.length}</span></div><div class="hub-off-list">${off.map(stoppedRow).join('')}</div>` : ''}
-${infos.length ? '' : '<p class="hub-m">Noch keine Projekte. Sie erscheinen hier, sobald works in ihnen eingerichtet ist, ein Board startet oder du sie hinzufügst.</p>'}
 <div style="height:28px"></div>
 </main>`;
 }
@@ -213,17 +207,33 @@ const HUB_JS = `(() => {
   }
   notifyUi();
   newPerms(true);
+  // W-0032: Läuft nur noch ein Board, schließt sich der Hub und der Tab zeigt dieses Board. Ist der Server dieser
+  // Seite selbst weg (drei Abfragen ohne Antwort, etwa 15 s, damit ein kurzer Neustart nicht wegspringt), zum
+  // einzigen anderen bekannten Board. Gehen wieder zwei auf, schaltet die Board-Seite zurück zum Hub.
+  let failures = 0;
+  function followSingle() {
+    const cards = root.querySelectorAll('[data-board-url]');
+    if (cards.length === 1) location.href = cards[0].dataset.boardUrl;
+  }
+  function serverGone() {
+    if (++failures < 3) return;
+    const others = root.querySelectorAll('[data-board-url]:not([data-self])');
+    if (others.length === 1) location.href = others[0].dataset.boardUrl;
+  }
+  followSingle();
   async function refresh() {
     try {
       const r = await fetch(H.part, { cache: 'no-store' }); if (!r.ok) return;
+      failures = 0;
       const t = await r.text(); if (t === last) return;
       // Fokus behalten, damit die Bedienung per Tastatur nicht bei jeder Aktualisierung von vorn beginnt.
       const k = focusKey(document.activeElement);
       last = t; root.innerHTML = t;
       notifyUi();
       newPerms(false);
+      followSingle();
       if (k) { const el = [...root.querySelectorAll('a, button')].find((x) => focusKey(x) === k); if (el) el.focus(); }
-    } catch (e) { /* Server startet neu */ }
+    } catch (e) { serverGone(); }
   }
   setInterval(refresh, 5000);
   if (H.events) new EventSource('/events');
@@ -242,7 +252,6 @@ const HUB_JS = `(() => {
     if (!b) return;
     let dir = b.dataset.path;
     if (b.dataset.op === 'stop' && !confirm('Board von ' + b.dataset.name + ' stoppen?')) return;
-    if (b.dataset.op === 'add') { dir = prompt('Ordner des Projekts, in dem works eingerichtet ist:'); if (!dir) return; }
     b.disabled = true;
     try {
       const r = await fetch('/api/hub', { method: 'POST', headers: { 'X-Works-Token': H.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: b.dataset.op, path: dir }) });
@@ -266,14 +275,9 @@ export function hubHtml({ token, self = '', part = false, partUrl = '/?part=1', 
 // Knöpfe im Hub: Board starten, stoppen, neu starten, Projekt hinzufügen. Nur für angemeldete Projekte.
 // Läuft über das CLI im Projektordner, wie works board von Hand. Gibt { status, error? } zurück.
 export function hubAction(op, dir) {
-  if (!['start', 'stop', 'restart', 'add'].includes(op)) return { status: 400, error: 'Unbekannte Aktion.' };
+  if (!['start', 'stop', 'restart'].includes(op)) return { status: 400, error: 'Unbekannte Aktion.' };
   const real = (x) => { try { return fs.realpathSync(String(x || '')); } catch { return null; } };
   const target = real(dir);
-  if (op === 'add') {
-    if (!target || !exists(path.join(target, '.works', 'config.json'))) return { status: 400, error: `In ${dir} ist works nicht eingerichtet (works init).` };
-    registerProject(target);
-    return { status: 200 };
-  }
   const p = target && projectList().find((x) => real(x.path) === target);
   if (!p) return { status: 400, error: 'Unbekanntes Projekt.' };
   const args = { start: ['board', '--serve', '--detach'], stop: ['board', '--stop'], restart: ['board', '--restart'] }[op];
