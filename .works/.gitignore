@@ -17,3 +17,4 @@ files.jsonl
 inbox/*
 !inbox/.gitkeep
 steps.json
+server-last.json

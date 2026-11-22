@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-22T21:03:03.238Z",
+  "fingerprint": "27c9c71dea70:f55559ffdd6d",
+  "results": {
+    "code-audit": {
+      "status": "ok",
+      "cmd": "",
+      "note": "Aktion add entfernt (weniger Angriffsfläche); Wechsel nur zu Board-Adressen aus der eigenen, serverseitig maskierten Seite; keine neuen Endpunkte",
+      "fingerprint": "27c9c71dea70:f55559ffdd6d",
+      "at": "2026-11-22T21:03:03.240Z"
+    }
+  }
+}
