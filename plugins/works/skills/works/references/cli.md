@@ -109,7 +109,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 |---|---|
 | `design [show] <ID> [--json]` | Designrichtung, Varianten, Brainstorming und Wahl anzeigen |
 | `design direction <ID> [--file pfad] [--text ..] [--colors "Name #hex,.."] [--fonts "A,B"] [--source ui-ux-pro-max]` | Designrichtung speichern |
-| `design add <ID> --name A --title ".." --file pfad [--note ..] [--source ..]` | Variante als HTML, Bild oder Datei anhängen |
+| `design add <ID> --name A --title ".." --file pfad [--note ..] [--source ..]` | Variante als HTML, Bild oder Datei anhängen. Warnt, wenn ein HTML-Entwurf lokale Dateien lädt, die das Board nicht anzeigt |
 | `design brainstorm <ID> --file pfad [--title ..] [--source superpowers]` | Brainstorming-Dokument anhängen |
 | `design choose <ID> <Name> [--reason ..]` | Variante wählen, landet in decisions.md |
 | `design remove <ID> <Name>` | Variante entfernen |

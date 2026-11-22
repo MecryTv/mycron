@@ -25,6 +25,7 @@ Ablauf:
    works design add W-0006 --name B --title "Runden als Tabs" --file /tmp/b.html
    ```
    Namen sind kurz (A, B, C). Die Datei wird als `design/A-klassisches-bracket.html` kopiert.
+   Das Board zeigt HTML-Entwürfe in einem abgesicherten iframe, das nur `data:`, `blob:` und `https` lädt. Verweist der Entwurf auf lokale CSS, Schriften oder Bilder (relativ oder `file://`), warnt `design add` und nennt die Verweise: Im Board fehlen sie. Vorher einbetten, mit dem Plugin entwurf: `entwurf.mjs inline <datei> --variant A`.
 4. Dem Nutzer sagen, dass die Entwürfe im Board unter Entwürfe liegen, und auf seine Wahl warten. Er wählt im Board mit "Diese nehmen" oder im Gespräch, dann `works design choose W-0006 B --reason "..."`. Die Wahl landet in decisions.md unter "Gewählter Entwurf". Die Sitzungsübersicht meldet Aufgaben mit Entwürfen ohne Wahl.
 5. Erst danach umsetzen. Die gewählte Variante ist die Vorgabe. Abweichungen mit dem Nutzer klären.
 6. Vor dem Review einen Screenshot des Ergebnisses mit `works asset W-0006 shot.png --kind nachher --desc "..."` ablegen. Das Board stellt ihn in der Abnahme neben den gewählten Entwurf.

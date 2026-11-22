@@ -54,6 +54,16 @@ export function setDirection(task, { text, file, source = '', colors = [], fonts
   return d;
 }
 
+// Verweise eines HTML-Entwurfs, die das Board nicht lädt: Die Vorschau läuft mit einer CSP, die nur data:, blob: und https
+// erlaubt, also weder file:// noch relative Pfade. Solche Entwürfe erscheinen dort ohne ihre Styles, Schriften oder Bilder.
+export function localRefs(html) {
+  const refs = new Set();
+  const add = (u) => { const v = String(u).trim(); if (v && !/^(https?:|data:|blob:|#|about:|mailto:|javascript:)/i.test(v) && !v.startsWith('//')) refs.add(v); };
+  for (const m of String(html).matchAll(/<(?:link|script|img|source|video|audio|iframe)\b[^>]*?\s(?:href|src)=["']([^"']+)["']/gi)) add(m[1]);
+  for (const m of String(html).matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi)) add(m[2]);
+  return [...refs];
+}
+
 export function addVariant(task, { name, title = '', file, source = '', note = '' }) {
   if (!VARIANT_RE.test(name || '')) throw new Error('Name der Variante: Buchstaben oder Zahlen, etwa A, B oder tabs.');
   if (!file) throw new Error('Datei fehlt: --file mockup.html oder bild.png');

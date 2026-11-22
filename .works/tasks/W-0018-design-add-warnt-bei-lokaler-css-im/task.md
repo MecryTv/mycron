@@ -36,17 +36,27 @@ Das Board zeigt HTML-Entwürfe in einem iframe mit CSP (style-src 'unsafe-inline
 
 ## Akzeptanzkriterien
 <!-- Prüfbare Aussagen. Jede Zeile muss sich mit ja oder nein beantworten lassen. -->
-- [ ] 
+- [x] design add warnt bei einem HTML-Entwurf mit lokalen Verweisen (relativ oder file://) und nennt sie
+- [x] Verweise auf https, data: und blob: lösen keine Warnung aus
+- [x] Der Entwurf wird trotz Warnung angehängt
+- [x] Die Warnung nennt den Weg zum Einbetten (entwurf.mjs inline)
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] 
+- [x] Test im Selbsttest-Schritt Entwürfe (RED)
+- [x] localRefs in design.mjs, Warnung in cmdDesign
+- [x] Doku in references/cli.md und integrations.md
+- [x] Selbsttest Windows, Linux und macOS über die CI
 
 ## Betroffene Dateien
+- `plugins/works/skills/works/scripts/design.mjs`: localRefs
+- `plugins/works/skills/works/scripts/works.mjs`: Warnung bei design add
+- `plugins/works/skills/works/scripts/selftest.mjs`: Test im Schritt Entwürfe
+- `plugins/works/skills/works/references/cli.md`, `integrations.md`
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
 
 ## Designentscheidungen
-<!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
+Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
@@ -63,3 +73,5 @@ Stand: Branch feature/w-0018-design-add-warnung, WIP-Commit mit dem Test im Selb
 - 2026-11-21: Aufgabe angelegt
 - 2026-11-21: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-21: Übergabe aktualisiert
+- 2026-11-22: decisions.md angelegt
+- 2026-11-22: Entscheidung E1 dokumentiert: Warnen statt automatisch einbetten

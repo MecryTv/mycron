@@ -32,7 +32,7 @@ import { listTemplates, findTemplate, saveTemplate, deleteTemplate, templateFrom
 import { taskTime, estimates, fmtDuration } from './timelog.mjs';
 import { configuredChecks, checksFor, detectChecks, runChecks, recordCheck, ackCheck, loadResults, NAME_RE, checkEntry, storedCheck } from './checks.mjs';
 import { writeWeekly, reportSettings, setWebhook } from './weekly.mjs';
-import { setDirection, addVariant, addBrainstorm, chooseVariant, removeVariant, loadDesign, parseColors, needsDesign, detectDesignSkills } from './design.mjs';
+import { setDirection, addVariant, addBrainstorm, chooseVariant, removeVariant, loadDesign, parseColors, needsDesign, detectDesignSkills, localRefs } from './design.mjs';
 import { addInstruction } from './live.mjs';
 import { loadKnowledge, addKnowledge, updateKnowledge, removeKnowledge } from './knowledge.mjs';
 import { rules, KINDS, dueRules, fillTitle, describe, upcoming } from './recurring.mjs';
@@ -2178,6 +2178,8 @@ function cmdDesign() {
       const v = addVariant(t, { name: str('name') || pos.shift(), title: str('title'), file, source: str('source') || 'ui-ux-pro-max', note: str('note') });
       addHistory(t, `Entwurf ${v.name} „${v.title}“ angehängt`); saveTask(t);
       out(`Variante ${v.name} gespeichert: design/${v.file}. Der Nutzer wählt im Board unter Entwürfe, oder: works design choose ${t.id} ${v.name}`);
+      const refs = v.kind === 'html' ? localRefs(readText(file)) : [];
+      if (refs.length) out(`Achtung: Der Entwurf lädt lokale Dateien, die das Board nicht anzeigt (dort gelten nur data:, blob: und https): ${refs.slice(0, 5).join(', ')}${refs.length > 5 ? ` und ${refs.length - 5} weitere` : ''}. Im Board fehlen dadurch Styles, Schriften oder Bilder. Vorher einbetten, etwa mit dem Plugin entwurf: node <entwurf>/scripts/entwurf.mjs inline <datei> --variant ${v.name}`);
     } else if (sub === 'brainstorm') {
       addBrainstorm(t, { file, text: str('text'), source: str('source') || 'superpowers', title: str('title') });
       addHistory(t, 'Brainstorming angehängt'); saveTask(t);

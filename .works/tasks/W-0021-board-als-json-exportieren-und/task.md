@@ -67,3 +67,5 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
 - 2026-11-22: decisions.md angelegt
+- 2026-11-22: Entwurf A „An Teilen und Import andocken“ angehängt
+- 2026-11-22: Entwurf B „Eigener Dialog Sichern und Wiederherstellen“ angehängt
