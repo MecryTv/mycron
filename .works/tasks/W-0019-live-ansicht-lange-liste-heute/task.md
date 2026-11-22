@@ -3,13 +3,13 @@ id: W-0019
 title: "Live-Ansicht: lange Liste Heute übersichtlicher"
 type: design
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-21
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0019-live-ansicht-lange-liste
 tags: [ui, design, board, live]
@@ -69,12 +69,14 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 Beschreibung: Live-Ansicht auf dem Handy (375 px, dunkel): W-0019 als voller Eintrag, darunter '2 heute erledigt' aufgeklappt mit einzeiligen Einträgen W-0018 und W-0020
 Art: nachher · Hinzugefügt: 2026-11-22
 
+![Vorher (Entwurfsseite, Variante Heute, 390 px hell): jede der 17 heute erledigte](assets/2026-11-22-vorher-entwurfsseite-variante-heute-390-vorher.png)
+Beschreibung: Vorher (Entwurfsseite, Variante Heute, 390 px hell): jede der 17 heute erledigten Aufgaben mit drei Zeilen, die Liste ist sehr lang
+Art: vorher · Hinzugefügt: 2026-11-22
+
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-21 16:40
-
-Entwürfe A (Erledigt eingeklappt), B (Erledigt kompakt), C (Gruppen mit Anzahl) hängen an, im Board unter Entwürfe; jede Datei zeigt oben im Rahmen auch 'Heute' zum Vergleich. Screenshots 1440/768/390 hell und dunkel ohne Probleme (entwurf.mjs shots). Nutzer musste los, Design wird später geklärt. Nächster Schritt: Wahl des Nutzers abwarten (works design choose W-0019 <A|B|C>), dann in board.js renderLive() und board.css .lv-run umsetzen (Klassen ew-mini, ew-fold, ew-group ohne ew- übernehmen), Selbsttest mit Browser.
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -87,3 +89,6 @@ Entwürfe A (Erledigt eingeklappt), B (Erledigt kompakt), C (Gruppen mit Anzahl)
 - 2026-11-22: Entwurf A „Erledigt eingeklappt“ gewählt. Grund: Nutzer am 2026-11-22 im Superpowers-Begleiter: Erledigtes eingeklappt
 - 2026-11-22: Asset hinzugefügt: assets/2026-11-22-live-ansicht-auf-dem-handy-375-px-nachher.jpg (nachher)
 - 2026-11-22: Variante A umgesetzt: Erledigtes in einer Zeile 'N heute erledigt' eingeklappt, aufgeklappt einzeilig, Zustand gemerkt. Selbsttest mit Browser 25 von 25. Geprüft im echten Board auf Desktop und Handy.
+- 2026-11-22: Asset hinzugefügt: assets/2026-11-22-vorher-entwurfsseite-variante-heute-390-vorher.png (vorher)
+- 2026-11-22: Entscheidung E1 dokumentiert: Erledigtes eingeklappt (Variante A)
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

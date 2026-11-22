@@ -9,18 +9,14 @@ Angelegt am 2026-11-21. Diese Datei hält fest, was entschieden wurde, warum, un
 <!-- Kernaussagen aus dem Brainstorming in eigenen Worten: Problemverständnis, betrachtete Ansätze, Ergebnis. -->
 
 ## Entscheidungen
-<!-- Pro Entscheidung ein Block. Neue Blöcke mit `works decisions <ID> --add "Titel" ...` oder von Hand im gleichen Format:
-
-### E1: Titel
-- Datum:
-- Quelle: Brainstorm | UI UX Pro Max | Gespräch | Analyse
+### E1: Erledigtes eingeklappt (Variante A)
+- Datum: 2026-11-22
+- Quelle: Gespräch
 - Kontext:
-- Entscheidung:
-- Begründung:
+- Entscheidung: Laufende und offene Aufgaben bleiben volle Einträge; heute Erledigtes steht in einer Zeile 'N heute erledigt' (details), aufgeklappt einzeilig; auf oder zu merkt sich das Board in den Live-Einstellungen, nur bei Klick des Nutzers
+- Begründung: Wahl des Nutzers; die laufende Arbeit bleibt ohne Scrollen sichtbar, Erledigtes bleibt einen Klick entfernt
 - Verworfene Alternativen:
-  - Alternative: Grund
 - Konsequenzen:
--->
 
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
