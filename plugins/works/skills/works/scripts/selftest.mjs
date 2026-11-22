@@ -805,6 +805,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const portOf = (s) => (String(s).match(/127\.0\.0\.1:(\d+)/) || [])[1];
   const waitFor = async (fn, what, ms = 12000) => { const until = Date.now() + ms; while (Date.now() < until) { if (await fn()) return; await new Promise((r) => setTimeout(r, 200)); } throw new Error(`Zeit abgelaufen: ${what}`); };
   await step('Hub: zwei Boards, /boards, /hub, Aktionen, --open über alle Boards, works hub', async () => {
+    if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eine Karte']); }
+    if (!fs.existsSync(path.join(base, 'tab.cjs'))) fs.writeFileSync(path.join(base, 'tab.cjs'), "const http = require('http'); const port = process.argv[2];\n(function connect() { const r = http.get({ host: '127.0.0.1', port, path: '/events' }, (res) => { res.on('data', () => {}); res.on('end', () => setTimeout(connect, 300)); }); r.on('error', () => setTimeout(connect, 300)); })();\n");
     fs.mkdirSync(other, { recursive: true });
     w(['init'], { cwd: other });
     w(['new', '--type=bug', '--title=Fehler im zweiten Projekt', '--priority=P1'], { cwd: other });
@@ -821,6 +823,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const boards = async () => (await (await get('/boards')).json()).boards;
       const bl = await boards();
       expect(bl.length === 2 && bl.some((x) => String(x.port) === b && x.name === 'zweites'), `/boards: ${JSON.stringify(bl)}`);
+      // W-0029: Kennung je Projekt (Hash des Pfads, kein Pfad in data.json), Projekte mit Pfad und Token nur lokal über /boards.
+      const bj = await (await get('/boards')).json();
+      const own = bj.projects && bj.projects.find((x) => x.name === 'projekt');
+      const meta = (await (await get('/data.json')).json()).meta;
+      expect(own && own.id && own.path && /^[a-f0-9]{20,}$/.test(bj.token || '') && meta.rootId === own.id && bl.every((x) => x.id), `/boards ohne Kennung, Pfad oder Token: ${JSON.stringify(bj).slice(0, 300)}`);
+      expect(!JSON.stringify(meta).includes(own.path.replace(/\\/g, '\\\\')), 'data.json enthält den Projektpfad');
       const html = await (await get('/hub')).text();
       has(html, 'Laufende Boards', 'Hub-Seite'); has(html, 'zweites', 'Hub-Seite'); has(html, `127.0.0.1:${b}/`, 'Hub-Seite (Link zum zweiten Board)');
       has(html, 'Fehler im zweiten Projekt', 'Hub-Seite (P1 des zweiten Projekts)');
@@ -888,6 +896,45 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         await p.waitForURL(new RegExp(`:${b}/`), { timeout: 10000 }); await p.waitForSelector('.card');
         await p.waitForSelector('#hubLink:not([hidden])', { timeout: 10000 });
         has(await p.locator('#hubLink').textContent(), '2 Boards', 'Hub-Link');
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        w(['board', '--stop'], { ok: false });
+        w(['board', '--stop'], { cwd: other, ok: false });
+      }
+    });
+  }
+
+  // W-0029: Endet ein Board und startet auf seinem Port ein anderes Projekt, zeigt der alte Tab eine Leiste statt
+  // still das fremde Board. Er zählt dort nicht als Tab und wechselt von selbst, sobald sein Projekt wieder läuft.
+  if (browser) {
+    await step('Verwaister Tab: Leiste statt fremdem Projekt, kein fremder Tab, Wechsel zurück', async () => {
+      if (!fs.existsSync(path.join(other, '.works', 'config.json'))) { fs.mkdirSync(other, { recursive: true }); w(['init'], { cwd: other }); }
+      if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eine Karte']); }
+      const br = await launchChromium(log);
+      if (!br) return;
+      try {
+        const port = await highPort();
+        w(['board', '--serve', '--detach', `--port=${port}`]);
+        const p = await br.newPage({ viewport: { width: 1280, height: 900 } });
+        const errs = [];
+        p.on('pageerror', (e) => errs.push(e.message));
+        await p.goto(`http://127.0.0.1:${port}/`); await p.waitForSelector('.card');
+        expect(await p.locator('#orphanBar').isHidden(), 'Leiste sichtbar, obwohl das eigene Board läuft');
+        w(['board', '--stop']);
+        w(['board', '--serve', '--detach', `--port=${port}`], { cwd: other });
+        await p.waitForSelector('#orphanBar:not([hidden])', { timeout: 15000 });
+        const bar = await p.locator('#orphanBar').textContent();
+        has(bar, 'projekt', 'Leiste (eigenes Projekt)'); has(bar, 'zweites', 'Leiste (fremdes Projekt)');
+        const st = await p.evaluate(() => ({ orphan: document.body.classList.contains('orphan'), h1: document.querySelector('#project').textContent }));
+        expect(st.orphan && st.h1.includes('projekt') && !st.h1.includes('zweites'), `Tab zeigt das fremde Projekt: ${JSON.stringify(st)}`);
+        const tabs = async () => (await (await fetch(`http://127.0.0.1:${port}/tabs`)).json()).tabs;
+        await waitFor(async () => await tabs() === 0, 'verwaister Tab zählt nicht als Tab des fremden Boards');
+        const own = await highPort();
+        w(['board', '--serve', '--detach', `--port=${own}`]);
+        await p.waitForURL(new RegExp(`:${own}/`), { timeout: 15000 });
+        await p.waitForSelector('.card');
+        expect(await p.locator('#orphanBar').isHidden(), 'Leiste nach dem Wechsel noch sichtbar');
         expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
       } finally {
         await br.close();
