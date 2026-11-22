@@ -3,13 +3,13 @@ id: W-0027
 title: "ci-watch: rote CI legt einen Bug in works an"
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0027-ci-watch-rote-ci-legt-einen
 tags: [ci, github]
@@ -64,8 +64,9 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (alles einbauen, P3). Ist die CI
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
 - 2026-11-22: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
