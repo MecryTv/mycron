@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-22T20:11:09.837Z",
+  "fingerprint": "0af3a2cd5619:91fa70b52351",
+  "results": {
+    "code-audit": {
+      "status": "ok",
+      "cmd": "",
+      "note": "Hinweistext als Text an Notification, keine HTML-Ausgabe; Datenattribute serverseitig maskiert; Ziel-URL ist die eigene Board-URL; keine neuen Endpunkte; im Browser nur die Wahl gespeichert",
+      "fingerprint": "0af3a2cd5619:91fa70b52351",
+      "at": "2026-11-22T20:11:09.839Z"
+    }
+  }
+}

@@ -214,6 +214,7 @@ Der Hub zeigt alle Projekte, in denen works eingerichtet ist, eine Sitzung lief 
 - Laufende Boards als große Karten: Live-Zeile (Claude arbeitet, wartet auf Freigabe, in Arbeit), offen, in Arbeit, Review, P1, überfällig, Fortschritt (Sprint oder gesamt), als Nächstes, Verbrauch heute, läuft seit und Port, CI aus dem GitHub-Abgleich, ob die Version aktuell ist.
 - Knöpfe: Öffnen (im selben Tab), In neuem Tab, Neu starten, Stoppen. Gestoppte Projekte stehen kompakt darunter mit Board starten. Projekt hinzufügen trägt einen Ordner mit `.works` ein.
 - Die Seite holt ihren Inhalt alle 5 Sekunden neu.
+- Hinweise bei wartender Freigabe: Unter dem Kopf fragt eine Leiste einmal, ob der Hub benachrichtigen soll (Einschalten, Nicht jetzt). Danach steht dort nur die Glocke „Hinweise an/aus“. Wartet Claude in einem Projekt auf eine Freigabe und liegt der Hub-Tab im Hintergrund, kommt ein Browser-Hinweis mit Projekt und Befehl, je Freigabe genau einmal; ein Klick öffnet das Board. Was beim Laden schon wartet, meldet er nicht. Die Wahl steht im Browser (`works-hub-notify`).
 
 Automatik: Läuft nur ein Board, gibt es keinen Hub. Die Board-Seite fragt alle 5 Sekunden `/boards`. Wird aus einem laufenden Board zwei, wechselt der offene Tab zu `/hub`. Ein Board, das aus dem Hub geöffnet wurde (`?from=hub`), bleibt offen. Oben links steht dann `← Hub (N Boards)`, solange mindestens zwei laufen.
 

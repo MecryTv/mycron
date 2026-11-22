@@ -56,3 +56,13 @@
 .hub-off-list { display: grid; gap: 8px; }
 .hub-offrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--line-strong); font-size: 13px; }
 .hub-offrow .hub-acts { margin-left: auto; }
+
+/* Hinweis bei wartender Freigabe (W-0028): Einladung unter dem Kopf, danach die Glocke */
+.hub-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); font-size: 13px; }
+.hub-ask[hidden], .hub-bell[hidden] { display: none; }
+.hub-ask p { margin: 0; flex: 1 1 260px; min-width: 0; color: var(--text); }
+.hub-ask p small { display: block; color: var(--text-2); font-size: 12px; }
+.hub-ask > .hub-bell-ico { color: var(--accent); }
+.hub-ask-acts { display: flex; gap: 8px; }
+.hub-bell-ico { width: 15px; height: 15px; flex: none; }
+.hub-bell[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
