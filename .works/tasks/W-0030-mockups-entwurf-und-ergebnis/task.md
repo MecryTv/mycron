@@ -66,3 +66,4 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (alles einbauen, P3). Beim Revie
 - 2026-11-22: Nach Rückfrage verkleinert: kein separates Vergleichsbild, stattdessen Breite und hell/dunkel im vorhandenen Vergleich des Abnahmedialogs
 - 2026-11-22: Entwurf A „Zwei Umschalter“ angehängt
 - 2026-11-22: Entwurf B „Vorhandene Bilder“ angehängt
+- 2026-11-22: Entwurf A „Zwei Umschalter“ gewählt. Grund: Nutzer am 2026-11-22: Empfehlung genommen. Feste Umschalter, zeigt fehlende Nachher-Bilder mit Befehl

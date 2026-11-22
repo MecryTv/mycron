@@ -73,3 +73,4 @@ Der Tab zeigt still B. works board --open in B meldet einen offenen Tab, obwohl 
 - 2026-11-22: Entwurf A „Ersatzseite“ angehängt
 - 2026-11-22: Entwurf B „Leiste über dem letzten Stand“ angehängt
 - 2026-11-22: Entwurf C „Dialog über dem letzten Stand“ angehängt
+- 2026-11-22: Entwurf B „Leiste über dem letzten Stand“ gewählt. Grund: Nutzer am 2026-11-22: Empfehlung genommen. Der letzte Stand bleibt ausgegraut sichtbar, Leiste mit den Knöpfen

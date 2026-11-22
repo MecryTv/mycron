@@ -65,3 +65,4 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (alles einbauen, P3). Der Hub (W
 - 2026-11-22: Entwurf A „Glocke im Kopf“ angehängt
 - 2026-11-22: Entwurf B „Einladung unter dem Kopf“ angehängt
 - 2026-11-22: Entwurf C „Schalter in der Kennzahl“ angehängt
+- 2026-11-22: Entwurf B „Einladung unter dem Kopf“ gewählt. Grund: Nutzer am 2026-11-22: Empfehlung genommen. Einladung erklärt einmal, wozu die Erlaubnis gebraucht wird, danach nur die Glocke
