@@ -9,18 +9,14 @@ Angelegt am 2026-11-22. Diese Datei hält fest, was entschieden wurde, warum, un
 <!-- Kernaussagen aus dem Brainstorming in eigenen Worten: Problemverständnis, betrachtete Ansätze, Ergebnis. -->
 
 ## Entscheidungen
-<!-- Pro Entscheidung ein Block. Neue Blöcke mit `works decisions <ID> --add "Titel" ...` oder von Hand im gleichen Format:
-
-### E1: Titel
-- Datum:
-- Quelle: Brainstorm | UI UX Pro Max | Gespräch | Analyse
+### E1: Erste Entwürfe verworfen
+- Datum: 2026-11-22
+- Quelle: Gespräch
 - Kontext:
-- Entscheidung:
-- Begründung:
+- Entscheidung: A Startseite und Umschalter, B Seitenleiste, C Projekt-Reiter passen nicht. Gewünscht ist eine eigene Hub-Seite mit besonderem Kopf, darunter alle Boards mit Infos zu jedem Board
+- Begründung: Rückmeldung des Nutzers am 2026-11-22: Alle Designs passen nicht
 - Verworfene Alternativen:
-  - Alternative: Grund
 - Konsequenzen:
--->
 
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->

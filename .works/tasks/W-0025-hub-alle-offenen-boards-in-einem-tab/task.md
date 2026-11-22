@@ -67,3 +67,7 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-22: Entwurf A „Startseite und Umschalter“ angehängt
 - 2026-11-22: Entwurf B „Seitenleiste“ angehängt
 - 2026-11-22: Entwurf C „Projekt-Reiter“ angehängt
+- 2026-11-22: Entscheidung E1 dokumentiert: Erste Entwürfe verworfen
+- 2026-11-22: Entwurf D „Kennzahlen-Kopf und große Karten“ angehängt
+- 2026-11-22: Entwurf E „Aktivitäts-Kopf und Liste“ angehängt
+- 2026-11-22: Entwurf F „Vorschau-Kacheln“ angehängt

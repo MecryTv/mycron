@@ -2,31 +2,31 @@
   "direction": null,
   "variants": [
     {
-      "name": "A",
-      "title": "Startseite und Umschalter",
-      "file": "A-startseite-und-umschalter.html",
+      "name": "D",
+      "title": "Kennzahlen-Kopf und große Karten",
+      "file": "D-kennzahlen-kopf-und-grosse.html",
       "kind": "html",
       "source": "ui-ux-pro-max",
-      "note": "Ab zwei Boards wird der Tab zur Übersicht mit Karten, Öffnen zeigt das Board groß, oben ein Umschalter",
-      "at": "2026-11-22 18:57"
+      "note": "Eigener Kopf mit Summen über alle Boards, jedes Board als große Karte mit allen Infos und Knöpfen, Gestoppte kompakt",
+      "at": "2026-11-22 19:03"
     },
     {
-      "name": "B",
-      "title": "Seitenleiste",
-      "file": "B-seitenleiste.html",
+      "name": "E",
+      "title": "Aktivitäts-Kopf und Liste",
+      "file": "E-aktivitaets-kopf-und-liste.html",
       "kind": "html",
       "source": "ui-ux-pro-max",
-      "note": "Ab zwei Boards blendet der Tab links eine Leiste mit allen Boards ein, das aktuelle Board bleibt groß",
-      "at": "2026-11-22 18:57"
+      "note": "Dunkler Kopf mit Summen und dem, was gerade passiert, darunter je Board eine aufklappbare Zeile",
+      "at": "2026-11-22 19:03"
     },
     {
-      "name": "C",
-      "title": "Projekt-Reiter",
-      "file": "C-projekt-reiter.html",
+      "name": "F",
+      "title": "Vorschau-Kacheln",
+      "file": "F-vorschau-kacheln.html",
       "kind": "html",
       "source": "ui-ux-pro-max",
-      "note": "Ab zwei Boards erscheinen über dem Board Reiter für alle laufenden Boards",
-      "at": "2026-11-22 18:57"
+      "note": "Schlanker Kopf, je Board eine Kachel mit Live-Bild des Boards und Infos",
+      "at": "2026-11-22 19:03"
     }
   ],
   "brainstorm": [],
