@@ -679,6 +679,20 @@ async function cmdDone() {
   }
 }
 
+// Abschluss in einem Rutsch (W-0026). Hält mit Exit 1 an, wenn etwas nicht stimmt.
+async function cmdShip() {
+  const root = requireRoot();
+  const { ship, ShipStop } = await import('./ship.mjs');
+  const id = pos[0] ? findTask(root, loadConfig(root), pos[0]).id : '';
+  try {
+    await ship(root, { id, push: !flags['no-push'], ci: !flags['no-ci'], update: !flags['no-update'], open: !flags['no-open'], log: out });
+  } catch (e) {
+    if (!(e instanceof ShipStop)) throw e;
+    out(e.message);
+    process.exit(1);
+  }
+}
+
 function cmdDrop() {
   const root = requireRoot();
   const config = loadConfig(root);
@@ -1828,6 +1842,7 @@ Bearbeiten
   link <A> blocks|blocked-by|related <B>                  unlink <A> <beziehung> <B>
   start <ID> [--git] [--force]     handoff [<ID>] [--text ".." | --file pfad]
   dod <ID>                         done <ID> [--run] [--confirm] [--force --reason ".."]
+  ship [<ID>] [--no-push] [--no-ci] [--no-update] [--no-open]   Abschluss in einem Rutsch: mergen, done, pushen, CI, Plugins, Board
   drop <ID> --reason ".."          reopen <ID> --reason ".." [--status backlog]
   archive [<ID>...] [--all] [--older-than Tage]
 
@@ -1866,7 +1881,7 @@ Dateien, Parallelarbeit, Import, Selbsttest
          [--sheet Name] [--json] [--all] [--apply [--only 1,4 | --skip 3] [--status geplant] [--tags a,b]
          [--include-done] [--keep-dups] [--include-archived]]
   import <sicherung.json> [--apply [--mode merge|restore] [--only 1,4]]  works-Sicherung zusammenführen oder wiederherstellen
-  selftest [--browser] [--keep] [--verbose]
+  selftest [--browser] [--keep] [--verbose] [--only <text>]
 
 Typen: ${TYPES.join(', ')}
 Status: ${STATUSES.join(', ')}
@@ -2773,7 +2788,7 @@ function cmdVersion() {
 
 async function cmdSelftest() {
   const { selftest } = await import('./selftest.mjs');
-  const r = await selftest({ keep: !!flags.keep, browser: !!flags.browser, verbose: !!flags.verbose });
+  const r = await selftest({ keep: !!flags.keep, browser: !!flags.browser, verbose: !!flags.verbose, only: flags.only && flags.only !== true ? String(flags.only) : '' });
   process.exit(r.ok ? 0 : 1);
 }
 
@@ -2782,7 +2797,7 @@ async function cmdSelftest() {
 const commands = {
   help: cmdHelp, init: cmdInit, new: cmdNew, list: cmdList, ls: cmdList, show: cmdShow,
   set: cmdSet, log: cmdLog, question: cmdQuestion, link: cmdLink, unlink: cmdLink,
-  start: cmdStart, handoff: cmdHandoff, dod: cmdDod, done: cmdDone, drop: cmdDrop,
+  start: cmdStart, handoff: cmdHandoff, dod: cmdDod, done: cmdDone, ship: cmdShip, drop: cmdDrop,
   reopen: cmdReopen, archive: cmdArchive, next: cmdNext, status: cmdStatus, index: cmdIndex,
   board: cmdBoard, doctor: cmdDoctor, asset: cmdAsset, inbox: cmdInbox, compress: cmdCompress,
   decisions: cmdDecisions, 'attach-doc': cmdAttachDoc, idea: cmdIdea, ideas: cmdIdeas,

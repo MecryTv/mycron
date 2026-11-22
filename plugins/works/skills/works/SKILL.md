@@ -79,7 +79,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Aufgabe hängt von anderer ab | `works link A blocked-by B` | `references/workflow.md` |
 | Arbeit beginnt | `works start <ID>`, Branchname aus der Ausgabe an den git-workflow Skill geben | `references/integrations.md` |
 | Arbeitsphase endet, Kontext wird knapp, Nutzer macht Pause | `works handoff <ID> --text "..."` | `references/workflow.md` |
-| Aufgabe fertig | `works done <ID>`, Punkte abarbeiten, dann `--confirm` | `references/workflow.md` |
+| Aufgabe fertig | `works done <ID>`, Punkte abarbeiten, dann `--confirm`. Auf einem Feature-Branch mit Merge und Push: Skill `works:ship` (`works ship`) | `references/workflow.md` |
 | Aufgabe wird nicht mehr gebraucht | `works drop <ID> --reason "..."` | `references/workflow.md` |
 | Erledigte Aufgabe muss nachgebessert werden | `works reopen <ID> --reason "..."` | `references/workflow.md` |
 | TODO-Kommentare im Code, GitHub Issues | `works scan`, `works gh-import` | `references/workflow.md` |
