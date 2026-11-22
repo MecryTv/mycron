@@ -37,14 +37,14 @@ Am 2026-11-22 mit dem Nutzer festgelegt (alle acht Vorschläge gewählt): Guten 
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] good-morning: CI des letzten Pushes steht in der Nachricht, rot kommt unter Wartet auf dich und nach vorn
-- [ ] good-morning: Entwürfe ohne Wahl werden als Screenshots im Superpowers-Begleiter gezeigt
-- [ ] good-morning: Überfälliges, heute Fälliges, nahe Meilensteine und wiederkehrende Aufgaben von heute werden genannt
-- [ ] good-morning: verfügbare Plugin-Updates werden angeboten, nicht ungefragt installiert
-- [ ] end-of-day: nicht gepushte Commits werden genannt und der Push angeboten, nie ungefragt
-- [ ] end-of-day: Verbrauch des Tages (Tokens, Kosten) steht in der Bilanz (works time --today)
-- [ ] end-of-day: von Claude gestartete Hintergrundprozesse und Begleiter werden beendet, Prozesse des Nutzers nicht
-- [ ] end-of-day: Tagesbericht liegt als Datei in .works/reports
+- [x] good-morning: CI des letzten Pushes steht in der Nachricht, rot kommt unter Wartet auf dich und nach vorn
+- [x] good-morning: Entwürfe ohne Wahl werden als Screenshots im Superpowers-Begleiter gezeigt
+- [x] good-morning: Überfälliges, heute Fälliges, nahe Meilensteine und wiederkehrende Aufgaben von heute werden genannt
+- [x] good-morning: verfügbare Plugin-Updates werden angeboten, nicht ungefragt installiert
+- [x] end-of-day: nicht gepushte Commits werden genannt und der Push angeboten, nie ungefragt
+- [x] end-of-day: Verbrauch des Tages (Tokens, Kosten) steht in der Bilanz (works time --today)
+- [x] end-of-day: von Claude gestartete Hintergrundprozesse und Begleiter werden beendet, Prozesse des Nutzers nicht
+- [x] end-of-day: Tagesbericht liegt als Datei in .works/reports
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
@@ -54,7 +54,7 @@ Am 2026-11-22 mit dem Nutzer festgelegt (alle acht Vorschläge gewählt): Guten 
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
 
 ## Designentscheidungen
-<!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
+Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
@@ -63,9 +63,19 @@ Am 2026-11-22 mit dem Nutzer festgelegt (alle acht Vorschläge gewählt): Guten 
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Stand: 2026-11-22 12:25
+
+Branch feature/w-0023-workday-erweitern, nicht committet. end-of-day getestet und abgehakt. good-morning getestet, drei Punkte nachgeschärft, Nachtest läuft (Szenario scratchpad/wd-gm, Begleiter-Ordner scratchpad/gm-content). Danach: good-morning-Kriterien abhaken, Entscheidung festhalten, done, Merge, Push, CI, Plugins works und workday aktualisieren.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
 - 2026-11-22: incomplete: true → false
 - 2026-11-22: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-22: works time --today ergänzt (Test, Doku). good-morning: CI des letzten Pushes, Fälliges, Plugin-Updates, Entwürfe im Superpowers-Begleiter. end-of-day: Tagesbericht speichern, nicht Gepushtes, Hintergrund aufräumen, Verbrauch heute. README angepasst. works-Selbsttest 26 von 26. Zwei Test-Agenten laufen in Scratch-Kopien (wd-gm, wd-fa).
+- 2026-11-22: Übergabe aktualisiert
+- 2026-11-22: Test end-of-day mit Agent grün: Tagesbericht gespeichert, Verbrauch heute in der Bilanz, 2 nicht gepushte Commits genannt und als Frage, Begleiter beendet (stale_pid sauber behandelt). Nachgeschärft: Zweige ohne Upstream gegen origin/HEAD vergleichen.
+- 2026-11-22: Test good-morning mit Agent: CI (kein Lauf), Fälliges (W-0024 überfällig), Plugin-Vergleich, Screenshots der Entwürfe und Begleiter-Seite beschrieben, drei Fragen. Nachgeschärft: Screenshots mit --out in den content-Ordner des Begleiters statt nach design/ (sonst im Git), Grund bei kein Lauf, Marketplaces ohne Git auslassen. Nachtest läuft.
+- 2026-11-22: Übergabe aktualisiert
+- 2026-11-22: Nachtest good-morning grün: Screenshots im content-Ordner des Begleiters, design/ unverändert, Grund bei kein Lauf, Marketplaces ohne vergleichbare Version ausgelassen. Präzisiert: nur Hash-Versionen vergleichen.
+- 2026-11-22: decisions.md angelegt
+- 2026-11-22: Entscheidung E1 dokumentiert: Erweiterungen von Feierabend und Guten Morgen
