@@ -16,7 +16,7 @@ import { loadConfig, loadTasks } from './lib.mjs';
 import { shareKeys, rotateKeys, shareLinks, lanAddresses } from './share.mjs';
 import { buildSnapshot, snapshotName } from './export.mjs';
 import { exportBoard, backupInfo, backupFileName } from './backup.mjs';
-import { runningVersion, writeServer, clearServer, newestCli, cliVersion, OWN_CLI, startDetached, ensureGitignore } from './server-control.mjs';
+import { runningVersion, writeServer, clearServer, newestCli, cliVersion, OWN_CLI, startDetached, ensureGitignore, rememberPort } from './server-control.mjs';
 
 const MIME = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
@@ -440,8 +440,9 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     });
     server.listen(p, host, () => {
       boundPort = p;
-      ensureGitignore(root, ['server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'steps.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json']);
+      ensureGitignore(root, ['server.json', 'server-last.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'steps.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json']);
       writeServer(root, { pid: process.pid, port: p, host, version: runningVersion(), cli: OWN_CLI, started: new Date().toISOString() });
+      rememberPort(root, p, host);
       const url = `http://${host === '0.0.0.0' || host === '::' ? 'localhost' : host}:${p}/`;
       process.stdout.write(`Live-Board läuft: ${url}\nBeobachte ${wd}\nBeenden mit Strg+C.\n`);
       if (shared) {

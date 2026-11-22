@@ -38,7 +38,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `status` | Kurzübersicht wie beim Sessionstart |
 | `index` | WORKS.md neu erzeugen |
 | `board [--open]` | `.works/board.html` erzeugen und optional im Browser öffnen. Danach wird die Datei nach jeder Änderung automatisch neu erzeugt |
-| `board --serve [--detach] [--port 4747] [--host 127.0.0.1] [--open]` | Live-Board auf einem lokalen Server, mit `--detach` im Hintergrund. Läuft schon ein aktueller Server, wird nur seine URL ausgegeben, ein veralteter wird ersetzt. Ist der Standardport belegt, wird der nächste freie genommen. `--open` öffnet nur, wenn noch kein works-Tab offen ist, auch keiner eines anderen Projekts. Siehe board.md |
+| `board --serve [--detach] [--port 4747] [--host 127.0.0.1] [--open]` | Live-Board auf einem lokalen Server, mit `--detach` im Hintergrund. Läuft schon ein aktueller Server, wird nur seine URL ausgegeben, ein veralteter wird ersetzt. Ohne `--port` nimmt es seinen zuletzt genutzten Port (sonst 4747); ist der belegt, den nächsten freien. `--open` öffnet nur, wenn noch kein works-Tab offen ist, auch keiner eines anderen Projekts. Siehe board.md |
 | `board --status` / `--restart` / `--stop` | Server abfragen, mit aktueller Version neu starten oder beenden |
 | `board --restart --share` / `--private` | Im lokalen Netz teilen (Leselink mit Schlüssel) oder wieder nur lokal |
 | `share [--owner] [--rotate]` | Links zum Teilen anzeigen, mit `--owner` auch den Bearbeitungslink, mit `--rotate` neue Schlüssel |
