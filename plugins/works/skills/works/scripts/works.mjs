@@ -2207,7 +2207,7 @@ function cmdDesign() {
       addHistory(t, `Entwurf ${v.name} „${v.title}“ angehängt`); saveTask(t);
       out(`Variante ${v.name} gespeichert: design/${v.file}. Der Nutzer wählt im Board unter Entwürfe, oder: works design choose ${t.id} ${v.name}`);
       const refs = v.kind === 'html' ? localRefs(readText(file)) : [];
-      if (refs.length) out(`Achtung: Der Entwurf lädt lokale Dateien, die das Board nicht anzeigt (dort gelten nur data:, blob: und https): ${refs.slice(0, 5).join(', ')}${refs.length > 5 ? ` und ${refs.length - 5} weitere` : ''}. Im Board fehlen dadurch Styles, Schriften oder Bilder. Vorher einbetten, etwa mit dem Plugin entwurf: node <entwurf>/scripts/entwurf.mjs inline <datei> --variant ${v.name}`);
+      if (refs.length) out(`Achtung: Der Entwurf lädt lokale Dateien, die das Board nicht anzeigt (dort gelten nur data:, blob: und https): ${refs.slice(0, 5).join(', ')}${refs.length > 5 ? ` und ${refs.length - 5} weitere` : ''}. Im Board fehlen dadurch Styles, Schriften oder Bilder. Vorher einbetten, etwa mit dem Plugin mockups: node <mockups>/scripts/entwurf.mjs inline <datei> --variant ${v.name}`);
     } else if (sub === 'brainstorm') {
       addBrainstorm(t, { file, text: str('text'), source: str('source') || 'superpowers', title: str('title') });
       addHistory(t, 'Brainstorming angehängt'); saveTask(t);

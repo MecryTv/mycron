@@ -24,4 +24,4 @@ const ann = [
 ];
 assert.deepEqual(failureLines(ann), ['src/a.test.js:12 AssertionError: expected 2 to equal 3', 'Process completed with exit code 1.']);
 assert.deepEqual(failureLines([]), []);
-console.log('ci-waechter: alle Prüfungen bestanden');
+console.log('ci-watch: alle Prüfungen bestanden');

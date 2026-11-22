@@ -1,4 +1,4 @@
-# ci-waechter
+# ci-watch
 
 Ein Skill, der nach einem Push auf den GitHub-Actions-Lauf zum Commit wartet und das Ergebnis meldet. Bei rot nennt er den Job, den Schritt und die Fehlerstelle.
 
@@ -6,7 +6,7 @@ Ein Skill, der nach einem Push auf den GitHub-Actions-Lauf zum Commit wartet und
 
 ```
 /plugin marketplace add MecryTv/mycron
-/plugin install ci-waechter@mycron
+/plugin install ci-watch@mycron
 ```
 
 Braucht Node 18 oder neuer und ein Repo, dessen `origin` auf GitHub zeigt. `gh` ist nicht nötig.
@@ -29,7 +29,7 @@ Ohne Token reicht das für öffentliche Repos. GitHub erlaubt dann 60 Abfragen p
 ## Direkt aufrufen
 
 ```
-node plugins/ci-waechter/skills/ci-waechter/scripts/ci-status.mjs [--sha <commit>] [--repo owner/name] [--timeout 20] [--interval 60] [--grace 3]
+node plugins/ci-watch/skills/ci-watch/scripts/ci-status.mjs [--sha <commit>] [--repo owner/name] [--timeout 20] [--interval 60] [--grace 3]
 ```
 
 Exit-Code 0 grün, 1 rot, 2 kein Lauf oder Zeitlimit, 3 Fehler (kein GitHub-Repo, Rate-Limit, Repo nicht gefunden).

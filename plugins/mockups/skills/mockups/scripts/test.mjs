@@ -73,4 +73,4 @@ if (r.code === 2 && /Playwright/.test(r.out)) {
   assert.match(r.out, /nicht geladen: .*fehlt\.css/, r.out);
 }
 fs.rmSync(dir, { recursive: true, force: true });
-console.log('entwurf: alle Prüfungen bestanden');
+console.log('mockups: alle Prüfungen bestanden');
