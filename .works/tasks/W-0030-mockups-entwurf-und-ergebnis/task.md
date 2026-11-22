@@ -3,13 +3,13 @@ id: W-0030
 title: "mockups: Entwurf und Ergebnis nebeneinander im Review"
 type: feature
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0030-mockups-entwurf-und-ergebnis
 tags: [ui, design, mockups, review]
@@ -78,7 +78,7 @@ Art: nachher · Hinzugefügt: 2026-11-22
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
@@ -94,3 +94,4 @@ Art: nachher · Hinzugefügt: 2026-11-22
 - 2026-11-22: Entscheidung E1 dokumentiert: Vergleich im gleichen Maßstab
 - 2026-11-22: Umgesetzt nach Entwurf A, Selbsttest 33/33 mit Browser
 - 2026-11-22: Beim ersten ship-Versuch ship-Fehler gefunden und behoben (siehe W-0026), Selbsttest 33/33
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
