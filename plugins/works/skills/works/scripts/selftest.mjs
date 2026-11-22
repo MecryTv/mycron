@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
@@ -46,7 +46,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const proj = path.join(base, 'projekt');
   const home = path.join(base, 'home');
   fs.mkdirSync(proj, { recursive: true }); fs.mkdirSync(home, { recursive: true });
-  const env = { ...process.env, HOME: home, USERPROFILE: home, WORKS_ACTOR: '', GIT_AUTHOR_NAME: 'works', GIT_AUTHOR_EMAIL: 'works@test', GIT_COMMITTER_NAME: 'works', GIT_COMMITTER_EMAIL: 'works@test' };
+  // WORKS_DRY_OPEN: --open meldet nur, was es öffnen würde. Der Selbsttest öffnet nie einen Browser.
+  const env = { ...process.env, HOME: home, USERPROFILE: home, WORKS_ACTOR: '', WORKS_DRY_OPEN: '1',GIT_AUTHOR_NAME: 'works', GIT_AUTHOR_EMAIL: 'works@test', GIT_COMMITTER_NAME: 'works', GIT_COMMITTER_EMAIL: 'works@test' };
   const results = [];
   const hasGit = spawnSync('git', ['--version'], { encoding: 'utf8' }).status === 0;
 
@@ -641,6 +642,44 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(fixed.code !== 0, `Belegter ausdrücklicher Port wurde nicht abgelehnt: ${fixed.out.split('\n')[0]}`);
     } finally {
       blocker.close();
+      w(['board', '--stop'], { ok: false });
+    }
+  });
+
+  // Ein offener Board-Tab hält /events offen und verbindet sich nach einem Neustart von selbst wieder (retry 2 s).
+  // --open soll dann keinen zweiten Tab öffnen. Der Kindprozess spielt so einen Tab.
+  await step('Board --open: kein zweiter Tab, wenn schon einer offen ist', async () => {
+    const tabJs = path.join(base, 'tab.cjs');
+    fs.writeFileSync(tabJs, "const http = require('http'); const port = process.argv[2];\n(function connect() { const r = http.get({ host: '127.0.0.1', port, path: '/events' }, (res) => { res.on('data', () => {}); res.on('end', () => setTimeout(connect, 300)); }); r.on('error', () => setTimeout(connect, 300)); })();\n");
+    let tab = null;
+    try {
+      const first = w(['board', '--serve', '--detach', '--open']).out;
+      has(first, 'Im Browser geöffnet', 'Start ohne Tab öffnet den Browser');
+      const port = (first.match(/127\.0\.0\.1:(\d+)/) || [])[1];
+      // fetch hält Verbindungen offen. Nach einem Neustart ist die gemerkte tot (ECONNRESET): dann einmal neu fragen.
+      const ask = async () => (await (await fetch(`http://127.0.0.1:${port}/tabs`)).json()).tabs;
+      const tabs = async () => {
+        try { return await ask(); } catch { /* alte Verbindung */ }
+        try { return await ask(); } catch (e) {
+          const sj = fs.existsSync(path.join(proj, '.works', 'server.json')) ? fs.readFileSync(path.join(proj, '.works', 'server.json'), 'utf8').replace(/\s+/g, ' ') : 'fehlt';
+          throw new Error(`/tabs auf Port ${port}: ${e.cause ? e.cause.code || e.cause.message : e.message}. Ausgabe: ${first.split('\n')[0]}. server.json: ${sj}`);
+        }
+      };
+      const until = async (n) => { for (let i = 0; i < 40; i++) { if (await tabs() === n) return; await new Promise((r) => setTimeout(r, 100)); } throw new Error(`/tabs meldet nicht ${n}, sondern ${await tabs()}`); };
+      await until(0);
+      tab = spawn(process.execPath, [tabJs, port], { stdio: 'ignore' });
+      await until(1);
+      const again = w(['board', '--serve', '--detach', '--open']).out;
+      has(again, 'schon in einem Browser-Tab offen', 'Laufendes Board mit Tab');
+      if (again.includes('Im Browser geöffnet')) throw new Error('Zweiter Tab geöffnet, obwohl einer offen ist');
+      const restart = w(['board', '--restart', '--open']).out;
+      has(restart, 'schon in einem Browser-Tab offen', 'Neustart: der Tab verbindet sich neu');
+      if (restart.includes('Im Browser geöffnet')) throw new Error('Nach dem Neustart zweiter Tab geöffnet');
+      tab.kill(); tab = null;
+      await until(0);
+      has(w(['board', '--serve', '--detach', '--open']).out, 'Im Browser geöffnet', 'Laufendes Board ohne Tab öffnet den Browser');
+    } finally {
+      if (tab) tab.kill();
       w(['board', '--stop'], { ok: false });
     }
   });

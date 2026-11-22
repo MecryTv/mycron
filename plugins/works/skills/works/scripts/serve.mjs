@@ -4,7 +4,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { worksDir, run } from './lib.mjs';
+import { worksDir, run, openInBrowser } from './lib.mjs';
 import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
 import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload } from './api.mjs';
@@ -90,6 +90,8 @@ function safeEqual(a, b) {
 export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false, fixedPort = false, takeover = false } = {}) {
   const wd = worksDir(root);
   const clients = new Set();
+  // Offene Board-Tabs auf diesem Rechner (Verbindungen zu /events von localhost). Geteilte Links anderer Geräte zählen nicht.
+  const localTabs = new Set();
   // Zufällige Tokens pro Serverstart. Nur Seiten, die dieser Server ausgeliefert hat, kennen sie.
   // token erlaubt Lesen und Schreiben, viewToken nur Lesen (geteilter Link).
   const token = crypto.randomBytes(24).toString('hex');
@@ -164,6 +166,7 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     clearInterval(timer); clearInterval(keepalive); clearInterval(updateTimer);
     for (const res of clients) { res.write('event: restart\ndata: 1\n\n'); res.end(); }
     clients.clear();
+    localTabs.clear();
     clearServer(root, process.pid);
     server.close();
     startDetached(root, { cli, port: boundPort, host: newHost, takeover: true });
@@ -343,6 +346,8 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
       if (!accessOf(req, null) && !(k && keyLevel(k))) return send(res, 403, 'text/plain', 'Kein Zugriff');
       try { return send(res, 200, 'text/calendar; charset=utf-8', buildIcal(root, { recurring: url.searchParams.get('recurring') === '1' })); } catch (e) { return send(res, 500, 'text/plain', e.message); }
     }
+    // Wie viele Board-Tabs hier offen sind, damit works board --open keinen zweiten öffnet. Nur lokal, nur eine Zahl.
+    if (pathname === '/tabs') return isLocal(req) ? json(res, 200, { tabs: localTabs.size }) : send(res, 403, 'text/plain', 'Kein Zugriff');
     const access = accessOf(req, pathname === '/' || pathname === '/index.html' ? url : null);
     if (!access) {
       return send(res, 403, 'text/html; charset=utf-8', '<!doctype html><meta charset="utf-8"><title>Kein Zugriff</title><body style="font:16px system-ui;padding:40px;max-width:560px;margin:auto;color:#222"><h1 style="font-size:22px">Kein Zugriff auf dieses Board</h1><p>Der Link ist ungültig oder wurde erneuert. Bitte den Besitzer des Boards um einen neuen Link.</p></body>');
@@ -364,7 +369,8 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
       res.write('retry: 2000\n\n');
       res.write(`event: update\ndata: ${Date.now()}\n\n`); // nach Reconnect sofort aufholen
       clients.add(res);
-      req.on('close', () => clients.delete(res));
+      if (isLocal(req)) localTabs.add(res);
+      req.on('close', () => { clients.delete(res); localTabs.delete(res); });
       return;
     }
 
@@ -413,10 +419,8 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
           for (const l of links) process.stdout.write(`  ${l.view}\n`);
         } else process.stdout.write('Im Netzwerk freigegeben, aber keine Netzwerkadresse gefunden.\n');
       }
-      if (open) {
-        const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
-        run(opener, [url], { detached: true, stdio: 'ignore', windowsHide: false });
-      }
+      // Offene Tabs eines vorherigen Servers verbinden sich nach etwa 2 s neu (retry im Event-Stream). So lange warten.
+      if (open) setTimeout(() => process.stdout.write((localTabs.size ? 'Das Board ist schon in einem Browser-Tab offen, kein neuer Tab.' : openInBrowser(url)) + '\n'), 3000);
     });
   };
   listen(port);

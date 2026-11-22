@@ -84,7 +84,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | TODO-Kommentare im Code, GitHub Issues | `works scan`, `works gh-import` | `references/workflow.md` |
 | Bericht, Changelog | `works report`, `works changelog` | `references/cli.md` |
 | "Wie weit ist Claude?", live mitverfolgen, Prüfungen ansehen | Live-Board starten wie unten, Ansicht Live nennen (Reiter Live, Taste 7) | `references/board.md` |
-| Übersicht im Browser, Board, "ich will selbst Aufgaben anlegen" | `works board --serve --detach` und die URL nennen. Läuft schon ein aktueller Server, wird nur seine URL ausgegeben. Dort kann der Nutzer alles selbst bearbeiten. Für eine reine Ansicht `works board` | `references/board.md` |
+| Übersicht im Browser, Board, "ich will selbst Aufgaben anlegen" | `works board --serve --detach --open` und die URL nennen. Läuft schon ein aktueller Server, wird nur seine URL ausgegeben. `--open` öffnet den Browser nur, wenn das Board dort noch in keinem Tab offen ist, also nicht selbst nachöffnen. Dort kann der Nutzer alles selbst bearbeiten. Für eine reine Ansicht `works board` | `references/board.md` |
 | Board zeigt altes Design, Board neu starten | `works board --restart` | `references/board.md` |
 | "Arbeite die Warteschlange ab", Reihenfolge vorgeben | `works queue` lesen, oberste startbare Aufgabe starten, nach `done` mit der nächsten weitermachen | `references/board.md` |
 | Sprint planen, "was schaffen wir bis ..." | `works sprint start`, Aufgaben mit `works sprint add`, Kapazität im Blick behalten | `references/planning.md` |

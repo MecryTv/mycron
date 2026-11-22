@@ -30,7 +30,7 @@ Weitere Befehle:
 - `works board --restart`: Server mit der aktuellen Version neu starten, gleicher Port.
 - `works board --stop`: Server beenden.
 
-Ohne `--detach` läuft der Server im Vordergrund, bis er mit Strg+C beendet wird. Das ist für ein eigenes Terminal gedacht. Mit `--open` öffnet sich der Standardbrowser auf dem Rechner, auf dem der Befehl läuft. Bei Remote-SSH kein `--open`, sondern auf die Portweiterleitung des Editors hinweisen; ein anderer lokaler Port ist dabei kein Problem.
+Ohne `--detach` läuft der Server im Vordergrund, bis er mit Strg+C beendet wird. Das ist für ein eigenes Terminal gedacht. Mit `--open` öffnet sich der Standardbrowser auf dem Rechner, auf dem der Befehl läuft, aber nur, wenn das Board dort noch in keinem Tab offen ist: Offene Tabs halten eine Verbindung zum Server, die er unter `/tabs` zählt (nur lokal, Links von anderen Geräten zählen nicht). Nach einem Start oder Neustart wartet `--open` bis zu drei Sekunden, weil sich offene Tabs dann von selbst neu verbinden. Das gilt auch für ein schon laufendes Board. Bei Remote-SSH kein `--open`, sondern auf die Portweiterleitung des Editors hinweisen; ein anderer lokaler Port ist dabei kein Problem.
 
 Optionen:
 
