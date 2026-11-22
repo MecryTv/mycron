@@ -3,13 +3,13 @@ id: W-0021
 title: Board als JSON exportieren und importieren
 type: design
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0021-board-als-json-exportieren
 tags: [ui, design, board, export, import]
@@ -80,9 +80,7 @@ Art: nachher · Hinzugefügt: 2026-11-22
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-22 11:57
-
-Branch feature/w-0021-json-sichern, nicht committet. Fertig: backup.mjs, CLI, API, Dialog, CSS, Doku. Browser-Selbsttest läuft (TEMP/w21-g3.log). Offen: 1) Behebung: bei d.scope.history === false im Abgleich Verlauf/Übergabe ignorieren und beim Zusammenführen die lokalen Abschnitte behalten (backup.mjs changesOf, mergeBackup), mit Test im Selbsttest-Schritt Sichern als JSON. 2) Selbsttest grün, Screenshot des Dialogs, Kriterien abhaken, done, Merge, Push, CI-Wächter, Plugin-Update.
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
@@ -101,3 +99,4 @@ Branch feature/w-0021-json-sichern, nicht committet. Fertig: backup.mjs, CLI, AP
 - 2026-11-22: Asset hinzugefügt: assets/2026-11-22-nachher-dialog-sichern-und-nachher.jpg (nachher)
 - 2026-11-22: Behebung: Export ohne Verlauf gilt im Abgleich als unverändert, Zusammenführen behält Verlauf und Übergabe des Boards (Test im Selbsttest). Selbsttest mit Browser 26 von 26. Vorher- und Nachher-Screenshot angehängt.
 - 2026-11-22: Entscheidung E3 dokumentiert: Export ohne Verlauf überschreibt keinen Verlauf
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
