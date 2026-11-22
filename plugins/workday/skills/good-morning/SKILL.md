@@ -1,11 +1,11 @@
 ---
-name: guten-morgen
+name: good-morning
 description: Verwenden, wenn der Nutzer einen neuen Arbeitstag in einem Projekt beginnt oder nach einer Pause wieder einsteigt, etwa mit "Guten Morgen", "weiter wie gestern", "mach weiter wie besprochen", "setz das um wie gestern besprochen" oder "wo waren wir stehen geblieben".
 ---
 
 # Guten Morgen
 
-Gegenstück zum Skill feierabend: liest den Stand von gestern, startet das Board und macht dort weiter, wo die Übergabe aufgehört hat.
+Gegenstück zum Skill end-of-day: liest den Stand von gestern, startet das Board und macht dort weiter, wo die Übergabe aufgehört hat.
 
 Braucht das works-Plugin. `works` steht unten für das works-CLI, aufgerufen wie im works-Skill beschrieben (Skill works:works), immer im Projektordner.
 

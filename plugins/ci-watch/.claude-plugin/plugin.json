@@ -1,5 +1,5 @@
 {
-  "name": "ci-waechter",
+  "name": "ci-watch",
   "description": "CI-Wächter: wartet nach einem Push auf den GitHub-Actions-Lauf zum Commit und meldet grün oder rot, bei rot mit Job und Fehlerstelle. Ohne gh, für öffentliche Repos ohne Token",
   "author": { "name": "MecryTv" },
   "repository": "https://github.com/MecryTv/mycron"

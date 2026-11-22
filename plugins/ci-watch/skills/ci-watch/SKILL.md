@@ -1,5 +1,5 @@
 ---
-name: ci-waechter
+name: ci-watch
 description: Verwenden, wenn der Nutzer nach einem Push wissen will, ob die CI durchläuft, ob GitHub Actions grün sind, ob der Build oder die Pipeline fertig ist, oder warum ein Workflow-Lauf rot ist. Auch wenn gh fehlt oder kein Token da ist.
 ---
 
@@ -9,7 +9,7 @@ Ein Node-Skript wartet auf die GitHub-Actions-Läufe zu einem Commit und meldet 
 
 ## Ablauf
 
-1. **Commit bestimmen.** Standard ist `HEAD`. Mit `git status -sb` prüfen, ob er gepusht ist. Steht dort `ahead`, gibt es auf GitHub noch keinen Lauf: das dem Nutzer sagen, nicht selbst pushen.
+1. **Commit bestimmen.** Standard ist `HEAD`. Mit `git status -sb` prüfen, ob er gepusht ist. Steht dort `ahead`, gibt es auf GitHub noch keinen Lauf: das dem Nutzer sagen, nicht selbst pushen. Gingen mehrere Commits in einem Push raus, startet GitHub den Lauf nur für den letzten davon: diesen prüfen, nicht einen früheren Merge-Commit aus demselben Push.
 2. **Skript im Hintergrund starten** (Bash mit `run_in_background: true`, es kann bis zu 20 Minuten laufen):
    ```
    node "${CLAUDE_SKILL_DIR}/scripts/ci-status.mjs"

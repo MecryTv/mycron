@@ -1,4 +1,4 @@
-# feierabend
+# workday
 
 Zwei Skills für Projekte mit [works](../works/README.md): Den Arbeitstag sauber abschließen und am nächsten Morgen ohne Suchen weitermachen.
 
@@ -6,12 +6,12 @@ Zwei Skills für Projekte mit [works](../works/README.md): Den Arbeitstag sauber
 
 ```
 /plugin marketplace add MecryTv/mycron
-/plugin install feierabend@mycron
+/plugin install workday@mycron
 ```
 
 Braucht das Plugin works (`/plugin install works@mycron`). Ohne `.works/` im Projekt sagen beide Skills Bescheid, statt etwas zu verändern.
 
-## Feierabend
+## Feierabend (Skill end-of-day)
 
 Auslöser: "Feierabend", "Schluss für heute", "wir machen morgen weiter".
 
@@ -20,7 +20,7 @@ Auslöser: "Feierabend", "Schluss für heute", "wir machen morgen weiter".
 - stoppt das Live-Board
 - fasst zusammen: heute erledigt, in Arbeit, wartet auf dich, morgen zuerst
 
-## Guten Morgen
+## Guten Morgen (Skill good-morning)
 
 Auslöser: "Guten Morgen", "weiter wie gestern", "wo waren wir stehen geblieben".
 

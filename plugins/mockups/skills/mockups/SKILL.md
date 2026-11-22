@@ -1,5 +1,5 @@
 ---
-name: entwurf
+name: mockups
 description: Verwenden, wenn für eine Gestaltungsaufgabe Entwürfe, Varianten oder ein HTML-Mockup gezeigt werden sollen, mit den echten Styles des Projekts, hell und dunkel, auf Desktop, Tablet und Handy, oder wenn ein Entwurf an eine works-Aufgabe gehängt wird (works design add). Auch für Screenshots einer Seite in mehreren Breiten und die Prüfung auf seitliches Scrollen.
 ---
 

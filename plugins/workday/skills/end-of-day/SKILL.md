@@ -1,11 +1,11 @@
 ---
-name: feierabend
+name: end-of-day
 description: Verwenden, wenn der Nutzer den Arbeitstag in einem Projekt beendet, etwa mit "Feierabend", "Schluss für heute", "wir machen morgen weiter", "für heute reicht's" oder "Board stoppen, morgen geht's weiter".
 ---
 
 # Feierabend
 
-Schließt den Tag so ab, dass der Skill guten-morgen am nächsten Tag ohne Rückfragen weitermachen kann: Übergaben für alles in Arbeit, Stand gesichert, Board aus, kurze Bilanz.
+Schließt den Tag so ab, dass der Skill good-morning am nächsten Tag ohne Rückfragen weitermachen kann: Übergaben für alles in Arbeit, Stand gesichert, Board aus, kurze Bilanz.
 
 Braucht das works-Plugin. `works` steht unten für das works-CLI, aufgerufen wie im works-Skill beschrieben (Skill works:works), immer im Projektordner.
 

@@ -10,18 +10,18 @@
       "description": "Aufgabenverwaltung in .works/ mit Prioritäten, Bildern, Designentscheidungen und Übergaben"
     },
     {
-      "name": "feierabend",
-      "source": "./plugins/feierabend",
+      "name": "workday",
+      "source": "./plugins/workday",
       "description": "Feierabend und Guten Morgen: Übergaben schreiben, Board stoppen, Tag zusammenfassen und am nächsten Morgen dort weitermachen (braucht works)"
     },
     {
-      "name": "ci-waechter",
-      "source": "./plugins/ci-waechter",
+      "name": "ci-watch",
+      "source": "./plugins/ci-watch",
       "description": "CI-Wächter: wartet nach einem Push auf den GitHub-Actions-Lauf zum Commit und meldet grün oder rot, bei rot mit Job und Fehlerstelle (ohne gh)"
     },
     {
-      "name": "entwurf",
-      "source": "./plugins/entwurf",
+      "name": "mockups",
+      "source": "./plugins/mockups",
       "description": "Entwurf-Werkzeug: Varianten als HTML-Entwurf mit den echten Styles, Screenshots in drei Breiten hell und dunkel, Prüfung auf seitliches Scrollen und Fehler, Anhängen an works-Aufgaben"
     }
   ]

@@ -63,7 +63,7 @@ async function main() {
   const timeout = (Number(a.timeout) || 20) * 60000;
   const interval = Math.max(30, Number(a.interval) || (token ? 30 : 60)) * 1000;
   const grace = (a.grace !== undefined ? Number(a.grace) : 3) * 60000;
-  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'ci-waechter', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'ci-watch', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   const api = async (p) => {
     const r = await fetch(`https://api.github.com/repos/${repo}${p}`, { headers });
     if (r.status === 403 && r.headers.get('x-ratelimit-remaining') === '0') {

@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-22 12:06 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-22 12:10 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 0 | 0 | 0 | 0 | 21 | 0 |
+| 1 | 0 | 1 | 0 | 0 | 0 | 21 | 0 |
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 0 · P4 Niedrig: 1
+
+## Aktive Aufgabe
+
+[W-0022](tasks/W-0022-plugins-und-skills-auf-englische-namen/task.md) Plugins und Skills auf englische Namen umstellen (In Arbeit), letzte Übergabe 2026-11-22 11:57
 
 ## Kritisch (P1)
 
@@ -16,13 +20,14 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0022](tasks/W-0022-plugins-und-skills-auf-englische-namen/task.md) | Plugins und Skills auf englische Namen umstellen | Chore | P2 Hoch | In Arbeit | S |  |  |  |
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0022](tasks/W-0022-plugins-und-skills-auf-englische-namen/task.md) | Plugins und Skills auf englische Namen umstellen | Chore | P2 Hoch | Backlog | S |  |  |  |
 | [W-0023](tasks/W-0023-feierabend-und-guten-morgen-erweitern/task.md) | Feierabend und Guten Morgen erweitern | Feature | P4 Niedrig | Backlog |  |  |  | unvollständig |
 
 ## Unvollständig erfasst
