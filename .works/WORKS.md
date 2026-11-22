@@ -1,18 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-21 16:40 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-22 11:07 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 1 | 0 | 2 | 0 | 0 | 0 | 17 | 0 |
+| 2 | 0 | 2 | 0 | 0 | 0 | 17 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 3 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 3 · P3 Mittel: 1 · P4 Niedrig: 0
 
 ## Aktive Aufgabe
 
-[W-0019](tasks/W-0019-live-ansicht-lange-liste-heute/task.md) Live-Ansicht: lange Liste Heute übersichtlicher (In Arbeit), letzte Übergabe 2026-11-21 16:40
+[W-0018](tasks/W-0018-design-add-warnt-bei-lokaler-css-im/task.md) design add warnt bei lokaler CSS im Entwurf (In Arbeit), letzte Übergabe 2026-11-21 16:40
 
 ## Kritisch (P1)
 
@@ -30,6 +30,7 @@ _Keine Einträge._
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
 | [W-0020](tasks/W-0020-board-open-oeffnet-nur-wenn-noch-kein/task.md) | board --open öffnet nur, wenn noch kein Tab offen ist | Feature | P2 Hoch | Backlog | S |  |  |  |
+| [W-0021](tasks/W-0021-board-als-json-exportieren-und/task.md) | Board als JSON exportieren und importieren | Design | P3 Mittel | Backlog | M |  |  |  |
 
 ## Zuletzt erledigt
 
