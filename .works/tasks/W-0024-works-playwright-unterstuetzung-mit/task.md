@@ -3,13 +3,13 @@ id: W-0024
 title: "works: Playwright-Unterstützung mit works shot"
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0024-works-playwright
 tags: [works, board, playwright]
@@ -66,9 +66,7 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-22 18:41
-
-Branch feature/w-0024-works-shot, nicht committet. works shot fertig, Doku fertig, Browser-Selbsttest läuft (TEMP/w24.log). Offen: loadPlaywright in shot.mjs soll zusätzlich vom Skriptordner aus suchen (in der CI liegt playwright im Repo-node_modules, works shot läuft im Testprojekt). Danach Selbsttest, Kriterien abhaken, done, Merge, Push, CI (Board im Browser muss works shot ausführen, nicht überspringen), Plugin-Update.
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
@@ -79,3 +77,4 @@ Branch feature/w-0024-works-shot, nicht committet. works shot fertig, Doku ferti
 - 2026-11-22: Browser-Selbsttest 26 von 26, works shot lief (nicht übersprungen). In der CI scheitert der Test, wenn works shot dort kein Playwright findet.
 - 2026-11-22: decisions.md angelegt
 - 2026-11-22: Entscheidung E1 dokumentiert: works shot statt Abhängigkeit zum Plugin mockups
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
