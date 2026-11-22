@@ -922,6 +922,17 @@ dialog:has(.tp), dialog:has(#teFields) { width: min(920px, calc(100vw - 24px)); 
 iframe.rv-img { background: #fff; }
 .rv-bottom { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 dialog:has(.rv-cmp) { width: min(1100px, calc(100vw - 32px)); }
+/* Gleicher Maßstab in der Abnahme (W-0030) */
+.rv-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.rv-scale[hidden] { display: none; }
+.rv-grp { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rv-grp > span { font-size: 12px; color: var(--text-2); margin-right: 2px; }
+.rv-w768 { aspect-ratio: 3 / 4; max-height: 70vh; max-width: 520px; justify-self: center; }
+.rv-w390 { aspect-ratio: 9 / 19; max-height: 70vh; max-width: 340px; justify-self: center; }
+img.rv-w1440, img.rv-w768, img.rv-w390 { object-fit: cover; object-position: top center; } /* oben bündig wie der Entwurf daneben */
+.rv-miss { display: grid; place-items: center; align-content: center; gap: 6px; min-height: 220px; padding: 16px; border: 1px dashed var(--line-strong); border-radius: 8px; color: var(--text-2); font-size: 13px; text-align: center; }
+.rv-miss b { color: var(--text); }
+.rv-miss code { font-size: 12px; overflow-wrap: anywhere; }
 .kn { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
 .kn:first-child { border-top: 0; }
 .kn.prop { padding: 10px 12px; margin-bottom: 8px; border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--line)); border-radius: 10px; background: var(--accent-soft); }

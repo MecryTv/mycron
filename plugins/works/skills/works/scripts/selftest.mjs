@@ -999,6 +999,55 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     });
   }
 
+  // W-0030: In der Abnahme lassen sich Breite und Schema wählen; Entwurf und Nachher-Bild folgen beide.
+  if (browser) {
+    await step('Abnahme: Entwurf und Ergebnis in gleicher Breite und gleichem Schema', async () => {
+      if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
+      const id = (w(['new', '--type=design', '--title=Vergleich im gleichen Maßstab', '--priority=P3']).out.match(/W-\d+/) || [])[0];
+      const dir = path.join(base, 'w30');
+      fs.mkdirSync(dir, { recursive: true });
+      // Entwurf wie aus der mockups-Vorlage: liest ?theme= und meldet Schema und Breite.
+      fs.writeFileSync(path.join(dir, 'A.html'), '<!doctype html><html><body><p id="t"></p><script>const q = new URLSearchParams(location.search); document.getElementById("t").textContent = (q.get("theme") || "light") + " " + innerWidth;</script></body></html>');
+      w(['design', 'add', id, '--name', 'A', '--title', 'Variante A', '--file', path.join(dir, 'A.html')]);
+      w(['design', 'choose', id, 'A', '--reason', 'Selbsttest']);
+      const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+      for (const n of ['seite-light-1440', 'seite-dark-390']) { fs.writeFileSync(path.join(dir, `${n}.png`), png); w(['asset', id, path.join(dir, `${n}.png`), '--kind=nachher', `--name=${n}`, '--desc=Selbsttest']); }
+      w(['set', id, 'status=review']);
+      const br = await launchChromium(log);
+      if (!br) return;
+      try {
+        const port = await highPort();
+        w(['board', '--serve', '--detach', `--port=${port}`]);
+        const p = await br.newPage({ viewport: { width: 1440, height: 900 } });
+        const errs = [];
+        p.on('pageerror', (e) => errs.push(e.message));
+        await p.goto(`http://127.0.0.1:${port}/`);
+        await p.click(`.card[data-id="${id}"]`);
+        await p.click('[data-act="review"]');
+        await p.waitForSelector('dialog[open] .rv-cmp');
+        const dlg = p.locator('dialog[open]');
+        const pick = (name) => dlg.getByRole('button', { name, exact: true }).click();
+        const state = () => p.evaluate(() => { const d = document.querySelector('dialog[open]'); const f = d.querySelector('.rv-cmp iframe'); const i = d.querySelector('.rv-cmp img'); const m = d.querySelector('.rv-miss'); return { frame: f ? f.getAttribute('src') : '', img: i ? i.getAttribute('src') : '', miss: m ? m.textContent : '' }; });
+        await pick('Handy'); await pick('Dunkel');
+        let st = await state();
+        expect(st.frame.includes('theme=dark') && st.img.includes('dark-390'), `Handy dunkel: ${JSON.stringify(st)}`);
+        await pick('Tablet');
+        st = await state();
+        expect(/Kein Nachher-Bild für Tablet, dunkel/.test(st.miss) && /--widths=768 --themes=dark/.test(st.miss), `Fehlendes Bild nicht gemeldet: ${JSON.stringify(st)}`);
+        await pick('Desktop'); await pick('Hell');
+        st = await state();
+        expect(st.img.includes('light-1440'), `Desktop hell: ${JSON.stringify(st)}`);
+        const inner = p.frameLocator('dialog[open] .rv-cmp iframe').locator('#t');
+        await inner.waitFor();
+        has(await inner.textContent(), 'light 1440', 'Entwurf in gewählter Breite');
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        w(['board', '--stop'], { ok: false });
+      }
+    });
+  }
+
   // works ship (W-0026): Abschluss in einem Rutsch. Eigenes Projekt mit einem lokalen Remote.
   if (hasGit) {
     await step('works ship: anhalten bei offenen Punkten, sonst mergen, abschließen, pushen', async () => {
