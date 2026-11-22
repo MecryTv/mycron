@@ -3,13 +3,13 @@ id: W-0025
 title: "Hub: alle offenen Boards in einem Tab"
 type: design
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0025-hub-alle-offenen-boards-in
 tags: [ui, design, board, hub]
@@ -54,7 +54,7 @@ Variante D „Kennzahlen-Kopf und große Karten“. Jedes Board liefert den Hub 
 - [x] works.mjs: openBoardOnce zählt die Tabs aller Boards
 - [x] Doku: board.md, cli.md, SKILL.md
 - [x] Selbsttest grün (28 von 28 mit Browser), Screenshots vorher und nachher (1440, 768, 390, hell und dunkel)
-- [ ] Abschluss: Merge, Push, CI, Plugin-Update
+- [x] Abschluss: Merge, Push, CI, Plugin-Update
 
 ## Betroffene Dateien
 - plugins/works/skills/works/scripts/hub.mjs
@@ -93,9 +93,7 @@ Art: nachher · Hinzugefügt: 2026-11-22
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-22 19:39
-
-Fertig bis auf Abschluss. Kriterien Kontrast, Tastatur, Öffnen im selben Tab abgehakt; Darstellung Mobil/Desktop geprüft, Tablet-Bild folgt nach dem laufenden Selbsttest. Danach: Commit auf feature/w-0025-hub, code-audit eintragen, works done, Merge --no-ff, Push, CI, Plugin-Update, Board neu starten.
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
@@ -122,3 +120,4 @@ Fertig bis auf Abschluss. Kriterien Kontrast, Tastatur, Öffnen im selben Tab ab
 - 2026-11-22: Kontraste auf WCAG AA angehoben (Chips, rote Zahlen, Beschriftungen, Kopf), Fokus bleibt bei der Aktualisierung erhalten, Vorher- und Nachher-Bilder angehängt, E2 in decisions.md
 - 2026-11-22: Übergabe aktualisiert
 - 2026-11-22: Asset hinzugefügt: assets/2026-11-22-hub-nachher-light-768-nachher.png (nachher)
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
