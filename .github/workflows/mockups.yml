@@ -1,0 +1,29 @@
+name: mockups Tests
+
+# Ohne Playwright: Die Screenshot-Prüfung überspringt test.mjs dann von selbst, alles andere läuft.
+on:
+  push:
+    paths:
+      - 'plugins/mockups/**'
+      - '.github/workflows/mockups.yml'
+  pull_request:
+    paths:
+      - 'plugins/mockups/**'
+      - '.github/workflows/mockups.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: mockups auf ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tests
+        run: node plugins/mockups/skills/mockups/scripts/test.mjs
