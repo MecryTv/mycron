@@ -3,13 +3,13 @@ id: W-0020
 title: board --open öffnet nur, wenn noch kein Tab offen ist
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-21
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0020-board-open-oeffnet-nur-wenn
 tags: [board, live]
@@ -66,9 +66,7 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-22 11:23
-
-Branch feature/w-0020-open-ohne-zweiten-tab, noch nicht committet. Code und Doku fertig, Handtest grün. Offen: neuer Selbsttest-Schritt 'Board --open: kein zweiter Tab' scheitert im vollen Selbsttest mit fetch failed auf /tabs. Diagnose (Port, Ausgabe, server.json) ist im Test eingebaut, Lauf mit --keep gestartet (Log in TEMP/w20-selftest2.log). Nächster Schritt: Ursache aus der Diagnose klären (Verdacht: Nachwirkung des Port-Schritts davor), beheben, Selbsttest grün, dann Kriterien abhaken, commit, merge, done, push, CI-Wächter, Plugin aktualisieren.
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -78,3 +76,4 @@ Branch feature/w-0020-open-ohne-zweiten-tab, noch nicht committet. Code und Doku
 - 2026-11-22: Umgesetzt: /tabs im Server, openBoardOnce in der CLI, WORKS_DRY_OPEN, Doku. Handtest mit Kindprozess als Tab: alle drei Fälle richtig. Voller Selbsttest: neuer Schritt rot mit 'fetch failed' (Port aus der Ausgabe nicht erreichbar), außerhalb des Selbsttests nicht nachstellbar; Diagnose eingebaut, Lauf mit --keep läuft.
 - 2026-11-22: Übergabe aktualisiert
 - 2026-11-22: Selbsttest 25 von 25 grün. Ursache des roten Laufs: fetch im Selbsttest nutzte nach dem Neustart eine tote Keep-Alive-Verbindung (ECONNRESET); Test fragt jetzt einmal neu.
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
