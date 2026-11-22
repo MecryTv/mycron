@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { worksDir, readJson, writeJson, exists, loadTasks } from './lib.mjs';
+import { readBackup, restoreBackup } from './backup.mjs';
 
 const MAX = 50;
 const dir = (root) => path.join(worksDir(root), '.undo');
@@ -46,6 +47,17 @@ export function snapshot(root, { label, ids = [], config = false, extra = [] }) 
   return key;
 }
 
+// Rückgängig für ein Wiederherstellen aus einer JSON-Sicherung (W-0021): Der Eintrag zeigt auf die Sicherung des
+// vorherigen Stands, die beim Wiederherstellen in .works/backups/ angelegt wurde.
+export function snapshotRestore(root, { label, backup }) {
+  const key = `${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
+  const list = undoList(root);
+  list.unshift({ key, label: String(label).slice(0, 160), at: new Date().toISOString(), backup: path.relative(worksDir(root), backup), files: [], dirs: [], before: [] });
+  for (const old of list.slice(MAX)) fs.rmSync(path.join(dir(root), old.key), { recursive: true, force: true });
+  writeJson(indexFile(root), list.slice(0, MAX));
+  return key;
+}
+
 // Stellt den Stand vor der Änderung wieder her. Neu angelegte Aufgaben werden entfernt,
 // verschobene Ordner (Archiv) zurückbewegt.
 export function undo(root, key) {
@@ -54,6 +66,14 @@ export function undo(root, key) {
   const i = key ? list.findIndex((x) => x.key === key) : 0;
   const e = list[i];
   if (!e) throw new Error('Nichts zum Rückgängigmachen.');
+  if (e.backup) {
+    const file = path.join(wd, e.backup);
+    if (!exists(file)) throw new Error(`Die Sicherung ${e.backup} fehlt, Rückgängig ist nicht möglich.`);
+    restoreBackup(root, readBackup(fs.readFileSync(file, 'utf8')), { backup: false });
+    list.splice(i, 1);
+    writeJson(indexFile(root), list);
+    return e;
+  }
   const base = path.join(dir(root), e.key);
   const before = new Set(e.before);
   // Neue Aufgabenordner entfernen, die erst durch die Änderung entstanden sind.

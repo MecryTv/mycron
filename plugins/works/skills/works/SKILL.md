@@ -92,6 +92,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Aufgabe aus einer Vorlage, "wie immer bei Slash-Befehlen" | `works template list`, dann `works new --template ... --field ... --text "..."` | `references/planning.md` |
 | Wochenbericht fällig oder gewünscht | Woche zusammenfassen, `works report --week --summary "..."` | `references/planning.md` |
 | Wie lange hat das gedauert, passen die Schätzungen | `works time <ID>`, `works time` | `references/planning.md` |
+| Board sichern, in ein anderes Projekt übernehmen, alten Stand wiederherstellen | `works export --json`, einlesen mit `works import <datei.json>` (Vorschau, dann `--apply` oder `--apply --mode=restore`). Wiederherstellen ersetzt den Stand, vorher den Nutzer fragen | `references/board.md` |
 | Board mit jemandem teilen | Im selben Netzwerk `works board --restart --share`, Leselink aus der Ausgabe nennen. Für Leute außerhalb `works export` und die Datei schicken. Bearbeitungslink nur auf Nachfrage (`works share --owner`) | `references/board.md` |
 | Board ausprobieren, Demo, "zeig mir, wie das aussieht" | `works demo --simulate --open` außerhalb echter Projekte. Legt ein Beispielprojekt im Temp-Ordner an und spielt Änderungen vor | `references/board.md` |
 | "Merk dir für das Projekt", wichtige Eigenheit gefunden | `works know add` (Nutzer) oder `works know propose` (eigene Erkenntnis) | `references/planning.md` |

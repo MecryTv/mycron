@@ -23,7 +23,8 @@ import { rules, upcoming, describe as describeRule, RULE_ID_RE } from './recurri
 import { addDays as addDaysIso } from './sprint.mjs';
 import { syncSettings, syncState, DEFAULT_SYNC, prsFor } from './ghsync.mjs';
 import { findSimilar, similarity } from './similar.mjs';
-import { snapshot, relabel, dropSnapshot, undo as undoFn, undoList } from './undo.mjs';
+import { snapshot, snapshotRestore, relabel, dropSnapshot, undo as undoFn, undoList } from './undo.mjs';
+import { readBackup, compareBackup, mergeBackup, restoreBackup } from './backup.mjs';
 import { filesForTask } from './files.mjs';
 import { laneOf, laneInfo, loadLanes, planParallel } from './parallel.mjs';
 
@@ -821,6 +822,26 @@ export async function importUpload(root, { name, data, format, map, sheet }) {
   return { token, name: path.basename(String(name)).slice(0, 120), ...JSON.parse(r.stdout) };
 }
 
+// Sichern und Wiederherstellen (W-0021): Die hochgeladene Sicherung wird geprüft, unter einem Token abgelegt und
+// mit dem Board verglichen. backupApply holt sie über das Token und führt zusammen oder stellt wieder her.
+const backupTmp = (root, token) => path.join(worksDir(root), '.tmp', `backup-${token}.json`);
+export function backupPreview(root, { name, data }) {
+  if (!data || !data.length) bad('Leere Datei.');
+  let d;
+  try { d = readBackup(data.toString('utf8')); } catch (e) { bad(e.message); }
+  const dir = path.join(worksDir(root), '.tmp');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const f of fs.readdirSync(dir)) if (f.startsWith('backup-')) { try { if (Date.now() - fs.statSync(path.join(dir, f)).mtimeMs > 3600000) fs.rmSync(path.join(dir, f)); } catch { /* egal */ } }
+  const token = crypto.randomBytes(8).toString('hex');
+  fs.writeFileSync(backupTmp(root, token), data);
+  const p = d.planning || {};
+  return {
+    token, name: path.basename(String(name || 'sicherung.json')).slice(0, 120), project: String(d.project || '').slice(0, 80), exported: String(d.exported || '').slice(0, 30),
+    tasks: d.tasks.length, milestones: Array.isArray(p.milestones) ? p.milestones.length : 0, knowledge: typeof d.knowledge === 'string' && d.knowledge.trim() ? (d.knowledge.match(/^### /gm) || []).length : 0,
+    ...compareBackup(root, d),
+  };
+}
+
 export { STATUS_LABEL };
 
 // ---------- Runde 3: Entwürfe, Wissen, Wiederkehrend, GitHub, Aufräumen, Rückgängig ----------
@@ -879,7 +900,7 @@ const LABEL = {
   queueAdd: 'Eingereiht', queueRemove: 'Aus der Warteschlange', queueOrder: 'Warteschlange sortiert', comment: 'Kommentar', designChoose: 'Entwurf gewählt',
   review: 'Abnahme', merge: 'Zusammengeführt', toIdeas: 'In Ideen verschoben', importApply: 'Importiert', sprintAdd: 'Eingeplant', sprintRemove: 'Aus dem Sprint',
 };
-const NO_UNDO = new Set(['undo', 'checksRun', 'githubSync', 'reportRun', 'reportWebhook', 'instruct', 'recurRun', 'requestHandoff']);
+const NO_UNDO = new Set(['undo', 'backupApply', 'checksRun', 'githubSync', 'reportRun', 'reportWebhook', 'instruct', 'recurRun', 'requestHandoff']);
 const CONFIG_ACTIONS = /^(queue|sprint|view|milestone|recur|checksSave|reportSettings|effortMode|githubSettings|dismissDuplicate|importApply)/;
 
 // Schreibaktion mit Sicherung für Rückgängig.
@@ -990,6 +1011,24 @@ Object.assign(actions, {
     await must(root, ['link', keep, 'related', drop]);
     await must(root, ['drop', drop, `--reason=Zusammengeführt in ${keep}`]);
     return { message: `${drop} in ${keep} zusammengeführt.` };
+  },
+  async backupApply(root, b) {
+    const token = typeof b.token === 'string' && /^[a-f0-9]{16}$/.test(b.token) ? b.token : bad('Ungültige Vorschau.');
+    const file = backupTmp(root, token);
+    if (!exists(file)) bad('Die Vorschau ist abgelaufen. Datei bitte neu wählen.');
+    const mode = oneOf(b.mode, 'Art des Imports', ['merge', 'restore'], { required: true });
+    try {
+      const d = readBackup(fs.readFileSync(file, 'utf8'));
+      if (mode === 'restore') {
+        const r = restoreBackup(root, d);
+        const key = snapshotRestore(root, { label: `Wiederhergestellt aus ${d.project || 'einer Sicherung'} (${r.tasks} Aufgaben)`, backup: r.backup });
+        return { message: `Wiederhergestellt: ${r.tasks} ${r.tasks === 1 ? 'Aufgabe' : 'Aufgaben'}. Der vorherige Stand ist gesichert.`, undo: key };
+      }
+      const only = (Array.isArray(b.only) ? b.only : []).map((n) => parseInt(n, 10)).filter((n) => n > 0 && n <= 20000);
+      if (!only.length) bad('Nichts gewählt.');
+      const r = mergeBackup(root, d, { only, snapshot: (o) => snapshot(root, o) });
+      return { message: `Übernommen: ${r.created.length} neu, ${r.updated.length} geändert.`, undo: r.undoKey };
+    } finally { removeQuiet(file); }
   },
   async importApply(root, b) {
     const file = importFile(root, b.token);

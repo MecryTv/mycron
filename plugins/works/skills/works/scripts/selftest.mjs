@@ -185,6 +185,78 @@ export async function selftest({ keep = false, browser = false, verbose = false,
 
   // Git mit core.autocrlf=true checkt .works unter Windows mit CRLF aus. works muss das genauso lesen wie LF.
   // W-0001 hat Kriterien und einen Kommentar, W-0004 ist eine Gestaltungsaufgabe (dort prüft die DoD decisions.md).
+  // W-0021: Das Board als eine JSON-Datei sichern und wieder einlesen. Zwei eigene Projekte, damit die anderen Schritte unberührt bleiben.
+  await step('Sichern als JSON: Export, Zusammenführen, Wiederherstellen, Rückgängig', () => {
+    const a = path.join(base, 'sich-a'); const b = path.join(base, 'sich-b');
+    for (const d of [a, b]) { fs.mkdirSync(d, { recursive: true }); w(['init'], { cwd: d }); }
+    const wa = (args, o = {}) => w(args, { cwd: a, ...o }); const wb = (args, o = {}) => w(args, { cwd: b, ...o });
+    wa(['new', '--type=feature', '--title=Login bauen', '--priority=P2', '--description=Mit Passwort']);
+    wa(['new', '--type=bug', '--title=Export testen', '--priority=P3']);
+    wa(['new', '--type=chore', '--title=Aufräumen', '--priority=P4']);
+    wa(['comment', 'W-0001', 'Bitte mit Test']);
+    wa(['decisions', 'W-0001', '--add=Weg', '--decision=Sitzung im Cookie', '--why=einfach']);
+    wa(['link', 'W-0002', 'blocked-by', 'W-0001']);
+    wa(['milestone', 'add', 'M1', '--title=Ziel']);
+    wa(['know', 'add', '--area=Repo', '--title=Regel', '--text=Erst testen']);
+    const file = path.join(base, 'sich.json');
+    has(wa(['export', '--json', `--out=${file}`]).out, 'sich.json', 'Export nennt die Datei');
+    const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+    expect(j.format === 'works-board' && j.version === 1 && j.tasks.length === 3, `Export: ${j.format} v${j.version}, ${j.tasks && j.tasks.length} Aufgaben`);
+    // Wiederherstellen in ein leeres Projekt ergibt denselben Stand.
+    has(wb(['import', file]).out, '3 neu', 'Vorschau in leeres Projekt');
+    wb(['import', file, '--apply', '--mode=restore']);
+    const dirOf = (p, id) => { const t = path.join(p, '.works', 'tasks'); return path.join(t, fs.readdirSync(t).find((x) => x.startsWith(id + '-'))); };
+    for (const id of ['W-0001', 'W-0002', 'W-0003']) for (const f of ['task.md', 'decisions.md', 'comments.md']) {
+      const fa = path.join(dirOf(a, id), f); const fb = path.join(dirOf(b, id), f);
+      if (fs.existsSync(fa)) expect(fs.existsSync(fb) && fs.readFileSync(fa, 'utf8').replace(/\r/g, '') === fs.readFileSync(fb, 'utf8').replace(/\r/g, ''), `${id}/${f} nach dem Wiederherstellen anders`);
+    }
+    has(fs.readFileSync(path.join(b, '.works', 'config.json'), 'utf8'), '"M1"', 'Meilenstein wiederhergestellt');
+    has(fs.readFileSync(path.join(b, '.works', 'wissen.md'), 'utf8'), 'Erst testen', 'Projektwissen wiederhergestellt');
+    // Export ohne Verlauf: Der Abgleich übergeht den Verlauf, Zusammenführen behält Verlauf und Übergabe des Boards.
+    const c = path.join(base, 'sich-c'); fs.mkdirSync(c, { recursive: true }); w(['init'], { cwd: c });
+    const wc = (args, o = {}) => w(args, { cwd: c, ...o });
+    wc(['import', file, '--apply', '--mode=restore']);
+    const file0 = path.join(base, 'sich0.json');
+    wc(['export', '--json', '--no-history', `--out=${file0}`]);
+    has(wb(['import', file0]).out, '0 geändert', 'Export ohne Verlauf gilt als unverändert');
+    wc(['set', 'W-0003', 'priority=P2']);
+    wc(['export', '--json', '--no-history', `--out=${file0}`]);
+    has(wb(['import', file0]).out, '1 geändert', 'Export ohne Verlauf: Änderung erkannt');
+    wb(['import', file0, '--apply']);
+    const t3 = fs.readFileSync(path.join(dirOf(b, 'W-0003'), 'task.md'), 'utf8');
+    has(t3, 'priority: P2', 'Export ohne Verlauf: Änderung übernommen');
+    has(t3, 'Aufgabe angelegt', 'Export ohne Verlauf: Verlauf des Boards bleibt');
+    wb(['undo']);
+    // Zusammenführen: neu in A (gleiche ID wie eine Aufgabe nur in B), geändert in A, nur in B.
+    wa(['new', '--type=feature', '--title=Neu in A', '--priority=P3']);
+    wa(['set', 'W-0001', 'priority=P1']);
+    wb(['new', '--type=feature', '--title=Nur in B', '--priority=P3']);
+    const file2 = path.join(base, 'sich2.json');
+    wa(['export', '--json', `--out=${file2}`]);
+    const pre = wb(['import', file2]).out;
+    for (const s of ['1 neu', '1 geändert', '2 gleich', '1 nur hier', 'P2 → P1']) has(pre, s, `Vorschau Zusammenführen: ${s}`);
+    wb(['import', file2, '--apply']);
+    const titles = () => wb(['list', '--json']).out;
+    has(titles(), 'Neu in A', 'Neue Aufgabe angelegt'); has(titles(), 'Nur in B', 'Was nur hier steht, bleibt');
+    has(fs.readFileSync(path.join(dirOf(b, 'W-0005'), 'task.md'), 'utf8'), 'Neu in A', 'Neue Aufgabe bekommt die nächste freie ID');
+    has(fs.readFileSync(path.join(dirOf(b, 'W-0001'), 'task.md'), 'utf8'), 'priority: P1', 'Geänderte übernommen');
+    wb(['undo']);
+    expect(!titles().includes('Neu in A'), 'Rückgängig entfernt die neue Aufgabe');
+    has(fs.readFileSync(path.join(dirOf(b, 'W-0001'), 'task.md'), 'utf8'), 'priority: P2', 'Rückgängig stellt die Priorität zurück');
+    // Wiederherstellen: sichert vorher, ersetzt den Stand; Rückgängig spielt die Sicherung wieder ein.
+    has(wb(['import', file2, '--apply', '--mode=restore']).out, 'backups', 'Wiederherstellen nennt die Sicherung');
+    expect(!titles().includes('Nur in B'), 'Wiederherstellen entfernt, was nur hier stand');
+    wb(['undo']);
+    has(titles(), 'Nur in B', 'Rückgängig nach dem Wiederherstellen');
+    // Ungültige Dateien werden abgelehnt, ohne etwas zu ändern.
+    const bad = path.join(base, 'kaputt.json');
+    for (const body of ['{"format":"works-board","version":9,"tasks":[]}', '{"format":"works-board","version":1,"tasks":[{"id":"W-0009","title":"x","dir":"../../boese","files":{"task.md":"---\\nid: W-0009\\n---\\n"}}]}', '{"format":"works-board","version":1,"tasks":[{"id":"W-0009","title":"x","files":{"task.md":"x"},"binary":{"../boese.png":"AA=="}}]}']) {
+      fs.writeFileSync(bad, body);
+      expect(wb(['import', bad, '--apply', '--mode=restore'], { ok: false }).code !== 0, `Ungültige Sicherung angenommen: ${body.slice(0, 60)}`);
+    }
+    has(titles(), 'Nur in B', 'Ungültige Sicherung hat nichts verändert');
+  });
+
   await step('Windows-Zeilenenden (CRLF) in .works', () => {
     const wd = path.join(proj, '.works');
     const dirOf = (id) => path.join(wd, 'tasks', fs.readdirSync(path.join(wd, 'tasks')).find((d) => d.startsWith(id + '-')));
@@ -808,6 +880,31 @@ async function browserCheck(url, log, between = async () => {}) {
       await p.evaluate(() => { document.querySelector('#hthBox').closest('details').open = true; });
       await p.click('#hthBox [data-hth="slow"]');
       if (!(await p.$('#hthBox [data-hth="slow"][aria-pressed="true"]'))) errs.push('Werkzeuge: Sortierung Langsam greift nicht');
+    }
+    // Sichern und Wiederherstellen (W-0021): Knopf unter Werkzeuge, JSON herunterladen, dieselbe Datei wieder einlesen.
+    if (!(await p.$('#btnBackup'))) errs.push('Werkzeuge: Knopf Sichern und Wiederherstellen fehlt');
+    else {
+      await p.click('#btnBackup');
+      try {
+        await p.waitForSelector('dialog[open] .bk-tabs', { timeout: 5000 });
+        const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 15000 }), p.click('dialog[open] #bkGo')]);
+        const saved = path.join(os.tmpdir(), `works-sicherung-${process.pid}.json`);
+        await dl.saveAs(saved);
+        const jd = JSON.parse(fs.readFileSync(saved, 'utf8'));
+        if (jd.format !== 'works-board' || !jd.tasks.length) errs.push(`Sichern: Datei ist keine Sicherung (${jd.format}, ${jd.tasks && jd.tasks.length} Aufgaben)`);
+        await p.click('dialog[open] .bk-tabs [data-bk="import"]');
+        await p.setInputFiles('dialog[open] #bkFile', saved);
+        await p.waitForSelector('dialog[open] .bk-counts', { timeout: 10000 });
+        const chips = (await p.evaluate(() => document.querySelector('dialog[open] .bk-counts').innerText)).replace(/\s+/g, ' ');
+        if (!chips.includes(`${jd.tasks.length} gleich`) || !chips.includes('0 neu')) errs.push(`Sichern: eigene Sicherung sollte nur Gleiches zeigen (${chips})`);
+        // Schmaler Bildschirm: nichts ragt über den Dialog hinaus (Fuß mit mehreren Knöpfen bricht um).
+        await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(200);
+        const over = await p.evaluate(() => { const f = document.querySelector('dialog[open] form'); return f.scrollWidth - f.clientWidth; });
+        if (over > 1) errs.push(`Sichern: Dialog auf 390 px ${over} px zu breit`);
+        await p.setViewportSize({ width: 1280, height: 900 });
+        fs.rmSync(saved, { force: true });
+      } catch (e) { errs.push(`Sichern: ${e.message.split('\n')[0]}`); }
+      await p.keyboard.press('Escape'); await p.waitForTimeout(200);
     }
     await between();
     const m = await b.newPage({ viewport: { width: 390, height: 844 } });

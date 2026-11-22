@@ -187,6 +187,17 @@ Anweisungen landen in `.works/instructions.json` und als Kommentar an der Aufgab
 
 Der Reiter Code und Commits zeigt unter "Auch in anderen Aufgaben" Dateien, die andere Aufgaben ebenfalls geändert haben, mit Sprung dorthin. Läuft die Aufgabe parallel, steht dort auch ihr Worktree mit Commits und offenen Dateien. Karten paralleler Aufgaben tragen "Parallel" und zeigen den aktuellen Schritt ihres Agenten.
 
+## Sichern und Wiederherstellen
+
+Unter Werkzeuge (und in der Befehlspalette) öffnet „Sichern und Wiederherstellen“ einen Dialog mit zwei Reitern:
+
+- **Exportieren:** das Board als eine JSON-Datei herunterladen. Wählbar sind offene, erledigte und archivierte Aufgaben, Kommentare und Entscheidungen, Verlauf und Übergaben, Prüfergebnisse, Planung (Meilensteine, Sprints, Warteschlange, Wiederkehrendes), Projektwissen und Ideen sowie Bilder und Entwürfe. Die Größe der Datei steht dabei. Aufgaben stecken darin als ihre Dateien im Wortlaut, Export und Import ergeben also denselben Stand.
+- **Importieren:** eine solche Datei wählen. Das Board zeigt, woher sie stammt, und den Abgleich: neu, geändert, gleich, nur hier. Gleich heißt gleiche ID und gleicher Titel (oder gleicher Titel unter anderer ID).
+  - **Zusammenführen** legt die gewählten neuen Aufgaben mit freien IDs an (Verweise wie blocked_by werden mit umgestellt) und übernimmt die gewählten geänderten. Was nur hier steht, bleibt, Planung und Projektwissen bleiben unverändert.
+  - **Wiederherstellen** sichert zuerst den ganzen jetzigen Stand samt Bildern in `.works/backups/` und ersetzt dann Aufgaben, Archiv, Planung, Projektwissen und Ideen durch die Datei. Aufgaben, die nur hier standen, sind danach weg, stecken aber in der Sicherung.
+
+Beides lässt sich mit Rückgängig zurücknehmen; nach einem Wiederherstellen spielt Rückgängig die Sicherung aus `.works/backups/` wieder ein. Im Terminal: `works export --json` und `works import <datei.json>` (siehe cli.md).
+
 ## Rückgängig
 
 Vor jeder Änderung aus dem Board sichert works die betroffenen Dateien in `.works/.undo/` (lokal, die letzten 50). Rückgängig stellt sie wieder her, holt archivierte Ordner zurück und entfernt Aufgaben, die erst durch die Änderung entstanden sind (sie landen in `.undo/entfernt/`). Änderungen von Claude oder aus dem Terminal laufen nicht über diesen Weg; dafür gibt es Git. `works undo --list` und `works undo <key>` machen dasselbe im Terminal.
