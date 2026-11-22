@@ -606,6 +606,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       ? { status: 'fail', cmd: 'node -v', ms: 40, output: 'The system cannot find the path specified.\n', at, ...(i === 0 ? { hist: ['ok', 'fail', 'ok', 'fail'].map((s) => ({ s, ms: 40, at, fp: 'x' })) } : {}) }
       // m10 bestanden, aber deutlich langsamer als sonst (W-0009).
       : { status: 'ok', cmd: 'node -v', ms: 48000, output: '', at, hist: [21000, 22000, 20000, 48000].map((ms) => ({ s: 'ok', ms, at })) }])) }));
+    // Eine heute erledigte Aufgabe für die Liste Heute (W-0019): Erledigtes steht dort eingeklappt.
+    // Vor der Dateiänderung, damit sie den Dateieintrag nicht aus dem Verlauf drängt.
+    if (browser) {
+      const nid = (w(['new', '--type=chore', '--title=Heute schon erledigt', '--priority=P4']).out.match(/W-\d+/) || [])[0];
+      w(['done', nid, '--confirm', '--force', '--reason=Selbsttest']);
+    }
     // Eine frische Dateiänderung für den Diff im Verlauf (W-0011), vor der Freigabe, damit sie diese nicht ersetzt.
     hook('post-tool.mjs', { cwd: proj, session_id: 's9', tool_name: 'Edit', tool_input: { file_path: path.join(proj, 'src', 'bot', 'backup.ts') }, tool_response: {} });
     // Claude wartet auf eine Freigabe für W-0002: Desktop zeigt das, der Stop-Hook beendet es vor der Handyprüfung.
@@ -727,6 +733,34 @@ async function browserCheck(url, log, between = async () => {}) {
       return v.text;
     };
     await liveText(p, '');
+    // Liste Heute (W-0019): Erledigtes steckt eingeklappt in einer Zeile, aufgeklappt einzeilig; auf oder zu bleibt gemerkt.
+    const fold = () => p.evaluate(async () => {
+      const d = await (await fetch('data.json')).json();
+      const f = document.querySelector('#viewLive details.lv-fold');
+      return {
+        done: d.tasks.filter((t) => Array.isArray(t.plan) && t.status === 'erledigt').map((t) => t.id),
+        has: !!f, open: f ? f.open : null, sum: f ? f.querySelector('summary').innerText.replace(/\s+/g, ' ') : '',
+        mini: [...document.querySelectorAll('#viewLive .lv-mini [data-lv-focus]')].map((x) => x.dataset.lvFocus),
+        full: [...document.querySelectorAll('#viewLive .lv-run [data-lv-focus]')].map((x) => x.dataset.lvFocus),
+      };
+    });
+    let fo = await fold();
+    if (!fo.done.length) errs.push('Live: Testprojekt hat keine heute erledigte Aufgabe');
+    else {
+      if (!fo.has || fo.open) errs.push(`Live: Erledigtes ist nicht eingeklappt (${JSON.stringify(fo)})`);
+      if (!fo.sum.includes(`${fo.done.length} heute erledigt`)) errs.push(`Live: Zeile zum Aufklappen nennt nicht "${fo.done.length} heute erledigt": ${fo.sum}`);
+      if (fo.full.some((id) => fo.done.includes(id))) errs.push('Live: Erledigte stehen noch als volle Einträge in der Liste');
+      if (fo.has) {
+        await p.click('#viewLive details.lv-fold > summary'); await p.waitForTimeout(250);
+        fo = await fold();
+        if (!fo.open || fo.mini.length !== fo.done.length) errs.push(`Live: Aufgeklappt fehlen einzeilige Einträge (${fo.mini.length} von ${fo.done.length})`);
+        // Das Board merkt sich die Ansicht: nach dem Neuladen ist Live schon offen, die Karten sind verborgen.
+        await p.goto(url + '/'); await p.waitForSelector('#viewLive .lv-fold', { timeout: 15000 }); await liveText(p, '');
+        fo = await fold();
+        if (!fo.open) errs.push('Live: Aufgeklappt wird nach dem Neuladen nicht gemerkt');
+        if (fo.has && fo.open) { await p.click('#viewLive details.lv-fold > summary'); await p.waitForTimeout(250); }
+      }
+    }
     const many = await p.evaluate(() => ({
       groups: [...document.querySelectorAll('#viewLive .lv-errgrp')].map((g) => g.innerText),
       attn: document.querySelectorAll('#viewLive .lv-attn li').length,

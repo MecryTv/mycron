@@ -50,7 +50,11 @@ Wunsch des Nutzers vom 2026-11-22: Das aktuelle Board soll sich als JSON exporti
 - [ ] Ein Import lässt sich rückgängig machen
 
 ## Umsetzungsplan
-- [ ] 
+- [x] Verhalten (E1) mit dem Nutzer klären
+- [ ] Export: Modul backup.mjs, works export --json, Test
+- [ ] Import: Abgleich, Zusammenführen, Wiederherstellen mit Sicherung, Rückgängig, works import für works-JSON, Test
+- [ ] Board: API und Dialog Sichern und Wiederherstellen, Fuß der Dialoge, Browser-Test
+- [ ] Doku, Selbsttest Windows mit Browser, CI
 
 ## Betroffene Dateien
 
@@ -69,3 +73,4 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-22: decisions.md angelegt
 - 2026-11-22: Entwurf A „An Teilen und Import andocken“ angehängt
 - 2026-11-22: Entwurf B „Eigener Dialog Sichern und Wiederherstellen“ angehängt
+- 2026-11-22: Entwurf B „Eigener Dialog Sichern und Wiederherstellen“ gewählt. Grund: Nutzer am 2026-11-22 im Superpowers-Begleiter: eigener Dialog Sichern und Wiederherstellen

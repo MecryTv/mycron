@@ -2869,20 +2869,31 @@
     const ft = list.find((t) => t.id === focusId) || null;
     // Fokus und angefangene Anweisung über das Neuzeichnen retten.
     const ae = document.activeElement;
-    const keyEl = ae && box.contains(ae) ? (ae.id ? '#' + ae.id : ae.dataset.lk ? '[data-lk="' + ae.dataset.lk + '"]' : ae.dataset.lvFocus ? '.lv-run [data-lv-focus="' + ae.dataset.lvFocus + '"]' : null) : null;
+    const keyEl = ae && box.contains(ae) ? (ae.id ? '#' + ae.id : ae.dataset.lk ? '[data-lk="' + ae.dataset.lk + '"]' : ae.dataset.lvFocus ? '.lv-run [data-lv-focus="' + ae.dataset.lvFocus + '"], .lv-mini [data-lv-focus="' + ae.dataset.lvFocus + '"]' : null) : null;
     const inp = $('#lvInstr', box);
     const keep = inp ? { v: inp.value, s: inp.selectionStart, task: inp.dataset.instrIn } : null;
     const openGroups = $$('details.lv-ckg[open] summary b', box).map((b) => b.textContent);
     const openOut = $$('details[data-out][open]', box).map((d) => d.dataset.out);
+    // Heute Erledigtes steckt eingeklappt in einer Zeile (W-0019). Auf oder zu bleibt über das Neuzeichnen und Neuladen erhalten.
+    const fold = $('details.lv-fold', box);
+    const foldOpen = fold ? fold.open : !!livePrefs.doneOpen;
+    const done = list.filter((t) => t.status === 'erledigt');
+    const rest = list.filter((t) => t.status !== 'erledigt');
+    const lvRow = (t) => {
+      const st = lvStatus(t);
+      return '<li><button type="button" data-lv-focus="' + esc(t.id) + '" aria-current="' + (t.id === focusId) + '">' + lvSi(st.ic) +
+        '<span class="r-top"><span class="r-id">' + esc(t.id) + '</span>' + (lvLanes().has(t.id) ? '<span class="tag lv-agent">Agent</span>' : '') + '<span class="r-prio" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span></span>' +
+        '<span class="r-title">' + esc(t.title) + '</span><span class="r-sub">' + esc(st.text) + '</span>' +
+        (st.w != null ? '<span class="lv-bar r-bar" style="--s:' + Math.max(0, Math.min(1, st.w)).toFixed(3) + (st.col ? ';--c:' + st.col : '') + '"><i></i></span>' : '') + '</button></li>';
+    };
+    const lvMini = (t) => '<li><button type="button" data-lv-focus="' + esc(t.id) + '" aria-current="' + (t.id === focusId) + '" title="' + esc(t.id + ' ' + t.title) + '">' + lvSi('ok') +
+      '<span class="r-id">' + esc(t.id) + '</span><span class="t">' + esc(t.title) + '</span></button></li>';
+    const runList = (rest.length ? '<ul class="lv-run">' + rest.map(lvRow).join('') + '</ul>' : '') +
+      (done.length ? '<details class="lv-fold"' + (foldOpen || done.some((t) => t.id === focusId) ? ' open' : '') + '><summary>' + lvSi('ok') + '<span><b>' + done.length + '</b> heute erledigt</span>' +
+        '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary><ul class="lv-mini">' + done.map(lvMini).join('') + '</ul></details>' : '');
     box.innerHTML = '<section class="lv-sum" aria-label="Überblick">' + lvTilesHtml(list) + '</section>' +
       '<div class="lv-grid"><section class="lv-panel lv-runbox" aria-label="Aufgaben heute"><div class="lv-head"><h2>Heute</h2><span class="meta">' + list.length + (list.length === 1 ? ' Aufgabe' : ' Aufgaben') + '</span></div>' +
-      (list.length ? '<ul class="lv-run">' + list.map((t) => {
-        const st = lvStatus(t);
-        return '<li><button type="button" data-lv-focus="' + esc(t.id) + '" aria-current="' + (t.id === focusId) + '">' + lvSi(st.ic) +
-          '<span class="r-top"><span class="r-id">' + esc(t.id) + '</span>' + (lvLanes().has(t.id) ? '<span class="tag lv-agent">Agent</span>' : '') + '<span class="r-prio" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span></span>' +
-          '<span class="r-title">' + esc(t.title) + '</span><span class="r-sub">' + esc(st.text) + '</span>' +
-          (st.w != null && t.status !== 'erledigt' ? '<span class="lv-bar r-bar" style="--s:' + Math.max(0, Math.min(1, st.w)).toFixed(3) + (st.col ? ';--c:' + st.col : '') + '"><i></i></span>' : '') + '</button></li>';
-      }).join('') + '</ul>' : '<p class="lv-empty">Keine Aufgaben für heute.</p>') + '</section>' +
+      (list.length ? runList : '<p class="lv-empty">Keine Aufgaben für heute.</p>') + '</section>' +
       '<section class="lv-panel lv-focus" aria-label="Gewählte Aufgabe">' + lvFocusHtml(ft, list) + '</section>' +
       '<section class="lv-panel lv-checks" aria-label="Prüfungen">' + lvChecksHtml(list, focusId) + '</section></div>';
     $$('details.lv-ckg', box).forEach((d) => { const b = $('summary b', d); if (b && openGroups.includes(b.textContent)) d.open = true; });
@@ -2898,6 +2909,9 @@
     if (!e.target.closest('#viewLive')) return;
     const f = e.target.closest('[data-lv-focus]');
     if (f) { liveFollow = false; livePrefs.focus = f.dataset.lvFocus; store.set(LIVE_KEY, livePrefs); renderLive(); return; }
+    // Klick auf „heute erledigt“: der Browser klappt danach um, also den kommenden Zustand merken.
+    const fs = e.target.closest('details.lv-fold > summary');
+    if (fs) { livePrefs.doneOpen = !fs.parentElement.open; store.set(LIVE_KEY, livePrefs); }
     if (e.target.closest('[data-lv-follow]')) { liveFollowClaude(); renderLive(); return; }
     const fb = e.target.closest('[data-lv-feed]');
     if (fb) { livePrefs.feedAll = fb.dataset.lvFeed === '1'; store.set(LIVE_KEY, livePrefs); renderLive(); return; }

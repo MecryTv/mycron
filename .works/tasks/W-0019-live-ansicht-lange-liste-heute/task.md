@@ -7,7 +7,7 @@ status: in-arbeit
 effort: M
 risk:
 created: 2026-11-21
-updated: 2026-11-21
+updated: 2026-11-22
 due:
 completed:
 milestone:
@@ -41,23 +41,33 @@ Wunsch des Nutzers vom 2026-11-21 (Screenshot aus dem Board): In der Live-Ansich
 <!-- Kurzbeschreibung des Ergebnisses. -->
 
 ## Akzeptanzkriterien
-- [ ] Darstellung ist auf Mobil, Tablet und Desktop korrekt
-- [ ] Kontraste erfüllen WCAG AA
-- [ ] Bedienung per Tastatur ist möglich
-- [ ] Bei vielen erledigten Aufgaben bleiben laufende und wartende Aufgaben ohne Scrollen sichtbar
-- [ ] Erledigte Aufgaben brauchen deutlich weniger Platz als heute
-- [ ] Hell und dunkel, 1440, 768 und 390 px ohne seitliches Scrollen
+- [x] Darstellung ist auf Mobil, Tablet und Desktop korrekt
+- [x] Kontraste erfüllen WCAG AA
+- [x] Bedienung per Tastatur ist möglich
+- [x] Bei vielen erledigten Aufgaben bleiben laufende und wartende Aufgaben ohne Scrollen sichtbar
+- [x] Erledigte Aufgaben brauchen deutlich weniger Platz als heute
+- [x] Hell und dunkel, 1440, 768 und 390 px ohne seitliches Scrollen
 
 ## Umsetzungsplan
-- [ ] 
+- [x] Entwürfe A, B, C mit dem Plugin entwurf
+- [x] Wahl des Nutzers: A (Erledigt eingeklappt)
+- [x] Browser-Test im Selbsttest (RED)
+- [x] renderLive: Erledigtes in details.lv-fold, einzeilig in .lv-mini, Zustand gemerkt
+- [x] Styles .lv-fold und .lv-mini
+- [x] Selbsttest mit Browser grün, Screenshots, Abschluss
 
 ## Betroffene Dateien
+- `plugins/works/skills/works/scripts/board/board.js`: renderLive, Klick auf die Zeile merkt auf oder zu
+- `plugins/works/skills/works/scripts/board/board.css`: .lv-fold, .lv-mini
+- `plugins/works/skills/works/scripts/selftest.mjs`: heute erledigte Aufgabe, Browser-Prüfung
 
 ## Designentscheidungen
 Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
-<!-- Ist-Zustand mit --kind ist oder vorher, Ergebnis mit --kind nachher. -->
+![Live-Ansicht auf dem Handy (375 px, dunkel): W-0019 als voller Eintrag, darunter](assets/2026-11-22-live-ansicht-auf-dem-handy-375-px-nachher.jpg)
+Beschreibung: Live-Ansicht auf dem Handy (375 px, dunkel): W-0019 als voller Eintrag, darunter '2 heute erledigt' aufgeklappt mit einzeiligen Einträgen W-0018 und W-0020
+Art: nachher · Hinzugefügt: 2026-11-22
 
 ## Offene Fragen
 
@@ -74,3 +84,6 @@ Entwürfe A (Erledigt eingeklappt), B (Erledigt kompakt), C (Gruppen mit Anzahl)
 - 2026-11-21: Entwurf B „Erledigt kompakt“ angehängt
 - 2026-11-21: Entwurf C „Gruppen mit Anzahl“ angehängt
 - 2026-11-21: Übergabe aktualisiert
+- 2026-11-22: Entwurf A „Erledigt eingeklappt“ gewählt. Grund: Nutzer am 2026-11-22 im Superpowers-Begleiter: Erledigtes eingeklappt
+- 2026-11-22: Asset hinzugefügt: assets/2026-11-22-live-ansicht-auf-dem-handy-375-px-nachher.jpg (nachher)
+- 2026-11-22: Variante A umgesetzt: Erledigtes in einer Zeile 'N heute erledigt' eingeklappt, aufgeklappt einzeilig, Zustand gemerkt. Selbsttest mit Browser 25 von 25. Geprüft im echten Board auf Desktop und Handy.
