@@ -3,13 +3,13 @@ id: W-0023
 title: Feierabend und Guten Morgen erweitern
 type: feature
 priority: P4
-status: in-arbeit
+status: erledigt
 effort:
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0023-feierabend-und-guten-morgen
 tags: [skill, plugin]
@@ -63,9 +63,7 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-22 12:25
-
-Branch feature/w-0023-workday-erweitern, nicht committet. end-of-day getestet und abgehakt. good-morning getestet, drei Punkte nachgeschärft, Nachtest läuft (Szenario scratchpad/wd-gm, Begleiter-Ordner scratchpad/gm-content). Danach: good-morning-Kriterien abhaken, Entscheidung festhalten, done, Merge, Push, CI, Plugins works und workday aktualisieren.
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
@@ -79,3 +77,4 @@ Branch feature/w-0023-workday-erweitern, nicht committet. end-of-day getestet un
 - 2026-11-22: Nachtest good-morning grün: Screenshots im content-Ordner des Begleiters, design/ unverändert, Grund bei kein Lauf, Marketplaces ohne vergleichbare Version ausgelassen. Präzisiert: nur Hash-Versionen vergleichen.
 - 2026-11-22: decisions.md angelegt
 - 2026-11-22: Entscheidung E1 dokumentiert: Erweiterungen von Feierabend und Guten Morgen
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
