@@ -719,12 +719,20 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         const t = w(['shot', 'W-0001', '--widths=1440', '--themes=light', `--out=${sdir}`, '--asset=W-0001', '--kind=nachher', '--desc=Detail von W-0001'], real);
         has(t.out, 'W-0001-light-1440.png', 'works shot einer Aufgabe');
         has(w(['show', 'W-0001']).out, 'Art: nachher', 'works shot --asset hängt das Bild an');
+        // Der Dateiname trägt Schema und Breite, sonst findet der Vergleich in der Abnahme (W-0030) das Bild nicht.
+        has(w(['show', 'W-0001']).out, 'w-0001-light-1440', 'works shot --asset (Name mit Schema und Breite)');
         const page = path.join(base, 'seite.html');
         fs.writeFileSync(page, '<!doctype html><body style="margin:0"><div class="breit" style="width:2000px">breit</div><script>throw new Error("kaputt")</script></body>');
         const u = w(['shot', `--url=${pathToFileURL(page).href}`, '--widths=390', '--themes=light', `--out=${sdir}`, '--name=breite seite'], { ok: false, ...real });
         expect(u.code === 1 && /seitliches Scrollen/.test(u.out) && /kaputt/.test(u.out), `works shot --url meldet Überlauf und Fehler nicht: ${u.out.slice(0, 300)}`);
         // W-0034: --name bestimmt den Dateinamen, auch bei --url.
         expect(fs.existsSync(path.join(sdir, 'breite-seite-light-390.png')), `works shot --name wirkt nicht: ${fs.readdirSync(sdir).join(', ')}`);
+        // W-0035: Szenario stellt einen Zustand in Wegwerf-Projekten her (hier: verwaister Tab), nimmt auf und räumt auf.
+        const kitDirs = () => fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith('works-szenario-'));
+        const before = new Set(kitDirs());
+        const sc = w(['shot', `--scenario=${path.join(HERE, '..', 'references', 'scenarios', 'verwaister-tab.mjs')}`, '--widths=1280', '--themes=light', `--out=${sdir}`], { ok: false, ...real });
+        expect(sc.code === 0 && fs.existsSync(path.join(sdir, 'verwaister-tab-light-1280.png')), `works shot --scenario → Exit ${sc.code}: ${(sc.out + sc.err).slice(0, 400)}`);
+        expect(!kitDirs().some((d) => !before.has(d)), `Szenario hat nicht aufgeräumt: ${kitDirs().filter((d) => !before.has(d)).join(', ')}`);
       }
     }
     if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }));

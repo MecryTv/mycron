@@ -95,3 +95,4 @@ Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 - 2026-11-22: Umgesetzt nach Entwurf A, Selbsttest 33/33 mit Browser
 - 2026-11-22: Beim ersten ship-Versuch ship-Fehler gefunden und behoben (siehe W-0026), Selbsttest 33/33
 - 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
+- 2026-11-22: Nachtrag (mit W-0035 ausgeliefert): works shot --asset gab --name nicht an works asset weiter, die Dateinamen trugen kein -light-1440; der Vergleich in der Abnahme fand solche Bilder nicht. Jetzt --name=<name>-<schema>-<breite>, Test im Selbsttest

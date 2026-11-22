@@ -47,7 +47,7 @@ import { findSimilar } from './similar.mjs';
 import { taskUsage, projectUsage, liveUsage, fmtTokens, fmtCost } from './usage.mjs';
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
-import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion, lastPort } from './server-control.mjs';
+import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion, lastPort, OWN_CLI } from './server-control.mjs';
 import { BOARD_VIEWS, loadPlaywright, takeShots, boardPrepare } from './shot.mjs';
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
@@ -2466,17 +2466,26 @@ function cmdUndo() {
 //   [--widths 1440,390] [--themes light,dark] [--out ordner] [--asset <ID> --kind vorher|nachher --desc ".."]
 // Board-Ansichten nutzen den laufenden Board-Server; läuft keiner, startet works einen und beendet ihn danach.
 async function cmdShot() {
-  const root = requireRoot();
-  const config = loadConfig(root);
+  // Mit --scenario (W-0035) braucht es kein works-Projekt; ein Projekt nur für --asset und den Standard-Ausgabeordner.
+  const scenarioFile = flags.scenario && flags.scenario !== true ? String(flags.scenario) : '';
+  const root = scenarioFile && !flags.asset ? findRoot() : requireRoot();
+  const config = root ? loadConfig(root) : {};
   const list = (v, d) => String(v && v !== true ? v : d).split(',').map((s) => s.trim()).filter(Boolean);
   const widths = list(flags.widths, '1440,390').map(Number);
   const themes = list(flags.themes, 'light');
   if (widths.some((w) => !(w >= 200 && w <= 4000)) || themes.some((t) => !['light', 'dark'].includes(t))) fail('--widths 200 bis 4000, --themes light oder dark.');
   const asset = flags.asset && flags.asset !== true ? findTask(root, config, String(flags.asset)).id : '';
-  const outDir = path.resolve(flags.out && flags.out !== true ? String(flags.out) : path.join(worksDir(root), '.tmp', 'shots'));
+  const outDir = path.resolve(flags.out && flags.out !== true ? String(flags.out) : root ? path.join(worksDir(root), '.tmp', 'shots') : 'shots');
   let url = flags.url && flags.url !== true ? String(flags.url) : '';
-  let name; let prepare = null; let started = null; let task = null;
-  if (url) {
+  let name; let prepare = null; let started = null; let task = null; let perShot = null;
+  if (scenarioFile) {
+    if (!exists(scenarioFile)) fail(`Szenario nicht gefunden: ${scenarioFile}`);
+    const { loadScenario } = await import('./scenario.mjs');
+    let sc;
+    try { sc = await loadScenario(scenarioFile, { cli: OWN_CLI }); } catch (e) { fail(e.message.split('\n')[0]); }
+    name = slugify(sc.name, 60) || 'szenario';
+    perShot = sc.perShot;
+  } else if (url) {
     if (!/^(https?|file):/i.test(url)) { if (exists(url)) url = pathToFileURL(path.resolve(url)).href; else fail('--url braucht http(s)://, file:// oder einen vorhandenen Dateipfad.'); }
     name = slugify(url.replace(/^[a-z]+:\/+/i, '').replace(/[?#].*$/, ''), 40) || 'seite';
   } else {
@@ -2504,14 +2513,15 @@ async function cmdShot() {
     return;
   }
   let shots;
-  try { shots = await takeShots(pw, { url, name, out: outDir, widths, themes, prepare, fullPage: !task, height: task ? 1100 : 900 }); } catch (e) { await stopStarted(); fail(e.message.split('\n')[0]); }
+  try { shots = await takeShots(pw, { url, name, out: outDir, widths, themes, prepare, perShot, fullPage: !task && !perShot, height: task ? 1100 : 900 }); } catch (e) { await stopStarted(); fail(e.message.split('\n')[0]); }
   await stopStarted();
   for (const s of shots) out(`${s.problems.length ? 'PROBLEM' : 'ok     '} ${s.theme} ${s.width}  ${s.file}${s.problems.length ? `  ${s.problems.join(' | ')}` : ''}`);
   if (asset) {
     const kind = flags.kind && flags.kind !== true ? String(flags.kind) : 'nachher';
     const desc = flags.desc && flags.desc !== true ? String(flags.desc) : `Screenshot ${name}`;
     for (const s of shots) {
-      const r = spawnSync(process.execPath, [process.argv[1], 'asset', asset, s.file, `--kind=${kind}`, `--desc=${desc} (${s.width} px, ${s.theme === 'dark' ? 'dunkel' : 'hell'})`], { cwd: root, encoding: 'utf8', windowsHide: true });
+      // Name mit Schema und Breite: Daran findet die Abnahme das passende Nachher-Bild (W-0030).
+      const r = spawnSync(process.execPath, [process.argv[1], 'asset', asset, s.file, `--kind=${kind}`, `--name=${name}-${s.theme}-${s.width}`, `--desc=${desc} (${s.width} px, ${s.theme === 'dark' ? 'dunkel' : 'hell'})`], { cwd: root, encoding: 'utf8', windowsHide: true });
       if (r.status !== 0) fail(`Anhängen an ${asset} fehlgeschlagen: ${(r.stderr || r.stdout || '').trim().split('\n')[0]}`);
     }
     out(`${shots.length} ${shots.length === 1 ? 'Bild' : 'Bilder'} an ${asset} angehängt (Art: ${kind}).`);

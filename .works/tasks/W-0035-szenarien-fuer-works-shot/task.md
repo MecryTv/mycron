@@ -3,7 +3,7 @@ id: W-0035
 title: Szenarien für works shot
 type: feature
 priority: P4
-status: backlog
+status: in-arbeit
 effort: L
 risk:
 created: 2026-11-22
@@ -11,7 +11,7 @@ updated: 2026-11-22
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0035-szenarien-fuer-works-shot
 tags: [shot, playwright]
 blocked_by: []
 blocks: []
@@ -35,17 +35,22 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (P4). Für Bilder bestimmter Zus
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] works shot führt vor dem Aufnehmen eine Szenario-Datei aus: Projekte und Aufgaben anlegen, Boards starten, Hooks auslösen, klicken, warten
-- [ ] Das Szenario läuft mit eigenem HOME und freien Ports, berührt keine echten Projekte und räumt danach auf
-- [ ] Die Bilder durchlaufen dieselbe Prüfung auf Probleme wie heute
-- [ ] Die drei Szenarien vom 2026-11-22 (verwaister Tab, wartende Freigabe, Abnahmedialog) lassen sich damit nachbauen
+- [x] works shot führt vor dem Aufnehmen eine Szenario-Datei aus: Projekte und Aufgaben anlegen, Boards starten, Hooks auslösen, klicken, warten
+- [x] Das Szenario läuft mit eigenem HOME und freien Ports, berührt keine echten Projekte und räumt danach auf
+- [x] Die Bilder durchlaufen dieselbe Prüfung auf Probleme wie heute
+- [x] Die drei Szenarien vom 2026-11-22 (verwaister Tab, wartende Freigabe, Abnahmedialog) lassen sich damit nachbauen
 
 ## Umsetzungsplan
-<!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] 
+- [x] Selbsttest: works shot --scenario mit dem Beispiel verwaister Tab, Bild da, Exit 0, kein Wegwerf-Ordner übrig
+- [x] shot.mjs: takeShots mit perShot (frischer Aufbau je Aufnahme, Aufräumen im finally)
+- [x] scenario.mjs: kit (Projekte, Boards auf freien Ports, works, Hooks, Dateien, Aufräumen) und loadScenario
+- [x] works.mjs: --scenario, ohne works-Projekt nutzbar
+- [x] Beispiele verwaister-tab, freigabe-im-hub, abnahme mit README
+- [x] Nebenbei gefunden: works shot --asset gab --name nicht weiter, die Abnahme (W-0030) fand die Bilder deshalb nicht; jetzt <name>-<schema>-<breite>
 
 ## Betroffene Dateien
-<!-- Pfade mit kurzer Notiz, was dort passiert. -->
+- plugins/works/skills/works/scripts/scenario.mjs (neu), shot.mjs, works.mjs, selftest.mjs
+- plugins/works/skills/works/references/scenarios/ (README und drei Beispiele), references/cli.md
 
 ## Designentscheidungen
 <!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
@@ -61,3 +66,4 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (P4). Für Bilder bestimmter Zus
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
+- 2026-11-22: Gestartet (Status: backlog → in-arbeit)
