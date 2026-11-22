@@ -2493,6 +2493,8 @@ async function cmdShot() {
     name = task || view;
     prepare = boardPrepare({ view, task });
   }
+  // --name bestimmt den Dateinamen für alle Arten (W-0034); sonst URL, Ansicht oder Aufgabe.
+  if (flags.name && flags.name !== true) name = slugify(String(flags.name), 60) || name;
   const stopStarted = async () => { if (started) { await stopProcess(started.pid); clearServer(root, started.pid); } };
   const pw = loadPlaywright(root);
   if (!pw) {
