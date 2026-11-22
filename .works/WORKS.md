@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-22 12:27 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-22 18:47 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 0 | 0 | 0 | 0 | 0 | 0 | 23 | 0 |
+| 0 | 0 | 1 | 0 | 0 | 0 | 23 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 0 · P4 Niedrig: 0
+
+## Aktive Aufgabe
+
+[W-0024](tasks/W-0024-works-playwright-unterstuetzung-mit/task.md) works: Playwright-Unterstützung mit works shot (In Arbeit), letzte Übergabe 2026-11-22 18:41
 
 ## Kritisch (P1)
 
@@ -16,7 +20,9 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0024](tasks/W-0024-works-playwright-unterstuetzung-mit/task.md) | works: Playwright-Unterstützung mit works shot | Feature | P2 Hoch | In Arbeit | M |  |  |  |
 
 ## Geplant und Backlog
 

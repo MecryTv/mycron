@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -51,8 +51,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const results = [];
   const hasGit = spawnSync('git', ['--version'], { encoding: 'utf8' }).status === 0;
 
-  const w = (args, { cwd = proj, input, ok = true } = {}) => {
-    const r = spawnSync(process.execPath, [CLI, ...args], { cwd, env, encoding: 'utf8', input, timeout: 60000 });
+  const w = (args, { cwd = proj, input, ok = true, extraEnv = null } = {}) => {
+    const r = spawnSync(process.execPath, [CLI, ...args], { cwd, env: extraEnv ? { ...env, ...extraEnv } : env, encoding: 'utf8', input, timeout: 60000 });
     const res = { code: r.status, out: (r.stdout || '').trim(), err: (r.stderr || '').trim() };
     if (ok && res.code !== 0) throw new Error(`works ${args.join(' ')} → Exit ${res.code}: ${(res.err || res.out).split('\n').slice(-3).join(' | ')}`);
     return res;
@@ -692,6 +692,26 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     hook('post-tool.mjs', { cwd: proj, session_id: 's9', tool_name: 'Edit', tool_input: { file_path: path.join(proj, 'src', 'bot', 'backup.ts') }, tool_response: {} });
     // Claude wartet auf eine Freigabe für W-0002: Desktop zeigt das, der Stop-Hook beendet es vor der Handyprüfung.
     hook('permission.mjs', { cwd: proj, session_id: 's9', tool_name: 'Bash', tool_input: { command: 'npm install -D vitest' } });
+    // works shot (W-0024): Screenshots einer Board-Ansicht, einer Aufgabe und einer URL; mit --asset als Bild an der Aufgabe.
+    if (browser) {
+      const sdir = path.join(base, 'shots');
+      // Chrome und Edge stürzen unter Windows ab, wenn USERPROFILE auf einen fremden Ordner zeigt: das echte Profil mitgeben.
+      const real = { extraEnv: { HOME: process.env.HOME || '', USERPROFILE: process.env.USERPROFILE || '' } };
+      const r = w(['shot', 'live', '--widths=390', '--themes=dark', `--out=${sdir}`], { ok: false, ...real });
+      // In der CI ist Playwright für die Browserprüfung installiert: Dort darf works shot nicht still überspringen.
+      if (r.code === 2 && /Playwright/.test(r.out + r.err)) { if (process.env.CI) throw new Error('works shot findet in der CI kein Playwright'); log('        works shot übersprungen: Playwright fehlt'); }
+      else {
+        expect(r.code === 0, `works shot live → Exit ${r.code}: ${(r.out + r.err).slice(0, 300)}`);
+        expect(fs.existsSync(path.join(sdir, 'live-dark-390.png')), 'works shot: Bild der Live-Ansicht fehlt');
+        const t = w(['shot', 'W-0001', '--widths=1440', '--themes=light', `--out=${sdir}`, '--asset=W-0001', '--kind=nachher', '--desc=Detail von W-0001'], real);
+        has(t.out, 'W-0001-light-1440.png', 'works shot einer Aufgabe');
+        has(w(['show', 'W-0001']).out, 'Art: nachher', 'works shot --asset hängt das Bild an');
+        const page = path.join(base, 'seite.html');
+        fs.writeFileSync(page, '<!doctype html><body style="margin:0"><div class="breit" style="width:2000px">breit</div><script>throw new Error("kaputt")</script></body>');
+        const u = w(['shot', `--url=${pathToFileURL(page).href}`, '--widths=390', '--themes=light', `--out=${sdir}`], { ok: false, ...real });
+        expect(u.code === 1 && /seitliches Scrollen/.test(u.out) && /kaputt/.test(u.out), `works shot --url meldet Überlauf und Fehler nicht: ${u.out.slice(0, 300)}`);
+      }
+    }
     if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }));
     w(['checks', 'remove', ...many]);
   });
