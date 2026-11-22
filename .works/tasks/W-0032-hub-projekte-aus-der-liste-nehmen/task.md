@@ -3,13 +3,13 @@ id: W-0032
 title: Hub zeigt nur laufende Boards und schließt sich bei einem
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0032-hub-projekte-aus-der-liste
 tags: [ui, hub]
@@ -79,7 +79,7 @@ Art: nachher · Hinzugefügt: 2026-11-22
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
@@ -95,3 +95,4 @@ Art: nachher · Hinzugefügt: 2026-11-22
 - 2026-11-22: Asset hinzugefügt: assets/2026-11-22-hub-nur-laufende-dark-390-nachher.png (nachher)
 - 2026-11-22: Asset hinzugefügt: assets/2026-11-22-hub-nur-laufende-768-nachher.png (nachher)
 - 2026-11-22: Nach der Idee des Nutzers umgesetzt, Selbsttest 35/35 mit Browser
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
