@@ -3,13 +3,13 @@ id: W-0026
 title: "Skill ship: Abschluss einer Aufgabe in einem Rutsch"
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0026-skill-ship-abschluss-einer
 tags: [skill, workflow, git]
@@ -67,7 +67,7 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - [x] Gehört ship ins Plugin works (works:ship) oder ins Plugin workday? Antwort des Nutzers am 2026-11-22: ins Plugin works, als works:ship.
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
@@ -75,3 +75,4 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-22: Frage geklärt: ship kommt als works:ship ins Plugin works
 - 2026-11-22: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-22: works ship mit Selbsttest (DoD offen, offene und neue Dateien, Remote weg mit Board-Neustart, Erfolg mit Board und time.jsonl), Skill works:ship mit drei Szenarien geprüft und nachgeschärft. CI-Wächter und Plugin-Update werden beim Abschluss von W-0026 mit ship selbst am echten Repo nachgewiesen
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

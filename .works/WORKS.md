@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-22 19:58 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-22 20:22 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 5 | 0 | 0 | 0 | 0 | 0 | 25 | 0 |
+| 4 | 0 | 0 | 0 | 0 | 0 | 26 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 2 · P3 Mittel: 3 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 3 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -22,7 +22,6 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0026](tasks/W-0026-skill-ship-abschluss-einer-aufgabe-in/task.md) | Skill ship: Abschluss einer Aufgabe in einem Rutsch | Feature | P2 Hoch | Backlog | M |  |  |  |
 | [W-0029](tasks/W-0029-verwaiste-board-tabs-zeigen-still-ein/task.md) | Verwaiste Board-Tabs zeigen still ein fremdes Projekt | Bug | P2 Hoch | Backlog | S |  |  |  |
 | [W-0027](tasks/W-0027-ci-watch-rote-ci-legt-einen-bug-in/task.md) | ci-watch: rote CI legt einen Bug in works an | Feature | P3 Mittel | Backlog | S |  |  |  |
 | [W-0028](tasks/W-0028-hub-browser-hinweis-wenn-claude-auf/task.md) | Hub: Browser-Hinweis, wenn Claude auf eine Freigabe wartet | Feature | P3 Mittel | Backlog | S |  |  |  |
@@ -40,8 +39,8 @@ _Keine Einträge._
 | [W-0023](tasks/W-0023-feierabend-und-guten-morgen-erweitern/task.md) | Feierabend und Guten Morgen erweitern | Feature | P4 Niedrig | 2026-11-22 |
 | [W-0024](tasks/W-0024-works-playwright-unterstuetzung-mit/task.md) | works: Playwright-Unterstützung mit works shot | Feature | P2 Hoch | 2026-11-22 |
 | [W-0025](tasks/W-0025-hub-alle-offenen-boards-in-einem-tab/task.md) | Hub: alle offenen Boards in einem Tab | Design | P3 Mittel | 2026-11-22 |
+| [W-0026](tasks/W-0026-skill-ship-abschluss-einer-aufgabe-in/task.md) | Skill ship: Abschluss einer Aufgabe in einem Rutsch | Feature | P2 Hoch | 2026-11-22 |
 | [W-0001](tasks/W-0001-live-ansicht-im-works-board/task.md) | Live-Ansicht im works-Board | Feature | P3 Mittel | 2026-11-21 |
-| [W-0002](tasks/W-0002-board-start-im-hintergrund-weicht-nicht/task.md) | Board-Start im Hintergrund weicht nicht auf freien Port aus | Bug | P3 Mittel | 2026-11-21 |
 
 ## Ideen
 
