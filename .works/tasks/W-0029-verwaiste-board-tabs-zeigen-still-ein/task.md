@@ -3,13 +3,13 @@ id: W-0029
 title: Verwaiste Board-Tabs zeigen still ein fremdes Projekt
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: fix/w-0029-verwaiste-board-tabs-zeigen
 tags: [ui, board, hub]
@@ -88,6 +88,7 @@ Art: nachher · Hinzugefügt: 2026-11-22
 ## Offene Fragen
 
 ## Übergabe
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
@@ -102,3 +103,4 @@ Art: nachher · Hinzugefügt: 2026-11-22
 - 2026-11-22: Asset hinzugefügt: assets/2026-11-22-tab-nachher-light-768-nachher.png (nachher)
 - 2026-11-22: Umgesetzt nach Entwurf B, Selbsttest 31/31 mit Browser, Hub-Schritt zusätzlich mit 8.3-Kurzpfad geprüft
 - 2026-11-22: Entscheidung E1 dokumentiert: Verwaisten Tab erkennen und anzeigen
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

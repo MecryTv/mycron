@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-22 20:41 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-22 20:59 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 3 | 0 | 0 | 0 | 0 | 0 | 27 | 0 |
+| 2 | 0 | 0 | 0 | 0 | 0 | 28 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 2 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 2 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -22,7 +22,6 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0029](tasks/W-0029-verwaiste-board-tabs-zeigen-still-ein/task.md) | Verwaiste Board-Tabs zeigen still ein fremdes Projekt | Bug | P2 Hoch | Backlog | S |  |  |  |
 | [W-0028](tasks/W-0028-hub-browser-hinweis-wenn-claude-auf/task.md) | Hub: Browser-Hinweis, wenn Claude auf eine Freigabe wartet | Feature | P3 Mittel | Backlog | S |  |  |  |
 | [W-0030](tasks/W-0030-mockups-entwurf-und-ergebnis/task.md) | mockups: Entwurf und Ergebnis nebeneinander im Review | Feature | P3 Mittel | Backlog | M |  |  |  |
 
