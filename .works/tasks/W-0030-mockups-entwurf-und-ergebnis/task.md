@@ -35,10 +35,12 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (alles einbauen, P3). Beim Revie
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Für eine Aufgabe mit gewähltem Entwurf und Nachher-Bild erzeugt mockups ein Vergleichsbild: Entwurf links, Umsetzung rechts, gleiche Breite und gleiches Farbschema
-- [ ] Das Vergleichsbild hängt als Asset an der Aufgabe und erscheint im Board bei der Abnahme
-- [ ] Fehlt Entwurf oder Nachher-Bild, nennt der Befehl, was fehlt, statt abzubrechen
-- [ ] Darstellung im Board auf Mobil, Tablet und Desktop korrekt, Kontraste WCAG AA
+<!-- Nach Rückfrage am 2026-11-22 verkleinert: Der Abnahmedialog zeigt Entwurf und Ergebnis schon nebeneinander, es fehlt der gleiche Maßstab. -->
+- [ ] Im Abnahmedialog gibt es beim Vergleich Entwurf gegen Ergebnis Umschalter für die Breite (Desktop, Tablet, Handy) und für hell/dunkel
+- [ ] Der Entwurf rendert in der gewählten Breite und im gewählten Schema; daneben steht das Nachher-Bild mit derselben Breite und demselben Schema, wenn es eins gibt
+- [ ] Fehlt ein passendes Nachher-Bild, nennt der Dialog, welches fehlt und wie es entsteht (works shot --asset), statt ein beliebiges zu zeigen
+- [ ] Ohne Entwurf oder ohne Nachher-Bild bleibt der Dialog wie heute
+- [ ] Darstellung auf Mobil, Tablet und Desktop korrekt, Kontraste WCAG AA, per Tastatur bedienbar
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
@@ -61,3 +63,4 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (alles einbauen, P3). Beim Revie
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
+- 2026-11-22: Nach Rückfrage verkleinert: kein separates Vergleichsbild, stattdessen Breite und hell/dunkel im vorhandenen Vergleich des Abnahmedialogs

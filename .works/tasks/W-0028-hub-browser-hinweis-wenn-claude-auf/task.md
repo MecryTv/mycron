@@ -62,3 +62,6 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (alles einbauen, P3). Der Hub (W
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
+- 2026-11-22: Entwurf A „Glocke im Kopf“ angehängt
+- 2026-11-22: Entwurf B „Einladung unter dem Kopf“ angehängt
+- 2026-11-22: Entwurf C „Schalter in der Kennzahl“ angehängt

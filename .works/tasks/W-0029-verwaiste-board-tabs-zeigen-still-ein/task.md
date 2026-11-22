@@ -70,3 +70,6 @@ Der Tab zeigt still B. works board --open in B meldet einen offenen Tab, obwohl 
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
+- 2026-11-22: Entwurf A „Ersatzseite“ angehängt
+- 2026-11-22: Entwurf B „Leiste über dem letzten Stand“ angehängt
+- 2026-11-22: Entwurf C „Dialog über dem letzten Stand“ angehängt
