@@ -7,6 +7,7 @@ import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { readJson, writeJson, exists, loadTasks, loadConfig, isOverdue, OPEN_STATUSES, today, rootIdOf } from './lib.mjs';
 import { readServer, newestCli, cliVersion } from './server-control.mjs';
 import { activeSprint, sprintStats } from './sprint.mjs';
@@ -14,6 +15,8 @@ import { loadActivity } from './live.mjs';
 import { liveUsage, fmtTokens, fmtCost } from './usage.mjs';
 import { syncState } from './ghsync.mjs';
 import { boardCss } from './board.mjs';
+
+const HUB_CSS = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'board', 'hub.css'), 'utf8');
 
 const regFile = () => path.join(os.homedir(), '.works', 'projects.json');
 
@@ -99,7 +102,10 @@ const hhmm = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()
 const pct = (done, total) => (total ? Math.round(done / total * 100) : 0);
 
 function liveLine(i) {
-  if (i.perm) return `<div class="hub-live hub-warnbg"><span class="hub-dot hub-perm"></span><span>Wartet ${ago(i.perm.permSince || i.perm.at).replace('vor ', 'seit ')} auf deine Freigabe: ${esc(i.perm.what || i.perm.verb)}</span></div>`;
+  if (i.perm) {
+    const since = ago(i.perm.permSince || i.perm.at);
+    return `<div class="hub-live hub-warnbg"><span class="hub-dot hub-perm"></span><span>Wartet ${since.startsWith('vor ') ? `${since.replace('vor ', 'seit ')} ` : ''}auf deine Freigabe: ${esc(i.perm.what || i.perm.verb)}</span></div>`;
+  }
   if (i.busy) return `<div class="hub-live"><span class="hub-dot hub-work"></span><span>Claude arbeitet${i.busy.task ? ` an ${esc(i.busy.task)}` : ''}: ${esc(i.busy.verb)} ${esc(i.busy.what)}</span></div>`;
   if (i.working.length) return `<div class="hub-live"><span class="hub-dot hub-work"></span><span>In Arbeit: ${esc(i.working.map((t) => `${t.id} ${t.title}`).join(', '))}</span></div>`;
   if (i.review) return `<div class="hub-live"><span class="hub-dot"></span><span>${i.review} ${i.review === 1 ? 'Aufgabe wartet' : 'Aufgaben warten'} auf deine Abnahme</span></div>`;
@@ -113,7 +119,9 @@ function boardCard(i, self) {
   const stat = (n, l, hot) => `<div class="hub-stat${hot && n ? ' hub-hot' : ''}"><b>${n}</b><span>${l}</span></div>`;
   const ci = { ok: '<span class="hub-chip hub-ok">CI grün</span>', fail: '<span class="hub-chip hub-red">CI rot</span>', pending: '<span class="hub-chip">CI läuft</span>' }[i.ci] || '';
   const isSelf = self && i.path === self;
-  return `<article class="hub-bc">
+  // Wartende Freigabe mit Kennung (Projekt und Zeitpunkt): Der Browser meldet jede genau einmal (W-0028).
+  const perm = i.perm ? ` data-perm="${esc(`${rootIdOf(i.path)}:${i.perm.permSince || i.perm.at}`)}" data-perm-name="${esc(i.name)}" data-perm-what="${esc(i.perm.what || i.perm.verb)}" data-url="${esc(url)}?from=hub"` : '';
+  return `<article class="hub-bc"${perm}>
 <header><span class="hub-dot hub-on"></span><h3>${esc(i.name)}</h3><span class="hub-m hub-path">${esc(i.path.replace(os.homedir(), '~'))}</span>
 <span class="hub-chips">${isSelf ? '<span class="hub-chip">dieses Board</span>' : ''}${ci}${i.outdated ? '<span class="hub-chip hub-old">Version veraltet</span>' : '<span class="hub-chip">Version aktuell</span>'}</span></header>
 ${liveLine(i)}
@@ -130,6 +138,7 @@ function stoppedRow(i) {
   return `<div class="hub-offrow"><span class="hub-dot hub-off"></span><b>${esc(i.name)}</b><span class="hub-m">${i.open} offen${i.p1.length ? ` · ${i.p1.length} P1` : ''} · zuletzt geändert ${ago(i.last)}</span><span class="hub-acts"><button class="btn small" type="button" data-op="start" data-path="${esc(i.path)}" data-name="${esc(i.name)}">Board starten</button></span></div>`;
 }
 
+const BELL_ICON = '<svg class="hub-bell-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>';
 const THEME_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" style="width:15px;height:15px"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>';
 
 // Inhalt der Seite (Kopf und Liste). Wird alle 5 s neu geholt.
@@ -144,7 +153,8 @@ export function hubBody(infos, { self = '' } = {}) {
   const kpi = (n, l, cls = '') => `<div class="hub-kpi${cls}"><b>${esc(n)}</b><span>${esc(l)}</span></div>`;
   return `<header class="hub-hd"><div class="hub-wrap">
 <div class="hub-hdtop"><h1 class="hub-mark"><i>w</i>works <small>HUB</small></h1><span class="hub-m">${on.length === 1 ? '1 Board läuft' : `${on.length} Boards laufen`} · ${off.length} gestoppt · aktualisiert ${hhmm(new Date().toISOString())}</span>
-<span class="hub-right"><button class="btn small" type="button" data-op="add">Projekt hinzufügen</button><button class="btn small icon" type="button" data-theme-toggle aria-label="Farbschema wechseln" title="Farbschema wechseln">${THEME_ICON}</button></span></div>
+<span class="hub-right"><button class="btn small" type="button" data-op="add">Projekt hinzufügen</button><button class="btn small hub-bell" type="button" data-notify aria-pressed="false" hidden>${BELL_ICON}<span>Hinweise aus</span></button><button class="btn small icon" type="button" data-theme-toggle aria-label="Farbschema wechseln" title="Farbschema wechseln">${THEME_ICON}</button></span></div>
+<div class="hub-ask" id="hubAsk" role="region" aria-label="Hinweise einschalten" hidden>${BELL_ICON}<p>Benachrichtigen, wenn Claude in einem Projekt auf deine Freigabe wartet?<small>Der Browser fragt dann einmal nach der Erlaubnis. Der Hinweis kommt nur, wenn dieser Tab im Hintergrund liegt.</small></p><span class="hub-ask-acts"><button class="btn small primary" type="button" data-notify-on>Einschalten</button><button class="btn small ghost" type="button" data-notify-later>Nicht jetzt</button></span></div>
 <div class="hub-kpis">${kpi(sum((i) => i.open), 'offene Aufgaben')}${kpi(sum((i) => i.p1.length), 'P1 kritisch')}${kpi(perms, 'wartet auf Freigabe', perms ? ' hub-warnk' : '')}${kpi(sum((i) => i.review), 'im Review')}${kpi(fmtCost(cost, cur), `Verbrauch heute · ${fmtTokens(tokens)} Tokens`)}</div>
 </div></header>
 <main class="hub-wrap">
@@ -156,65 +166,6 @@ ${infos.length ? '' : '<p class="hub-m">Noch keine Projekte. Sie erscheinen hier
 </main>`;
 }
 
-const HUB_CSS = `
-.hub-page { min-height: 100vh; background: var(--bg); }
-.hub-wrap { max-width: 1280px; margin: 0 auto; padding: 0 20px; }
-.hub-mark { margin: 0; display: inline-flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
-.hub-mark i { width: 26px; height: 26px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; color: var(--on-accent); font-style: normal; font-size: 14px; font-weight: 800; }
-.hub-mark small { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
-.hub-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--c, var(--muted)); display: inline-block; }
-.hub-dot.hub-on { --c: var(--ok); } .hub-dot.hub-work { --c: var(--s-in-arbeit); } .hub-dot.hub-perm { --c: var(--warn); } .hub-dot.hub-off { --c: var(--line-strong); }
-.hub-m { color: var(--muted); font-size: 12.5px; }
-.hub-sec { display: flex; align-items: baseline; gap: 10px; margin: 22px 0 10px; }
-.hub-sec h2 { margin: 0; font-size: 14px; font-weight: 650; }
-.hub-live { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-radius: 9px; background: var(--sunken); font-size: 13px; min-width: 0; }
-.hub-live.hub-warnbg { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); }
-.hub-live > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hub-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-.hub-stat { padding: 7px 8px; border-radius: 8px; background: var(--sunken); display: grid; text-align: center; }
-.hub-stat b { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.hub-stat span { font-size: 11.5px; color: var(--text-2); }
-/* Kontrast mindestens 4,5:1 (WCAG AA) in beiden Schemata: Signalfarben mit der Textfarbe gemischt. */
-.hub-stat.hub-hot b { color: color-mix(in srgb, var(--danger) 65%, var(--text)); }
-.hub-prog { display: grid; gap: 4px; align-content: start; }
-.hub-pl { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text-2); }
-.hub-track { height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
-.hub-track i { display: block; height: 100%; background: var(--c, var(--ok)); }
-.hub-kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-size: 12.5px; margin: 0; }
-.hub-kv dt { color: var(--muted); }
-.hub-kv dd { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hub-chip { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; background: var(--sunken); color: var(--text-2); white-space: nowrap; }
-.hub-chip.hub-ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: color-mix(in srgb, var(--ok) 65%, var(--text)); }
-.hub-chip.hub-red { background: color-mix(in srgb, var(--danger) 14%, transparent); color: color-mix(in srgb, var(--danger) 65%, var(--text)); }
-.hub-chip.hub-old { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--text); }
-.hub-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.hub-page a.btn { color: var(--text); }
-.hub-page a.btn.primary { color: var(--on-accent); }
-.hub-acts .hub-m { margin-left: auto; }
-.hub-hd { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface)); border-bottom: 1px solid var(--line); }
-.hub-hd .hub-wrap { display: grid; gap: 14px; padding-top: 18px; padding-bottom: 18px; }
-.hub-hdtop { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
-.hub-hdtop .hub-m { font-size: 13px; color: var(--text-2); }
-.hub-hd .hub-mark small { color: var(--text-2); }
-.hub-right { margin-left: auto; display: flex; gap: 8px; }
-.hub-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
-.hub-kpi { padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); display: grid; gap: 2px; min-width: 0; }
-.hub-kpi b { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.15; }
-.hub-kpi span { font-size: 12px; color: var(--muted); }
-.hub-kpi.hub-warnk { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); }
-@media (max-width: 760px) { .hub-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.hub-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 14px; }
-.hub-bc { display: grid; gap: 12px; padding: 16px 18px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); align-content: start; min-width: 0; }
-.hub-bc header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
-.hub-bc h3 { margin: 0; font-size: 17px; font-weight: 650; }
-.hub-path { min-width: 0; overflow-wrap: anywhere; }
-.hub-chips { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
-.hub-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
-@media (max-width: 560px) { .hub-cols { grid-template-columns: minmax(0, 1fr); } .hub-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.hub-off-list { display: grid; gap: 8px; }
-.hub-offrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--line-strong); font-size: 13px; }
-.hub-offrow .hub-acts { margin-left: auto; }
-`;
 
 // Holt den Inhalt alle 5 s neu, schaltet das Farbschema wie im Board und schickt die Knöpfe an die API.
 // events: Die Seite hält /events offen, damit works board --open sie als offenen works-Tab zählt.
@@ -227,6 +178,41 @@ const HUB_JS = `(() => {
   const root = document.getElementById('hub');
   let last = root.innerHTML;
   const focusKey = (el) => (el && el !== document.body && root.contains(el) ? [el.tagName, el.getAttribute('href'), el.dataset.op, el.dataset.path, el.textContent].join('|') : '');
+  // Browser-Hinweis bei wartender Freigabe (W-0028). Die Wahl steht im Browser: on, off oder later (Nicht jetzt).
+  const canNotify = 'Notification' in window;
+  const choice = () => get('works-hub-notify', '');
+  const notifyOn = () => canNotify && Notification.permission === 'granted' && choice() === 'on';
+  function notifyUi() {
+    const ask = document.getElementById('hubAsk');
+    const bell = root.querySelector('[data-notify]');
+    if (!ask || !bell) return;
+    const denied = canNotify && Notification.permission === 'denied';
+    ask.hidden = !canNotify || denied || choice() !== '';
+    bell.hidden = !canNotify || !ask.hidden;
+    bell.setAttribute('aria-pressed', String(notifyOn()));
+    bell.title = denied ? 'Im Browser blockiert. Erlauben in den Website-Einstellungen.' : 'Hinweis, wenn Claude auf eine Freigabe wartet';
+    bell.querySelector('span').textContent = notifyOn() ? 'Hinweise an' : denied ? 'Hinweise blockiert' : 'Hinweise aus';
+  }
+  // Was beim Laden schon wartet, sieht man; gemeldet werden nur neue Freigaben, und nur im Hintergrund.
+  const seen = new Set();
+  function newPerms(initial) {
+    for (const c of root.querySelectorAll('[data-perm]')) {
+      const k = c.dataset.perm;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      if (initial || !notifyOn() || !document.hidden) continue;
+      const n = new Notification(c.dataset.permName + ' wartet auf deine Freigabe', { body: c.dataset.permWhat, tag: k });
+      const url = c.dataset.url;
+      n.onclick = () => { window.focus(); location.href = url; n.close(); };
+    }
+  }
+  async function askPermission() {
+    const r = await Notification.requestPermission();
+    put('works-hub-notify', r === 'granted' ? 'on' : 'off');
+    notifyUi();
+  }
+  notifyUi();
+  newPerms(true);
   async function refresh() {
     try {
       const r = await fetch(H.part, { cache: 'no-store' }); if (!r.ok) return;
@@ -234,6 +220,8 @@ const HUB_JS = `(() => {
       // Fokus behalten, damit die Bedienung per Tastatur nicht bei jeder Aktualisierung von vorn beginnt.
       const k = focusKey(document.activeElement);
       last = t; root.innerHTML = t;
+      notifyUi();
+      newPerms(false);
       if (k) { const el = [...root.querySelectorAll('a, button')].find((x) => focusKey(x) === k); if (el) el.focus(); }
     } catch (e) { /* Server startet neu */ }
   }
@@ -241,6 +229,15 @@ const HUB_JS = `(() => {
   if (H.events) new EventSource('/events');
   root.addEventListener('click', async (e) => {
     if (e.target.closest('[data-theme-toggle]')) { const o = ['auto', 'light', 'dark']; put('works-theme', o[(o.indexOf(get('works-theme', 'auto')) + 1) % 3]); theme(); return; }
+    if (e.target.closest('[data-notify-on]')) { await askPermission(); return; }
+    if (e.target.closest('[data-notify-later]')) { put('works-hub-notify', 'later'); notifyUi(); return; }
+    if (e.target.closest('[data-notify]')) {
+      if (notifyOn()) put('works-hub-notify', 'off');
+      else if (Notification.permission === 'granted') put('works-hub-notify', 'on');
+      else if (Notification.permission === 'default') { await askPermission(); return; }
+      notifyUi();
+      return;
+    }
     const b = e.target.closest('[data-op]');
     if (!b) return;
     let dir = b.dataset.path;

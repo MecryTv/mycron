@@ -837,6 +837,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(token, 'Kein Token in der Hub-Seite');
       const part = await (await get('/hub?part=1')).text();
       expect(!part.includes('<html') && part.includes('zweites'), `/hub?part=1 liefert nicht nur den Inhalt: ${part.slice(0, 120)}`);
+      // W-0028: Wartet Claude im zweiten Projekt auf eine Freigabe, trägt dessen Karte eine Kennung für den Browser-Hinweis.
+      hook('permission.mjs', { cwd: other, session_id: 'h1', tool_name: 'Bash', tool_input: { command: 'npm install -D vitest' } });
+      const ph = await (await get('/hub?part=1')).text();
+      expect(/data-perm="[^"]+"/.test(ph) && ph.includes('data-perm-name="zweites"') && ph.includes('npm install -D vitest'), `Karte ohne Kennung der Freigabe: ${ph.slice(0, 200)}`);
+      has(ph, 'id="hubAsk"', 'Hub (Einladung zu Hinweisen)'); has(ph, 'data-notify', 'Hub (Glocke)');
+      expect(!ph.includes('Wartet gerade eben') && ph.includes('Wartet auf deine Freigabe: npm install -D vitest'), 'Live-Zeile einer frischen Freigabe falsch formuliert');
       const act = (body, t = token) => get('/api/hub', { method: 'POST', headers: { ...(t ? { 'X-Works-Token': t } : {}), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       expect((await act({ op: 'stop', path: other }, '')).status === 403, 'Stoppen ohne Token war erlaubt');
       expect((await act({ op: 'stop', path: path.join(base, 'gibt-es-nicht') })).status === 400, 'Unbekanntes Projekt nicht abgelehnt');
@@ -896,6 +902,55 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         await p.waitForURL(new RegExp(`:${b}/`), { timeout: 10000 }); await p.waitForSelector('.card');
         await p.waitForSelector('#hubLink:not([hidden])', { timeout: 10000 });
         has(await p.locator('#hubLink').textContent(), '2 Boards', 'Hub-Link');
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        w(['board', '--stop'], { ok: false });
+        w(['board', '--stop'], { cwd: other, ok: false });
+      }
+    });
+  }
+
+  // W-0028: Hinweis bei wartender Freigabe. Notification ist nachgebaut (zählt mit), "Hintergrund" wird simuliert.
+  if (browser) {
+    await step('Hub: Browser-Hinweis bei wartender Freigabe, einmal je Freigabe', async () => {
+      if (!fs.existsSync(path.join(other, '.works', 'config.json'))) { fs.mkdirSync(other, { recursive: true }); w(['init'], { cwd: other }); }
+      if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eine Karte']); }
+      const br = await launchChromium(log);
+      if (!br) return;
+      try {
+        const a = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`]).out);
+        w(['board', '--serve', '--detach', `--port=${await highPort()}`], { cwd: other });
+        const ctx = await br.newContext({ viewport: { width: 1280, height: 900 } });
+        await ctx.addInitScript(() => {
+          window.__notes = []; window.__hidden = false;
+          Object.defineProperty(document, 'hidden', { get: () => window.__hidden, configurable: true });
+          class FakeNote { constructor(title, opt) { window.__notes.push({ title, body: (opt || {}).body || '' }); } close() {} }
+          FakeNote.permission = 'default';
+          FakeNote.requestPermission = async () => { FakeNote.permission = 'granted'; return 'granted'; };
+          window.Notification = FakeNote;
+        });
+        const p = await ctx.newPage();
+        const errs = [];
+        p.on('pageerror', (e) => errs.push(e.message));
+        await p.goto(`http://127.0.0.1:${a}/hub`);
+        await p.waitForSelector('#hubAsk:not([hidden])', { timeout: 10000 });
+        await p.getByRole('button', { name: 'Einschalten', exact: true }).click();
+        await p.waitForSelector('#hubAsk', { state: 'hidden' });
+        const bell = p.locator('[data-notify]');
+        expect(await bell.getAttribute('aria-pressed') === 'true', 'Glocke nach Einschalten nicht an');
+        has(await bell.textContent(), 'Hinweise an', 'Glocke');
+        await p.evaluate(() => { window.__hidden = true; });
+        hook('permission.mjs', { cwd: other, session_id: 'b1', tool_name: 'Bash', tool_input: { command: 'npm test -- --watch' } });
+        await p.waitForFunction(() => window.__notes.length >= 1, null, { timeout: 15000 });
+        const n = (await p.evaluate(() => window.__notes))[0];
+        has(n.title, 'zweites', 'Hinweis (Projekt)'); has(n.body, 'npm test', 'Hinweis (Freigabe)');
+        await p.waitForTimeout(6500);
+        expect(await p.evaluate(() => window.__notes.length) === 1, 'Zweiter Hinweis für dieselbe Freigabe');
+        // Nach dem Neuladen bleibt die Wahl erhalten: keine Einladung, Glocke an.
+        await p.reload();
+        await p.waitForSelector('[data-notify]:not([hidden])');
+        expect(await p.locator('#hubAsk').isHidden(), 'Einladung nach dem Neuladen wieder da');
         expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
       } finally {
         await br.close();
