@@ -28,7 +28,7 @@ Ablauf:
    Das Board zeigt HTML-Entwürfe in einem abgesicherten iframe, das nur `data:`, `blob:` und `https` lädt. Verweist der Entwurf auf lokale CSS, Schriften oder Bilder (relativ oder `file://`), warnt `design add` und nennt die Verweise: Im Board fehlen sie. Vorher einbetten, mit dem Plugin mockups: `entwurf.mjs inline <datei> --variant A`.
 4. Dem Nutzer sagen, dass die Entwürfe im Board unter Entwürfe liegen, und auf seine Wahl warten. Er wählt im Board mit "Diese nehmen" oder im Gespräch, dann `works design choose W-0006 B --reason "..."`. Die Wahl landet in decisions.md unter "Gewählter Entwurf". Die Sitzungsübersicht meldet Aufgaben mit Entwürfen ohne Wahl.
 5. Erst danach umsetzen. Die gewählte Variante ist die Vorgabe. Abweichungen mit dem Nutzer klären.
-6. Vor dem Review einen Screenshot des Ergebnisses mit `works asset W-0006 shot.png --kind nachher --desc "..."` ablegen. Das Board stellt ihn in der Abnahme neben den gewählten Entwurf.
+6. Vor dem Review einen Screenshot des Ergebnisses ablegen: `works shot --url <seite> --asset W-0006 --kind nachher --desc "..."` (oder ein vorhandenes Bild mit `works asset W-0006 shot.png --kind nachher --desc "..."`). Das Board stellt ihn in der Abnahme neben den gewählten Entwurf.
 
 Zusätzlich bleiben die bisherigen Wege gültig: Entscheidungen als E-Block in `decisions.md` mit `--source "UI UX Pro Max"`, verworfene Varianten mit Grund. Projektweite Design-Systeme nur mit `works attach-doc` verlinken, nicht in eine Aufgabe kopieren.
 

@@ -6,6 +6,8 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { readText,
   SKILL_DIR, STATUSES, OPEN_STATUSES, CLOSED_STATUSES, STATUS_LABEL, PRIORITIES, PRIO_LABEL,
   TYPES, TYPE_LABEL, EFFORTS, RISKS, BRANCH_PREFIX, FIELD_ORDER, LIST_FIELDS, DEFAULT_CONFIG,
@@ -46,6 +48,7 @@ import { taskUsage, projectUsage, liveUsage, fmtTokens, fmtCost } from './usage.
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
 import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion } from './server-control.mjs';
+import { BOARD_VIEWS, loadPlaywright, takeShots, boardPrepare } from './shot.mjs';
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
 const ASSET_KINDS = ['ist', 'vorher', 'nachher', 'referenz', 'mockup', 'skizze', 'fehler', 'diagramm'];
@@ -1821,6 +1824,8 @@ Bearbeiten
 Assets und Entscheidungen
   asset <ID> <pfad|inbox-datei> --desc ".." [--kind ist|vorher|nachher|referenz|mockup|skizze|fehler|diagramm]
         [--alt ".."] [--name ".."] [--move] [--compress] [--origin ".."]
+  shot [board|live|..|<ID>] | --url <adresse> [--widths 1440,390] [--themes light,dark] [--asset <ID> --kind nachher]
+                                   Screenshots mit Playwright (installiertes Chrome)
   inbox [--json]                   compress [<ID>]
   decisions <ID> [--add "Titel" --decision ".." --why ".." --rejected "A: Grund,B: Grund" --source ".."]
   attach-doc <ID> <pfad> [--mode link|copy|move] [--label ".."]
@@ -2429,6 +2434,63 @@ function cmdUndo() {
   try { const e = undo(root, pos[0]); refresh(root); out(`Rückgängig gemacht: ${e.label}`); } catch (e) { fail(e.message); }
 }
 
+// ---------- Screenshots mit Playwright (W-0024) ----------
+
+// works shot [board|sprint|queue|timeline|graph|table|live|<ID>] | --url <adresse>
+//   [--widths 1440,390] [--themes light,dark] [--out ordner] [--asset <ID> --kind vorher|nachher --desc ".."]
+// Board-Ansichten nutzen den laufenden Board-Server; läuft keiner, startet works einen und beendet ihn danach.
+async function cmdShot() {
+  const root = requireRoot();
+  const config = loadConfig(root);
+  const list = (v, d) => String(v && v !== true ? v : d).split(',').map((s) => s.trim()).filter(Boolean);
+  const widths = list(flags.widths, '1440,390').map(Number);
+  const themes = list(flags.themes, 'light');
+  if (widths.some((w) => !(w >= 200 && w <= 4000)) || themes.some((t) => !['light', 'dark'].includes(t))) fail('--widths 200 bis 4000, --themes light oder dark.');
+  const asset = flags.asset && flags.asset !== true ? findTask(root, config, String(flags.asset)).id : '';
+  const outDir = path.resolve(flags.out && flags.out !== true ? String(flags.out) : path.join(worksDir(root), '.tmp', 'shots'));
+  let url = flags.url && flags.url !== true ? String(flags.url) : '';
+  let name; let prepare = null; let started = null; let task = null;
+  if (url) {
+    if (!/^(https?|file):/i.test(url)) { if (exists(url)) url = pathToFileURL(path.resolve(url)).href; else fail('--url braucht http(s)://, file:// oder einen vorhandenen Dateipfad.'); }
+    name = slugify(url.replace(/^[a-z]+:\/+/i, '').replace(/[?#].*$/, ''), 40) || 'seite';
+  } else {
+    const target = String(pos[0] || 'board');
+    const view = target.toLowerCase();
+    task = BOARD_VIEWS[view] ? null : findTask(root, config, target).id;
+    let info = readServer(root);
+    if (!info) {
+      startDetached(root, { cli: newestCli(), port: 0, host: '127.0.0.1', takeover: false });
+      info = started = await waitForServer(root, null);
+      if (!info) fail('Board-Server startet nicht. Details in .works/server.log');
+    }
+    url = `http://127.0.0.1:${info.port}/`;
+    name = task || view;
+    prepare = boardPrepare({ view, task });
+  }
+  const stopStarted = async () => { if (started) { await stopProcess(started.pid); clearServer(root, started.pid); } };
+  const pw = loadPlaywright(root);
+  if (!pw) {
+    await stopStarted();
+    out('Playwright fehlt. Einmalig `npm install -g playwright` (lädt keine Browser, genutzt wird das installierte Chrome) oder NODE_PATH auf einen Ordner mit playwright setzen.');
+    process.exitCode = 2;
+    return;
+  }
+  let shots;
+  try { shots = await takeShots(pw, { url, name, out: outDir, widths, themes, prepare, fullPage: !task, height: task ? 1100 : 900 }); } catch (e) { await stopStarted(); fail(e.message.split('\n')[0]); }
+  await stopStarted();
+  for (const s of shots) out(`${s.problems.length ? 'PROBLEM' : 'ok     '} ${s.theme} ${s.width}  ${s.file}${s.problems.length ? `  ${s.problems.join(' | ')}` : ''}`);
+  if (asset) {
+    const kind = flags.kind && flags.kind !== true ? String(flags.kind) : 'nachher';
+    const desc = flags.desc && flags.desc !== true ? String(flags.desc) : `Screenshot ${name}`;
+    for (const s of shots) {
+      const r = spawnSync(process.execPath, [process.argv[1], 'asset', asset, s.file, `--kind=${kind}`, `--desc=${desc} (${s.width} px, ${s.theme === 'dark' ? 'dunkel' : 'hell'})`], { cwd: root, encoding: 'utf8', windowsHide: true });
+      if (r.status !== 0) fail(`Anhängen an ${asset} fehlgeschlagen: ${(r.stderr || r.stdout || '').trim().split('\n')[0]}`);
+    }
+    out(`${shots.length} ${shots.length === 1 ? 'Bild' : 'Bilder'} an ${asset} angehängt (Art: ${kind}).`);
+  }
+  if (shots.some((s) => s.problems.length)) process.exitCode = 1;
+}
+
 // ---------- Dateien ----------
 
 function cmdFile() {
@@ -2722,7 +2784,7 @@ const commands = {
   templates: cmdTemplate, time: cmdTime, checks: cmdChecks,
   design: cmdDesign, instruct: cmdInstruct, know: cmdKnow, wissen: cmdKnow, recur: cmdRecur, hub: cmdHub,
   github: cmdGithub, gh: cmdGithub, ical: cmdIcal, undo: cmdUndo,
-  file: cmdFile, files: cmdFiles, parallel: cmdParallel, par: cmdParallel, import: cmdImport, selftest: cmdSelftest, 'install-cli': cmdInstallCli, version: cmdVersion, '--version': cmdVersion,
+  file: cmdFile, files: cmdFiles, parallel: cmdParallel, par: cmdParallel, import: cmdImport, shot: cmdShot, selftest: cmdSelftest, 'install-cli': cmdInstallCli, version: cmdVersion, '--version': cmdVersion,
 };
 
 const fn = commands[cmd];

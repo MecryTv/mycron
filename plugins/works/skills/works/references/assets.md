@@ -30,22 +30,19 @@ Dateien aus der Inbox werden verschoben, nicht kopiert. Vor der Zuordnung das Bi
 
 ### 3. Selbst erstellte Screenshots
 
-Ist ein Browser-Werkzeug verfügbar (Playwright MCP, Claude in Chrome oder ein lokales Playwright), kann Claude bei UI-Aufgaben selbst Screenshots erzeugen:
+`works shot` macht Screenshots mit dem installierten Chrome über Playwright und hängt sie auf Wunsch gleich an die Aufgabe:
 
-1. Vor der ersten Änderung: Seite im Dev-Server öffnen, Screenshot in den Scratchpad speichern, mit `--kind vorher` ablegen.
-2. Nach der Umsetzung: gleicher Ausschnitt, gleiche Fenstergröße, `--kind nachher`.
-3. Für responsive Prüfungen getrennte Bilder je Breite mit `--name "login mobil"` und so weiter.
-
-Mit lokalem Playwright reicht ein kurzes Script:
-
-```js
-import { chromium } from 'playwright';
-const b = await chromium.launch();
-const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
-await p.goto('http://localhost:5173/login');
-await p.screenshot({ path: '/pfad/zum/scratchpad/login.png', fullPage: true });
-await b.close();
 ```
+works shot --url http://localhost:5173/login --widths 1440,390 --themes light,dark --asset W-0012 --kind vorher --desc "Login vor der Änderung"
+works shot live --widths 390 --themes dark        # eine Ansicht des works-Boards
+works shot W-0012                                 # das Detail einer Aufgabe im Board
+```
+
+1. Vor der ersten Änderung: die Seite mit `--asset <ID> --kind vorher` aufnehmen.
+2. Nach der Umsetzung: gleiche Adresse, gleiche Breiten und Farbschemata, `--kind nachher`.
+3. Die Bilder mit Read ansehen. `works shot` meldet außerdem seitliches Scrollen, Seiten- und Konsolenfehler und Dateien, die nicht geladen wurden (Exit 1).
+
+Ohne `--asset` landen die Bilder in `.works/.tmp/shots/` (nicht im Git) oder in `--out`. Fehlt Playwright, nennt der Befehl den Installationsbefehl (Exit 2); Browser lädt er keine herunter. Einen anderen Browser setzt `WORKS_BROWSER=<Pfad>`.
 
 ## Benennung
 

@@ -90,6 +90,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | Befehl | Wirkung |
 |---|---|
 | `asset <ID> <pfad\|inbox-datei> --desc ".." [--kind ..] [--alt ..] [--name ..] [--move] [--compress] [--origin ..]` | Datei nach assets/ kopieren (aus der Inbox verschieben), umbenennen und mit Beschreibung in die task.md eintragen |
+| `shot [board\|sprint\|queue\|timeline\|graph\|table\|live\|<ID>] \| --url <adresse\|datei> [--widths 1440,390] [--themes light,dark] [--out ordner] [--asset <ID> --kind vorher\|nachher --desc ".."]` | Screenshots mit dem installierten Chrome über Playwright: eine Board-Ansicht, das Detail einer Aufgabe oder eine Seite des Projekts. Meldet seitliches Scrollen und Fehler (Exit 1), ohne Playwright Exit 2. Mit `--asset` als Bild an die Aufgabe. Ohne laufenden Board-Server startet works einen und beendet ihn danach |
 | `inbox [--json]` | Dateien in der Inbox anzeigen |
 | `compress [<ID>]` | Bilder mit sharp verkleinern |
 | `decisions <ID>` | decisions.md anlegen, falls nicht vorhanden, und Pfad ausgeben |
