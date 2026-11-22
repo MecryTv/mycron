@@ -38,7 +38,7 @@ import { setDirection, addVariant, addBrainstorm, chooseVariant, removeVariant, 
 import { addInstruction } from './live.mjs';
 import { loadKnowledge, addKnowledge, updateKnowledge, removeKnowledge } from './knowledge.mjs';
 import { rules, KINDS, dueRules, fillTitle, describe, upcoming } from './recurring.mjs';
-import { serveHub, projectList, registerProject } from './hub.mjs';
+import { serveHub, projectList, registerProject, runningBoards } from './hub.mjs';
 import { syncGithub, syncSettings, syncState, DEFAULT_SYNC } from './ghsync.mjs';
 import { buildIcal } from './ical.mjs';
 import { undo, undoList, snapshot, snapshotRestore } from './undo.mjs';
@@ -879,14 +879,24 @@ async function boardTabs(info) {
 
 // --open ohne zweiten Tab: Ist das Board schon offen, nichts öffnen. wait: so lange auf Tabs warten, die sich nach
 // einem Neustart von selbst wieder verbinden (der Event-Stream versucht es alle 2 s).
+// Ist ein anderes Board offen, auch nicht: Dessen Tab wechselt von selbst zum Hub (W-0025).
 async function openBoardOnce(info, wait = 0) {
+  const others = () => runningBoards().filter((b) => b.port !== info.port);
+  const count = async () => {
+    const own = await boardTabs(info);
+    if (own) return 'own';
+    for (const b of others()) if (await boardTabs(b)) return 'other';
+    return '';
+  };
   const until = Date.now() + wait;
-  let tabs = await boardTabs(info);
+  let tabs = await count();
   while (!tabs && Date.now() < until) {
     await new Promise((r) => setTimeout(r, 250));
-    tabs = await boardTabs(info);
+    tabs = await count();
   }
-  out(tabs ? 'Das Board ist schon in einem Browser-Tab offen, kein neuer Tab.' : openInBrowser(serverUrl(info)));
+  out(tabs === 'own' ? 'Das Board ist schon in einem Browser-Tab offen, kein neuer Tab.'
+    : tabs ? 'Ein anderes works-Board ist schon in einem Browser-Tab offen, kein neuer Tab. Der Tab wechselt von selbst zum Hub.'
+      : openInBrowser(serverUrl(info)));
 }
 
 function printShare(root, info) {

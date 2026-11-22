@@ -3620,6 +3620,24 @@
   };
   applyTheme();
 
+  // Hub (W-0025): Laufen mehrere Boards, führt oben ein Link zur Übersicht. Wird aus einem Board zwei,
+  // wechselt der Tab von selbst dorthin. Ein Board, das aus dem Hub geöffnet wurde (?from=hub), bleibt offen.
+  if (LIVE && EDIT) {
+    const hubLink = $('#hubLink');
+    const fromHub = new URLSearchParams(location.search).has('from');
+    let boardCount = null;
+    const pollBoards = async () => {
+      let n;
+      try { const r = await fetch('/boards', { cache: 'no-store' }); if (!r.ok) return; n = (await r.json()).boards.length; } catch (e) { return; }
+      if (boardCount !== null && boardCount < 2 && n >= 2 && !fromHub) { location.href = '/hub'; return; }
+      boardCount = n;
+      hubLink.hidden = n < 2;
+      hubLink.textContent = '← Hub (' + n + ' Boards)';
+    };
+    pollBoards();
+    setInterval(pollBoards, 5000);
+  }
+
   $('#q').oninput = (e) => { state.q = e.target.value.toLowerCase().trim(); renderAll(); };
   $('#typeFilter').onchange = (e) => { state.type = e.target.value; renderAll(); };
   $('#tagFilter').onchange = (e) => { state.tag = e.target.value; renderAll(); };

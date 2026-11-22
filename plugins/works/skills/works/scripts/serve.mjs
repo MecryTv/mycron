@@ -9,7 +9,7 @@ import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
 import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload, backupPreview } from './api.mjs';
 import { buildIcal } from './ical.mjs';
-import { registerProject } from './hub.mjs';
+import { registerProject, runningBoards, hubHtml, hubAction } from './hub.mjs';
 import { syncSettings, syncState } from './ghsync.mjs';
 import { dueRules } from './recurring.mjs';
 import { loadConfig, loadTasks } from './lib.mjs';
@@ -299,6 +299,14 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         return json(res, 404, { error: 'Unbekannter Endpunkt.' });
       }
       if (req.method !== 'POST') return json(res, 405, { error: 'Nur GET und POST.' });
+      // Knöpfe im Hub (W-0025): wirken auf Boards anderer Projekte, deshalb nur direkt am Rechner.
+      if (p === '/api/hub') {
+        if (!isLocal(req)) throw new ApiError(403, 'Das geht nur direkt am Rechner, auf dem das Board läuft.');
+        let body;
+        try { body = JSON.parse((await readBody(req, 8192)).toString('utf8')); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, 'Ungültiges JSON.'); }
+        const r = hubAction(body && body.op, body && body.path);
+        return json(res, r.status, r.error ? { error: r.error } : { ok: true });
+      }
       if (p === '/api/action') {
         if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: 'JSON erwartet.' });
         let body;
@@ -365,6 +373,12 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     }
     // Wie viele Board-Tabs hier offen sind, damit works board --open keinen zweiten öffnet. Nur lokal, nur eine Zahl.
     if (pathname === '/tabs') return isLocal(req) ? json(res, 200, { tabs: localTabs.size }) : send(res, 403, 'text/plain', 'Kein Zugriff');
+    // Hub (W-0025): laufende Boards aller Projekte und die Übersicht. Nur lokal, die Seite enthält das Token.
+    if (pathname === '/boards') return isLocal(req) ? json(res, 200, { boards: runningBoards().map(({ name, port, url: u }) => ({ name, port, url: u })) }) : send(res, 403, 'text/plain', 'Kein Zugriff');
+    if (pathname === '/hub') {
+      if (!isLocal(req)) return send(res, 403, 'text/plain', 'Kein Zugriff');
+      try { return send(res, 200, 'text/html; charset=utf-8', hubHtml({ token, self: fs.realpathSync(root), part: url.searchParams.has('part'), partUrl: '/hub?part=1', events: true })); } catch (e) { return send(res, 500, 'text/plain; charset=utf-8', `Fehler beim Erzeugen: ${e.message}`); }
+    }
     const access = accessOf(req, pathname === '/' || pathname === '/index.html' ? url : null);
     if (!access) {
       return send(res, 403, 'text/html; charset=utf-8', '<!doctype html><meta charset="utf-8"><title>Kein Zugriff</title><body style="font:16px system-ui;padding:40px;max-width:560px;margin:auto;color:#222"><h1 style="font-size:22px">Kein Zugriff auf dieses Board</h1><p>Der Link ist ungültig oder wurde erneuert. Bitte den Besitzer des Boards um einen neuen Link.</p></body>');

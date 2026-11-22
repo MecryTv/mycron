@@ -133,6 +133,8 @@ function boardAssets() {
   return assetCache;
 }
 
+export function boardCss() { return boardAssets().css; }
+
 // Setzt Vorlage, Stile, Skript und Daten zu einer eigenständigen HTML-Datei zusammen.
 // mode: edit (Live mit Bearbeiten), view (Live nur lesen, geteilter Link), static (board.html), snapshot (Export).
 export function renderBoard(data, { live = false, token = '', mode = live ? 'edit' : 'static', details = null } = {}) {
