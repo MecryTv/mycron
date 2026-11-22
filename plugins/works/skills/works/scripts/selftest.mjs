@@ -1091,6 +1091,15 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       git(['remote', 'set-url', 'origin', remote], sp);
       expect(rb.code !== 0 && branchNow() === 'feature/ship-test', `ship ohne erreichbaren Remote: ${rb.code} auf ${branchNow()}: ${(rb.out + rb.err).slice(0, 300)}`);
       await waitFor(async () => boardPort() === bport, `Board nach Abbruch wieder auf Port ${bport}`);
+      // Liegengebliebene Datei: Unter Windows kann ein Virenscanner frisch geschriebene Dateien kurz sperren, dann löscht
+      // git switch sie nicht und der Merge scheitert an "untracked files would be overwritten". Der Hook stellt das nach.
+      const tdirRel = path.relative(sp, tdir).split(path.sep).join('/');
+      fs.writeFileSync(path.join(tdir, 'anhang.txt'), 'Anhang nur im Branch\n');
+      git(['add', '-A'], sp); git(['commit', '-q', '-m', `works: ${id} Anhang`], sp);
+      fs.copyFileSync(path.join(tdir, 'anhang.txt'), path.join(base, 'anhang-kopie.txt'));
+      const hookPath = path.join(sp, '.git', 'hooks', 'post-checkout');
+      fs.writeFileSync(hookPath, `#!/bin/sh\n[ "$3" = 1 ] || exit 0\n[ "$(git rev-parse --abbrev-ref HEAD)" = main ] || exit 0\n[ -f "${tdirRel}/anhang.txt" ] && exit 0\nmkdir -p "${tdirRel}" && cp "${path.join(base, 'anhang-kopie.txt').split(path.sep).join('/')}" "${tdirRel}/anhang.txt"\nexit 0\n`);
+      fs.chmodSync(hookPath, 0o755);
       // Neue Zeiten in time.jsonl, noch nicht committet: Sie müssen nach dem Abschluss erhalten bleiben.
       fs.appendFileSync(path.join(sp, '.works', 'time.jsonl'), JSON.stringify({ t: new Date().toISOString(), ev: 'turn', task: id, marke: 'ship-zeit' }) + '\n');
       const r3 = w(['ship', id], { cwd: sp, ok: false });

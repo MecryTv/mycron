@@ -93,3 +93,4 @@ Art: nachher · Hinzugefügt: 2026-11-22
 - 2026-11-22: Asset hinzugefügt: assets/2026-11-22-abnahme-mobil-390-nachher.png (nachher)
 - 2026-11-22: Entscheidung E1 dokumentiert: Vergleich im gleichen Maßstab
 - 2026-11-22: Umgesetzt nach Entwurf A, Selbsttest 33/33 mit Browser
+- 2026-11-22: Beim ersten ship-Versuch ship-Fehler gefunden und behoben (siehe W-0026), Selbsttest 33/33
