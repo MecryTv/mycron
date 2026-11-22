@@ -3,13 +3,13 @@ id: W-0022
 title: Plugins und Skills auf englische Namen umstellen
 type: chore
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: chore/w-0022-plugins-und-skills-auf
 tags: [plugin, skill]
@@ -31,7 +31,7 @@ Wunsch des Nutzers vom 2026-11-22: Alle Skill-Namen sollen englisch sein, Plugin
 ## Akzeptanzkriterien
 - [x] Skills heißen workday:end-of-day, workday:good-morning, ci-watch:ci-watch, mockups:mockups
 - [x] Marketplace und alle Plugins sind gültig (claude plugin validate), Tests der Plugins grün
-- [ ] Beim Nutzer sind die neuen Plugins installiert und die alten entfernt
+- [x] Beim Nutzer sind die neuen Plugins installiert und die alten entfernt
 
 ## Betroffene Dateien
 - `plugins/feierabend` → `plugins/workday` (Skills end-of-day, good-morning)
@@ -45,8 +45,15 @@ Wunsch des Nutzers vom 2026-11-22: Alle Skill-Namen sollen englisch sein, Plugin
 ## Offene Fragen
 
 ## Übergabe
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
+
+## Designentscheidungen
+Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
 - 2026-11-22: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-22: Ordner und Namen umgestellt: workday (end-of-day, good-morning), ci-watch, mockups. Validierung und Tests grün, works-Selbsttest 26 von 26.
+- 2026-11-22: decisions.md angelegt
+- 2026-11-22: Entscheidung E1 dokumentiert: Englische Namen für Plugins und Skills
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
