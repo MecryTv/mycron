@@ -30,7 +30,7 @@ Weitere Befehle:
 - `works board --restart`: Server mit der aktuellen Version neu starten, gleicher Port.
 - `works board --stop`: Server beenden.
 
-Ohne `--detach` läuft der Server im Vordergrund, bis er mit Strg+C beendet wird. Das ist für ein eigenes Terminal gedacht. Mit `--open` öffnet sich der Standardbrowser auf dem Rechner, auf dem der Befehl läuft, aber nur, wenn das Board dort noch in keinem Tab offen ist: Offene Tabs halten eine Verbindung zum Server, die er unter `/tabs` zählt (nur lokal, Links von anderen Geräten zählen nicht). Nach einem Start oder Neustart wartet `--open` bis zu drei Sekunden, weil sich offene Tabs dann von selbst neu verbinden. Das gilt auch für ein schon laufendes Board. Bei Remote-SSH kein `--open`, sondern auf die Portweiterleitung des Editors hinweisen; ein anderer lokaler Port ist dabei kein Problem.
+Ohne `--detach` läuft der Server im Vordergrund, bis er mit Strg+C beendet wird. Das ist für ein eigenes Terminal gedacht. Mit `--open` öffnet sich der Standardbrowser auf dem Rechner, auf dem der Befehl läuft, aber nur, wenn das Board dort noch in keinem Tab offen ist: Offene Tabs halten eine Verbindung zum Server, die er unter `/tabs` zählt (nur lokal, Links von anderen Geräten zählen nicht). Nach einem Start oder Neustart wartet `--open` bis zu drei Sekunden, weil sich offene Tabs dann von selbst neu verbinden. Das gilt auch für ein schon laufendes Board. Gezählt werden die Tabs aller laufenden Boards: Ist das Board eines anderen Projekts offen, öffnet `--open` nichts, weil dieser Tab von selbst zum Hub wechselt. Bei Remote-SSH kein `--open`, sondern auf die Portweiterleitung des Editors hinweisen; ein anderer lokaler Port ist dabei kein Problem.
 
 Optionen:
 
@@ -208,7 +208,16 @@ Vor jeder Änderung aus dem Board sichert works die betroffenen Dateien in `.wor
 
 ## Alle Projekte
 
-`works hub` startet auf Port 4740 eine Übersicht über alle Projekte, in denen works eingerichtet ist oder eine Sitzung lief (`~/.works/projects.json`). Je Projekt: offene Aufgaben, P1, Review, Überfälliges, Sprint oder nächster Meilenstein, was Claude gerade tut und ob das Board läuft. Oben stehen alle P1 über alle Projekte. "Board starten" startet das Board eines Projekts. `works hub --list` gibt dasselbe als Text aus. Die Übersicht ist nur auf diesem Rechner erreichbar.
+Der Hub zeigt alle Projekte, in denen works eingerichtet ist, eine Sitzung lief oder ein Board gestartet wurde (`~/.works/projects.json`). Jedes laufende Board liefert ihn unter `/hub`, `works hub` zeigt dieselbe Seite auf Port 4740.
+
+- Kopf: Summen über alle Projekte (offene Aufgaben, P1, wartende Freigaben, Review, Verbrauch heute in Geld und Tokens).
+- Laufende Boards als große Karten: Live-Zeile (Claude arbeitet, wartet auf Freigabe, in Arbeit), offen, in Arbeit, Review, P1, überfällig, Fortschritt (Sprint oder gesamt), als Nächstes, Verbrauch heute, läuft seit und Port, CI aus dem GitHub-Abgleich, ob die Version aktuell ist.
+- Knöpfe: Öffnen (im selben Tab), In neuem Tab, Neu starten, Stoppen. Gestoppte Projekte stehen kompakt darunter mit Board starten. Projekt hinzufügen trägt einen Ordner mit `.works` ein.
+- Die Seite holt ihren Inhalt alle 5 Sekunden neu.
+
+Automatik: Läuft nur ein Board, gibt es keinen Hub. Die Board-Seite fragt alle 5 Sekunden `/boards`. Wird aus einem laufenden Board zwei, wechselt der offene Tab zu `/hub`. Ein Board, das aus dem Hub geöffnet wurde (`?from=hub`), bleibt offen. Oben links steht dann `← Hub (N Boards)`, solange mindestens zwei laufen.
+
+`/boards`, `/hub` und die Knöpfe (`POST /api/hub` mit Token) gehen nur direkt am Rechner, nicht über geteilte Links. Die Knöpfe rufen im Projektordner `works board --serve --detach`, `--stop` oder `--restart` auf. `works hub --list` gibt die Projekte als Text aus.
 
 ## Für Claude wichtig
 
@@ -242,7 +251,7 @@ Vor jeder Änderung aus dem Board sichert works die betroffenen Dateien in `.wor
 - Temporäre Dateien liegen kurz in `.works/.tmp/` und werden sofort wieder gelöscht.
 - HTML-Mockups aus `design/` laufen in einem iframe mit `sandbox="allow-scripts"` und eigener Content-Security-Policy. Sie haben keinen Zugriff auf das Board, seine Tokens oder Cookies und dürfen nicht in fremde Seiten eingebettet werden.
 - GitHub-Abgleich und seine Einstellungen gehen nur bei lokalen Anfragen, weil sie über das gh CLI mit den Rechten des Nutzers handeln. Die Kalenderadresse braucht im geteilten Modus den Leseschlüssel.
-- Die Projektübersicht `works hub` bindet nur an 127.0.0.1, prüft den Hostnamen und startet Boards nur mit einem Token aus der eigenen Seite.
+- Der Hub (`/hub` am Board, `works hub`) ist nur lokal erreichbar, prüft den Hostnamen und startet, stoppt oder startet Boards nur mit dem Token aus der eigenen Seite neu, und nur für eingetragene Projekte.
 
 ## Meilensteine
 

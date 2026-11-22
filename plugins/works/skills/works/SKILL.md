@@ -102,7 +102,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Was kostet das, Tokens, Verbrauch | `works time <ID>` oder `works time`, Kosten sind Schätzungen nach `config.prices` | `references/planning.md` |
 | Etwas im Board versehentlich geändert | `works undo --list`, dann `works undo <key>` | `references/board.md` |
 | Termine im Kalender | `works ical --out termine.ics` oder die Abo-URL aus dem Board | `references/board.md` |
-| Mehrere Projekte im Blick | `works hub` startet die Übersicht auf Port 4740 | `references/board.md` |
+| Mehrere Projekte im Blick | Laufen zwei Boards, wechselt der Board-Tab von selbst zum Hub (`/hub`). Sonst `works hub` auf Port 4740 | `references/board.md` |
 | Mehrere Aufgaben abarbeiten, Warteschlange, Sprint | `works parallel plan`, dann parallel mit Agenten, nacheinander oder nachfragen | `references/parallel.md` |
 | Wer hat diese Datei zuletzt geändert, was wurde dort entschieden | `works file <pfad>`, `works files <ID>` | `references/cli.md` |
 | Aufgaben aus Trello, Notion, Linear, CSV, Excel, Word, Liste übernehmen | `works import <datei>`, prüfen, dann `--apply` | `references/import.md` |

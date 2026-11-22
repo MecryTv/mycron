@@ -755,7 +755,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     fs.writeFileSync(tabJs, "const http = require('http'); const port = process.argv[2];\n(function connect() { const r = http.get({ host: '127.0.0.1', port, path: '/events' }, (res) => { res.on('data', () => {}); res.on('end', () => setTimeout(connect, 300)); }); r.on('error', () => setTimeout(connect, 300)); })();\n");
     let tab = null;
     try {
-      const first = w(['board', '--serve', '--detach', '--open']).out;
+      const first = w(['board', '--serve', '--detach', '--open', `--port=${await highPort()}`]).out;
       has(first, 'Im Browser geöffnet', 'Start ohne Tab öffnet den Browser');
       const port = (first.match(/127\.0\.0\.1:(\d+)/) || [])[1];
       // fetch hält Verbindungen offen. Nach einem Neustart ist die gemerkte tot (ECONNRESET): dann einmal neu fragen.
@@ -786,6 +786,104 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  // Hub (W-0025): Laufen zwei Boards, zeigt jedes unter /hub alle Boards. /boards nennt die laufenden,
+  // --open zählt die Tabs aller Boards, Stoppen und Starten gehen nur mit Token.
+  const other = path.join(base, 'zweites');
+  const portOf = (s) => (String(s).match(/127\.0\.0\.1:(\d+)/) || [])[1];
+  const waitFor = async (fn, what, ms = 12000) => { const until = Date.now() + ms; while (Date.now() < until) { if (await fn()) return; await new Promise((r) => setTimeout(r, 200)); } throw new Error(`Zeit abgelaufen: ${what}`); };
+  await step('Hub: zwei Boards, /boards, /hub, Aktionen, --open über alle Boards, works hub', async () => {
+    fs.mkdirSync(other, { recursive: true });
+    w(['init'], { cwd: other });
+    w(['new', '--type=bug', '--title=Fehler im zweiten Projekt', '--priority=P1'], { cwd: other });
+    // Eine Währung aus der config.json darf im Hub nur maskiert erscheinen.
+    const ocfg = path.join(other, '.works', 'config.json');
+    fs.writeFileSync(ocfg, JSON.stringify({ ...JSON.parse(fs.readFileSync(ocfg, 'utf8')), prices: { currency: '<img src=x onerror=alert(1)>' } }, null, 2));
+    const tabJs = path.join(base, 'tab.cjs');
+    let tab = null; let hubProc = null;
+    try {
+      const a = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`]).out);
+      const b = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`], { cwd: other }).out);
+      expect(a && b && a !== b, `Zwei Boards auf verschiedenen Ports erwartet: ${a}, ${b}`);
+      const get = (u, opt) => fetch(`http://127.0.0.1:${a}${u}`, opt);
+      const boards = async () => (await (await get('/boards')).json()).boards;
+      const bl = await boards();
+      expect(bl.length === 2 && bl.some((x) => String(x.port) === b && x.name === 'zweites'), `/boards: ${JSON.stringify(bl)}`);
+      const html = await (await get('/hub')).text();
+      has(html, 'Laufende Boards', 'Hub-Seite'); has(html, 'zweites', 'Hub-Seite'); has(html, `127.0.0.1:${b}/`, 'Hub-Seite (Link zum zweiten Board)');
+      has(html, 'Fehler im zweiten Projekt', 'Hub-Seite (P1 des zweiten Projekts)');
+      expect(!html.includes('<img src=x'), 'Hub-Seite gibt die Währung aus der config.json unmaskiert aus');
+      const token = (html.match(/"token":"([a-f0-9]{20,})"/) || [])[1];
+      expect(token, 'Kein Token in der Hub-Seite');
+      const part = await (await get('/hub?part=1')).text();
+      expect(!part.includes('<html') && part.includes('zweites'), `/hub?part=1 liefert nicht nur den Inhalt: ${part.slice(0, 120)}`);
+      const act = (body, t = token) => get('/api/hub', { method: 'POST', headers: { ...(t ? { 'X-Works-Token': t } : {}), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      expect((await act({ op: 'stop', path: other }, '')).status === 403, 'Stoppen ohne Token war erlaubt');
+      expect((await act({ op: 'stop', path: path.join(base, 'gibt-es-nicht') })).status === 400, 'Unbekanntes Projekt nicht abgelehnt');
+      // Projekt hinzufügen: nur Ordner mit .works/config.json.
+      expect((await act({ op: 'add', path: home })).status === 400, 'Ordner ohne works als Projekt angenommen');
+      const third = path.join(base, 'drittes');
+      fs.cpSync(path.join(other, '.works'), path.join(third, '.works'), { recursive: true });
+      expect((await act({ op: 'add', path: third })).ok, 'Projekt hinzufügen');
+      has(await (await get('/hub?part=1')).text(), 'drittes', 'Hub nach Projekt hinzufügen');
+      expect((await act({ op: 'rm', path: other })).status === 400, 'Unbekannte Aktion nicht abgelehnt');
+      // Ein Tab am zweiten Board reicht: --open im ersten Projekt öffnet keinen weiteren.
+      const tabsB = async () => { try { return (await (await fetch(`http://127.0.0.1:${b}/tabs`)).json()).tabs; } catch { return -1; } };
+      tab = spawn(process.execPath, [tabJs, b], { stdio: 'ignore' });
+      await waitFor(async () => await tabsB() === 1, 'Tab am zweiten Board');
+      has(w(['board', '--serve', '--detach', '--open']).out, 'schon in einem Browser-Tab offen', '--open mit Tab an einem anderen Board');
+      tab.kill(); tab = null;
+      await waitFor(async () => await tabsB() === 0, 'Tab geschlossen');
+      has(w(['board', '--serve', '--detach', '--open']).out, 'Im Browser geöffnet', '--open ohne Tab');
+      // Stoppen und Starten über den Hub. Der neue Start nimmt den Standardport, deshalb zuletzt und ohne Tab-Zählung.
+      expect((await act({ op: 'stop', path: other })).ok, 'Stoppen über den Hub');
+      await waitFor(async () => (await boards()).length === 1, 'zweites Board stoppt');
+      expect((await act({ op: 'start', path: other })).ok, 'Starten über den Hub');
+      await waitFor(async () => (await boards()).length === 2, 'zweites Board startet');
+      // works hub zeigt dieselbe Seite.
+      let hp = 0;
+      for (let p = 48100 + Math.floor(Math.random() * 80); p < 48200 && !hp; p++) hp = await free(p) ? p : 0;
+      hubProc = spawn(process.execPath, [CLI, 'hub', `--port=${hp}`], { cwd: proj, env, stdio: 'ignore' });
+      let hh = '';
+      await waitFor(async () => { try { hh = await (await fetch(`http://127.0.0.1:${hp}/`)).text(); return true; } catch { return false; } }, 'works hub startet');
+      has(hh, 'Laufende Boards', 'works hub'); has(hh, 'zweites', 'works hub');
+    } finally {
+      if (tab) tab.kill();
+      if (hubProc) hubProc.kill();
+      w(['board', '--stop'], { ok: false });
+      w(['board', '--stop'], { cwd: other, ok: false });
+    }
+  });
+
+  // Im Browser: Ein offenes Board wechselt zum Hub, sobald ein zweites startet. Öffnen zeigt ein Board im selben Tab.
+  if (browser) {
+    await step('Hub im Browser: Wechsel beim zweiten Board, Öffnen im selben Tab', async () => {
+      const br = await launchChromium(log);
+      if (!br) return;
+      try {
+        const a = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`]).out);
+        const p = await br.newPage({ viewport: { width: 1280, height: 900 } });
+        const errs = [];
+        p.on('pageerror', (e) => errs.push(e.message));
+        await p.goto(`http://127.0.0.1:${a}/`); await p.waitForSelector('.card');
+        expect(await p.locator('#hubLink').isHidden(), 'Hub-Link sichtbar, obwohl nur ein Board läuft');
+        const b = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`], { cwd: other }).out);
+        await p.waitForURL(/\/hub$/, { timeout: 15000 });
+        await p.waitForSelector('.hub-bc');
+        expect(await p.locator('.hub-bc').count() === 2, `Hub zeigt ${await p.locator('.hub-bc').count()} statt 2 Boards`);
+        expect(!(await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'Hub: seitliches Scrollen');
+        await p.locator('.hub-bc', { hasText: 'zweites' }).getByRole('link', { name: 'Öffnen', exact: true }).click();
+        await p.waitForURL(new RegExp(`:${b}/`), { timeout: 10000 }); await p.waitForSelector('.card');
+        await p.waitForSelector('#hubLink:not([hidden])', { timeout: 10000 });
+        has(await p.locator('#hubLink').textContent(), '2 Boards', 'Hub-Link');
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        w(['board', '--stop'], { ok: false });
+        w(['board', '--stop'], { cwd: other, ok: false });
+      }
+    });
+  }
+
   const failed = results.filter((r) => !r.ok);
   log(`\n${results.length - failed.length} von ${results.length} Prüfungen bestanden${failed.length ? `, ${failed.length} fehlgeschlagen` : ''}.`);
   if (!keep) { try { cleanupWorktrees(proj); fs.rmSync(base, { recursive: true, force: true }); } catch { /* Windows hält Dateien manchmal kurz fest */ } }
@@ -795,6 +893,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
 
 function cleanupWorktrees(proj) { spawnSync('git', ['worktree', 'prune'], { cwd: proj }); }
 
+// Feste freie Ports weit über 4747: Auf 4747 und folgenden können echte Board-Tabs des Nutzers hängen,
+// die sich nach dem Ende ihres Boards alle 2 s neu verbinden und dann als offener Tab zählen würden.
+async function highPort() { for (let p = 48200 + Math.floor(Math.random() * 300); p < 48600; p++) if (await free(p)) return p; throw new Error('Kein freier Port'); }
+
 function free(port) {
   return import('node:net').then(({ default: net }) => new Promise((resolve) => {
     const s = net.createServer().once('error', () => resolve(false)).once('listening', () => s.close(() => resolve(true)));
@@ -802,15 +904,20 @@ function free(port) {
   }));
 }
 
+// Chromium aus Playwright, sonst ein installiertes Chrome oder Edge. null, wenn Playwright fehlt.
+async function launchChromium(log) {
+  let pw;
+  try { pw = createRequire(path.join(process.cwd(), 'x.js'))('playwright'); } catch { try { pw = createRequire(import.meta.url)('playwright'); } catch { log('        Playwright nicht gefunden, Browserprüfung übersprungen.'); return null; } }
+  for (const opt of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) {
+    try { return await pw.chromium.launch(opt); } catch (e) { if (opt.channel === 'msedge') throw e; }
+  }
+  return null;
+}
+
 // between: läuft zwischen Desktop- und Handyprüfung, hier setzt der Stop-Hook Claude auf untätig.
 async function browserCheck(url, log, between = async () => {}) {
-  let pw;
-  try { pw = createRequire(path.join(process.cwd(), 'x.js'))('playwright'); } catch { try { pw = createRequire(import.meta.url)('playwright'); } catch { log('        Playwright nicht gefunden, Browserprüfung übersprungen.'); return; } }
-  // Ohne heruntergeladene Playwright-Browser auf ein installiertes Chrome oder Edge ausweichen.
-  let b = null;
-  for (const opt of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) {
-    try { b = await pw.chromium.launch(opt); break; } catch (e) { if (opt.channel === 'msedge') throw e; }
-  }
+  const b = await launchChromium(log);
+  if (!b) return;
   const errs = [];
   try {
     const p = await b.newPage({ viewport: { width: 1280, height: 900 } });

@@ -138,14 +138,15 @@ export function projectUsage(root, config, tasks, days = 30) {
 
 // Verbrauch für die Live-Ansicht: heute (lokaler Tag) und je Aufgabe. Das Board fragt bei jeder Aktualisierung,
 // gelesen wird time.jsonl aber nur, wenn sie sich geändert hat (Größe, Änderungszeit), der Tag wechselt oder die Preise.
-let liveCache = null;
+const liveCache = new Map();
 export function liveUsage(root, config) {
   let st = null;
   try { st = fs.statSync(timeFile(root)); } catch { /* noch keine Datei */ }
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const since = start.toISOString();
   const key = [root, st ? `${st.size}:${st.mtimeMs}` : '-', since, JSON.stringify(config.prices || {})].join('|');
-  if (liveCache && liveCache.key === key) return liveCache.data;
+  const hit = liveCache.get(root);
+  if (hit && hit.key === key) return hit.data;
   const table = priceTable(config);
   const day = zero();
   const byTask = {};
@@ -156,7 +157,7 @@ export function liveUsage(root, config) {
   }
   const tok = (x) => x.in + x.out + x.cw + x.cr;
   const data = { currency: table.currency, today: { tokens: tok(day), cost: day.cost }, byTask: Object.fromEntries(Object.entries(byTask).map(([k, v]) => [k, { tokens: tok(v), cost: v.cost }])) };
-  liveCache = { key, data };
+  liveCache.set(root, { key, data });
   return data;
 }
 
