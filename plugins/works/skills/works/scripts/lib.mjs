@@ -1,8 +1,16 @@
 // Gemeinsame Hilfsfunktionen für das works CLI. Keine externen Abhängigkeiten.
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+
+// Kennung eines Projekts (W-0029): Hash des echten Pfads. Steht in data.json, ohne den Pfad preiszugeben.
+export function rootIdOf(dir) {
+  let real = String(dir);
+  try { real = fs.realpathSync(real); } catch { /* Pfad wie angegeben */ }
+  return crypto.createHash('sha256').update(process.platform === 'win32' ? real.toLowerCase() : real).digest('hex').slice(0, 16);
+}
 
 export const SKILL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const TEMPLATE_DIR = path.join(SKILL_DIR, 'references', 'templates');

@@ -950,7 +950,7 @@ dialog:has(.rv-cmp) { width: min(1100px, calc(100vw - 32px)); }
 .tools-top { margin-bottom: 10px; }
 .dz-wrap { position: relative; overflow: hidden; }
 .dz-wrap iframe { position: absolute; left: 0; top: 0; width: 1024px; border: 0; transform-origin: 0 0; pointer-events: none; background: #fff; }
-a.btn { text-decoration: none; }
+a.btn { text-decoration: none; color: var(--text); }
 .cl-score > div { flex: none; min-width: 130px; }
 .lane-tag { font-size: 11px; padding: 0 7px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 16%, var(--surface)); color: var(--text); font-weight: 600; }
 .lb-lane { font-size: 11px; color: var(--muted); text-transform: none; }
@@ -1274,3 +1274,12 @@ details.lv-all > summary::-webkit-details-marker { display: none; }
 .lv-alllist div { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 12px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); min-width: 0; }
 .lv-alllist div span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace; }
 @media (max-width: 560px) { .lv-alllist { grid-template-columns: 1fr; } }
+
+/* Verwaister Tab (W-0029): Leiste oben, der letzte Stand bleibt ausgegraut und gesperrt sichtbar */
+.orphan-bar { position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 24px; background: color-mix(in srgb, var(--warn) 16%, var(--surface)); border-bottom: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); color: var(--text); }
+.orphan-bar[hidden] { display: none; }
+.orphan-bar svg { width: 22px; height: 22px; flex: none; }
+.orphan-bar p { margin: 0; flex: 1 1 320px; min-width: 0; font-size: 13.5px; }
+.orphan-bar p small { display: block; color: var(--text-2); font-size: 12.5px; }
+.orphan-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+body.orphan > :not(#orphanBar):not(dialog):not(script) { filter: grayscale(1); opacity: .45; }
