@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-22T21:11:54.652Z",
+  "fingerprint": "abc30ac729cb:bddb3a243971",
+  "results": {
+    "code-audit": {
+      "status": "ok",
+      "cmd": "",
+      "note": "Name läuft durch slugify, also nur Buchstaben, Ziffern und Bindestriche im Dateinamen; kein Pfad aus --name möglich",
+      "fingerprint": "abc30ac729cb:bddb3a243971",
+      "at": "2026-11-22T21:11:54.654Z"
+    }
+  }
+}

@@ -721,8 +721,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         has(w(['show', 'W-0001']).out, 'Art: nachher', 'works shot --asset hängt das Bild an');
         const page = path.join(base, 'seite.html');
         fs.writeFileSync(page, '<!doctype html><body style="margin:0"><div class="breit" style="width:2000px">breit</div><script>throw new Error("kaputt")</script></body>');
-        const u = w(['shot', `--url=${pathToFileURL(page).href}`, '--widths=390', '--themes=light', `--out=${sdir}`], { ok: false, ...real });
+        const u = w(['shot', `--url=${pathToFileURL(page).href}`, '--widths=390', '--themes=light', `--out=${sdir}`, '--name=breite seite'], { ok: false, ...real });
         expect(u.code === 1 && /seitliches Scrollen/.test(u.out) && /kaputt/.test(u.out), `works shot --url meldet Überlauf und Fehler nicht: ${u.out.slice(0, 300)}`);
+        // W-0034: --name bestimmt den Dateinamen, auch bei --url.
+        expect(fs.existsSync(path.join(sdir, 'breite-seite-light-390.png')), `works shot --name wirkt nicht: ${fs.readdirSync(sdir).join(', ')}`);
       }
     }
     if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }));
