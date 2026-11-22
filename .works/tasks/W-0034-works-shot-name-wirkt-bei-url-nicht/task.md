@@ -3,13 +3,13 @@ id: W-0034
 title: works shot --name wirkt bei --url nicht
 type: bug
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: fix/w-0034-works-shot-name-wirkt-bei-url
 tags: [shot]
@@ -63,7 +63,9 @@ Nach der Namensbildung überschreibt --name (slugify, 60 Zeichen) den Namen für
 ## Offene Fragen
 
 ## Übergabe
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
 - 2026-11-22: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
