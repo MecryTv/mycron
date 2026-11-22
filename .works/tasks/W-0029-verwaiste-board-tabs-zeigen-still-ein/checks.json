@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-22T19:58:47.147Z",
+  "fingerprint": "a5f5775b665b:201a528497f6",
+  "results": {
+    "code-audit": {
+      "status": "ok",
+      "cmd": "",
+      "note": "/boards mit Token und Projektpfaden nur lokal (isLocal, Hostprüfung gegen DNS-Rebinding), Lesen fremder Origins durch Same-Origin geschützt; Projektnamen in der Leiste mit esc; Start nur über POST /api/hub mit Token; data.json enthält nur den Hash, nicht den Pfad",
+      "fingerprint": "a5f5775b665b:201a528497f6",
+      "at": "2026-11-22T19:58:47.148Z"
+    }
+  }
+}

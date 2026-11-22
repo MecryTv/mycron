@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-22T19:20:06.455Z",
+  "fingerprint": "01c73b934427:6eb9c10a9364",
+  "results": {
+    "code-audit": {
+      "status": "ok",
+      "cmd": "",
+      "note": "Git und works ohne Shell mit Argumentlisten; claude nur mit geprüften Namen, Shell nur als Ausweg für claude.cmd; kein Force-Push; Merge-Konflikt bricht ab; time.jsonl-Zeilen bleiben erhalten",
+      "fingerprint": "01c73b934427:6eb9c10a9364",
+      "at": "2026-11-22T19:20:06.457Z"
+    }
+  }
+}

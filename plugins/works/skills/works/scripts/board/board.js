@@ -23,6 +23,11 @@
   const state = { q: '', prios: new Set(PRIOS), type: '', tag: '', ms: '', closed: false, signal: '', view: 'board' };
   const PAGE_VERSION = meta.version || '';
   const PAGE_SERVER = meta.server || '';
+  // Kennung des eigenen Projekts (W-0029). Läuft auf dem Port später ein anderes Projekt, ist dieser Tab verwaist.
+  const ROOT_ID = meta.rootId || '';
+  const isForeign = (m) => !!(m && m.rootId && ROOT_ID && m.rootId !== ROOT_ID);
+  let orphan = false;
+  let liveSource = null;
   const outdated = (m) => !!m && ((m.version && PAGE_VERSION && m.version !== PAGE_VERSION) || (m.server && PAGE_SERVER && m.server !== PAGE_SERVER));
   const UI_KEY = 'works-ui-' + meta.project;
   const changes = new Map();
@@ -1128,12 +1133,51 @@
   }
   let updateWaiting = false;
 
+  // Verwaister Tab (W-0029): Das eigene Board ist beendet, auf seinem Port läuft jetzt ein anderes Projekt.
+  // Statt es still anzuzeigen: Leiste oben, der letzte Stand bleibt ausgegraut und gesperrt. Die Verbindung wird
+  // geschlossen, damit der Tab beim fremden Board nicht als offen zählt. Läuft das eigene Board wieder, geht es dorthin.
+  function becomeOrphan(m) {
+    if (orphan) return;
+    orphan = true;
+    if (liveSource) liveSource.close();
+    setLive(false, 'Anderes Projekt auf diesem Port');
+    const bar = $('#orphanBar');
+    const at = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const own = esc(meta.project);
+    bar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/><path d="M3 3l18 18"/></svg>' +
+      '<p><b>' + own + ' läuft hier nicht mehr.</b> Auf Port ' + esc(location.port) + ' läuft jetzt ' + esc(m.project) + '.<small>Unten der letzte Stand von ' + at + ', nur zum Ansehen.</small></p>' +
+      '<span class="orphan-acts">' + (EDIT ? '<button type="button" class="btn small primary" id="orphanStart">' + own + ' starten</button><a class="btn small" href="/hub">Zum Hub</a>' : '') +
+      '<a class="btn small ghost" href="/">' + esc(m.project) + ' ansehen</a></span>';
+    bar.hidden = false;
+    document.body.classList.add('orphan');
+    for (const el of document.body.children) if (el !== bar && !/^(DIALOG|SCRIPT)$/.test(el.tagName)) el.inert = true;
+    if (!EDIT) return;
+    let info = null;
+    const look = async () => {
+      try { const r = await fetch('/boards', { cache: 'no-store' }); if (!r.ok) return; info = await r.json(); } catch (e) { return; }
+      const mine = (info.boards || []).find((b) => b.id === ROOT_ID);
+      if (mine) location.href = mine.url;
+    };
+    look();
+    setInterval(look, 3000);
+    $('#orphanStart').onclick = async (e) => {
+      const b = e.currentTarget;
+      const p = info && (info.projects || []).find((x) => x.id === ROOT_ID);
+      if (!p) { b.disabled = true; b.textContent = 'Im Projekt mit works board --serve starten'; return; }
+      b.disabled = true;
+      b.textContent = meta.project + ' startet …';
+      try { await fetch('/api/hub', { method: 'POST', headers: { 'X-Works-Token': info.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'start', path: p.path }) }); } catch (err) { /* look() meldet sich, sobald es läuft */ }
+    };
+  }
+
   async function reload() {
+    if (orphan) return;
     // Während eine Karte gezogen wird, nicht neu zeichnen, sonst springt das Board unter dem Mauszeiger.
     if (dragId || qDrag || tlDrag) { reloadPending = true; return; }
     try {
       const res = await fetch('data.json', { cache: 'no-store' });
       const next = await res.json();
+      if (isForeign(next.meta)) return becomeOrphan(next.meta);
       if (outdated(next.meta)) return reloadForUpdate();
       const found = diff(tasks, next.tasks);
       const now = new Date();
@@ -3627,6 +3671,7 @@
     const fromHub = new URLSearchParams(location.search).has('from');
     let boardCount = null;
     const pollBoards = async () => {
+      if (orphan) return;
       let n;
       try { const r = await fetch('/boards', { cache: 'no-store' }); if (!r.ok) return; n = (await r.json()).boards.length; } catch (e) { return; }
       if (boardCount !== null && boardCount < 2 && n >= 2 && !fromHub) { location.href = '/hub'; return; }
@@ -3682,9 +3727,10 @@
     setLive(true, 'Live');
     let first = true;
     const es = new EventSource('events');
+    liveSource = es;
     es.addEventListener('update', () => {
       // Das erste update nach dem Verbinden prüft nur die Version, die Daten sind schon in der Seite.
-      if (first) { first = false; fetch('data.json', { cache: 'no-store' }).then((r) => r.json()).then((n) => { if (outdated(n.meta)) reloadForUpdate(); }).catch(() => {}); return; }
+      if (first) { first = false; fetch('data.json', { cache: 'no-store' }).then((r) => r.json()).then((n) => { if (isForeign(n.meta)) becomeOrphan(n.meta); else if (outdated(n.meta)) reloadForUpdate(); }).catch(() => {}); return; }
       reload();
     });
     es.addEventListener('restart', () => { first = true; setLive(true, 'Neue Version startet'); });

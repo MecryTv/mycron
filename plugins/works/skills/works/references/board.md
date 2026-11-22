@@ -217,6 +217,8 @@ Der Hub zeigt alle Projekte, in denen works eingerichtet ist, eine Sitzung lief 
 
 Automatik: Läuft nur ein Board, gibt es keinen Hub. Die Board-Seite fragt alle 5 Sekunden `/boards`. Wird aus einem laufenden Board zwei, wechselt der offene Tab zu `/hub`. Ein Board, das aus dem Hub geöffnet wurde (`?from=hub`), bleibt offen. Oben links steht dann `← Hub (N Boards)`, solange mindestens zwei laufen.
 
+Verwaiste Tabs: Endet ein Board und startet auf seinem Port ein anderes Projekt, verbindet sich der alte Tab zwar neu, zeigt aber nicht still das fremde Board. Jede Seite kennt ihr Projekt (`meta.rootId`, ein Hash des Pfads). Passt es nicht, erscheint oben die Leiste „<Projekt> läuft hier nicht mehr“ mit „<Projekt> starten“, „Zum Hub“ und „<anderes Projekt> ansehen“; der letzte Stand bleibt ausgegraut und gesperrt. Der Tab schließt seine Verbindung und zählt beim fremden Board nicht als offen (`--open` öffnet dort also einen eigenen Tab). Läuft das eigene Board wieder, wechselt er von selbst dorthin. `/boards` liefert dafür neben den laufenden Boards die angemeldeten Projekte mit Pfad und das Token, nur lokal.
+
 `/boards`, `/hub` und die Knöpfe (`POST /api/hub` mit Token) gehen nur direkt am Rechner, nicht über geteilte Links. Die Knöpfe rufen im Projektordner `works board --serve --detach`, `--stop` oder `--restart` auf. `works hub --list` gibt die Projekte als Text aus.
 
 ## Für Claude wichtig

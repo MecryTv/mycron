@@ -41,7 +41,8 @@ const docx = (paras) => makeZip({
 
 // ---------- Ablauf ----------
 
-export async function selftest({ keep = false, browser = false, verbose = false, log = (s) => process.stdout.write(s + '\n') } = {}) {
+// only: nur Schritte, deren Name diesen Text enthält (für eigenständige Schritte beim Entwickeln).
+export async function selftest({ keep = false, browser = false, verbose = false, only = '', log =(s) => process.stdout.write(s + '\n') } = {}) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'works-selftest-'));
   const proj = path.join(base, 'projekt');
   const home = path.join(base, 'home');
@@ -66,13 +67,25 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const has = (text, part, what) => expect(String(text).includes(part), `${what || 'Ausgabe'} enthält nicht "${part}": ${String(text).slice(0, 300)}`);
   const step = async (name, fn) => {
+    if (only && !name.includes(only)) return;
     const t0 = Date.now();
     try { await fn(); results.push({ name, ok: true }); log(`ok      ${name}${verbose ? ` (${Date.now() - t0} ms)` : ''}`); }
-    catch (e) { results.push({ name, ok: false, error: e.message }); log(`FEHLER  ${name}\n        ${e.message.split('\n').join('\n        ')}`); }
+    catch (e) {
+      results.push({ name, ok: false, error: e.message });
+      log(`FEHLER  ${name}\n        ${e.message.split('\n').join('\n        ')}`);
+      if (process.env.GITHUB_ACTIONS === 'true') log(ghError(`Selbsttest: ${name}`, e.message.slice(0, 2000)));
+    }
   };
   const skip = (name, why) => { results.push({ name, ok: true, skipped: true }); log(`--      ${name} (übersprungen: ${why})`); };
 
   log(`works Selbsttest in ${base}\nNode ${process.version}, ${process.platform}${hasGit ? '' : ', ohne Git'}\n`);
+
+  // Rote Schritte erscheinen in GitHub Actions als Annotation (W-0027), die der CI-Wächter auch ohne Token liest.
+  await step('GitHub-Annotation für rote Schritte', () => {
+    expect(typeof ghError === 'function', 'ghError fehlt');
+    const a = ghError('Selbsttest: works ship, Teil 1', 'Zeile 1\nZeile 2: 100%');
+    expect(a === '::error title=Selbsttest%3A works ship%2C Teil 1::Zeile 1%0AZeile 2: 100%25', `Annotation falsch kodiert: ${a}`);
+  });
 
   await step('Syntax aller Skripte', () => {
     const files = [...fs.readdirSync(HERE).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HERE, f)), ...fs.readdirSync(HOOKS).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HOOKS, f)), path.join(HERE, 'board', 'board.js')];
@@ -792,6 +805,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const portOf = (s) => (String(s).match(/127\.0\.0\.1:(\d+)/) || [])[1];
   const waitFor = async (fn, what, ms = 12000) => { const until = Date.now() + ms; while (Date.now() < until) { if (await fn()) return; await new Promise((r) => setTimeout(r, 200)); } throw new Error(`Zeit abgelaufen: ${what}`); };
   await step('Hub: zwei Boards, /boards, /hub, Aktionen, --open über alle Boards, works hub', async () => {
+    if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eine Karte']); }
+    if (!fs.existsSync(path.join(base, 'tab.cjs'))) fs.writeFileSync(path.join(base, 'tab.cjs'), "const http = require('http'); const port = process.argv[2];\n(function connect() { const r = http.get({ host: '127.0.0.1', port, path: '/events' }, (res) => { res.on('data', () => {}); res.on('end', () => setTimeout(connect, 300)); }); r.on('error', () => setTimeout(connect, 300)); })();\n");
     fs.mkdirSync(other, { recursive: true });
     w(['init'], { cwd: other });
     w(['new', '--type=bug', '--title=Fehler im zweiten Projekt', '--priority=P1'], { cwd: other });
@@ -808,6 +823,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const boards = async () => (await (await get('/boards')).json()).boards;
       const bl = await boards();
       expect(bl.length === 2 && bl.some((x) => String(x.port) === b && x.name === 'zweites'), `/boards: ${JSON.stringify(bl)}`);
+      // W-0029: Kennung je Projekt (Hash des Pfads, kein Pfad in data.json), Projekte mit Pfad und Token nur lokal über /boards.
+      const bj = await (await get('/boards')).json();
+      const own = bj.projects && bj.projects.find((x) => x.name === 'projekt');
+      const meta = (await (await get('/data.json')).json()).meta;
+      expect(own && own.id && own.path && /^[a-f0-9]{20,}$/.test(bj.token || '') && meta.rootId === own.id && bl.every((x) => x.id), `/boards ohne Kennung, Pfad oder Token: ${JSON.stringify(bj).slice(0, 300)}`);
+      expect(!JSON.stringify(meta).includes(own.path.replace(/\\/g, '\\\\')), 'data.json enthält den Projektpfad');
       const html = await (await get('/hub')).text();
       has(html, 'Laufende Boards', 'Hub-Seite'); has(html, 'zweites', 'Hub-Seite'); has(html, `127.0.0.1:${b}/`, 'Hub-Seite (Link zum zweiten Board)');
       has(html, 'Fehler im zweiten Projekt', 'Hub-Seite (P1 des zweiten Projekts)');
@@ -884,6 +905,108 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     });
   }
 
+  // W-0029: Endet ein Board und startet auf seinem Port ein anderes Projekt, zeigt der alte Tab eine Leiste statt
+  // still das fremde Board. Er zählt dort nicht als Tab und wechselt von selbst, sobald sein Projekt wieder läuft.
+  if (browser) {
+    await step('Verwaister Tab: Leiste statt fremdem Projekt, kein fremder Tab, Wechsel zurück', async () => {
+      if (!fs.existsSync(path.join(other, '.works', 'config.json'))) { fs.mkdirSync(other, { recursive: true }); w(['init'], { cwd: other }); }
+      if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eine Karte']); }
+      const br = await launchChromium(log);
+      if (!br) return;
+      try {
+        const port = await highPort();
+        w(['board', '--serve', '--detach', `--port=${port}`]);
+        const p = await br.newPage({ viewport: { width: 1280, height: 900 } });
+        const errs = [];
+        p.on('pageerror', (e) => errs.push(e.message));
+        await p.goto(`http://127.0.0.1:${port}/`); await p.waitForSelector('.card');
+        expect(await p.locator('#orphanBar').isHidden(), 'Leiste sichtbar, obwohl das eigene Board läuft');
+        w(['board', '--stop']);
+        w(['board', '--serve', '--detach', `--port=${port}`], { cwd: other });
+        await p.waitForSelector('#orphanBar:not([hidden])', { timeout: 15000 });
+        const bar = await p.locator('#orphanBar').textContent();
+        has(bar, 'projekt', 'Leiste (eigenes Projekt)'); has(bar, 'zweites', 'Leiste (fremdes Projekt)');
+        const st = await p.evaluate(() => ({ orphan: document.body.classList.contains('orphan'), h1: document.querySelector('#project').textContent }));
+        expect(st.orphan && st.h1.includes('projekt') && !st.h1.includes('zweites'), `Tab zeigt das fremde Projekt: ${JSON.stringify(st)}`);
+        const tabs = async () => (await (await fetch(`http://127.0.0.1:${port}/tabs`)).json()).tabs;
+        await waitFor(async () => await tabs() === 0, 'verwaister Tab zählt nicht als Tab des fremden Boards');
+        const own = await highPort();
+        w(['board', '--serve', '--detach', `--port=${own}`]);
+        await p.waitForURL(new RegExp(`:${own}/`), { timeout: 15000 });
+        await p.waitForSelector('.card');
+        expect(await p.locator('#orphanBar').isHidden(), 'Leiste nach dem Wechsel noch sichtbar');
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        w(['board', '--stop'], { ok: false });
+        w(['board', '--stop'], { cwd: other, ok: false });
+      }
+    });
+  }
+
+  // works ship (W-0026): Abschluss in einem Rutsch. Eigenes Projekt mit einem lokalen Remote.
+  if (hasGit) {
+    await step('works ship: anhalten bei offenen Punkten, sonst mergen, abschließen, pushen', async () => {
+      const remote = path.join(base, 'ship-remote.git');
+      const sp = path.join(base, 'ship');
+      fs.mkdirSync(sp);
+      git(['init', '-q', '--bare', remote], base);
+      git(['init', '-q'], sp); git(['symbolic-ref', 'HEAD', 'refs/heads/main'], sp);
+      w(['init'], { cwd: sp });
+      fs.writeFileSync(path.join(sp, 'app.txt'), 'eins\n');
+      git(['add', '-A'], sp); git(['commit', '-q', '-m', 'Start'], sp);
+      git(['remote', 'add', 'origin', remote], sp); git(['push', '-q', '-u', 'origin', 'main'], sp);
+      const id = (w(['new', '--type=chore', '--title=Ship-Test', '--priority=P3'], { cwd: sp }).out.match(/W-\d+/) || [])[0];
+      // time.jsonl ist wie in echten Projekten im Git; ship setzt sie zurück und muss neue Zeilen behalten.
+      fs.appendFileSync(path.join(sp, '.works', 'time.jsonl'), JSON.stringify({ t: new Date().toISOString(), ev: 'turn', task: id, marke: 'alt' }) + '\n');
+      git(['add', '-A'], sp); git(['commit', '-q', '-m', `works: ${id} angelegt`], sp);
+      git(['switch', '-q', '-c', 'feature/ship-test'], sp);
+      w(['start', id], { cwd: sp });
+      fs.appendFileSync(path.join(sp, 'app.txt'), 'zwei\n');
+      git(['add', 'app.txt'], sp); git(['commit', '-q', '-m', `feat(${id}): zwei`], sp);
+      const tdir = path.join(sp, '.works', 'tasks', fs.readdirSync(path.join(sp, '.works', 'tasks')).find((d) => d.startsWith(id)));
+      const tf = path.join(tdir, 'task.md');
+      const branchNow = () => git(['rev-parse', '--abbrev-ref', 'HEAD'], sp);
+      // Offene Kriterien: ship hält vor dem Merge an, nichts wird gepusht.
+      const r1 = w(['ship', id], { cwd: sp, ok: false });
+      expect(r1.code !== 0 && /Definition of Done/.test(r1.out + r1.err), `ship trotz offener Kriterien: ${r1.code} ${(r1.out + r1.err).slice(0, 300)}`);
+      expect(branchNow() === 'feature/ship-test', `ship hat den Branch gewechselt: ${branchNow()}`);
+      // Alle Punkte erledigt, aber eine nicht committete Code-Änderung: ship hält an.
+      fs.writeFileSync(tf, fs.readFileSync(tf, 'utf8').replace(/^- \[ \] ?$/gm, '- [x] erledigt').replace(/^- \[ \] (.+)$/gm, '- [x] $1'));
+      git(['add', '-A'], sp); git(['commit', '-q', '-m', `works: ${id} Kriterien`], sp);
+      fs.appendFileSync(path.join(sp, 'app.txt'), 'drei\n');
+      fs.writeFileSync(path.join(sp, 'neu.txt'), 'vergessen\n');
+      const r2 = w(['ship', id], { cwd: sp, ok: false });
+      expect(r2.code !== 0 && /app\.txt/.test(r2.out + r2.err) && /neu\.txt/.test(r2.out + r2.err), `ship trotz nicht committeter oder neuer Datei: ${r2.code} ${(r2.out + r2.err).slice(0, 300)}`);
+      git(['checkout', '--', 'app.txt'], sp); fs.rmSync(path.join(sp, 'neu.txt'));
+      // Bricht ship nach dem Stoppen des Boards ab (Remote nicht erreichbar), läuft das Board wieder auf demselben Port.
+      const bport = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`], { cwd: sp }).out);
+      const boardPort = () => { const sj = path.join(sp, '.works', 'server.json'); return fs.existsSync(sj) ? String(JSON.parse(fs.readFileSync(sj, 'utf8')).port) : ''; };
+      git(['remote', 'set-url', 'origin', path.join(base, 'gibt-es-nicht.git')], sp);
+      const rb = w(['ship', id], { cwd: sp, ok: false });
+      git(['remote', 'set-url', 'origin', remote], sp);
+      expect(rb.code !== 0 && branchNow() === 'feature/ship-test', `ship ohne erreichbaren Remote: ${rb.code} auf ${branchNow()}: ${(rb.out + rb.err).slice(0, 300)}`);
+      await waitFor(async () => boardPort() === bport, `Board nach Abbruch wieder auf Port ${bport}`);
+      // Neue Zeiten in time.jsonl, noch nicht committet: Sie müssen nach dem Abschluss erhalten bleiben.
+      fs.appendFileSync(path.join(sp, '.works', 'time.jsonl'), JSON.stringify({ t: new Date().toISOString(), ev: 'turn', task: id, marke: 'ship-zeit' }) + '\n');
+      const r3 = w(['ship', id], { cwd: sp, ok: false });
+      expect(r3.code === 0, `ship → Exit ${r3.code}: ${(r3.out + r3.err).slice(0, 500)}`);
+      expect(branchNow() === 'main', `Nach ship nicht auf main, sondern ${branchNow()}`);
+      has(git(['log', '--merges', '--format=%s', '-1'], sp), "Merge branch 'feature/ship-test'", 'Merge-Commit');
+      expect(!git(['branch', '--list', 'feature/ship-test'], sp), 'Feature-Branch nicht gelöscht');
+      has(w(['show', id], { cwd: sp }).out, 'erledigt', 'Status nach ship');
+      expect(git(['rev-parse', 'main'], remote) === git(['rev-parse', 'HEAD'], sp), 'Remote steht nicht auf dem lokalen Stand');
+      expect(!git(['status', '--porcelain', '--untracked-files=no'], sp).split('\n').some((l) => /time\.jsonl|WORKS\.md/.test(l) === false && l.trim()), `Nach ship bleiben Änderungen: ${git(['status', '--porcelain'], sp)}`);
+      const marks = fs.readFileSync(path.join(sp, '.works', 'time.jsonl'), 'utf8').split('ship-zeit').length - 1;
+      expect(marks === 1, `Neue Zeile in time.jsonl ${marks}-mal statt einmal`);
+      has(r3.out, 'CI', 'ship nennt den CI-Schritt');
+      await waitFor(async () => boardPort() === bport, `Board nach ship wieder auf Port ${bport}`);
+      w(['board', '--stop'], { cwd: sp, ok: false });
+    });
+  } else {
+    skip('works ship', 'Git fehlt');
+  }
+
   const failed = results.filter((r) => !r.ok);
   log(`\n${results.length - failed.length} von ${results.length} Prüfungen bestanden${failed.length ? `, ${failed.length} fehlgeschlagen` : ''}.`);
   if (!keep) { try { cleanupWorktrees(proj); fs.rmSync(base, { recursive: true, force: true }); } catch { /* Windows hält Dateien manchmal kurz fest */ } }
@@ -902,6 +1025,13 @@ function free(port) {
     const s = net.createServer().once('error', () => resolve(false)).once('listening', () => s.close(() => resolve(true)));
     s.listen(port, '127.0.0.1');
   }));
+}
+
+// GitHub-Annotation (Workflow-Befehl ::error). Daten kodieren %, Zeilenumbrüche; Eigenschaften zusätzlich : und ,.
+export function ghError(title, message) {
+  const data = (s) => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  const prop = (s) => data(s).replace(/:/g, '%3A').replace(/,/g, '%2C');
+  return `::error title=${prop(title)}::${data(message)}`;
 }
 
 // Chromium aus Playwright, sonst ein installiertes Chrome oder Edge. null, wenn Playwright fehlt.

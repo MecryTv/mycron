@@ -8,7 +8,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readJson, writeJson, exists, loadTasks, loadConfig, isOverdue, OPEN_STATUSES, today } from './lib.mjs';
+import { readJson, writeJson, exists, loadTasks, loadConfig, isOverdue, OPEN_STATUSES, today, rootIdOf } from './lib.mjs';
 import { readServer, newestCli, cliVersion } from './server-control.mjs';
 import { activeSprint, sprintStats } from './sprint.mjs';
 import { loadActivity } from './live.mjs';
@@ -41,7 +41,12 @@ const boardUrl = (s) => `http://${['0.0.0.0', '::', '', undefined].includes(s.ho
 // Laufende Boards aller angemeldeten Projekte.
 export function runningBoards() {
   return projectList().map((p) => ({ p, s: readServer(p.path) })).filter((x) => x.s)
-    .map(({ p, s }) => ({ name: p.name, path: p.path, port: s.port, url: boardUrl(s) }));
+    .map(({ p, s }) => ({ id: rootIdOf(p.path), name: p.name, path: p.path, port: s.port, url: boardUrl(s) }));
+}
+
+// Alle angemeldeten Projekte mit Kennung, für verwaiste Board-Tabs (W-0029).
+export function projectsBrief() {
+  return projectList().map((p) => ({ id: rootIdOf(p.path), name: p.name, path: p.path }));
 }
 
 const prio = (t) => String(t.priority || 'P9');

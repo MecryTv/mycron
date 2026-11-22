@@ -1,0 +1,29 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Zwei Umschalter",
+      "file": "A-zwei-umschalter.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Breite und Schema fest umschaltbar, fehlendes Nachher-Bild mit Befehl, Dialog breiter",
+      "at": "2026-11-22 20:44"
+    },
+    {
+      "name": "B",
+      "title": "Vorhandene Bilder",
+      "file": "B-vorhandene-bilder.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Nur Kombinationen mit Nachher-Bild als Auswahl, Dialog breiter",
+      "at": "2026-11-22 20:44"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": {
+    "name": "A",
+    "at": "2026-11-22 20:48",
+    "reason": "Nutzer am 2026-11-22: Empfehlung genommen. Feste Umschalter, zeigt fehlende Nachher-Bilder mit Befehl"
+  }
+}

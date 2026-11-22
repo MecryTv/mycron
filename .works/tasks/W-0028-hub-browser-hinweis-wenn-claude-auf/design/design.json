@@ -1,0 +1,38 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Glocke im Kopf",
+      "file": "A-glocke-im-kopf.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Knopf Hinweise neben dem Farbschema; Klick fragt die Erlaubnis, danach Hinweise an",
+      "at": "2026-11-22 20:03"
+    },
+    {
+      "name": "B",
+      "title": "Einladung unter dem Kopf",
+      "file": "B-einladung-unter-dem-kopf.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Leiste mit Einschalten und Nicht jetzt, solange die Hinweise aus sind; danach nur die Glocke",
+      "at": "2026-11-22 20:03"
+    },
+    {
+      "name": "C",
+      "title": "Schalter in der Kennzahl",
+      "file": "C-schalter-in-der-kennzahl.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Schalter Benachrichtigen in der Kachel wartet auf Freigabe",
+      "at": "2026-11-22 20:03"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": {
+    "name": "B",
+    "at": "2026-11-22 20:48",
+    "reason": "Nutzer am 2026-11-22: Empfehlung genommen. Einladung erklärt einmal, wozu die Erlaubnis gebraucht wird, danach nur die Glocke"
+  }
+}

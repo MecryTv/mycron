@@ -1,0 +1,38 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Ersatzseite",
+      "file": "A-ersatzseite.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Statt des Boards nur eine Karte mit mycron starten, Zum Hub, Trainingsplan ansehen",
+      "at": "2026-11-22 20:03"
+    },
+    {
+      "name": "B",
+      "title": "Leiste über dem letzten Stand",
+      "file": "B-leiste-ueber-dem-letzten-stand.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Warnleiste oben, der letzte Stand bleibt ausgegraut sichtbar",
+      "at": "2026-11-22 20:03"
+    },
+    {
+      "name": "C",
+      "title": "Dialog über dem letzten Stand",
+      "file": "C-dialog-ueber-dem-letzten-stand.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Dialog im Board-Stil, darunter der letzte Stand abgedunkelt",
+      "at": "2026-11-22 20:03"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": {
+    "name": "B",
+    "at": "2026-11-22 20:48",
+    "reason": "Nutzer am 2026-11-22: Empfehlung genommen. Der letzte Stand bleibt ausgegraut sichtbar, Leiste mit den Knöpfen"
+  }
+}

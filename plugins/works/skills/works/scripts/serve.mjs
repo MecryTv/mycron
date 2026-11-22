@@ -9,7 +9,7 @@ import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
 import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload, backupPreview } from './api.mjs';
 import { buildIcal } from './ical.mjs';
-import { registerProject, runningBoards, hubHtml, hubAction } from './hub.mjs';
+import { registerProject, runningBoards, projectsBrief, hubHtml, hubAction } from './hub.mjs';
 import { syncSettings, syncState } from './ghsync.mjs';
 import { dueRules } from './recurring.mjs';
 import { loadConfig, loadTasks } from './lib.mjs';
@@ -374,7 +374,8 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     // Wie viele Board-Tabs hier offen sind, damit works board --open keinen zweiten öffnet. Nur lokal, nur eine Zahl.
     if (pathname === '/tabs') return isLocal(req) ? json(res, 200, { tabs: localTabs.size }) : send(res, 403, 'text/plain', 'Kein Zugriff');
     // Hub (W-0025): laufende Boards aller Projekte und die Übersicht. Nur lokal, die Seite enthält das Token.
-    if (pathname === '/boards') return isLocal(req) ? json(res, 200, { boards: runningBoards().map(({ name, port, url: u }) => ({ name, port, url: u })) }) : send(res, 403, 'text/plain', 'Kein Zugriff');
+    // Verwaiste Tabs (W-0029) brauchen die Projekte mit Pfad und das Token für "Board starten". Nur lokal, wie /hub.
+    if (pathname === '/boards') return isLocal(req) ? json(res, 200, { boards: runningBoards().map(({ id, name, port, url: u }) => ({ id, name, port, url: u })), projects: projectsBrief(), token }) : send(res, 403, 'text/plain', 'Kein Zugriff');
     if (pathname === '/hub') {
       if (!isLocal(req)) return send(res, 403, 'text/plain', 'Kein Zugriff');
       try { return send(res, 200, 'text/html; charset=utf-8', hubHtml({ token, self: fs.realpathSync(root), part: url.searchParams.has('part'), partUrl: '/hub?part=1', events: true })); } catch (e) { return send(res, 500, 'text/plain; charset=utf-8', `Fehler beim Erzeugen: ${e.message}`); }

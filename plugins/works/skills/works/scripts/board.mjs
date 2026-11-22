@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   loadTasks, loadConfig, worksDir, queueOf, getSection, checkboxes, stripComments, imageLinks,
   isBlocked, openBlockers, isOverdue, openQuestions, relFromWorks, nowStamp, STATUS_LABEL,
-  PRIO_LABEL, TYPE_LABEL, OPEN_STATUSES, today,
+  PRIO_LABEL, TYPE_LABEL, OPEN_STATUSES, today, rootIdOf,
 } from './lib.mjs';
 import { byIdMap, milestoneProgress } from './views.mjs';
 import { runningVersion } from './server-control.mjs';
@@ -110,6 +110,7 @@ export function boardData(root) {
     queueSettings: { auto_next: false, skip_blocked: true, ask_before: true, ...(config.queue_settings || {}) },
     version: runningVersion(),
     project: path.basename(root),
+    rootId: rootIdOf(root),
     statusLabel: STATUS_LABEL, prioLabel: PRIO_LABEL, typeLabel: TYPE_LABEL,
     milestones: milestoneProgress(config, all).map((m) => ({
       ...m,
