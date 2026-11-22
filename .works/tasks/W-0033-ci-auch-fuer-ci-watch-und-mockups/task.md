@@ -3,13 +3,13 @@ id: W-0033
 title: CI auch für ci-watch und mockups
 type: chore
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: chore/w-0033-ci-auch-fuer-ci-watch-und
 tags: [ci, github]
@@ -42,8 +42,10 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (P3). Die CI läuft nur bei Änd
 ## Offene Fragen
 
 ## Übergabe
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
 - 2026-11-22: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-22: Zwei Workflows angelegt; lokal geprüft: beide test.mjs grün, eine absichtlich scheiternde Kopie endet mit Exit 1. Erster CI-Lauf beim Abschluss
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

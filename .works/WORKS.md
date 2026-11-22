@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-22 22:12 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-22 22:16 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 0 | 0 | 0 | 0 | 33 | 0 |
+| 1 | 0 | 0 | 0 | 0 | 0 | 34 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 1 · P4 Niedrig: 1
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 1
 
 ## Kritisch (P1)
 
@@ -22,7 +22,6 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0033](tasks/W-0033-ci-auch-fuer-ci-watch-und-mockups/task.md) | CI auch für ci-watch und mockups | Chore | P3 Mittel | Backlog | S |  |  |  |
 | [W-0035](tasks/W-0035-szenarien-fuer-works-shot/task.md) | Szenarien für works shot | Feature | P4 Niedrig | Backlog | L |  |  |  |
 
 ## Zuletzt erledigt
