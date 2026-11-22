@@ -166,7 +166,17 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const f = path.join(base, 'a.html');
     fs.writeFileSync(f, '<!doctype html><p>A</p>');
     w(['design', 'direction', 'W-0004', '--text=Dunkel', '--colors=Grund #0F1420,Akzent=#3DD6B5', '--fonts=Inter']);
-    w(['design', 'add', 'W-0004', '--name=A', '--title=Klassisch', `--file=${f}`]);
+    const added = w(['design', 'add', 'W-0004', '--name=A', '--title=Klassisch', `--file=${f}`]).out;
+    if (added.includes('lokale Dateien')) throw new Error('Warnung bei einem Entwurf ohne lokale Verweise');
+    // Das Board zeigt Entwürfe mit CSP ohne file:// und relative Pfade: design add warnt, nennt die Verweise und hängt trotzdem an.
+    const g = path.join(base, 'g.html');
+    fs.writeFileSync(g, '<!doctype html><link rel="stylesheet" href="css/app.css"><link rel="stylesheet" href="https://fonts.example/a.css"><style>@font-face{src:url("file:///C:/f.woff2")} .x{background:url(data:image/png;base64,AA==)}</style><img src="bild.png"><img src="https://x.example/a.png">');
+    const warned = w(['design', 'add', 'W-0004', '--name=G', '--title=Lokal', `--file=${g}`]).out;
+    has(warned, 'lokale Dateien', 'Warnung bei lokalen Verweisen');
+    for (const ref of ['css/app.css', 'file:///C:/f.woff2', 'bild.png', 'entwurf.mjs inline']) has(warned, ref, `Warnung nennt ${ref}`);
+    for (const ref of ['fonts.example', 'x.example', 'data:image']) if (warned.includes(ref)) throw new Error(`Warnung nennt fälschlich ${ref}`);
+    has(w(['design', 'show', 'W-0004']).out, 'Variante G: Lokal', 'trotz Warnung angehängt');
+    w(['design', 'remove', 'W-0004', 'G']);
     has(w(['design', 'show', 'W-0004']).out, 'Noch keine Variante gewählt');
     w(['design', 'choose', 'W-0004', 'A', '--reason=Test']);
     has(w(['design', 'show', 'W-0004']).out, 'Gewählt: A');

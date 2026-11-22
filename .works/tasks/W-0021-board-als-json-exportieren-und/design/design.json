@@ -1,0 +1,25 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "An Teilen und Import andocken",
+      "file": "A-an-teilen-und-import-andocken.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Block Sicherung als JSON im Teilen-Dialog, Format works-Board (JSON) im Import, Vorschau mit Spalte Abgleich; nur Zusammenführen",
+      "at": "2026-11-22 11:12"
+    },
+    {
+      "name": "B",
+      "title": "Eigener Dialog Sichern und Wiederherstellen",
+      "file": "B-eigener-dialog-sichern-und.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Export mit Umfang und Größe, Import mit Zusammenführen oder Wiederherstellen (vorher Sicherung), Vergleich nach Neu und Geändert",
+      "at": "2026-11-22 11:12"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": null
+}
