@@ -63,9 +63,13 @@ function appendTail(top, rel, tail) {
 export async function ship(root, { id = '', push = true, ci = true, update = true, open = true, log = (s) => process.stdout.write(s + '\n') } = {}) {
   const cli = OWN_CLI;
   const stop = (msg) => { throw new ShipStop(msg); };
-  const top = git(root, ['rev-parse', '--show-toplevel']);
-  if (!top.ok) stop('Kein Git-Repository. ship braucht Git.');
-  const repo = path.resolve(top.out);
+  // Repo-Wurzel relativ zum Projektordner bestimmen, nicht über --show-toplevel: Das liefert den langen Pfad,
+  // der Projektordner kann aber einen 8.3-Kurznamen enthalten (Windows-Runner: C:\Users\RUNNER~1). Gemischt
+  // ergäben sich relative Pfade außerhalb des Repos.
+  const cdup = git(root, ['rev-parse', '--show-cdup']);
+  if (!cdup.ok) stop('Kein Git-Repository. ship braucht Git.');
+  const repo = path.resolve(root, cdup.out || '.');
+  const worksRel = (path.relative(repo, path.join(root, '.works')) || '.works').split(path.sep).join('/');
   const task = id || loadState(root).active;
   if (!task) stop('Keine aktive Aufgabe. Aufgabe angeben: works ship <ID>.');
   const branch = git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).out;
@@ -80,7 +84,8 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
   // 2. Nicht committete Änderungen außerhalb von .works gehören zur Aufgabe oder nicht: das entscheidet der Nutzer.
   // Neue, nicht verfolgte Dateien zählen mit: Eine vergessene Quelldatei fehlte sonst nach dem Merge.
   // Die Ausgabe ist gekürzt: Der ersten Zeile kann das führende Leerzeichen des Status fehlen.
-  const dirty = git(repo, ['status', '--porcelain']).out.split('\n').filter((l) => l.trim() && !/^\s*\S{1,2}\s+"?\.works\//.test(l));
+  const inWorks = new RegExp(`^\\s*\\S{1,2}\\s+"?${worksRel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`);
+  const dirty = git(repo, ['status', '--porcelain']).out.split('\n').filter((l) => l.trim() && !inWorks.test(l));
   if (dirty.length) stop(`Nicht committete Änderungen (?? = neue Datei):\n${dirty.join('\n')}\nErst committen, verwerfen oder in .gitignore eintragen, dann ship erneut.`);
 
   // 3. Board stoppen. Es startet am Ende mit der neuen Version auf demselben Port, bei einem Abbruch sofort.
@@ -109,7 +114,7 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
     // Nur eine verfolgte time.jsonl wird zurückgesetzt; eine neue geht mit dem Commit unten ganz mit.
     const tail = tracked.includes(timeTarget) ? uncommittedTail(repo, timeTarget) : '';
     if (tracked.length) git(repo, ['checkout', '--', ...tracked]);
-    git(repo, ['add', '--', path.relative(repo, path.join(root, '.works')) || '.works']);
+    git(repo, ['add', '--', worksRel]);
     if (!git(repo, ['diff', '--cached', '--quiet']).ok) {
       const c = git(repo, ['commit', '-q', '-m', `works: ${task} Stand vor dem Abschluss`]);
       if (!c.ok) stop(`Commit der .works-Änderungen fehlgeschlagen: ${c.err}`);
@@ -133,7 +138,7 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
     // 6. Aufgabe abschließen und .works committen.
     const done = works(cli, root, ['done', task, '--confirm']);
     if (!done.ok) stop(`${done.out}\n\nship hält an: works done --confirm fehlgeschlagen. Der Merge ist lokal und nicht gepusht.`);
-    git(repo, ['add', '--', path.relative(repo, path.join(root, '.works')) || '.works']);
+    git(repo, ['add', '--', worksRel]);
     if (!git(repo, ['diff', '--cached', '--quiet']).ok) git(repo, ['commit', '-q', '-m', `works: ${task} erledigt`]);
     log(`ok  ${task} erledigt und committet`);
 
@@ -161,7 +166,7 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
       log(`..  CI für ${sha.slice(0, 7)} läuft, warte auf das Ergebnis`);
       const r = spawnSync(process.execPath, [ciJs, '--sha', sha], { cwd: repo, encoding: 'utf8', timeout: 25 * 60000, windowsHide: true });
       const msg = `${r.stdout || ''}${r.stderr || ''}`.trim().split('\n').slice(-6).join('\n');
-      if (r.status === 1) stop(`CI rot für ${sha.slice(0, 7)}:\n${msg}\nPlugins nicht aktualisiert, Board nicht neu gestartet.`);
+      if (r.status === 1) stop(`CI rot für ${sha.slice(0, 7)}:\n${msg}\nPlugins nicht aktualisiert.`);
       log(r.status === 0 ? `ok  CI grün für ${sha.slice(0, 7)}` : `--  CI: ${msg.split('\n').pop()}`);
     }
 

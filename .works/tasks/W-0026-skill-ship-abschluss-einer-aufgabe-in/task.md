@@ -3,13 +3,13 @@ id: W-0026
 title: "Skill ship: Abschluss einer Aufgabe in einem Rutsch"
 type: feature
 priority: P2
-status: erledigt
+status: in-arbeit
 effort: M
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed: 2026-11-22
+completed:
 milestone:
 branch: feature/w-0026-skill-ship-abschluss-einer
 tags: [skill, workflow, git]
@@ -18,6 +18,7 @@ blocks: []
 related: []
 source: manuell
 incomplete: false
+reopened: 1
 ---
 
 # Skill ship: Abschluss einer Aufgabe in einem Rutsch
@@ -76,3 +77,6 @@ Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 - 2026-11-22: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-22: works ship mit Selbsttest (DoD offen, offene und neue Dateien, Remote weg mit Board-Neustart, Erfolg mit Board und time.jsonl), Skill works:ship mit drei Szenarien geprüft und nachgeschärft. CI-Wächter und Plugin-Update werden beim Abschluss von W-0026 mit ship selbst am echten Repo nachgewiesen
 - 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
+- 2026-11-22: Wiedereröffnet (Status: erledigt → backlog). Grund: CI rot auf allen Windows-Runnern (a5cfc20): ship verrechnet den 8.3-Kurzpfad des Temp-Ordners (RUNNER~1) mit dem langen Pfad aus git rev-parse, WORKS.md wird nicht zurückgesetzt, der Wechsel nach main scheitert. Lokal mit TMP=...\LANGER~1 nachgestellt.
+- 2026-11-22: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-22: Ursache CI rot unter Windows: Projektordner mit 8.3-Kurznamen (RUNNER~1), git rev-parse --show-toplevel liefert den langen Pfad, path.relative ergab Pfade außerhalb des Repos. Fix: Repo-Wurzel über --show-cdup relativ zum Projektordner. Lokal nachgestellt und geprüft mit TMP=...\LANGER~1. Meldung bei CI rot korrigiert (Board startet doch neu).
