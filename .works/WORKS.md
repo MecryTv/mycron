@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-22 21:33 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-22 21:40 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 0 | 0 | 0 | 0 | 0 | 0 | 30 | 0 |
+| 5 | 0 | 0 | 0 | 0 | 0 | 30 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 2 · P3 Mittel: 2 · P4 Niedrig: 1
 
 ## Kritisch (P1)
 
@@ -20,7 +20,13 @@ _Keine Einträge._
 
 ## Geplant und Backlog
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0031](tasks/W-0031-board-merkt-sich-seinen-port/task.md) | Board merkt sich seinen Port | Feature | P2 Hoch | Backlog | S |  |  |  |
+| [W-0032](tasks/W-0032-hub-projekte-aus-der-liste-nehmen/task.md) | Hub: Projekte aus der Liste nehmen | Feature | P2 Hoch | Backlog | S |  |  |  |
+| [W-0033](tasks/W-0033-ci-auch-fuer-ci-watch-und-mockups/task.md) | CI auch für ci-watch und mockups | Chore | P3 Mittel | Backlog | S |  |  |  |
+| [W-0034](tasks/W-0034-works-shot-name-wirkt-bei-url-nicht/task.md) | works shot --name wirkt bei --url nicht | Bug | P3 Mittel | Backlog | S |  |  |  |
+| [W-0035](tasks/W-0035-szenarien-fuer-works-shot/task.md) | Szenarien für works shot | Feature | P4 Niedrig | Backlog | L |  |  |  |
 
 ## Zuletzt erledigt
 
