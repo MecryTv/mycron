@@ -1,6 +1,6 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-22 12:18 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-22 12:27 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
@@ -12,7 +12,7 @@ Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedri
 
 ## Aktive Aufgabe
 
-[W-0023](tasks/W-0023-feierabend-und-guten-morgen-erweitern/task.md) Feierabend und Guten Morgen erweitern (In Arbeit), letzte Übergabe 2026-11-22 11:57
+[W-0023](tasks/W-0023-feierabend-und-guten-morgen-erweitern/task.md) Feierabend und Guten Morgen erweitern (In Arbeit), letzte Übergabe 2026-11-22 12:25
 
 ## Kritisch (P1)
 

@@ -42,7 +42,7 @@ import { buildIcal } from './ical.mjs';
 import { undo, undoList, snapshot, snapshotRestore } from './undo.mjs';
 import { FORMAT as BACKUP_FORMAT, exportBoard, readBackup, compareBackup, mergeBackup, restoreBackup, backupFileName } from './backup.mjs';
 import { findSimilar } from './similar.mjs';
-import { taskUsage, projectUsage, fmtTokens, fmtCost } from './usage.mjs';
+import { taskUsage, projectUsage, liveUsage, fmtTokens, fmtCost } from './usage.mjs';
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
 import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion } from './server-control.mjs';
@@ -2084,6 +2084,13 @@ function cmdTime() {
   const root = requireRoot();
   const config = loadConfig(root);
   const tasks = loadTasks(root);
+  // Verbrauch von heute, etwa für die Bilanz beim Feierabend (W-0023).
+  if (flags.today) {
+    const u = liveUsage(root, config);
+    if (flags.json) { out(JSON.stringify({ ...u.today, currency: u.currency })); return; }
+    out(`Heute: ${fmtTokens(u.today.tokens)} Tokens, geschätzt ${fmtCost(u.today.cost, u.currency)}`);
+    return;
+  }
   if (flags.mode) {
     if (!['measured', 'fixed'].includes(flags.mode)) fail('--mode measured oder fixed');
     config.effort_mode = flags.mode; saveConfig(root, config); refresh(root);

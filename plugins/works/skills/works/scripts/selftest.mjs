@@ -315,6 +315,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const sum = usage.reduce((a, u) => a + u.in, 0);
     expect(sum === 2000, `Tokens doppelt oder fehlen: Eingabe ${sum} statt 2000`);
     has(w(['time', 'W-0001']).out, 'Verbrauch');
+    // Verbrauch von heute für die Bilanz beim Feierabend (W-0023).
+    const today = w(['time', '--today']).out;
+    has(today, 'Heute:', 'time --today'); has(today, 'Tokens', 'time --today nennt Tokens');
+    expect(/\d/.test(today) && !today.includes('Schätzung gegen'), `time --today zeigt nur den Tag: ${today.split('\n')[0]}`);
     const at = path.join(base, 'agent.jsonl');
     fs.writeFileSync(at, JSON.stringify({ type: 'assistant', message: { id: 'a1', model: 'claude-haiku-5-5', usage: { input_tokens: 500, output_tokens: 100 } } }) + '\n');
     hook('subagent-stop.mjs', { cwd: proj, session_id: 's1', transcript_path: tr, agent_transcript_path: at, agent_id: 'x' });
