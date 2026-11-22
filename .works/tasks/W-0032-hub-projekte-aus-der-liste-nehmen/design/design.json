@@ -1,0 +1,34 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Knopf je Zeile",
+      "file": "A-knopf-je-zeile.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Aus der Liste neben Board starten, mit Rückfrage",
+      "at": "2026-11-22 21:42"
+    },
+    {
+      "name": "B",
+      "title": "× mit Rückgängig",
+      "file": "B-mit-rueckgaengig.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Kleines ×, keine Rückfrage, Rückgängig für ein paar Sekunden",
+      "at": "2026-11-22 21:42"
+    },
+    {
+      "name": "C",
+      "title": "Liste bearbeiten",
+      "file": "C-liste-bearbeiten.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Auswahl mit Häkchen, alle Temp-Ordner auf einmal, Ausgewählte entfernen",
+      "at": "2026-11-22 21:42"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": null
+}

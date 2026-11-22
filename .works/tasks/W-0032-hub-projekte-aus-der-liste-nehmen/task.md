@@ -61,3 +61,6 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (P2, erst Entwürfe). Im Hub sta
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
+- 2026-11-22: Entwurf A „Knopf je Zeile“ angehängt
+- 2026-11-22: Entwurf B „× mit Rückgängig“ angehängt
+- 2026-11-22: Entwurf C „Liste bearbeiten“ angehängt
