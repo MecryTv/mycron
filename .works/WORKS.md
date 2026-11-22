@@ -6,13 +6,9 @@
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 2 | 0 | 0 | 0 | 17 | 0 |
+| 2 | 0 | 1 | 0 | 0 | 0 | 18 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 3 · P3 Mittel: 1 · P4 Niedrig: 0
-
-## Aktive Aufgabe
-
-[W-0018](tasks/W-0018-design-add-warnt-bei-lokaler-css-im/task.md) design add warnt bei lokaler CSS im Entwurf (In Arbeit), letzte Übergabe 2026-11-21 16:40
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 2 · P3 Mittel: 1 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -22,7 +18,6 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0018](tasks/W-0018-design-add-warnt-bei-lokaler-css-im/task.md) | design add warnt bei lokaler CSS im Entwurf | Feature | P2 Hoch | In Arbeit | S |  |  |  |
 | [W-0019](tasks/W-0019-live-ansicht-lange-liste-heute/task.md) | Live-Ansicht: lange Liste Heute übersichtlicher | Design | P2 Hoch | In Arbeit | M |  |  |  |
 
 ## Geplant und Backlog
@@ -36,6 +31,7 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Erledigt am |
 |---|---|---|---|---|
+| [W-0018](tasks/W-0018-design-add-warnt-bei-lokaler-css-im/task.md) | design add warnt bei lokaler CSS im Entwurf | Feature | P2 Hoch | 2026-11-22 |
 | [W-0001](tasks/W-0001-live-ansicht-im-works-board/task.md) | Live-Ansicht im works-Board | Feature | P3 Mittel | 2026-11-21 |
 | [W-0002](tasks/W-0002-board-start-im-hintergrund-weicht-nicht/task.md) | Board-Start im Hintergrund weicht nicht auf freien Port aus | Bug | P3 Mittel | 2026-11-21 |
 | [W-0003](tasks/W-0003-markdown-mit-windows-zeilenenden-wird/task.md) | Markdown mit Windows-Zeilenenden wird nicht erkannt | Bug | P2 Hoch | 2026-11-21 |
@@ -45,7 +41,6 @@ _Keine Einträge._
 | [W-0007](tasks/W-0007-live-ansicht-zeigt-wenn-claude-auf-eine/task.md) | Live-Ansicht zeigt, wenn Claude auf eine Freigabe wartet | Feature | P2 Hoch | 2026-11-21 |
 | [W-0008](tasks/W-0008-verbrauch-der-sitzung-in-der-live/task.md) | Verbrauch der Sitzung in der Live-Ansicht | Feature | P3 Mittel | 2026-11-21 |
 | [W-0009](tasks/W-0009-wackelige-pruefungen-und-laufzeittrend/task.md) | Wackelige Prüfungen und Laufzeittrend erkennen | Feature | P3 Mittel | 2026-11-21 |
-| [W-0010](tasks/W-0010-design-funde-in-board-css-ueberarbeiten/task.md) | Design-Funde in board.css überarbeiten | Design | P4 Niedrig | 2026-11-21 |
 
 ## Ideen
 

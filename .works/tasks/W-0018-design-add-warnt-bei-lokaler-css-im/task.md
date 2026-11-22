@@ -3,13 +3,13 @@ id: W-0018
 title: design add warnt bei lokaler CSS im Entwurf
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-21
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0018-design-add-warnt-bei-lokaler
 tags: [works, board, design-add]
@@ -65,9 +65,7 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-21 16:37
-
-Stand: Branch feature/w-0018-design-add-warnung, WIP-Commit mit dem Test im Selbsttest-Schritt 'Entwürfe: design direction, add, choose' (selftest.mjs): Entwurf g.html mit css/app.css, file:///C:/f.woff2 und bild.png muss beim design add eine Warnung 'lokale Dateien' mit diesen Verweisen und dem Hinweis 'entwurf.mjs inline' liefern, https- und data:-Verweise nicht nennen, und trotzdem anhängen. RED bestätigt (heute keine Warnung). Nächster Schritt: in design.mjs eine Funktion localRefs(html) (link/script/img/source href|src und url() ohne https:, data:, blob:, #, //), in works.mjs cmdDesign bei sub==='add' und .html die Warnung ausgeben (höchstens 5 Verweise nennen). Danach Doku in references/cli.md und integrations.md, Selbsttest, Linux, done. Unterbrochen für W-0019 (Design der Liste Heute).
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-21: Aufgabe angelegt
@@ -75,3 +73,4 @@ Stand: Branch feature/w-0018-design-add-warnung, WIP-Commit mit dem Test im Selb
 - 2026-11-21: Übergabe aktualisiert
 - 2026-11-22: decisions.md angelegt
 - 2026-11-22: Entscheidung E1 dokumentiert: Warnen statt automatisch einbetten
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
