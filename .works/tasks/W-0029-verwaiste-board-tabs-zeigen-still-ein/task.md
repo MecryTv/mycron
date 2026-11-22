@@ -101,3 +101,4 @@ Art: nachher · Hinzugefügt: 2026-11-22
 - 2026-11-22: Asset hinzugefügt: assets/2026-11-22-tab-nachher-dark-390-nachher.png (nachher)
 - 2026-11-22: Asset hinzugefügt: assets/2026-11-22-tab-nachher-light-768-nachher.png (nachher)
 - 2026-11-22: Umgesetzt nach Entwurf B, Selbsttest 31/31 mit Browser, Hub-Schritt zusätzlich mit 8.3-Kurzpfad geprüft
+- 2026-11-22: Entscheidung E1 dokumentiert: Verwaisten Tab erkennen und anzeigen
