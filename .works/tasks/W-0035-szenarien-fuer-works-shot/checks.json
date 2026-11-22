@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-22T21:27:58.612Z",
+  "fingerprint": "bcf3127e1827:a84434ee7e10",
+  "results": {
+    "code-audit": {
+      "status": "ok",
+      "cmd": "",
+      "note": "Szenario-Dateien sind ausführbarer Code und nur per --scenario ausdrücklich geladen (in README benannt); kit prüft Projektnamen und Hook-Dateinamen, startet Prozesse ohne Shell mit windowsHide, eigenes HOME, räumt Boards und Ordner auch bei Fehlern auf",
+      "fingerprint": "bcf3127e1827:a84434ee7e10",
+      "at": "2026-11-22T21:27:58.614Z"
+    }
+  }
+}
