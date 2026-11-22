@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-22 18:47 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-22 18:57 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 0 | 0 | 0 | 0 | 0 | 0 | 24 | 0 |
+| 1 | 0 | 0 | 0 | 0 | 0 | 24 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 1 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -20,7 +20,9 @@ _Keine Einträge._
 
 ## Geplant und Backlog
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0025](tasks/W-0025-hub-alle-offenen-boards-in-einem-tab/task.md) | Hub: alle offenen Boards in einem Tab | Design | P3 Mittel | Backlog | M |  |  |  |
 
 ## Zuletzt erledigt
 

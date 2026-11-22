@@ -1,0 +1,34 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Startseite und Umschalter",
+      "file": "A-startseite-und-umschalter.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Ab zwei Boards wird der Tab zur Übersicht mit Karten, Öffnen zeigt das Board groß, oben ein Umschalter",
+      "at": "2026-11-22 18:57"
+    },
+    {
+      "name": "B",
+      "title": "Seitenleiste",
+      "file": "B-seitenleiste.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Ab zwei Boards blendet der Tab links eine Leiste mit allen Boards ein, das aktuelle Board bleibt groß",
+      "at": "2026-11-22 18:57"
+    },
+    {
+      "name": "C",
+      "title": "Projekt-Reiter",
+      "file": "C-projekt-reiter.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Ab zwei Boards erscheinen über dem Board Reiter für alle laufenden Boards",
+      "at": "2026-11-22 18:57"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": null
+}
