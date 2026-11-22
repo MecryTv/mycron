@@ -70,11 +70,22 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     if (only && !name.includes(only)) return;
     const t0 = Date.now();
     try { await fn(); results.push({ name, ok: true }); log(`ok      ${name}${verbose ? ` (${Date.now() - t0} ms)` : ''}`); }
-    catch (e) { results.push({ name, ok: false, error: e.message }); log(`FEHLER  ${name}\n        ${e.message.split('\n').join('\n        ')}`); }
+    catch (e) {
+      results.push({ name, ok: false, error: e.message });
+      log(`FEHLER  ${name}\n        ${e.message.split('\n').join('\n        ')}`);
+      if (process.env.GITHUB_ACTIONS === 'true') log(ghError(`Selbsttest: ${name}`, e.message.slice(0, 2000)));
+    }
   };
   const skip = (name, why) => { results.push({ name, ok: true, skipped: true }); log(`--      ${name} (übersprungen: ${why})`); };
 
   log(`works Selbsttest in ${base}\nNode ${process.version}, ${process.platform}${hasGit ? '' : ', ohne Git'}\n`);
+
+  // Rote Schritte erscheinen in GitHub Actions als Annotation (W-0027), die der CI-Wächter auch ohne Token liest.
+  await step('GitHub-Annotation für rote Schritte', () => {
+    expect(typeof ghError === 'function', 'ghError fehlt');
+    const a = ghError('Selbsttest: works ship, Teil 1', 'Zeile 1\nZeile 2: 100%');
+    expect(a === '::error title=Selbsttest%3A works ship%2C Teil 1::Zeile 1%0AZeile 2: 100%25', `Annotation falsch kodiert: ${a}`);
+  });
 
   await step('Syntax aller Skripte', () => {
     const files = [...fs.readdirSync(HERE).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HERE, f)), ...fs.readdirSync(HOOKS).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HOOKS, f)), path.join(HERE, 'board', 'board.js')];
@@ -967,6 +978,13 @@ function free(port) {
     const s = net.createServer().once('error', () => resolve(false)).once('listening', () => s.close(() => resolve(true)));
     s.listen(port, '127.0.0.1');
   }));
+}
+
+// GitHub-Annotation (Workflow-Befehl ::error). Daten kodieren %, Zeilenumbrüche; Eigenschaften zusätzlich : und ,.
+export function ghError(title, message) {
+  const data = (s) => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  const prop = (s) => data(s).replace(/:/g, '%3A').replace(/,/g, '%2C');
+  return `::error title=${prop(title)}::${data(message)}`;
 }
 
 // Chromium aus Playwright, sonst ein installiertes Chrome oder Edge. null, wenn Playwright fehlt.

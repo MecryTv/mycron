@@ -8,9 +8,14 @@
 //   --interval Sekunden zwischen zwei Abfragen, mindestens 30 (Standard 30 mit Token, sonst 60:
 //              ohne Token erlaubt GitHub nur 60 Abfragen pro Stunde)
 //   --grace    Minuten, so lange darf nach dem Start noch kein Lauf existieren (Standard 3)
+//   --no-bug   bei rot keinen Bug in works anlegen
 // Exit: 0 grün, 1 rot, 2 kein Lauf oder Zeitlimit, 3 Fehler (etwa kein GitHub-Repo, Rate-Limit).
-import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+// Bei rot legt der Wächter in einem Projekt mit .works einen Bug an (P2) oder ergänzt den offenen zum selben Schritt.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 
 export function repoFromUrl(url) {
   const m = String(url).trim().match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/);
@@ -34,12 +39,72 @@ export function failureLines(annotations) {
   });
 }
 
+// W-0027: Bug aus den roten Jobs. Der Titel ist je Workflow und Schritt gleich, damit derselbe Fehler
+// bei jedem weiteren roten Commit den offenen Bug ergänzt statt einen neuen anzulegen.
+export function bugFor({ repo, sha, failures }) {
+  const f = failures[0] || { run: 'CI', job: '', steps: [] };
+  const steps = [...new Set(failures.flatMap((x) => x.steps))];
+  const title = `CI rot: ${f.run}, ${steps.length ? `Schritt ${steps.join(', ')}` : `Job ${f.job}`}`;
+  const jobs = failures.map((x) => `- ${x.job}${x.steps.length ? ` (Schritt ${x.steps.join(', ')})` : ''}: ${x.url}`).join('\n');
+  const log = [...new Set(failures.flatMap((x) => [...x.lines, ...(x.excerpt ? [x.excerpt] : [])]))].join('\n');
+  const description = `Vom CI-Wächter angelegt: CI rot für Commit ${sha.slice(0, 7)} in ${repo}.\n\nRote Jobs:\n${jobs}\n\nDie Fehlerstelle steht unter Logs, soweit GitHub sie herausgibt (ohne GITHUB_TOKEN nur die Annotationen). Den ganzen Log zeigen die Links.`;
+  return { title, description, log, jobs: failures.map((x) => x.job).join(', ') };
+}
+
+// works-CLI: im Repo nebenan (plugins/works), sonst aus der Plugin-Installation.
+export function findWorksCli() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const rel = path.join('skills', 'works', 'scripts', 'works.mjs');
+  const local = path.resolve(here, '..', '..', '..', '..', 'works', rel);
+  if (fs.existsSync(local)) return local;
+  try {
+    const reg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json'), 'utf8'));
+    const entries = Object.entries(reg.plugins || {}).filter(([k]) => k.split('@')[0] === 'works').flatMap(([, v]) => (Array.isArray(v) ? v : [v]));
+    for (const e of entries) if (e && e.installPath && fs.existsSync(path.join(e.installPath, rel))) return path.join(e.installPath, rel);
+  } catch { /* keine Installation */ }
+  return null;
+}
+
+function worksRoot(dir) {
+  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, '.works', 'config.json'))) return d;
+    if (path.dirname(d) === d) return null;
+  }
+}
+
+// Legt den Bug an oder ergänzt den offenen mit gleichem Titel. null ohne .works oder works-CLI.
+// Rückgabe { action: 'neu' | 'ergänzt' | 'bekannt', id }.
+export function fileBug({ cwd = process.cwd(), bug, sha, cli = findWorksCli(), env = process.env }) {
+  const root = worksRoot(cwd);
+  if (!root || !cli) return null;
+  const works = (args) => spawnSync(process.execPath, [cli, ...args], { cwd: root, env, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  const short = sha.slice(0, 7);
+  let open = [];
+  try { open = JSON.parse(works(['list', '--json']).stdout || '[]'); } catch { return null; }
+  const known = open.find((t) => t.type === 'bug' && t.title === bug.title);
+  if (known) {
+    if ((works(['show', known.id]).stdout || '').includes(short)) return { action: 'bekannt', id: known.id };
+    works(['log', known.id, `CI erneut rot für ${short}: ${bug.jobs}`]);
+    return { action: 'ergänzt', id: known.id };
+  }
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-watch-'));
+  try {
+    const logFile = path.join(tmp, 'ci.log');
+    fs.writeFileSync(logFile, bug.log || 'Keine Fehlerstelle abgefragt.');
+    const r = works(['new', '--type', 'bug', '--priority', 'P2', '--title', bug.title, '--description', bug.description, '--source', 'ci-watch', '--log-file', logFile]);
+    const id = (String(r.stdout).match(/\b[A-Z]+-\d+\b/) || [])[0];
+    return r.status === 0 && id ? { action: 'neu', id } : null;
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 const GOOD = ['success', 'skipped', 'neutral'];
 
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
-    const m = argv[i].match(/^--([a-z]+)(?:=(.*))?$/);
+    const m = argv[i].match(/^--([a-z-]+)(?:=(.*))?$/);
     if (m) out[m[1]] = m[2] !== undefined ? m[2] : argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
   }
   return out;
@@ -92,6 +157,7 @@ async function main() {
         }
         console.log(`CI rot für ${short}: ${bad.map((r) => `${r.name} (${r.conclusion})`).join(', ')}.`);
         let detail = 0; // Annotationen und Logs nur für die ersten 5 Jobs, schont das Abfragelimit
+        const failures = [];
         for (const run of bad) {
           const all = (await api(`/actions/runs/${run.id}/jobs?per_page=100`)).jobs || [];
           const jobs = all.filter((j) => !GOOD.includes(j.conclusion));
@@ -100,17 +166,27 @@ async function main() {
           for (const j of jobs) {
             const steps = (j.steps || []).filter((s) => s.conclusion && !GOOD.includes(s.conclusion)).map((s) => s.name);
             console.log(`\nJob: ${j.name}${steps.length ? `, Schritt: ${steps.join(', ')}` : ''}\n${j.html_url}`);
+            const f = { run: run.name, job: j.name, steps, url: j.html_url, lines: [], excerpt: '' };
+            failures.push(f);
             if (++detail > 5) { console.log('  (keine Fehlerstelle abgefragt, Details nur für die ersten 5 Jobs)'); continue; }
-            for (const l of failureLines(await api(`/check-runs/${j.id}/annotations`).catch(() => []))) console.log(`  ${l}`);
+            f.lines = failureLines(await api(`/check-runs/${j.id}/annotations`).catch(() => []));
+            for (const l of f.lines) console.log(`  ${l}`);
             if (!token) continue;
             // GitHub leitet auf einen Speicher-Host weiter. Dorthin geht der Token nicht mit, die Weiterleitung ist schon signiert.
             const r = await fetch(`https://api.github.com/repos/${repo}/actions/jobs/${j.id}/logs`, { headers, redirect: 'manual' });
             const loc = r.status >= 300 && r.status < 400 && r.headers.get('location');
             const log = loc ? await fetch(loc) : r;
-            if (log.ok) console.log(errorExcerpt(await log.text()));
+            if (log.ok) { f.excerpt = errorExcerpt(await log.text()); console.log(f.excerpt); }
           }
         }
         if (!token) console.log('\nDen Log-Auszug gibt es nur mit GITHUB_TOKEN in der Umgebung, sonst hinter den Links.');
+        if (!a['no-bug']) {
+          const bug = bugFor({ repo, sha, failures });
+          const res = fileBug({ bug, sha });
+          if (res && res.action === 'neu') console.log(`\nBug ${res.id} angelegt: ${bug.title}`);
+          else if (res && res.action === 'ergänzt') console.log(`\nBug ${res.id} ist noch offen, um diesen Commit ergänzt: ${bug.title}`);
+          else if (res) console.log(`\nBug ${res.id} kennt diesen Commit schon.`);
+        }
         return 1;
       }
       if (waited + interval > timeout) {

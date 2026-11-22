@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-22T19:38:33.924Z",
+  "fingerprint": "a030e840450d:b74afd1d8451",
+  "results": {
+    "code-audit": {
+      "status": "ok",
+      "cmd": "",
+      "note": "Prozesse ohne Shell mit Argumentlisten; Jobnamen und Annotationen von GitHub gehen nur als Argumente bzw. Datei an works; Temp-Datei wird entfernt; kein Token in URLs",
+      "fingerprint": "a030e840450d:b74afd1d8451",
+      "at": "2026-11-22T19:38:33.926Z"
+    }
+  }
+}

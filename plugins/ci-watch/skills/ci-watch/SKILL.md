@@ -14,7 +14,7 @@ Ein Node-Skript wartet auf die GitHub-Actions-Läufe zu einem Commit und meldet 
    ```
    node "${CLAUDE_SKILL_DIR}/scripts/ci-status.mjs"
    ```
-   Optionen: `--sha <commit>`, `--repo owner/name` (sonst aus `origin`), `--timeout <Minuten>` (Standard 20), `--grace <Minuten>` (so lange darf noch kein Lauf existieren, Standard 3).
+   Optionen: `--sha <commit>`, `--repo owner/name` (sonst aus `origin`), `--timeout <Minuten>` (Standard 20), `--grace <Minuten>` (so lange darf noch kein Lauf existieren, Standard 3), `--no-bug` (bei rot keinen Bug in works anlegen).
    Dem Nutzer in einem Satz sagen, dass du wartest. Bis zur Meldung des Hintergrundjobs anderes erledigen oder die Runde beenden. Nicht selbst zwischendurch abfragen, kein Monitor, keine `sleep`-Schleifen: Das Ende des Hintergrundjobs wird von selbst gemeldet.
 3. **Ergebnis nach Exit-Code melden**, mit der Ausgabe des Skripts als einziger Quelle:
 
@@ -32,7 +32,8 @@ In dieser Reihenfolge:
 1. **Urteil**: „CI rot für `<sha>`“ und der Workflow.
 2. **Was scheitert**, gleiche Fehler zusammengefasst: Job (bei Matrix-Jobs welche Kombinationen, und welche grün sind, laut Zeile „x von y Jobs rot. Grün: …“), Schritt, Fehlerstelle aus den Annotationen oder dem Log-Auszug. Jobs mit „keine Fehlerstelle abgefragt“ haben nur deshalb keine Fehlerstelle, nicht weil es keine gibt.
 3. **Link** zum ersten fehlgeschlagenen Job.
-4. **Nächster Schritt** als Angebot: „Soll ich mir den Schritt `<Name>` im Code ansehen?“ Nicht ungefragt reparieren, committen oder pushen.
+4. **Bug**: Hat das Projekt `.works`, legt das Skript einen Bug mit P2 an („Bug W-… angelegt“) oder ergänzt den offenen Bug zum selben Workflow und Schritt („ergänzt“). Die ID nennen. Will der Nutzer das nicht, beim nächsten Mal mit `--no-bug` starten.
+5. **Nächster Schritt** als Angebot: „Soll ich mir den Schritt `<Name>` im Code ansehen?“ Nicht ungefragt reparieren, committen oder pushen.
 
 Nur melden, was in der Ausgabe steht. Vermutungen zur Ursache (Pfade, Rechte, Zeilenenden) gehören nicht in die Meldung. Wer die Ursache wissen will, bekommt sie nach dem Lesen des Codes oder des Logs.
 
