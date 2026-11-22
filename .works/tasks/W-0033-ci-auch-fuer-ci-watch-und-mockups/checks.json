@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-22T21:16:35.080Z",
+  "fingerprint": "c600a5e9883b:da39a3ee5e6b",
+  "results": {
+    "code-audit": {
+      "status": "ok",
+      "cmd": "",
+      "note": "Workflows ohne Geheimnisse und ohne Schreibrechte, nur checkout, setup-node und node test.mjs",
+      "fingerprint": "c600a5e9883b:da39a3ee5e6b",
+      "at": "2026-11-22T21:16:35.081Z"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+name: ci-watch Tests
+
+# Läuft auch bei Änderungen am works-CLI: Der CI-Wächter legt bei roter CI über dieses CLI einen Bug an (W-0027).
+on:
+  push:
+    paths:
+      - 'plugins/ci-watch/**'
+      - 'plugins/works/skills/works/scripts/**'
+      - '.github/workflows/ci-watch.yml'
+  pull_request:
+    paths:
+      - 'plugins/ci-watch/**'
+      - 'plugins/works/skills/works/scripts/**'
+      - '.github/workflows/ci-watch.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ci-watch auf ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tests
+        run: node plugins/ci-watch/skills/ci-watch/scripts/test.mjs
