@@ -46,7 +46,7 @@ ship endet mit Exit 1 und sagt, was los ist. Vor Schritt 5 ist am Repo nichts ve
 | Hauptbranch lässt sich nicht vorspulen | Der Remote hat Commits, die lokal fehlen. Dem Nutzer melden, nicht force-pushen. |
 | works done --confirm fehlgeschlagen | Der Merge ist lokal und nicht gepusht. Fehler beheben, dann `works done <ID> --confirm`, `.works` committen und pushen. |
 | Push fehlgeschlagen | Alles ist lokal committet. Ursache nennen (Rechte, Netz, Remote weiter), nie force-pushen. |
-| CI rot | Gepusht ist schon, nicht zurücknehmen. Fehler aus der Meldung lesen und dem Nutzer nennen. Fragen, ob du einen Bug anlegst (`works new --type bug`, mit Priorität) oder ihn gleich auf einem neuen Branch behebst; nicht eigenmächtig anfangen. Plugins sind dann nicht aktualisiert; das holt der nächste ship nach. |
+| CI rot | Gepusht ist schon, nicht zurücknehmen. Fehler aus der Meldung lesen und dem Nutzer nennen. Der CI-Wächter legt dafür selbst einen Bug an oder ergänzt den offenen (die Meldung nennt die ID). Fragen, ob du ihn gleich auf einem neuen Branch behebst; nicht eigenmächtig anfangen. Plugins sind dann nicht aktualisiert; das holt der nächste ship nach. |
 
 ## Danach
 
