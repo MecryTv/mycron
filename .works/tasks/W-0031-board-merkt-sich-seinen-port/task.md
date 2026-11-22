@@ -3,13 +3,13 @@ id: W-0031
 title: Board merkt sich seinen Port
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-22
 updated: 2026-11-22
 due:
-completed:
+completed: 2026-11-22
 milestone:
 branch: feature/w-0031-board-merkt-sich-seinen-port
 tags: [board, hub]
@@ -61,9 +61,10 @@ Vorschlag vom 2026-11-22, vom Nutzer gewünscht (P2). Startet ein Board ohne --p
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-22. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-22: Aufgabe angelegt
 - 2026-11-22: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-22: Umgesetzt, Selbsttest 34/34 mit Browser
+- 2026-11-22: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
