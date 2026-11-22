@@ -81,6 +81,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `handoff <ID> --text ".." \| --file pfad` | Übergabe ersetzen |
 | `dod <ID> [--json]` | Definition of Done anzeigen und automatische Punkte prüfen |
 | `done <ID> [--run] [--confirm] [--force --reason ".."] [--no-checks]` | Abschließen. Ohne `--confirm` nur prüfen. Eingerichtete Prüfungen (`checks`) laufen automatisch, wenn es für den aktuellen Stand kein Ergebnis gibt. `--run` führt zusätzlich `dod.commands` aus |
+| `ship [<ID>] [--no-push] [--no-ci] [--no-update] [--no-open]` | Abschluss in einem Rutsch auf dem Feature-Branch: Definition of Done, keine offenen oder neuen Dateien außerhalb von `.works`, Board stoppen (bei Abbruch und am Ende auf demselben Port neu gestartet), `WORKS.md` und `time.jsonl` zurücksetzen (neue Zeiten bleiben erhalten), Merge mit `--no-ff`, `done --confirm`, `.works` committen, pushen, Branch löschen, CI abwarten (ci-watch), in Marketplace-Repos Plugins aktualisieren, Board neu starten. Hält mit Exit 1 an, wenn etwas nicht stimmt. Skill `works:ship` |
 | `drop <ID> --reason ".."` | Verwerfen |
 | `reopen <ID> --reason ".." [--status backlog\|geplant\|in-arbeit\|review]` | Wiedereröffnen, holt aus dem Archiv zurück |
 | `archive [<ID> ...] [--all] [--older-than <Tage>]` | Erledigte und verworfene Aufgaben nach `archive/` verschieben |
@@ -158,7 +159,7 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `import <datei> [--format ..] [--map feld=Spalte,..] [--sheet ..] [--json] [--all]` | Vorschau mit Duplikaten, siehe import.md |
 | `import <sicherung.json> [--apply] [--mode merge\|restore] [--only 1,4]` | works-Sicherung aus `export --json`: Vorschau mit neu, geändert, gleich, nur hier. `--apply` führt zusammen (neue Aufgaben mit freien IDs, gewählte geänderte übernehmen), `--mode=restore` ersetzt den Stand und sichert ihn vorher in `.works/backups/`. Beides mit `undo` rückgängig |
 | `import <datei> --apply [--only 1,4] [--skip 3] [--status geplant] [--tags ..] [--include-done] [--keep-dups] [--include-archived]` | Anlegen |
-| `selftest [--browser] [--keep] [--verbose]` | Prüft CLI, Hooks, Import, Dateien, Parallelarbeit, Server und API in einem Wegwerfprojekt. Exit 1 bei Fehlern |
+| `selftest [--browser] [--keep] [--verbose] [--only <text>]` | Prüft CLI, Hooks, Import, Dateien, Parallelarbeit, Server und API in einem Wegwerfprojekt. Exit 1 bei Fehlern. `--only` führt nur Schritte aus, deren Name den Text enthält (für eigenständige Schritte wie `works ship`) |
 
 Im Worktree einer parallelen Aufgabe (erkennbar an `.works.link`) arbeitet das CLI auf der `.works` des Hauptprojekts. `start` ändert dort die aktive Aufgabe nicht, `done` ist gesperrt.
 

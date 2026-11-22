@@ -41,7 +41,8 @@ const docx = (paras) => makeZip({
 
 // ---------- Ablauf ----------
 
-export async function selftest({ keep = false, browser = false, verbose = false, log = (s) => process.stdout.write(s + '\n') } = {}) {
+// only: nur Schritte, deren Name diesen Text enthält (für eigenständige Schritte beim Entwickeln).
+export async function selftest({ keep = false, browser = false, verbose = false, only = '', log =(s) => process.stdout.write(s + '\n') } = {}) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'works-selftest-'));
   const proj = path.join(base, 'projekt');
   const home = path.join(base, 'home');
@@ -66,6 +67,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const has = (text, part, what) => expect(String(text).includes(part), `${what || 'Ausgabe'} enthält nicht "${part}": ${String(text).slice(0, 300)}`);
   const step = async (name, fn) => {
+    if (only && !name.includes(only)) return;
     const t0 = Date.now();
     try { await fn(); results.push({ name, ok: true }); log(`ok      ${name}${verbose ? ` (${Date.now() - t0} ms)` : ''}`); }
     catch (e) { results.push({ name, ok: false, error: e.message }); log(`FEHLER  ${name}\n        ${e.message.split('\n').join('\n        ')}`); }
@@ -882,6 +884,69 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         w(['board', '--stop'], { cwd: other, ok: false });
       }
     });
+  }
+
+  // works ship (W-0026): Abschluss in einem Rutsch. Eigenes Projekt mit einem lokalen Remote.
+  if (hasGit) {
+    await step('works ship: anhalten bei offenen Punkten, sonst mergen, abschließen, pushen', async () => {
+      const remote = path.join(base, 'ship-remote.git');
+      const sp = path.join(base, 'ship');
+      fs.mkdirSync(sp);
+      git(['init', '-q', '--bare', remote], base);
+      git(['init', '-q'], sp); git(['symbolic-ref', 'HEAD', 'refs/heads/main'], sp);
+      w(['init'], { cwd: sp });
+      fs.writeFileSync(path.join(sp, 'app.txt'), 'eins\n');
+      git(['add', '-A'], sp); git(['commit', '-q', '-m', 'Start'], sp);
+      git(['remote', 'add', 'origin', remote], sp); git(['push', '-q', '-u', 'origin', 'main'], sp);
+      const id = (w(['new', '--type=chore', '--title=Ship-Test', '--priority=P3'], { cwd: sp }).out.match(/W-\d+/) || [])[0];
+      // time.jsonl ist wie in echten Projekten im Git; ship setzt sie zurück und muss neue Zeilen behalten.
+      fs.appendFileSync(path.join(sp, '.works', 'time.jsonl'), JSON.stringify({ t: new Date().toISOString(), ev: 'turn', task: id, marke: 'alt' }) + '\n');
+      git(['add', '-A'], sp); git(['commit', '-q', '-m', `works: ${id} angelegt`], sp);
+      git(['switch', '-q', '-c', 'feature/ship-test'], sp);
+      w(['start', id], { cwd: sp });
+      fs.appendFileSync(path.join(sp, 'app.txt'), 'zwei\n');
+      git(['add', 'app.txt'], sp); git(['commit', '-q', '-m', `feat(${id}): zwei`], sp);
+      const tdir = path.join(sp, '.works', 'tasks', fs.readdirSync(path.join(sp, '.works', 'tasks')).find((d) => d.startsWith(id)));
+      const tf = path.join(tdir, 'task.md');
+      const branchNow = () => git(['rev-parse', '--abbrev-ref', 'HEAD'], sp);
+      // Offene Kriterien: ship hält vor dem Merge an, nichts wird gepusht.
+      const r1 = w(['ship', id], { cwd: sp, ok: false });
+      expect(r1.code !== 0 && /Definition of Done/.test(r1.out + r1.err), `ship trotz offener Kriterien: ${r1.code} ${(r1.out + r1.err).slice(0, 300)}`);
+      expect(branchNow() === 'feature/ship-test', `ship hat den Branch gewechselt: ${branchNow()}`);
+      // Alle Punkte erledigt, aber eine nicht committete Code-Änderung: ship hält an.
+      fs.writeFileSync(tf, fs.readFileSync(tf, 'utf8').replace(/^- \[ \] ?$/gm, '- [x] erledigt').replace(/^- \[ \] (.+)$/gm, '- [x] $1'));
+      git(['add', '-A'], sp); git(['commit', '-q', '-m', `works: ${id} Kriterien`], sp);
+      fs.appendFileSync(path.join(sp, 'app.txt'), 'drei\n');
+      fs.writeFileSync(path.join(sp, 'neu.txt'), 'vergessen\n');
+      const r2 = w(['ship', id], { cwd: sp, ok: false });
+      expect(r2.code !== 0 && /app\.txt/.test(r2.out + r2.err) && /neu\.txt/.test(r2.out + r2.err), `ship trotz nicht committeter oder neuer Datei: ${r2.code} ${(r2.out + r2.err).slice(0, 300)}`);
+      git(['checkout', '--', 'app.txt'], sp); fs.rmSync(path.join(sp, 'neu.txt'));
+      // Bricht ship nach dem Stoppen des Boards ab (Remote nicht erreichbar), läuft das Board wieder auf demselben Port.
+      const bport = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`], { cwd: sp }).out);
+      const boardPort = () => { const sj = path.join(sp, '.works', 'server.json'); return fs.existsSync(sj) ? String(JSON.parse(fs.readFileSync(sj, 'utf8')).port) : ''; };
+      git(['remote', 'set-url', 'origin', path.join(base, 'gibt-es-nicht.git')], sp);
+      const rb = w(['ship', id], { cwd: sp, ok: false });
+      git(['remote', 'set-url', 'origin', remote], sp);
+      expect(rb.code !== 0 && branchNow() === 'feature/ship-test', `ship ohne erreichbaren Remote: ${rb.code} auf ${branchNow()}: ${(rb.out + rb.err).slice(0, 300)}`);
+      await waitFor(async () => boardPort() === bport, `Board nach Abbruch wieder auf Port ${bport}`);
+      // Neue Zeiten in time.jsonl, noch nicht committet: Sie müssen nach dem Abschluss erhalten bleiben.
+      fs.appendFileSync(path.join(sp, '.works', 'time.jsonl'), JSON.stringify({ t: new Date().toISOString(), ev: 'turn', task: id, marke: 'ship-zeit' }) + '\n');
+      const r3 = w(['ship', id], { cwd: sp, ok: false });
+      expect(r3.code === 0, `ship → Exit ${r3.code}: ${(r3.out + r3.err).slice(0, 500)}`);
+      expect(branchNow() === 'main', `Nach ship nicht auf main, sondern ${branchNow()}`);
+      has(git(['log', '--merges', '--format=%s', '-1'], sp), "Merge branch 'feature/ship-test'", 'Merge-Commit');
+      expect(!git(['branch', '--list', 'feature/ship-test'], sp), 'Feature-Branch nicht gelöscht');
+      has(w(['show', id], { cwd: sp }).out, 'erledigt', 'Status nach ship');
+      expect(git(['rev-parse', 'main'], remote) === git(['rev-parse', 'HEAD'], sp), 'Remote steht nicht auf dem lokalen Stand');
+      expect(!git(['status', '--porcelain', '--untracked-files=no'], sp).split('\n').some((l) => /time\.jsonl|WORKS\.md/.test(l) === false && l.trim()), `Nach ship bleiben Änderungen: ${git(['status', '--porcelain'], sp)}`);
+      const marks = fs.readFileSync(path.join(sp, '.works', 'time.jsonl'), 'utf8').split('ship-zeit').length - 1;
+      expect(marks === 1, `Neue Zeile in time.jsonl ${marks}-mal statt einmal`);
+      has(r3.out, 'CI', 'ship nennt den CI-Schritt');
+      await waitFor(async () => boardPort() === bport, `Board nach ship wieder auf Port ${bport}`);
+      w(['board', '--stop'], { cwd: sp, ok: false });
+    });
+  } else {
+    skip('works ship', 'Git fehlt');
   }
 
   const failed = results.filter((r) => !r.ok);
