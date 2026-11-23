@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-23 18:58 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-23 19:05 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 4 | 0 | 0 | 0 | 2 | 0 | 37 | 0 |
+| 5 | 0 | 0 | 0 | 2 | 0 | 37 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 4 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 5 · P3 Mittel: 0 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -26,6 +26,7 @@ _Keine Einträge._
 | [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | Backlog | M |  |  | blockiert durch W-0040 |
 | [W-0040](tasks/W-0040-gemeinsamer-discord-bot-zentraler/task.md) | Gemeinsamer Discord-Bot: zentraler Dienst auf dem VPS | Feature | P2 Hoch | Backlog | XL |  |  |  |
 | [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | Backlog | XL |  |  |  |
+| [W-0042](tasks/W-0042-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest | Bug | P2 Hoch | Backlog |  |  |  |  |
 
 ## Blockiert
 
