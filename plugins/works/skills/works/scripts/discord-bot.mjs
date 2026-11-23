@@ -419,7 +419,16 @@ export class Bot {
     for (const t of Object.values(next.tasks)) {
       const o = prev.tasks[t.id];
       const base = { id: t.id, title: t.title };
-      if (!o) { if (t.priority === 'P1' && t.source !== 'board' && OPEN_STATUSES.includes(t.status) && this.once(rid, `p1:${t.id}`)) this.event(rid, 'p1', base, cfg); continue; }
+      if (!o) {
+        if (t.priority === 'P1' && t.source !== 'board' && OPEN_STATUSES.includes(t.status) && this.once(rid, `p1:${t.id}`)) this.event(rid, 'p1', base, cfg);
+        // Neu und schon im Review (works new --status review, oder angelegt und gesetzt zwischen zwei Blicken des Bots).
+        // Erledigte oder Fragen neuer Aufgaben nicht melden: Ein Import brächte sonst Dutzende Nachrichten.
+        if (t.status === 'review' && this.once(rid, `review:${t.id}`)) {
+          const r = this.event(rid, 'review', { ...base, crit: t.crit, cost: next.costs[t.id] || '' }, cfg);
+          if (r) this.state.open[`review:${rid}:${t.id}`] = { ...r, rid };
+        }
+        continue;
+      }
       if (o.status !== 'review' && t.status === 'review') {
         if (this.once(rid, `review:${t.id}`)) {
           const r = this.event(rid, 'review', { ...base, crit: t.crit, cost: next.costs[t.id] || '' }, cfg);

@@ -1141,7 +1141,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const fake = await startFakeDiscord({ token: DTOKEN });
   // Schnelle Takte für den Test: Bot-Schleife 100 ms, Statuspost frühestens alle 300 ms.
   const denv = { WORKS_DISCORD_API: fake.api, WORKS_DISCORD_FAST: '1' };
-  const nodeMajor = Number(process.versions.node.split('.')[0]);
+  // Gateway nur mit globalem WebSocket (ab Node 22, abschaltbar mit --no-experimental-websocket).
+  const hasWs = typeof globalThis.WebSocket === 'function';
   const embedsOf = (ch = '11') => fake.inChannel(ch).map((m) => ({ m, e: m.embeds[0] || {} }));
   const findMsg = (pred, ch) => embedsOf(ch).find(({ m, e }) => pred(e, m));
   // Neuester Statuspost: Nach einem 403 bleibt der alte stehen, der Bot legt einen neuen an.
@@ -1193,7 +1194,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     let r = await wa(['discord', 'start'], { extraEnv: denv });
     has(r.out, 'gestartet');
     try {
-      if (nodeMajor >= 22) {
+      if (hasWs) {
         await dwait(() => fake.gateway.identifies.length >= 1, 'Identify am Gateway');
         expect(fake.gateway.identifies[0].token === DTOKEN, 'Identify ohne Token');
       }
@@ -1205,7 +1206,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       r = await wa(['discord', 'start'], { extraEnv: denv });
       has(r.out, 'läuft schon');
       await new Promise((res) => setTimeout(res, 600));
-      if (nodeMajor >= 22) expect(fake.gateway.identifies.length === 1, `Zweiter Bot verbunden (${fake.gateway.identifies.length})`);
+      if (hasWs) expect(fake.gateway.identifies.length === 1, `Zweiter Bot verbunden (${fake.gateway.identifies.length})`);
       has((await wa(['discord'], { extraEnv: denv })).out, 'läuft', 'Status');
       // Mehrere Änderungen kurz nacheinander: höchstens wenige Bearbeitungen, am Ende der neue Stand.
       // Eigene, frische Aufgabe: Im vollen Selbsttest sind die ersten Aufgaben schon in Arbeit oder erledigt.
@@ -1286,7 +1287,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
 
   await step('Discord: nichts geht verloren (Bot aus, 429, 502, gelöschter Statuspost), Gateway verbindet neu', async () => {
     try {
-      if (nodeMajor >= 22) {
+      if (hasWs) {
         const ids = fake.gateway.identifies.length;
         fake.reconnect();
         await dwait(() => fake.gateway.resumes >= 1 || fake.gateway.identifies.length > ids, 'Neuverbindung nach op 7');
@@ -1359,6 +1360,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       await dwait(() => findMsg((e) => e.title === 'Nach dem Fehler'), 'Ereignis nach einem kaputten');
       // Freigabe aus einer parallelen Bahn (activity.lanes).
       const actF = path.join(proj, '.works', 'activity.json');
+      // Aufgabe, die schon im Review ist, wenn der Bot sie zum ersten Mal sieht (W-0039: langsame Runner).
+      const direct = nid(w(['new', '--type=chore', '--title=Direkt im Review', '--status', 'review']).out);
+      await dwait(() => findMsg((e) => e.title === `${direct} im Review`), 'Review einer neuen Aufgabe');
       const lane = nid(w(['new', '--type=chore', '--title=Bahn-Aufgabe']).out);
       const since = new Date().toISOString();
       const act = JSON.parse(fs.readFileSync(actF, 'utf8'));
@@ -1432,7 +1436,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         const rv = await dwait(() => findMsg((e) => e.title === `${sid} im Review`), 'Review Ship-Probe');
         const emitB = (data) => w(['discord', 'emit', 'ship', `--json=${JSON.stringify({ id: sid, run: 'b1', ...data })}`], { cwd: bp, extraEnv: denv });
         emitB({ step: 'start' });
-        await sleep(400);
+        // Erst weiter, wenn der Bot den Start verarbeitet hat (feste Pausen reichen auf langsamen Runnern nicht).
+        await dwait(() => findMsg((e) => e.title === `${sid} wird ausgeliefert`), 'ship-Start verarbeitet');
         w(['done', sid, '--confirm', '--force', '--reason=Selbsttest'], { cwd: bp });
         w(['new', '--type=bug', '--title=Während-ship', '--priority=P1'], { cwd: bp });
         await sleep(800);
