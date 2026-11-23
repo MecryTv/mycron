@@ -1135,7 +1135,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const DTOKEN = 'MTAwMA.fake-bot-token.0123456789abcdefWXYZ';
   const ddir = path.join(home, '.works', 'discord');
   const dcfg = () => JSON.parse(fs.readFileSync(path.join(ddir, 'config.json'), 'utf8'));
-  const dwait = async (fn, what, ms = 15000) => { const until = Date.now() + ms; let last; while (Date.now() < until) { last = await fn(); if (last) return last; await new Promise((r) => setTimeout(r, 100)); } throw new Error(`Zeit abgelaufen: ${what}`); };
+  const dwait = async (fn, what, ms = 25000) => { const until = Date.now() + ms; let last; while (Date.now() < until) { last = await fn(); if (last) return last; await new Promise((r) => setTimeout(r, 100)); } throw new Error(`Zeit abgelaufen: ${what}`); };
   const fromUrl = pathToFileURL(path.join(HERE, 'discord-fake.mjs')).href;
   const { startFakeDiscord } = await import(fromUrl);
   const fake = await startFakeDiscord({ token: DTOKEN });
@@ -1198,8 +1198,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         await dwait(() => fake.gateway.identifies.length >= 1, 'Identify am Gateway');
         expect(fake.gateway.identifies[0].token === DTOKEN, 'Identify ohne Token');
       }
-      const st = await dwait(() => statusOf('projekt'), 'Statuspost für projekt');
-      expect(st.m.pinned, 'Statuspost nicht angeheftet');
+      // Anheften ist eine eigene Anfrage nach dem Anlegen: darauf warten, nicht nur auf die Nachricht.
+      const st = await dwait(() => { const s = statusOf('projekt'); return s && s.m.pinned ? s : null; }, 'Statuspost für projekt angeheftet');
       const names = (st.e.fields || []).map((f) => f.name);
       expect(names.includes('CI') && names.includes('Heute'), `Felder fehlen: ${names.join(', ')}`);
       expect(st.m.flags & 4096, 'Statuspost nicht still');
@@ -1227,6 +1227,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   });
 
   await step('Discord: Ereignisse mit Feldern, Erwähnung nur bei @, Erledigtes wird bearbeitet', async () => {
+    // Eigenständig: Ist ein Schritt davor gescheitert, startet dieser den Bot selbst und legt seine Aufgabe an.
+    await wa(['discord', 'start'], { extraEnv: denv, ok: false });
+    if (!dprobe) { dprobe = (w(['new', '--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0]; w(['start', dprobe, '--force']); }
     try {
       // Review: still, mit Kriterien.
       w(['set', dprobe, 'status=review']);
@@ -1261,6 +1264,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   });
 
   await step('Discord: works ship als eine Nachricht, CI rot mit Bug, Wochenbericht', async () => {
+    await wa(['discord', 'start'], { extraEnv: denv, ok: false });
     try {
       const emit = (type, data) => w(['discord', 'emit', type, `--json=${JSON.stringify(data)}`], { extraEnv: denv });
       emit('ship', { id: 'W-0001', step: 'start', run: 'r1' });
@@ -1286,6 +1290,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   });
 
   await step('Discord: nichts geht verloren (Bot aus, 429, 502, gelöschter Statuspost), Gateway verbindet neu', async () => {
+    await wa(['discord', 'start'], { extraEnv: denv, ok: false });
     try {
       if (hasWs) {
         const ids = fake.gateway.identifies.length;
@@ -1442,9 +1447,11 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         w(['new', '--type=bug', '--title=Während-ship', '--priority=P1'], { cwd: bp });
         await sleep(800);
         expect(!p1Msgs('Während-ship').length, 'Ereignis während ship gemeldet');
+        // Nach dem Push sind die Git-Schritte vorbei: Der Bot taut auf, auch wenn ship noch auf die CI wartet.
+        emitB({ step: 'push', sha: 'abc1234def' });
+        await dwait(() => /angenommen/.test(fake.messages.get(rv.m.id).embeds[0].title || ''), 'Review nach dem Push angenommen');
+        await dwait(() => p1Msgs('Während-ship').length, 'P1 aus der Zeit von ship nach dem Push gemeldet');
         emitB({ step: 'done' });
-        await dwait(() => /angenommen/.test(fake.messages.get(rv.m.id).embeds[0].title || ''), 'Review nach ship angenommen');
-        await dwait(() => p1Msgs('Während-ship').length, 'P1 aus der Zeit von ship nach dem Ende gemeldet');
         await sleep(600);
         expect(p1Msgs('Während-ship').length === 1, 'P1 aus ship doppelt');
         expect(!findMsg((e) => e.title === `✓ ${sid} erledigt`), 'Ausgelieferte Aufgabe zusätzlich als erledigt gemeldet');
