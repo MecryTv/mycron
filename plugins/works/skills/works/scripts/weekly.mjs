@@ -7,6 +7,7 @@ import { byIdMap, milestoneProgress } from './views.mjs';
 import { addDays } from './sprint.mjs';
 import { loadComments } from './comments.mjs';
 import { ensureGitignore } from './server-control.mjs';
+import { emit } from './discord.mjs';
 
 export const DEFAULT_REPORT = {
   days: 7,
@@ -175,6 +176,8 @@ export async function writeWeekly(root, config, { date = today(), summary = '', 
       try { await sendDiscord(url, project, d, sum, s.include); notes.push('An Discord gesendet.'); } catch (e) { notes.push(`Discord: ${e.name === 'AbortError' ? 'Zeitüberschreitung' : e.message}`); }
     }
   }
+  // Discord-Bot (W-0036): Bericht als Nachricht, wenn der Bot eingerichtet ist. Wartet nicht auf Discord.
+  if (emit('report', { kind: 'woche', title: `Wochenbericht ${project}, KW ${range.week}`, summary: sum, done: d.done.length }, root)) notes.push('Für den Discord-Bot abgelegt.');
   return { name, md: path.join(dir, `${name}.md`), html: path.join(dir, `${name}.html`), notes, summary: sum, range };
 }
 

@@ -73,6 +73,15 @@ function worksRoot(dir) {
 }
 
 // Legt den Bug an oder ergänzt den offenen mit gleichem Titel. null ohne .works oder works-CLI.
+// Meldet das CI-Ergebnis an den Discord-Bot von works (W-0036). works legt es nur ab, wenn der Bot eingerichtet ist,
+// und wartet nie auf Discord. false ohne .works oder works-CLI.
+export function notifyWorks({ cwd = process.cwd(), data, cli = findWorksCli(), env = process.env }) {
+  const root = worksRoot(cwd);
+  if (!root || !cli) return false;
+  const r = spawnSync(process.execPath, [cli, 'discord', 'emit', 'ci', `--json=${JSON.stringify(data)}`], { cwd: root, env, encoding: 'utf8', windowsHide: true, timeout: 15000 });
+  return r.status === 0;
+}
+
 // Rückgabe { action: 'neu' | 'ergänzt' | 'bekannt', id }.
 export function fileBug({ cwd = process.cwd(), bug, sha, cli = findWorksCli(), env = process.env }) {
   const root = worksRoot(cwd);
@@ -153,13 +162,16 @@ async function main() {
         const bad = runs.filter((r) => !GOOD.includes(r.conclusion));
         if (!bad.length) {
           console.log(`CI grün für ${short}: ${runs.map((r) => r.name).join(', ')}.`);
+          notifyWorks({ data: { ok: true, sha, workflows: runs.length } });
           return 0;
         }
         console.log(`CI rot für ${short}: ${bad.map((r) => `${r.name} (${r.conclusion})`).join(', ')}.`);
         let detail = 0; // Annotationen und Logs nur für die ersten 5 Jobs, schont das Abfragelimit
         const failures = [];
+        let jobCount = 0;
         for (const run of bad) {
           const all = (await api(`/actions/runs/${run.id}/jobs?per_page=100`)).jobs || [];
+          jobCount += all.length;
           const jobs = all.filter((j) => !GOOD.includes(j.conclusion));
           const ok = all.filter((j) => GOOD.includes(j.conclusion)).map((j) => j.name);
           console.log(`\n${run.name}: ${jobs.length} von ${all.length} Jobs rot.${ok.length ? ` Grün: ${ok.join(', ')}.` : ''}`);
@@ -180,13 +192,16 @@ async function main() {
           }
         }
         if (!token) console.log('\nDen Log-Auszug gibt es nur mit GITHUB_TOKEN in der Umgebung, sonst hinter den Links.');
+        let res = null;
         if (!a['no-bug']) {
           const bug = bugFor({ repo, sha, failures });
-          const res = fileBug({ bug, sha });
+          res = fileBug({ bug, sha });
           if (res && res.action === 'neu') console.log(`\nBug ${res.id} angelegt: ${bug.title}`);
           else if (res && res.action === 'ergänzt') console.log(`\nBug ${res.id} ist noch offen, um diesen Commit ergänzt: ${bug.title}`);
           else if (res) console.log(`\nBug ${res.id} kennt diesen Commit schon.`);
         }
+        const first = failures[0] || {};
+        notifyWorks({ data: { ok: false, sha, failed: failures.length, total: jobCount, job: first.job || '', error: (first.lines && first.lines[0]) || String(first.excerpt || '').split('\n').find((l) => l.trim()) || '', bug: res ? res.id : '', url: bad[0] && bad[0].html_url } });
         return 1;
       }
       if (waited + interval > timeout) {

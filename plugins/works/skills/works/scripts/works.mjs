@@ -2856,7 +2856,7 @@ async function cmdDiscord() {
     if (!cfg.channel_id) { out(`Nächster Schritt: einladen mit ${d.inviteUrl(cfg.app_id)}\nDanach Kanal wählen: works discord channel`); return; }
     out(`Kanal: #${cfg.channel_name} auf ${cfg.guild_name}`);
     const info = d.botInfo();
-    out(info ? `Prozess: läuft (PID ${info.pid}, seit ${String(info.started).slice(11, 16)} UTC)` : `Prozess: gestoppt${cfg.autostart === false ? ', Autostart aus' : ', startet mit dem Board'}`);
+    out(info ? `Prozess: läuft (PID ${info.pid}, seit ${new Date(info.started).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })})` : `Prozess: gestoppt${cfg.autostart === false ? ', Autostart aus' : ', startet mit dem Board'}`);
     const evs = Object.entries(cfg.events);
     out(`Ereignisse: ${evs.filter(([, v]) => v.on).length} von ${evs.length} an, mit Erwähnung: ${evs.filter(([, v]) => v.on && v.at).map(([k]) => k).join(', ') || 'keine'}`);
     out(`Ruhezeit: ${cfg.quiet.on ? `${cfg.quiet.from} bis ${cfg.quiet.to}` : 'aus'}. Verzögerung: Freigabe ${cfg.delays.perm} s, fertig ${cfg.delays.idle} s`);

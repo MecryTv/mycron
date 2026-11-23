@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { readJson, writeJson, exists, rootIdOf } from './lib.mjs';
+import { readJson, writeJson, rootIdOf } from './lib.mjs';
 import { isAlive, stopProcess, newestCli, cliVersion } from './server-control.mjs';
 
 export const discordDir = () => path.join(os.homedir(), '.works', 'discord');
@@ -98,6 +98,8 @@ export function emit(type, data = {}, root = '') {
     if (!loadToken()) return false;
     const dir = dfile('outbox');
     fs.mkdirSync(dir, { recursive: true });
+    // Läuft der Bot lange nicht, wächst die outbox nicht unbegrenzt.
+    if (fs.readdirSync(dir).length >= 500) return false;
     const ev = { v: 1, type, at: new Date().toISOString(), root: root || '', rootId: root ? rootIdOf(root) : '', project: root ? path.basename(root) : '', data };
     const name = `${Date.now().toString().padStart(15, '0')}-${crypto.randomBytes(4).toString('hex')}.json`;
     const tmp = path.join(dir, `.${name}.tmp`);
@@ -186,5 +188,3 @@ export function applySetting(cfg, key, value) {
   throw new Error(`Unbekannte Einstellung ${key}. Möglich: autostart, auto_enroll, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, event.<name>[.at]`);
 }
 
-export const projectKey = (root) => rootIdOf(root);
-export const existsDir = () => exists(discordDir());

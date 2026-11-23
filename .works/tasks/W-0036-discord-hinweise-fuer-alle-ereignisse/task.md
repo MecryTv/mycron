@@ -47,17 +47,17 @@ Wunsch des Nutzers vom 2026-11-22/23 (P2): Discord-Anbindung für alles, nicht n
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] Nachgebautes Discord für Tests: REST (Nutzer, Anwendung, Server, Kanäle, Nachrichten, Anheften, 429) und Gateway über WebSocket (Hello, Identify, Ready, Heartbeat)
-- [ ] Ablage in ~/.works/discord: secret.json (nur Token, Datei nur für den Nutzer), config.json (Einstellungen), state.json (Nachrichten-IDs, Stand je Projekt), outbox/ (eine Datei je Ereignis), bot.log ohne Token
-- [ ] works discord: Status mit nächstem Schritt, token (liest von stdin, versteckte Eingabe), Einladungslink, channel, set, test, start, stop, emit
-- [ ] REST-Client mit Grenzen von Discord (Buckets, 429, Wiederholung), Basis-URL nur für Loopback überschreibbar (Tests)
-- [ ] Gateway mit Heartbeat, Resume und Neuverbindung; unter Node 22 online, darunter nur REST
-- [ ] Bot-Prozess: einer je Rechner (Sperrdatei), startet mit dem Board und beim Sitzungsstart, nur mit Einrichtung, neu bei neuer Version
-- [ ] Ereignisse aus dem Stand der Projekte ableiten (Review, angenommen, zurückgegeben, Frage, neue P1, Warteschlange leer, Freigabe mit Verzögerung, fertig mit Verzögerung); Hooks schreiben nichts zusätzlich
-- [ ] Ereignisse über outbox: works ship (eine Nachricht mit Schritten), CI aus ci-watch, Wochenbericht
-- [ ] Nachrichten nach F2: Felder, Erledigtes nachträglich bearbeiten, Erwähnung nur bei @, sonst still, Ruhezeit, Datenschutz-Schalter
-- [ ] Statuspost je Projekt angeheftet, gebündelt bearbeitet, bei gelöschter Nachricht neu
-- [ ] Selbsttest-Schritte, Doku (cli.md, integrations.md, SKILL.md)
+- [x] Nachgebautes Discord für Tests: REST (Nutzer, Anwendung, Server, Kanäle, Nachrichten, Anheften, 429) und Gateway über WebSocket (Hello, Identify, Ready, Heartbeat)
+- [x] Ablage in ~/.works/discord: secret.json (nur Token, Datei nur für den Nutzer), config.json (Einstellungen), state.json (Nachrichten-IDs, Stand je Projekt), outbox/ (eine Datei je Ereignis), bot.log ohne Token
+- [x] works discord: Status mit nächstem Schritt, token (liest von stdin, versteckte Eingabe), Einladungslink, channel, set, test, start, stop, emit
+- [x] REST-Client mit Grenzen von Discord (Buckets, 429, Wiederholung), Basis-URL nur für Loopback überschreibbar (Tests)
+- [x] Gateway mit Heartbeat, Resume und Neuverbindung; unter Node 22 online, darunter nur REST
+- [x] Bot-Prozess: einer je Rechner (Sperrdatei), startet mit dem Board und beim Sitzungsstart, nur mit Einrichtung, neu bei neuer Version
+- [x] Ereignisse aus dem Stand der Projekte ableiten (Review, angenommen, zurückgegeben, Frage, neue P1, Warteschlange leer, Freigabe mit Verzögerung, fertig mit Verzögerung); Hooks schreiben nichts zusätzlich
+- [x] Ereignisse über outbox: works ship (eine Nachricht mit Schritten), CI aus ci-watch, Wochenbericht
+- [x] Nachrichten nach F2: Felder, Erledigtes nachträglich bearbeiten, Erwähnung nur bei @, sonst still, Ruhezeit, Datenschutz-Schalter
+- [x] Statuspost je Projekt angeheftet, gebündelt bearbeitet, bei gelöschter Nachricht neu
+- [x] Selbsttest-Schritte, Doku (cli.md, integrations.md, SKILL.md)
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -95,3 +95,6 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: Entwurf F2 „F verbessert“ angehängt
 - 2026-11-23: Entwurf F2 „F verbessert“ gewählt. Grund: Wahl des Nutzers: F verbessert
 - 2026-11-23: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-23: Entscheidung E3 dokumentiert: Ereignisse aus dem Stand der Projekte
+- 2026-11-23: Entscheidung E4 dokumentiert: Gateway ab Node 22, Nachrichten auch darunter
+- 2026-11-23: Entscheidung E5 dokumentiert: Rechte und Verzögerungen

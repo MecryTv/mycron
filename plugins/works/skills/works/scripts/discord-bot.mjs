@@ -55,10 +55,9 @@ export function renderStatus(s, cfg, now = new Date()) {
   const lines = [];
   const aLabel = a ? `**${a.id}**${cfg.privacy.titles && a.title ? ` ${cut(a.title, 120)}` : ''}` : '';
   if (s.perm) lines.push(`**Claude** wartet auf deine Freigabe${s.perm.tool ? ` (${cut(s.perm.tool, 40)})` : ''}, seit ${rel(s.perm.since)}`);
-  else if (s.busy && a) lines.push(`**Claude** arbeitet an ${aLabel}${s.since ? `, seit ${rel(s.since)}` : ''}`);
-  else if (s.busy) lines.push(`**Claude** arbeitet${s.since ? `, seit ${rel(s.since)}` : ''}`);
+  else if (s.busy) lines.push(`**Claude** arbeitet${a ? ` an ${aLabel}` : ''}${s.since ? `, seit ${rel(s.since)}` : ''}`);
   else if (s.idleSince) lines.push(`**Claude** ist fertig und wartet auf dich, seit ${rel(s.idleSince)}`);
-  if (!s.busy && a) lines.push(`In Arbeit: ${aLabel}`);
+  if (a && (s.perm || !s.busy)) lines.push(`In Arbeit: ${aLabel}`);
   if (!a && !s.busy && !s.perm) lines.push('Keine Aufgabe in Arbeit');
   if (a && a.crit && a.crit[1]) lines.push(`${bar(a.crit[0], a.crit[1], 7)} ${a.crit[0]} von ${a.crit[1]} Kriterien`);
   const t = s.today || {};
@@ -141,7 +140,7 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date() } = {}) {
     }
     case 'ci_red':
     case 'ci_green':
-      if (ev.type === 'ci_green') { e = { color: COLOR.done, title: `CI grün für ${sha7(ev.sha)}`, description: ev.total ? `${ev.total} Jobs grün` : 'Wieder grün' }; }
+      if (ev.type === 'ci_green') { e = { color: COLOR.done, title: `CI grün für ${sha7(ev.sha)}`, description: ev.workflows ? `${ev.workflows} Workflows grün` : 'Wieder grün' }; }
       else {
         e = { color: COLOR.red, title: `CI rot für ${sha7(ev.sha)}`, fields: [...(ev.total ? [field('Rot', `${ev.failed || '?'} von ${ev.total} Jobs`)] : []), ...(ev.job ? [field('Erster Fehler', cut(ev.job, 200))] : []), ...(ev.bug ? [field('Bug', `${ev.bug} angelegt`)] : [])] };
         if (cfg.privacy.ci_error && ev.error) e.footer = { text: cut(ev.error, 300) };
@@ -449,13 +448,18 @@ export class Bot {
   prune() {
     const old = Date.now() - 7 * 86400000;
     for (const [k, v] of Object.entries(this.state.msgs)) if (Date.parse(v.at) < old && !Object.values(this.state.open).some((o) => o.key === k)) delete this.state.msgs[k];
-    for (const [k, v] of Object.entries(this.state.ships)) if (v.status !== 'run' && Date.parse(v.ended || 0) < Date.now() - 86400000) delete this.state.ships[k];
+    for (const [k, v] of Object.entries(this.state.ships)) if (Date.parse(v.ended || v.started) < Date.now() - 86400000) delete this.state.ships[k];
   }
 
   async tick() {
     const cfg = loadDiscordConfig();
     const done = [];
-    for (const { file, ev } of readOutbox()) { try { this.fromOutbox(ev, cfg); } catch (e) { this.log(`outbox: ${e.message}`); } done.push(file); }
+    // Ereignisse älter als zwei Tage (Bot lange aus) wären nur noch Lärm: verwerfen.
+    for (const { file, ev } of readOutbox()) {
+      if (Date.now() - Date.parse(ev.at) > 2 * 86400000) this.log(`Altes Ereignis ${ev.type} vom ${ev.at} verworfen`);
+      else { try { this.fromOutbox(ev, cfg); } catch (e) { this.log(`outbox: ${e.message}`); } }
+      done.push(file);
+    }
     if (done.length) this.dirty = true;
     for (const p of projectList()) {
       const rid = rootIdOf(p.path);
@@ -535,15 +539,20 @@ export async function runBot() {
       }
     }
     log(`Bot gestartet (PID ${process.pid}, Node ${process.version})`);
-    if (hasWebSocket()) {
+    if (!hasWebSocket()) log(`Node ${process.version}: ohne Gateway, online erst ab Node 22. Nachrichten gehen trotzdem.`);
+    // Gateway: beim Start und, falls Discord da nicht erreichbar war, jede Minute neu versuchen.
+    let gwRetry = 0;
+    const connectGateway = async () => {
+      gwRetry = Date.now() + 60000;
       try {
         const g = await rest.get('/gateway/bot');
         gw = new Gateway({ token, url: g.url, log, onFatal: (code) => { fatal = code === 4004 ? 'Token ungültig' : `Gateway-Code ${code}`; } });
         gw.start();
       } catch (e) { log(`Gateway nicht erreichbar (${e.message}), Nachrichten gehen trotzdem.`); }
-    } else log(`Node ${process.version}: ohne Gateway, online erst ab Node 22. Nachrichten gehen trotzdem.`);
+    };
     const bot = new Bot({ rest, log });
     while (!stopping && !stopRequested() && !fatal) {
+      if (!gw && hasWebSocket() && Date.now() >= gwRetry) await connectGateway();
       try { await bot.tick(); } catch (e) {
         if (e.status === 401) { fatal = 'Token ungültig'; break; }
         log(`Fehler: ${e.message}`);

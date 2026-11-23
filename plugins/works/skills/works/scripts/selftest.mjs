@@ -1145,6 +1145,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const embedsOf = (ch = '11') => fake.inChannel(ch).map((m) => ({ m, e: m.embeds[0] || {} }));
   const findMsg = (pred, ch) => embedsOf(ch).find(({ m, e }) => pred(e, m));
   const statusOf = (name) => findMsg((e) => e.author && e.author.name === `${name} · Stand`);
+  let dprobe = '';
 
   await step('Discord: Einrichtung, Token nur lokal und nie in der Ausgabe', async () => {
     if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eins']); w(['new', '--type=chore', '--title=Zwei', '--criteria=Fertig']); }
@@ -1206,10 +1207,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       if (nodeMajor >= 22) expect(fake.gateway.identifies.length === 1, `Zweiter Bot verbunden (${fake.gateway.identifies.length})`);
       has((await wa(['discord'], { extraEnv: denv })).out, 'läuft', 'Status');
       // Mehrere Änderungen kurz nacheinander: höchstens wenige Bearbeitungen, am Ende der neue Stand.
+      // Eigene, frische Aufgabe: Im vollen Selbsttest sind die ersten Aufgaben schon in Arbeit oder erledigt.
       const before = st.m.edits;
-      w(['start', 'W-0002', '--force']);
-      for (let i = 0; i < 5; i++) w(['log', 'W-0002', `Schritt ${i}`]);
-      await dwait(() => (statusOf('projekt').e.description || '').includes('W-0002'), 'Statuspost zeigt W-0002');
+      dprobe = (w(['new', '--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0];
+      w(['start', dprobe, '--force']);
+      for (let i = 0; i < 5; i++) w(['log', dprobe, `Schritt ${i}`]);
+      await dwait(() => (statusOf('projekt').e.description || '').includes(dprobe), `Statuspost zeigt ${dprobe}`);
       await new Promise((res) => setTimeout(res, 800));
       const edits = statusOf('projekt').m.edits - before;
       expect(edits >= 1 && edits <= 4, `Statuspost ${edits}-mal bearbeitet`);
@@ -1224,8 +1227,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   await step('Discord: Ereignisse mit Feldern, Erwähnung nur bei @, Erledigtes wird bearbeitet', async () => {
     try {
       // Review: still, mit Kriterien.
-      w(['set', 'W-0002', 'status=review']);
-      const rv = await dwait(() => findMsg((e) => e.title === 'W-0002 im Review'), 'Nachricht Im Review');
+      w(['set', dprobe, 'status=review']);
+      const rv = await dwait(() => findMsg((e) => e.title === `${dprobe} im Review`), 'Nachricht Im Review');
       expect(rv.m.flags & 4096, 'Review nicht still');
       expect(!rv.m.content.includes('<@'), 'Review erwähnt');
       expect((rv.e.fields || []).some((f) => f.name === 'Kriterien'), 'Feld Kriterien fehlt');
@@ -1245,7 +1248,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       hook('prompt-submit.mjs', { cwd: proj, session_id: 's-d', prompt: 'weiter' });
       await dwait(() => /weiter/i.test(fake.messages.get(fin.m.id).embeds[0].title || ''), 'Fertig-Nachricht nach neuer Anfrage bearbeitet');
       // Review angenommen: Review-Nachricht wird grün bearbeitet statt einer neuen.
-      w(['done', 'W-0002', '--confirm', '--force', '--reason=Selbsttest']);
+      w(['done', dprobe, '--confirm', '--force', '--reason=Selbsttest']);
       await dwait(() => /angenommen/.test(fake.messages.get(rv.m.id).embeds[0].title || ''), 'Review als angenommen bearbeitet');
       // Neue P1.
       w(['new', '--type=bug', '--title=Server brennt', '--priority=P1']);
