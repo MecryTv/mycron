@@ -1118,6 +1118,382 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     });
   }
 
+  // Discord-Bot works (W-0036) gegen ein nachgebautes Discord im selben Prozess. Die CLI läuft deshalb asynchron:
+  // spawnSync würde den Fake blockieren, auf den die CLI wartet.
+  const wa = (args, { cwd = proj, input, ok = true, extraEnv = null } = {}) => new Promise((resolve, reject) => {
+    const c = spawn(process.execPath, [CLI, ...args], { cwd, env: extraEnv ? { ...env, ...extraEnv } : env, windowsHide: true });
+    let out = ''; let err = '';
+    c.stdout.on('data', (d) => { out += d; }); c.stderr.on('data', (d) => { err += d; });
+    const timer = setTimeout(() => c.kill(), 60000);
+    c.on('close', (code) => {
+      clearTimeout(timer);
+      const res = { code, out: out.trim(), err: err.trim() };
+      if (ok && code !== 0) reject(new Error(`works ${args.join(' ')} → Exit ${code}: ${(err || out).split('\n').slice(-3).join(' | ')}`)); else resolve(res);
+    });
+    c.stdin.end(input || '');
+  });
+  const DTOKEN = 'MTAwMA.fake-bot-token.0123456789abcdefWXYZ';
+  const ddir = path.join(home, '.works', 'discord');
+  const dcfg = () => JSON.parse(fs.readFileSync(path.join(ddir, 'config.json'), 'utf8'));
+  const dwait = async (fn, what, ms = 15000) => { const until = Date.now() + ms; let last; while (Date.now() < until) { last = await fn(); if (last) return last; await new Promise((r) => setTimeout(r, 100)); } throw new Error(`Zeit abgelaufen: ${what}`); };
+  const fromUrl = pathToFileURL(path.join(HERE, 'discord-fake.mjs')).href;
+  const { startFakeDiscord } = await import(fromUrl);
+  const fake = await startFakeDiscord({ token: DTOKEN });
+  // Schnelle Takte für den Test: Bot-Schleife 100 ms, Statuspost frühestens alle 300 ms.
+  const denv = { WORKS_DISCORD_API: fake.api, WORKS_DISCORD_FAST: '1' };
+  const nodeMajor = Number(process.versions.node.split('.')[0]);
+  const embedsOf = (ch = '11') => fake.inChannel(ch).map((m) => ({ m, e: m.embeds[0] || {} }));
+  const findMsg = (pred, ch) => embedsOf(ch).find(({ m, e }) => pred(e, m));
+  // Neuester Statuspost: Nach einem 403 bleibt der alte stehen, der Bot legt einen neuen an.
+  const statusOf = (name) => embedsOf().filter(({ e }) => e.author && e.author.name === `${name} · Stand`).pop();
+  let dprobe = '';
+
+  await step('Discord: Einrichtung, Token nur lokal und nie in der Ausgabe', async () => {
+    if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eins']); w(['new', '--type=chore', '--title=Zwei', '--criteria=Fertig']); }
+    let r = await wa(['discord'], { extraEnv: denv });
+    has(r.out, 'nicht eingerichtet', 'Status ohne Einrichtung');
+    r = await wa(['discord', 'start'], { extraEnv: denv, ok: false });
+    expect(r.code !== 0, 'start ohne Einrichtung lief durch'); has(r.out + r.err, 'nicht eingerichtet');
+    expect(!fs.existsSync(path.join(ddir, 'bot.pid')), 'Bot ohne Einrichtung gestartet');
+    // Token als Argument landet in der Shell-Historie: abgelehnt.
+    r = await wa(['discord', 'token', DTOKEN], { extraEnv: denv, ok: false });
+    expect(r.code !== 0, 'Token als Argument angenommen'); expect(!(r.out + r.err).includes(DTOKEN), 'Token in der Ausgabe');
+    // Basis-URL nur auf diesem Rechner überschreibbar, sonst ginge das Token an einen fremden Server.
+    r = await wa(['discord', 'token'], { input: DTOKEN + '\n', extraEnv: { ...denv, WORKS_DISCORD_API: 'https://example.org/api/v10' }, ok: false });
+    expect(r.code !== 0, 'Fremde API-Adresse angenommen'); has(r.out + r.err, '127.0.0.1');
+    r = await wa(['discord', 'token'], { input: 'falsch\n', extraEnv: denv, ok: false });
+    expect(r.code !== 0, 'Falsches Token angenommen'); has(r.out + r.err, 'ungültig');
+    expect(!fs.existsSync(path.join(ddir, 'secret.json')), 'Falsches Token gespeichert');
+    r = await wa(['discord', 'token'], { input: DTOKEN + '\n', extraEnv: denv });
+    has(r.out, 'works#4821', 'Name des Bots'); has(r.out, 'client_id=1000', 'Einladungslink'); has(r.out, 'permissions=', 'Rechte im Link');
+    expect(!(r.out + r.err).includes(DTOKEN), 'Token in der Ausgabe');
+    const sec = JSON.parse(fs.readFileSync(path.join(ddir, 'secret.json'), 'utf8'));
+    expect(sec.token === DTOKEN, 'Token nicht gespeichert');
+    if (process.platform !== 'win32') expect((fs.statSync(path.join(ddir, 'secret.json')).mode & 0o077) === 0, 'secret.json ist für andere lesbar');
+    const cfg = dcfg();
+    expect(cfg.owner_id === '4242' && cfg.app_id === '1000', `Besitzer oder Anwendung fehlt: ${JSON.stringify(cfg)}`);
+    expect(!JSON.stringify(cfg).includes(DTOKEN), 'Token in config.json');
+    r = await wa(['discord', 'channel'], { extraEnv: denv });
+    has(r.out, '#works'); has(r.out, 'Mein Server'); expect(!r.out.includes('Sprache'), 'Sprachkanal angeboten');
+    r = await wa(['discord', 'channel', 'works'], { extraEnv: denv });
+    has(r.out, '#works');
+    expect(dcfg().channel_id === '11' && dcfg().guild_id === '1', 'Kanal nicht gespeichert');
+    r = await wa(['discord'], { extraEnv: denv });
+    has(r.out, 'eingerichtet'); has(r.out, DTOKEN.slice(-4), 'maskiertes Token'); expect(!r.out.includes(DTOKEN), 'Token im Status');
+    const inProject = fs.readdirSync(path.join(proj, '.works'), { recursive: true }).filter((f) => !String(f).includes('tasks')).some((f) => { try { return fs.readFileSync(path.join(proj, '.works', String(f)), 'utf8').includes(DTOKEN); } catch { return false; } });
+    expect(!inProject, 'Token im Projekt');
+    // Einstellungen für den Test: ohne Verzögerung und ohne Ruhezeit.
+    await wa(['discord', 'set', 'delay.perm=0', 'delay.idle=0', 'quiet.on=false'], { extraEnv: denv });
+    expect(dcfg().delays.perm === 0 && dcfg().quiet.on === false, 'set wirkt nicht');
+    r = await wa(['discord', 'set', 'quiet.from=25:00'], { extraEnv: denv, ok: false });
+    expect(r.code !== 0, 'Ungültige Uhrzeit angenommen');
+  });
+
+  await step('Discord: Bot startet einmal, verbindet sich, Statuspost angeheftet und gebündelt bearbeitet', async () => {
+    let r = await wa(['discord', 'start'], { extraEnv: denv });
+    has(r.out, 'gestartet');
+    try {
+      if (nodeMajor >= 22) {
+        await dwait(() => fake.gateway.identifies.length >= 1, 'Identify am Gateway');
+        expect(fake.gateway.identifies[0].token === DTOKEN, 'Identify ohne Token');
+      }
+      const st = await dwait(() => statusOf('projekt'), 'Statuspost für projekt');
+      expect(st.m.pinned, 'Statuspost nicht angeheftet');
+      const names = (st.e.fields || []).map((f) => f.name);
+      expect(names.includes('CI') && names.includes('Heute'), `Felder fehlen: ${names.join(', ')}`);
+      expect(st.m.flags & 4096, 'Statuspost nicht still');
+      r = await wa(['discord', 'start'], { extraEnv: denv });
+      has(r.out, 'läuft schon');
+      await new Promise((res) => setTimeout(res, 600));
+      if (nodeMajor >= 22) expect(fake.gateway.identifies.length === 1, `Zweiter Bot verbunden (${fake.gateway.identifies.length})`);
+      has((await wa(['discord'], { extraEnv: denv })).out, 'läuft', 'Status');
+      // Mehrere Änderungen kurz nacheinander: höchstens wenige Bearbeitungen, am Ende der neue Stand.
+      // Eigene, frische Aufgabe: Im vollen Selbsttest sind die ersten Aufgaben schon in Arbeit oder erledigt.
+      const before = st.m.edits;
+      dprobe = (w(['new', '--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0];
+      w(['start', dprobe, '--force']);
+      for (let i = 0; i < 5; i++) w(['log', dprobe, `Schritt ${i}`]);
+      await dwait(() => (statusOf('projekt').e.description || '').includes(dprobe), `Statuspost zeigt ${dprobe}`);
+      await new Promise((res) => setTimeout(res, 800));
+      const edits = statusOf('projekt').m.edits - before;
+      expect(edits >= 1 && edits <= 4, `Statuspost ${edits}-mal bearbeitet`);
+      expect(fake.inChannel('11').filter((m) => m.embeds[0] && m.embeds[0].author && m.embeds[0].author.name === 'projekt · Stand').length === 1, 'Statuspost doppelt');
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+      expect(fake.requests.every((q) => q.auth === `Bot ${DTOKEN}`), 'Anfrage ohne Token');
+      const log = fs.readFileSync(path.join(ddir, 'bot.log'), 'utf8');
+      expect(!log.includes(DTOKEN), 'Token im Log');
+    } catch (e) { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); throw e; }
+  });
+
+  await step('Discord: Ereignisse mit Feldern, Erwähnung nur bei @, Erledigtes wird bearbeitet', async () => {
+    try {
+      // Review: still, mit Kriterien.
+      w(['set', dprobe, 'status=review']);
+      const rv = await dwait(() => findMsg((e) => e.title === `${dprobe} im Review`), 'Nachricht Im Review');
+      expect(rv.m.flags & 4096, 'Review nicht still');
+      expect(!rv.m.content.includes('<@'), 'Review erwähnt');
+      expect((rv.e.fields || []).some((f) => f.name === 'Kriterien'), 'Feld Kriterien fehlt');
+      // Freigabe: Erwähnung, Befehl ausgeblendet.
+      const known = new Set(fake.messages.keys());
+      hook('permission.mjs', { cwd: proj, session_id: 's-d', tool_name: 'Bash', tool_input: { command: 'echo geheim-4711' } });
+      const pm = await dwait(() => findMsg((e, m) => e.title === 'Wartet auf deine Freigabe' && !known.has(m.id)), 'Nachricht Freigabe');
+      has(pm.m.content, '<@4242>', 'Erwähnung');
+      expect(pm.m.allowed_mentions && JSON.stringify(pm.m.allowed_mentions.users) === '["4242"]', `allowed_mentions: ${JSON.stringify(pm.m.allowed_mentions)}`);
+      expect(!(pm.m.flags & 4096), 'Freigabe still');
+      expect(!JSON.stringify(pm.m).includes('geheim-4711'), 'Befehl trotz Datenschutz gezeigt');
+      // Freigabe erledigt: dieselbe Nachricht wird grau, ohne Erwähnung im Text.
+      hook('stop-reminder.mjs', { cwd: proj, session_id: 's-d' });
+      await dwait(() => /beantwortet/.test(fake.messages.get(pm.m.id).embeds[0].title || ''), 'Freigabe als beantwortet bearbeitet');
+      // Fertig und wartet: nach setIdle, Verzögerung 0.
+      const fin = await dwait(() => findMsg((e) => e.title === 'Claude ist fertig und wartet auf dich'), 'Nachricht fertig');
+      has(fin.m.content, '<@4242>');
+      hook('prompt-submit.mjs', { cwd: proj, session_id: 's-d', prompt: 'weiter' });
+      await dwait(() => /weiter/i.test(fake.messages.get(fin.m.id).embeds[0].title || ''), 'Fertig-Nachricht nach neuer Anfrage bearbeitet');
+      // Review angenommen: Review-Nachricht wird grün bearbeitet statt einer neuen.
+      w(['done', dprobe, '--confirm', '--force', '--reason=Selbsttest']);
+      await dwait(() => /angenommen/.test(fake.messages.get(rv.m.id).embeds[0].title || ''), 'Review als angenommen bearbeitet');
+      // Neue P1.
+      w(['new', '--type=bug', '--title=Server brennt', '--priority=P1']);
+      await dwait(() => findMsg((e) => /Neue P1/.test(e.title || '') && /Server brennt/.test(JSON.stringify(e))), 'Nachricht Neue P1');
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+    } catch (e) { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); throw e; }
+  });
+
+  await step('Discord: works ship als eine Nachricht, CI rot mit Bug, Wochenbericht', async () => {
+    try {
+      const emit = (type, data) => w(['discord', 'emit', type, `--json=${JSON.stringify(data)}`], { extraEnv: denv });
+      emit('ship', { id: 'W-0001', step: 'start', run: 'r1' });
+      const sh = await dwait(() => findMsg((e) => e.title === 'W-0001 wird ausgeliefert'), 'ship-Nachricht');
+      emit('ship', { id: 'W-0001', step: 'merge', run: 'r1' });
+      emit('ship', { id: 'W-0001', step: 'push', sha: 'abcdef1234567', run: 'r1' });
+      emit('ship', { id: 'W-0001', step: 'ci', ok: true, workflows: 3, run: 'r1' });
+      emit('ship', { id: 'W-0001', step: 'done', run: 'r1' });
+      await dwait(() => fake.messages.get(sh.m.id).embeds[0].title === 'W-0001 ausgeliefert', 'ship-Nachricht abgeschlossen');
+      const d = fake.messages.get(sh.m.id).embeds[0].description;
+      expect((d.match(/✓/g) || []).length >= 3, `Schritte nicht abgehakt: ${d}`);
+      expect(fake.inChannel('11').filter((m) => /W-0001 (wird )?ausgeliefert/.test((m.embeds[0] || {}).title || '')).length === 1, 'ship als mehrere Nachrichten');
+      emit('ci', { ok: false, sha: 'feedbeef1234', failed: 2, total: 6, job: 'test (windows)', error: 'AssertionError: expected 3 to be 4', bug: 'W-0099', url: 'https://github.com/a/b/actions/runs/1' });
+      const ci = await dwait(() => findMsg((e) => e.title === 'CI rot für feedbee'), 'CI-Nachricht');
+      has(JSON.stringify(ci.e.fields), 'W-0099', 'Bug im Feld');
+      expect(ci.m.components.length && ci.m.components[0].components.some((c) => c.style === 5 && c.url === 'https://github.com/a/b/actions/runs/1'), 'Link auf den Lauf fehlt');
+      emit('report', { kind: 'woche', title: 'Woche 47', summary: 'Discord-Bot gebaut.', done: 1, lists: { Erledigt: [{ id: 'W-0001', title: 'Eins' }], 'Braucht dich': ['W-0002: offene Frage, Welche Farbe?'] } });
+      const wr = await dwait(() => findMsg((e) => /Woche 47/.test(e.title || '')), 'Wochenbericht');
+      expect((wr.e.fields || []).some((f) => f.name === 'Erledigt (1)' && f.value.includes('W-0001 Eins')), `Liste im Wochenbericht fehlt: ${JSON.stringify(wr.e.fields)}`);
+      await dwait(() => !fs.readdirSync(path.join(ddir, 'outbox')).length, 'outbox geleert');
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+    } catch (e) { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); throw e; }
+  });
+
+  await step('Discord: nichts geht verloren (Bot aus, 429, 502, gelöschter Statuspost), Gateway verbindet neu', async () => {
+    try {
+      if (nodeMajor >= 22) {
+        const ids = fake.gateway.identifies.length;
+        fake.reconnect();
+        await dwait(() => fake.gateway.resumes >= 1 || fake.gateway.identifies.length > ids, 'Neuverbindung nach op 7');
+        fake.dropGateway();
+        await dwait(() => fake.gateway.sockets.size >= 1, 'Neuverbindung nach Abbruch');
+      }
+      const r = await wa(['discord', 'stop'], { extraEnv: denv });
+      has(r.out, 'gestoppt');
+      expect(!fs.existsSync(path.join(ddir, 'bot.pid')), 'bot.pid nach stop');
+      // Ohne Bot: Ereignisse landen in der outbox, die CLI wartet nicht auf Discord.
+      const t0 = Date.now();
+      w(['discord', 'emit', 'report', `--json=${JSON.stringify({ kind: 'woche', title: 'Woche 48', summary: 'Offline geschrieben.' })}`], { extraEnv: denv });
+      expect(Date.now() - t0 < 5000, 'emit hat gewartet');
+      expect(fs.readdirSync(path.join(ddir, 'outbox')).length === 1, 'Ereignis nicht in der outbox');
+      const st = statusOf('projekt');
+      fake.deleteMessage(st.m.id);
+      fake.limitNext = 2; fake.failNext = 1;
+      await wa(['discord', 'start'], { extraEnv: denv });
+      await dwait(() => findMsg((e) => /Woche 48/.test(e.title || '')), 'Offline-Ereignis nachgeliefert');
+      w(['log', 'W-0001', 'Neuer Stand für den Statuspost']);
+      const again = await dwait(() => { const s = statusOf('projekt'); return s && s.m.id !== st.m.id && s.m.pinned ? s : null; }, 'Statuspost neu angelegt und angeheftet');
+      expect(again, 'kein neuer Statuspost');
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+    } finally {
+      await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+    }
+  });
+
+  // Funde aus dem Audit von W-0036.
+  await step('Discord: Branch-Wechsel, ship, Bahnen, Sperrdatei, Versionswechsel, Neustart ohne Verluste', async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const nid = (s) => (s.match(/W-\d+/) || [])[0];
+    const pidFile = path.join(ddir, 'bot.pid');
+    const readPid = () => { try { return JSON.parse(fs.readFileSync(pidFile, 'utf8')); } catch { return null; } };
+    const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+    const p1Msgs = (title) => fake.inChannel('11').filter((m) => /Neue P1/.test((m.embeds[0] || {}).title || '') && ((m.embeds[0] || {}).description || '').includes(title));
+    const ob = path.join(ddir, 'outbox');
+    const obCount = () => (fs.existsSync(ob) ? fs.readdirSync(ob).filter((f) => f.endsWith('.json')).length : 0);
+    // Wochenbericht: die Vorschau mit --no-send legt nichts für den Bot ab (Bot ist hier aus).
+    const before = obCount();
+    w(['report', '--week', '--no-send']);
+    expect(obCount() === before, 'Vorschau des Wochenberichts für den Bot abgelegt');
+    w(['report', '--week', '--summary=Selbsttest-Woche']);
+    expect(obCount() === before + 1, 'Wochenbericht nicht für den Bot abgelegt');
+    // Alte bot.pid, deren PID inzwischen einem anderen Prozess gehört: start startet trotzdem, stop beendet ihn nicht.
+    const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { windowsHide: true, stdio: 'ignore' });
+    const stale = () => { fs.writeFileSync(pidFile, JSON.stringify({ pid: other.pid, started: '2026-01-01T00:00:00Z', version: 'alt' })); const t = new Date(Date.now() - 5 * 60000); fs.utimesSync(pidFile, t, t); };
+    try {
+      stale();
+      has((await wa(['discord', 'stop'], { extraEnv: denv })).out, 'lief nicht', 'stop mit fremder PID');
+      expect(alive(other.pid), 'stop hat einen fremden Prozess beendet');
+      stale();
+      has((await wa(['discord', 'start'], { extraEnv: denv })).out, 'gestartet', 'start mit alter bot.pid');
+      expect(alive(other.pid), 'start hat einen fremden Prozess beendet');
+      const info = await dwait(() => { const i = readPid(); return i && i.pid !== other.pid ? i : null; }, 'neuer Bot in bot.pid');
+      // Arbeitsordner des Bots: ~/.works/discord, damit er unter Windows keinen Projektordner oder Worktree sperrt.
+      // realpath: Unter macOS ist der Temp-Ordner ein Symlink, process.cwd() liefert den echten Pfad.
+      expect(info.cwd && fs.realpathSync(info.cwd).toLowerCase() === fs.realpathSync(ddir).toLowerCase(), `Bot läuft in ${info.cwd}`);
+    } finally { other.kill(); }
+    try {
+      await dwait(() => statusOf('projekt'), 'Statuspost nach Neustart');
+      // Ohne Änderung schreibt der Bot seinen Zustand nicht dauernd neu.
+      await sleep(800);
+      const m0 = fs.statSync(path.join(ddir, 'state.json')).mtimeMs;
+      await sleep(1500);
+      expect(fs.statSync(path.join(ddir, 'state.json')).mtimeMs === m0, 'state.json ohne Änderung neu geschrieben');
+      // Ein Ereignis, an dem die Darstellung scheitert, blockiert die folgenden nicht.
+      w(['discord', 'emit', 'report', `--json=${JSON.stringify({ title: 'Kaputt', lists: { A: null } })}`], { extraEnv: denv });
+      w(['discord', 'emit', 'report', `--json=${JSON.stringify({ title: 'Nach dem Fehler', summary: 'geht' })}`], { extraEnv: denv });
+      await dwait(() => findMsg((e) => e.title === 'Nach dem Fehler'), 'Ereignis nach einem kaputten');
+      // Freigabe aus einer parallelen Bahn (activity.lanes).
+      const actF = path.join(proj, '.works', 'activity.json');
+      const lane = nid(w(['new', '--type=chore', '--title=Bahn-Aufgabe']).out);
+      const since = new Date().toISOString();
+      const act = JSON.parse(fs.readFileSync(actF, 'utf8'));
+      act.lanes = { ...(act.lanes || {}), [lane]: { at: since, task: lane, tool: 'Bash', verb: 'Führt aus', what: 'npm test', ok: true, lane: true, running: true, perm: true, permSince: since } };
+      // Die Bahn muss in lanes.json stehen: Einträge beendeter Bahnen ignoriert der Bot.
+      const lanesF = path.join(proj, '.works', 'lanes.json');
+      const lanesBefore = fs.existsSync(lanesF) ? fs.readFileSync(lanesF, 'utf8') : null;
+      const lanesNow = lanesBefore ? JSON.parse(lanesBefore) : { lanes: [] };
+      lanesNow.lanes = [...(lanesNow.lanes || []), { task: lane, branch: 'feature/bahn', path: path.join(base, 'bahn'), started: since, status: 'läuft' }];
+      fs.writeFileSync(lanesF, JSON.stringify(lanesNow));
+      fs.writeFileSync(actF, JSON.stringify(act));
+      const lp = await dwait(() => findMsg((e) => e.title === 'Wartet auf deine Freigabe' && JSON.stringify(e.fields || []).includes(lane)), 'Freigabe aus der Bahn');
+      has(lp.m.content, '<@4242>', 'Erwähnung bei Freigabe aus der Bahn');
+      const act2 = JSON.parse(fs.readFileSync(actF, 'utf8'));
+      act2.lanes[lane] = { at: new Date().toISOString(), task: lane, tool: 'Bash', verb: 'Führt aus', what: 'npm test', ok: true, lane: true };
+      fs.writeFileSync(actF, JSON.stringify(act2));
+      await dwait(() => /beantwortet/.test(fake.messages.get(lp.m.id).embeds[0].title || ''), 'Freigabe aus der Bahn beantwortet');
+      if (lanesBefore === null) fs.unlinkSync(lanesF); else fs.writeFileSync(lanesF, lanesBefore);
+      // Verzögerte Freigabe überlebt einen Neustart des Bots.
+      await wa(['discord', 'set', 'delay.perm=3'], { extraEnv: denv });
+      await sleep(300);
+      hook('permission.mjs', { cwd: proj, session_id: 's-n', tool_name: 'Read', tool_input: { file_path: 'neustart.txt' } });
+      await sleep(700);
+      await wa(['discord', 'stop'], { extraEnv: denv });
+      await wa(['discord', 'start'], { extraEnv: denv });
+      const np = await dwait(() => findMsg((e, m) => e.title === 'Wartet auf deine Freigabe' && m.content.includes('(Read)')), 'Freigabe nach Neustart', 12000);
+      expect(np, 'Freigabe nach Neustart fehlt');
+      await wa(['discord', 'set', 'delay.perm=0'], { extraEnv: denv });
+      hook('prompt-submit.mjs', { cwd: proj, session_id: 's-n', prompt: 'weiter' });
+      // Statuspost, den der Bot nicht mehr bearbeiten darf (anderer Bot, 403): neu anlegen.
+      const old = statusOf('projekt');
+      fake.forbidEdit = true;
+      w(['new', '--type=chore', '--title=Neuer Stand für 403', '--priority=P2']);
+      const fresh = await dwait(() => { const s = statusOf('projekt'); return s && s.m.id !== old.m.id && s.m.pinned ? s : null; }, 'neuer Statuspost nach 403');
+      expect(fresh, 'kein neuer Statuspost');
+      fake.forbidEdit = false;
+      // Abgeschaltetes Projekt: auch Ereignisse aus der outbox kommen nicht.
+      const { rootIdOf } = await import(pathToFileURL(path.join(HERE, 'lib.mjs')).href);
+      const cfg0 = dcfg();
+      fs.writeFileSync(path.join(ddir, 'config.json'), JSON.stringify({ ...cfg0, projects: { [rootIdOf(proj)]: { enabled: false } } }));
+      w(['discord', 'emit', 'report', `--json=${JSON.stringify({ title: 'Projekt ist aus' })}`], { extraEnv: denv });
+      await dwait(() => !obCount(), 'outbox nach abgeschaltetem Projekt geleert');
+      await sleep(400);
+      expect(!findMsg((e) => e.title === 'Projekt ist aus'), 'Ereignis trotz abgeschaltetem Projekt');
+      fs.writeFileSync(path.join(ddir, 'config.json'), JSON.stringify(cfg0));
+      // Neue Version: Der Sitzungsstart wartet nicht auf den alten Bot, danach läuft genau ein neuer.
+      const cur = readPid();
+      fs.writeFileSync(pidFile, JSON.stringify({ ...cur, version: 'alt' }));
+      const t0 = Date.now();
+      spawnSync(process.execPath, [path.join(HOOKS, 'session-start.mjs')], { cwd: proj, env: { ...env, ...denv }, input: JSON.stringify({ cwd: proj }), encoding: 'utf8', timeout: 20000, windowsHide: true });
+      expect(Date.now() - t0 < 6000, `Sitzungsstart hat ${Date.now() - t0} ms auf den Bot gewartet`);
+      await dwait(() => { const i = readPid(); return i && i.pid !== cur.pid && !alive(cur.pid); }, 'alter Bot durch neuen ersetzt');
+      if (hasGit) {
+        // Branch-Wechsel: Eine P1 vom Branch verschwindet auf main und kommt zurück, gemeldet wird sie einmal.
+        const bp = path.join(base, 'dbranch');
+        fs.mkdirSync(bp, { recursive: true });
+        git(['init', '-q'], bp); git(['symbolic-ref', 'HEAD', 'refs/heads/main'], bp);
+        w(['init'], { cwd: bp });
+        git(['add', '-A'], bp); git(['commit', '-q', '-m', 'Start'], bp);
+        git(['switch', '-q', '-c', 'feature/x'], bp);
+        await dwait(() => statusOf('dbranch'), 'Statuspost dbranch');
+        w(['new', '--type=bug', '--title=Branch-P1', '--priority=P1'], { cwd: bp });
+        await dwait(() => p1Msgs('Branch-P1').length, 'P1 auf dem Branch');
+        git(['add', '-A'], bp); git(['commit', '-q', '-m', 'P1'], bp);
+        git(['switch', '-q', 'main'], bp); await sleep(700);
+        git(['switch', '-q', 'feature/x'], bp); await sleep(1200);
+        expect(p1Msgs('Branch-P1').length === 1, `P1 nach Branch-Wechsel ${p1Msgs('Branch-P1').length}-mal gemeldet`);
+        // ship: Während des Laufs keine Ereignisse; danach zählt der Vergleich mit dem Stand vor ship.
+        const sid = nid(w(['new', '--type=chore', '--title=Ship-Probe'], { cwd: bp }).out);
+        w(['set', sid, 'status=review'], { cwd: bp });
+        const rv = await dwait(() => findMsg((e) => e.title === `${sid} im Review`), 'Review Ship-Probe');
+        const emitB = (data) => w(['discord', 'emit', 'ship', `--json=${JSON.stringify({ id: sid, run: 'b1', ...data })}`], { cwd: bp, extraEnv: denv });
+        emitB({ step: 'start' });
+        await sleep(400);
+        w(['done', sid, '--confirm', '--force', '--reason=Selbsttest'], { cwd: bp });
+        w(['new', '--type=bug', '--title=Während-ship', '--priority=P1'], { cwd: bp });
+        await sleep(800);
+        expect(!p1Msgs('Während-ship').length, 'Ereignis während ship gemeldet');
+        emitB({ step: 'done' });
+        await dwait(() => /angenommen/.test(fake.messages.get(rv.m.id).embeds[0].title || ''), 'Review nach ship angenommen');
+        await dwait(() => p1Msgs('Während-ship').length, 'P1 aus der Zeit von ship nach dem Ende gemeldet');
+        await sleep(600);
+        expect(p1Msgs('Während-ship').length === 1, 'P1 aus ship doppelt');
+        expect(!findMsg((e) => e.title === `✓ ${sid} erledigt`), 'Ausgelieferte Aufgabe zusätzlich als erledigt gemeldet');
+      }
+      expect(!fs.readdirSync(ddir).some((f) => f.endsWith('.tmp')), 'Halbe Zwischendateien im Discord-Ordner');
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+    } finally {
+      fake.forbidEdit = false;
+      await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+    }
+  });
+
+  await step('Discord: Start mit Board und Sitzung nur mit Einrichtung, Nachrichten passen in die Grenzen', async () => {
+    const bot = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
+    const { embedProblems } = await import(fromUrl);
+    const long = 'x'.repeat(5000);
+    const snap = { name: long, tasks: [{ id: 'W-1', title: long, status: 'in-arbeit', crit: [1, 3] }], active: { id: 'W-1', title: long, crit: [1, 3], since: new Date().toISOString() }, queue: [{ id: 'W-2', title: long }], recent: Array.from({ length: 9 }, () => ({ at: new Date().toISOString(), text: long })), today: { done: 2, cost: '1,20 $' }, ci: null, perm: null };
+    const cfg = bot.normalizeConfig({});
+    for (const e of bot.renderStatus(snap, cfg).embeds) expect(!embedProblems(e).length, `Statuspost zu lang: ${embedProblems(e)}`);
+    const ev = bot.renderEvent({ type: 'review', project: long, id: 'W-1', title: long, crit: [1, 3] }, cfg, { owner: '1' });
+    for (const e of ev.embeds) expect(!embedProblems(e).length, `Ereignis zu lang: ${embedProblems(e)}`);
+    // Voller Wochenbericht: alles zusammen unter 6000 Zeichen.
+    const many = (f) => Array.from({ length: 40 }, (_, i) => f(i));
+    const big = bot.renderEvent({ type: 'report_week', project: 'p', title: 'Woche', summary: 'y'.repeat(4000), lists: { Erledigt: many((i) => ({ id: `W-${i}`, title: 'z'.repeat(100) })), 'Braucht dich': many(() => 'q'.repeat(100)), 'Nächste Woche': many((i) => ({ id: `W-${i}`, title: 'n'.repeat(100) })) } }, cfg, {});
+    expect(!embedProblems(big.embeds[0]).length, `Wochenbericht zu lang: ${embedProblems(big.embeds[0])}`);
+    // Links in fremdem Text (Titel, etwa aus GitHub-Issues) werden nicht klickbar.
+    const lk = bot.renderEvent({ type: 'p1', project: 'p', id: 'W-1', title: '[klick](https://evil.example)' }, cfg, {});
+    expect(!/(^|[^\\])\[klick\]\(/.test(lk.embeds[0].description || ''), `Link nicht entschärft: ${lk.embeds[0].description}`);
+    // Datenschutz: nur IDs, keine Kosten.
+    const priv = bot.normalizeConfig({ privacy: { titles: false, costs: false } });
+    const s2 = JSON.stringify(bot.renderStatus({ ...snap, name: 'p', active: { ...snap.active, title: 'Geheimer Titel' }, today: { done: 1, cost: '9,99 $' } }, priv));
+    expect(!s2.includes('Geheimer Titel') && !s2.includes('9,99'), 'Titel oder Kosten trotz Datenschutz');
+    // Ruhezeit über Mitternacht.
+    const q = bot.normalizeConfig({ quiet: { on: true, from: '22:00', to: '07:00' } });
+    expect(bot.isQuiet(q, new Date(2026, 0, 1, 23, 30)) && bot.isQuiet(q, new Date(2026, 0, 1, 6, 59)) && !bot.isQuiet(q, new Date(2026, 0, 1, 7, 0)), 'Ruhezeit falsch');
+    const m = bot.renderEvent({ type: 'perm', project: 'p', id: 'W-1', tool: 'Bash' }, q, { owner: '1', now: new Date(2026, 0, 1, 23, 30) });
+    expect(!m.content.includes('<@') && m.flags & 4096, 'Erwähnung in der Ruhezeit');
+    // Ohne Einrichtung startet weder das Board noch der Sitzungsstart einen Bot.
+    const home2 = path.join(base, 'home-ohne-discord'); fs.mkdirSync(home2, { recursive: true });
+    const env2 = { HOME: home2, USERPROFILE: home2 };
+    spawnSync(process.execPath, [path.join(HOOKS, 'session-start.mjs')], { cwd: proj, env: { ...env, ...env2 }, input: JSON.stringify({ cwd: proj }), encoding: 'utf8', timeout: 20000, windowsHide: true });
+    expect(!fs.existsSync(path.join(home2, '.works', 'discord', 'bot.pid')), 'Bot ohne Einrichtung gestartet');
+    // Mit Einrichtung startet der Sitzungsstart den Bot.
+    try {
+      spawnSync(process.execPath, [path.join(HOOKS, 'session-start.mjs')], { cwd: proj, env: { ...env, ...denv }, input: JSON.stringify({ cwd: proj }), encoding: 'utf8', timeout: 20000, windowsHide: true });
+      await dwait(() => fs.existsSync(path.join(ddir, 'bot.pid')), 'Bot beim Sitzungsstart gestartet');
+    } finally { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); }
+    // Ab hier kein Autostart mehr: Spätere Schritte starten Boards, deren Bot sonst das echte Discord fragen würde.
+    // Ereignisse landen weiter in der outbox (geprüft bei works ship).
+    await wa(['discord', 'set', 'autostart=false'], { extraEnv: denv });
+  });
+  await wa(['discord', 'stop'], { extraEnv: denv, ok: false }).catch(() => {});
+  await fake.close();
+
   // works ship (W-0026): Abschluss in einem Rutsch. Eigenes Projekt mit einem lokalen Remote.
   if (hasGit) {
     await step('works ship: anhalten bei offenen Punkten, sonst mergen, abschließen, pushen', async () => {
@@ -1183,6 +1559,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const marks = fs.readFileSync(path.join(sp, '.works', 'time.jsonl'), 'utf8').split('ship-zeit').length - 1;
       expect(marks === 1, `Neue Zeile in time.jsonl ${marks}-mal statt einmal`);
       has(r3.out, 'CI', 'ship nennt den CI-Schritt');
+      // Discord-Bot (W-0036): ship meldet Beginn und Ende als Ereignisse, auch wenn der Bot gerade nicht läuft.
+      if (fs.existsSync(path.join(ddir, 'secret.json'))) {
+        const ob = path.join(ddir, 'outbox');
+        const evs = (fs.existsSync(ob) ? fs.readdirSync(ob) : []).map((f) => JSON.parse(fs.readFileSync(path.join(ob, f), 'utf8'))).filter((e) => e.type === 'ship' && e.data.id === id);
+        expect(evs.some((e) => e.data.step === 'start') && evs.some((e) => e.data.step === 'done'), `ship meldet sich nicht beim Discord-Bot: ${JSON.stringify(evs.map((e) => e.data.step))}`);
+      }
       await waitFor(async () => boardPort() === bport, `Board nach ship wieder auf Port ${bport}`);
       w(['board', '--stop'], { cwd: sp, ok: false });
     });

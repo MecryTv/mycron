@@ -37,27 +37,27 @@ Wunsch des Nutzers vom 2026-11-22/23 (P2): Discord-Anbindung für alles, nicht n
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] works discord richtet den Bot ein (Token, Server, Kanal) und speichert den Token nur lokal (nicht im Git, Datei nur für den Nutzer lesbar), nie in Logs oder URLs
-- [ ] Ein Bot-Prozess je Rechner verbindet sich mit Discord (Node 22 oder neuer), startet mit dem Board und läuft für alle Projekte; ohne Einrichtung startet nichts
-- [ ] Je Projekt gibt es einen angehefteten Statuspost, den der Bot bei Änderungen bearbeitet (gebündelt, Limits von Discord eingehalten)
-- [ ] Ereignisse der vier Gruppen kommen als eigene Nachrichten mit Feldern; bei „Claude braucht dich“ mit Erwähnung des Nutzers
-- [ ] Hooks und CLI bleiben schnell; läuft der Bot nicht, geht nichts verloren und es hängt nichts
-- [ ] Befehle aus Freigaben gehen nur mit eigenem Schalter mit
-- [ ] Tests ohne echtes Discord (nachgebaute API und Gateway)
+- [x] works discord richtet den Bot ein (Token, Server, Kanal) und speichert den Token nur lokal (nicht im Git, Datei nur für den Nutzer lesbar), nie in Logs oder URLs
+- [x] Ein Bot-Prozess je Rechner verbindet sich mit Discord (Node 22 oder neuer), startet mit dem Board und läuft für alle Projekte; ohne Einrichtung startet nichts
+- [x] Je Projekt gibt es einen angehefteten Statuspost, den der Bot bei Änderungen bearbeitet (gebündelt, Limits von Discord eingehalten)
+- [x] Ereignisse der vier Gruppen kommen als eigene Nachrichten mit Feldern; bei „Claude braucht dich“ mit Erwähnung des Nutzers
+- [x] Hooks und CLI bleiben schnell; läuft der Bot nicht, geht nichts verloren und es hängt nichts
+- [x] Befehle aus Freigaben gehen nur mit eigenem Schalter mit
+- [x] Tests ohne echtes Discord (nachgebaute API und Gateway)
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] Nachgebautes Discord für Tests: REST (Nutzer, Anwendung, Server, Kanäle, Nachrichten, Anheften, 429) und Gateway über WebSocket (Hello, Identify, Ready, Heartbeat)
-- [ ] Ablage in ~/.works/discord: secret.json (nur Token, Datei nur für den Nutzer), config.json (Einstellungen), state.json (Nachrichten-IDs, Stand je Projekt), outbox/ (eine Datei je Ereignis), bot.log ohne Token
-- [ ] works discord: Status mit nächstem Schritt, token (liest von stdin, versteckte Eingabe), Einladungslink, channel, set, test, start, stop, emit
-- [ ] REST-Client mit Grenzen von Discord (Buckets, 429, Wiederholung), Basis-URL nur für Loopback überschreibbar (Tests)
-- [ ] Gateway mit Heartbeat, Resume und Neuverbindung; unter Node 22 online, darunter nur REST
-- [ ] Bot-Prozess: einer je Rechner (Sperrdatei), startet mit dem Board und beim Sitzungsstart, nur mit Einrichtung, neu bei neuer Version
-- [ ] Ereignisse aus dem Stand der Projekte ableiten (Review, angenommen, zurückgegeben, Frage, neue P1, Warteschlange leer, Freigabe mit Verzögerung, fertig mit Verzögerung); Hooks schreiben nichts zusätzlich
-- [ ] Ereignisse über outbox: works ship (eine Nachricht mit Schritten), CI aus ci-watch, Wochenbericht
-- [ ] Nachrichten nach F2: Felder, Erledigtes nachträglich bearbeiten, Erwähnung nur bei @, sonst still, Ruhezeit, Datenschutz-Schalter
-- [ ] Statuspost je Projekt angeheftet, gebündelt bearbeitet, bei gelöschter Nachricht neu
-- [ ] Selbsttest-Schritte, Doku (cli.md, integrations.md, SKILL.md)
+- [x] Nachgebautes Discord für Tests: REST (Nutzer, Anwendung, Server, Kanäle, Nachrichten, Anheften, 429) und Gateway über WebSocket (Hello, Identify, Ready, Heartbeat)
+- [x] Ablage in ~/.works/discord: secret.json (nur Token, Datei nur für den Nutzer), config.json (Einstellungen), state.json (Nachrichten-IDs, Stand je Projekt), outbox/ (eine Datei je Ereignis), bot.log ohne Token
+- [x] works discord: Status mit nächstem Schritt, token (liest von stdin, versteckte Eingabe), Einladungslink, channel, set, test, start, stop, emit
+- [x] REST-Client mit Grenzen von Discord (Buckets, 429, Wiederholung), Basis-URL nur für Loopback überschreibbar (Tests)
+- [x] Gateway mit Heartbeat, Resume und Neuverbindung; unter Node 22 online, darunter nur REST
+- [x] Bot-Prozess: einer je Rechner (Sperrdatei), startet mit dem Board und beim Sitzungsstart, nur mit Einrichtung, neu bei neuer Version
+- [x] Ereignisse aus dem Stand der Projekte ableiten (Review, angenommen, zurückgegeben, Frage, neue P1, Warteschlange leer, Freigabe mit Verzögerung, fertig mit Verzögerung); Hooks schreiben nichts zusätzlich
+- [x] Ereignisse über outbox: works ship (eine Nachricht mit Schritten), CI aus ci-watch, Wochenbericht
+- [x] Nachrichten nach F2: Felder, Erledigtes nachträglich bearbeiten, Erwähnung nur bei @, sonst still, Ruhezeit, Datenschutz-Schalter
+- [x] Statuspost je Projekt angeheftet, gebündelt bearbeitet, bei gelöschter Nachricht neu
+- [x] Selbsttest-Schritte, Doku (cli.md, integrations.md, SKILL.md)
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -71,7 +71,17 @@ Wunsch des Nutzers vom 2026-11-22/23 (P2): Discord-Anbindung für alles, nicht n
 Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Vorher: In Discord kam nur der Wochenbericht per Webhook, keine Hinweise zu Frei](assets/2026-11-23-vorher-in-discord-kam-nur-der-vorher.png)
+Beschreibung: Vorher: In Discord kam nur der Wochenbericht per Webhook, keine Hinweise zu Freigaben, Reviews oder CI, kein Statuspost
+Art: vorher · Hinzugefügt: 2026-11-23
+
+![Nachher: echte Nachrichten des Bots gegen das nachgebaute Discord, Statuspost an](assets/2026-11-23-nachher-echte-nachrichten-des-bots-nachher.png)
+Beschreibung: Nachher: echte Nachrichten des Bots gegen das nachgebaute Discord, Statuspost angeheftet, Review angenommen, ship mit Schritten, CI rot mit Bug, neue P1, Freigabe mit Erwähnung
+Art: nachher · Hinzugefügt: 2026-11-23
+
+![Nachher auf dem Handy, hell: dieselben Nachrichten in 390 px Breite](assets/2026-11-23-nachher-auf-dem-handy-hell-dieselben-nachher.png)
+Beschreibung: Nachher auf dem Handy, hell: dieselben Nachrichten in 390 px Breite
+Art: nachher · Hinzugefügt: 2026-11-23
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
@@ -95,3 +105,11 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: Entwurf F2 „F verbessert“ angehängt
 - 2026-11-23: Entwurf F2 „F verbessert“ gewählt. Grund: Wahl des Nutzers: F verbessert
 - 2026-11-23: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-23: Entscheidung E3 dokumentiert: Ereignisse aus dem Stand der Projekte
+- 2026-11-23: Entscheidung E4 dokumentiert: Gateway ab Node 22, Nachrichten auch darunter
+- 2026-11-23: Entscheidung E5 dokumentiert: Rechte und Verzögerungen
+- 2026-11-23: Asset hinzugefügt: assets/2026-11-23-vorher-in-discord-kam-nur-der-vorher.png (vorher)
+- 2026-11-23: Asset hinzugefügt: assets/2026-11-23-nachher-echte-nachrichten-des-bots-nachher.png (nachher)
+- 2026-11-23: Asset hinzugefügt: assets/2026-11-23-nachher-auf-dem-handy-hell-dieselben-nachher.png (nachher)
+- 2026-11-23: Bot works umgesetzt: Einrichtung über works discord, REST und Gateway, Statuspost je Projekt, Ereignisse nach F2, ship, ci-watch und Wochenbericht über die outbox. Selbsttest gegen nachgebautes Discord.
+- 2026-11-23: code-audit durch frischen Prüfer: 12 Funde (5 wichtig), alle behoben und mit Tests abgesichert. Selbsttest Windows 37/37, ci-watch grün.

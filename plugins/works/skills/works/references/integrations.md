@@ -81,6 +81,32 @@ Befehle: `works github status` zeigt Repository, letzten Lauf und Ereignisse, `w
 
 Weiterhin verfügbar: `works gh-import` für einen einmaligen Import alter Issues und `works gh-export <ID>` (nur nach Zustimmung). Label-Zuordnung in `config.json` unter `github`.
 
+## Discord-Bot works
+
+Hinweise aufs Handy für alle Projekte, auch ohne offenes Board. Den Bot legt der Nutzer selbst an; Claude fragt nie nach dem Token und gibt es nie aus.
+
+Einrichtung (der Nutzer im eigenen Terminal):
+1. Im Discord-Entwicklerportal eine Anwendung mit Bot anlegen und das Token kopieren.
+2. `Get-Clipboard | works discord token` oder `works discord token` (fragt versteckt). Prüft das Token, erkennt den Besitzer der Anwendung (der wird erwähnt) und gibt den Einladungslink mit genau den nötigen Rechten aus: Kanal sehen, Nachrichten senden, Links einbetten, Verlauf lesen, Nachrichten anheften.
+3. Einladen, dann `works discord channel` und `works discord channel works`.
+
+Danach startet der Bot mit jedem Board und beim Sitzungsstart, einer je Rechner (Sperrdatei `bot.pid`); eine neue works-Version ersetzt ihn. Unter Node 22 verbindet er sich mit dem Gateway (online sichtbar), darunter schickt er nur über REST.
+
+Was er schickt (Entwurf F2 aus W-0036):
+- Je Projekt einen angehefteten Statuspost: aktive Aufgabe mit Kriterien, Freigabe, CI, heute erledigt und Kosten, die nächsten zwei Aufgaben, die letzten drei Ereignisse. Er wird gebündelt bearbeitet (höchstens alle 10 s) und neu angelegt, wenn jemand ihn löscht.
+- Ereignisse mit Feldern: Freigabe wartet (nach 30 s), Claude fertig (nach 120 s), Frage, Review, angenommen, zurückgegeben, erledigt, works ship als eine Nachricht mit Schritten, CI rot mit Bug und wieder grün, neue P1, Warteschlange leer, Wochenbericht.
+- Erledigtes wird nachträglich bearbeitet: Freigabe beantwortet wird grau, Review angenommen grün.
+- Nur Ereignisse mit `at` erwähnen den Nutzer (Standard: die drei aus „Claude braucht dich“), alles andere kommt still. In der Ruhezeit (Standard 22 bis 7 Uhr) kommt auch das still.
+- Befehle aus Freigaben gehen nur mit `privacy.commands=an` mit. Links nur auf GitHub, nie auf das lokale Board.
+
+Wie Ereignisse entstehen: Der Bot liest den Stand der angemeldeten Projekte (Aufgaben, Warteschlange, `activity.json`) und vergleicht ihn mit dem letzten. Hooks tun dafür nichts zusätzlich. ship, ci-watch und `report --week` legen Ereignisse mit `works discord emit` in `~/.works/discord/outbox`; läuft der Bot nicht, holt er sie beim nächsten Start ab. Fehler bei Discord (429, 5xx, Netz) werden später wiederholt, nichts geht verloren.
+
+Doppelmeldungen vermeidet er so: Wechselt der Branch, übernimmt er den Stand ohne Vergleich; während `works ship` friert er ihn ein und vergleicht am Ende mit dem Stand davor; P1, Erledigung und Fragen meldet er je Aufgabe höchstens einmal am Tag. Freigaben aus parallelen Bahnen meldet er wie die der Hauptsitzung, solange die Bahn in `lanes.json` steht.
+
+Prozess: `bot.pid` ist die Sperrdatei, der Bot erneuert sie alle 5 s. Eine alte Datei, deren PID inzwischen ein anderer Prozess hat, zählt nicht; `stop` beendet nie einen fremden Prozess. Arbeitsordner ist `~/.works/discord`, damit kein Projekt- oder Worktree-Ordner gesperrt bleibt. Eine neue works-Version ersetzt den Bot, ohne dass Board oder Sitzungsstart warten. Wechselt das Token auf eine andere Bot-Anwendung, beginnt der Bot mit neuen Statusposts.
+
+Protokoll in `~/.works/discord/bot.log` (ohne Token). Befehle und Knöpfe in Discord kommen mit W-0037, die Einstellungen im Board mit W-0038.
+
 ## Playwright und Browser-Werkzeuge
 
 Für Vorher- und Nachher-Screenshots, siehe assets.md.

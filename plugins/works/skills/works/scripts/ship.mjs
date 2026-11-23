@@ -8,6 +8,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readJson, exists, loadState } from './lib.mjs';
 import { readServer, stopProcess, clearServer, newestCli, OWN_CLI } from './server-control.mjs';
+import { emit } from './discord.mjs';
 
 export class ShipStop extends Error {}
 
@@ -80,6 +81,10 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
   const dod = works(cli, root, ['done', task]);
   if (!dod.ok) stop(`${dod.out}\n\nship hält an: Definition of Done nicht erfüllt. Nichts wurde gemergt oder gepusht.`);
   log(`ok  Definition of Done erfüllt (${task})`);
+  // Discord-Bot (W-0036): eine Nachricht je Lauf, die ihre Schritte abhakt. Ohne Einrichtung passiert nichts.
+  const run = Date.now().toString(36);
+  const tell = (step, extra = {}) => emit('ship', { id: task, step, run, ...extra }, root);
+  tell('start');
 
   // 2. Nicht committete Änderungen außerhalb von .works gehören zur Aufgabe oder nicht: das entscheidet der Nutzer.
   // Neue, nicht verfolgte Dateien zählen mit: Eine vergessene Quelldatei fehlte sonst nach dem Merge.
@@ -99,9 +104,11 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
   };
   try {
     const result = await finish();
+    tell('done');
     restartBoard();
     return result;
   } catch (e) {
+    tell('fail', { note: String(e.message || '').split('\n').filter(Boolean).pop() || '' });
     if (e instanceof ShipStop) restartBoard();
     throw e;
   }
@@ -159,6 +166,7 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
         : `Merge von ${branch} in ${base} nicht möglich: ${(merge.err || merge.out).split('\n').slice(0, 6).join('\n')}`);
     }
     log(`ok  ${branch} mit --no-ff in ${base} gemergt`);
+    tell('merge');
     // Die aufgehobenen Zeiten gleich zurückschreiben, damit sie auch bei einem Abbruch danach erhalten bleiben.
     appendTail(repo, timeTarget, tail);
 
@@ -177,6 +185,7 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
       const p = git(repo, ['push', '-q', 'origin', base], 300000);
       if (!p.ok) stop(`Push fehlgeschlagen: ${p.err}\nDer Abschluss ist lokal committet (${sha.slice(0, 7)}).`);
       log(`ok  Gepusht: ${base} auf ${sha.slice(0, 7)}`);
+      tell('push', { sha });
     }
     git(repo, ['branch', '-d', branch]);
     if (remote.ok && push && git(repo, ['ls-remote', '--exit-code', '--heads', 'origin', branch]).ok) git(repo, ['push', '-q', 'origin', '--delete', branch]);
@@ -193,6 +202,8 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
       log(`..  CI für ${sha.slice(0, 7)} läuft, warte auf das Ergebnis`);
       const r = spawnSync(process.execPath, [ciJs, '--sha', sha], { cwd: repo, encoding: 'utf8', timeout: 25 * 60000, windowsHide: true });
       const msg = `${r.stdout || ''}${r.stderr || ''}`.trim().split('\n').slice(-6).join('\n');
+      if (r.status === 0) tell('ci', { ok: true, workflows: ((msg.match(/CI grün für \w+: (.+)\./) || [])[1] || '').split(', ').filter(Boolean).length });
+      if (r.status === 1) tell('ci', { ok: false });
       if (r.status === 1) stop(`CI rot für ${sha.slice(0, 7)}:\n${msg}\nPlugins nicht aktualisiert.`);
       log(r.status === 0 ? `ok  CI grün für ${sha.slice(0, 7)}` : `--  CI: ${msg.split('\n').pop()}`);
     }
@@ -218,6 +229,7 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
           log(u.status === 0 ? `ok  Plugin ${n} aktualisiert` : `--  Plugin ${n}: ${String(u.stderr || u.stdout).trim().split('\n').pop()}`);
         }
         if (!installed.length) log(`--  Keine Plugins aus ${mp.name} installiert.`);
+        else tell('update');
       }
     }
 

@@ -1003,6 +1003,8 @@ async function cmdBoard() {
       if (flags.open) await openBoardOnce(started, 3000);
       return;
     }
+    // Discord-Bot startet mit dem Board, wenn er eingerichtet ist (W-0036). Einer je Rechner, ein zweiter Start tut nichts.
+    try { const { ensureBot } = await import('./discord.mjs'); await ensureBot(); } catch { /* Board läuft auch ohne Bot */ }
     serveBoard(root, {
       port, host, open: !!flags.open,
       fixedPort: !!flags.port || !!flags.takeover || !!info || legacy.length > 0,
@@ -1833,6 +1835,7 @@ Ansehen
   checks [detect [--save]|set name="befehl"|remove name|run <ID>|record <ID> <name> --status ok|warn|fail|ack <ID> <name>]
   report --week [--summary ".."] [--send|--no-send]    report --settings enabled=true weekday=5 time=16:00 discord=true
   report --webhook https://discord.com/api/webhooks/..
+  discord [status|token|channel [name]|set k=v ..|test|start|stop|restart|disconnect]   Discord-Bot works, Token über die Eingabe
   demo [--simulate] [--delay 6] [--open] [--port 4747] [--path ordner] | demo --remove
   milestone list|add M1 --title ".." [--due ..]|set M1 status=erledigt
 
@@ -2805,6 +2808,178 @@ async function cmdSelftest() {
   process.exit(r.ok ? 0 : 1);
 }
 
+// ---------- Discord-Bot (W-0036) ----------
+
+// Token von der Eingabe lesen: im Terminal versteckt, sonst aus einer Pipe (Get-Clipboard | works discord token).
+async function readHidden(prompt) {
+  const stdin = process.stdin;
+  if (!stdin.isTTY) { let s = ''; for await (const c of stdin) s += c; return s; }
+  process.stdout.write(prompt);
+  return new Promise((resolve) => {
+    let s = '';
+    stdin.setRawMode(true); stdin.resume(); stdin.setEncoding('utf8');
+    const onData = (chunk) => {
+      for (const c of chunk) {
+        if (c === '\r' || c === '\n' || c === '\u0004') { stdin.setRawMode(false); stdin.pause(); stdin.off('data', onData); process.stdout.write('\n'); resolve(s); return; }
+        if (c === '\u0003') { stdin.setRawMode(false); process.stdout.write('\n'); process.exit(130); }
+        if (c === '\u007f' || c === '\b') s = s.slice(0, -1); else s += c;
+      }
+    };
+    stdin.on('data', onData);
+  });
+}
+
+async function cmdDiscord() {
+  const d = await import('./discord.mjs');
+  const sub = pos[0] || 'status';
+  const cfg = d.loadDiscordConfig();
+  const token = d.loadToken();
+  const restFor = async (t) => {
+    const { Rest } = await import('./discord-api.mjs');
+    let base;
+    try { base = d.apiBase(); } catch (e) { fail(e.message); }
+    return new Rest({ token: t, base });
+  };
+  const needToken = () => { if (!token) fail('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.'); };
+  const why = (e) => (e.status === 401 ? 'Discord lehnt das Token ab.' : e.message);
+
+  if (sub === 'status') {
+    if (!token) {
+      out('Discord-Bot works: nicht eingerichtet.');
+      out('1. Im Discord-Entwicklerportal eine Anwendung mit Bot anlegen: https://discord.com/developers/applications');
+      out('2. Token des Bots eintragen: works discord token (fragt danach, oder Get-Clipboard | works discord token)');
+      out('3. Bot mit dem Link aus Schritt 2 auf deinen Server einladen, dann Kanal wählen: works discord channel');
+      return;
+    }
+    out(`Discord-Bot works: ${cfg.channel_id ? 'eingerichtet' : 'Token hinterlegt, Kanal fehlt'}`);
+    out(`Bot: ${cfg.bot_name || '?'}, Token ${d.maskToken(token)} (nur auf diesem Rechner)`);
+    if (!cfg.channel_id) { out(`Nächster Schritt: einladen mit ${d.inviteUrl(cfg.app_id)}\nDanach Kanal wählen: works discord channel`); return; }
+    out(`Kanal: #${cfg.channel_name} auf ${cfg.guild_name}`);
+    const info = d.botInfo();
+    out(info ? `Prozess: läuft (PID ${info.pid}, seit ${new Date(info.started).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })})` : `Prozess: gestoppt${cfg.autostart === false ? ', Autostart aus' : ', startet mit dem Board'}`);
+    const evs = Object.entries(cfg.events);
+    out(`Ereignisse: ${evs.filter(([, v]) => v.on).length} von ${evs.length} an, mit Erwähnung: ${evs.filter(([, v]) => v.on && v.at).map(([k]) => k).join(', ') || 'keine'}`);
+    out(`Ruhezeit: ${cfg.quiet.on ? `${cfg.quiet.from} bis ${cfg.quiet.to}` : 'aus'}. Verzögerung: Freigabe ${cfg.delays.perm} s, fertig ${cfg.delays.idle} s`);
+    const waiting = d.readOutbox().length;
+    if (waiting) out(`Wartende Ereignisse: ${waiting}`);
+    return;
+  }
+
+  if (sub === 'token') {
+    if (pos[1]) fail('Das Token nicht als Argument angeben, sonst steht es in der Shell-Historie. Über die Eingabe: works discord token (fragt danach) oder Get-Clipboard | works discord token');
+    const rest0 = await restFor('');
+    const t = (await readHidden('Token des Bots einfügen (wird nicht angezeigt): ')).trim();
+    if (!t) fail('Kein Token eingegeben.');
+    if (/\s/.test(t) || t.length < 20) fail('Token ungültig: Das sieht nicht nach einem Bot-Token aus.');
+    rest0.token = t;
+    let me; let app;
+    try { me = await rest0.get('/users/@me'); app = await rest0.get('/oauth2/applications/@me'); } catch (e) { fail(e.status === 401 ? 'Token ungültig: Discord lehnt es ab.' : `Discord nicht erreichbar: ${e.message}`); }
+    // Andere Bot-Anwendung: alte Nachrichten kann der neue Bot nicht bearbeiten, also Zustand verwerfen.
+    if (cfg.app_id && cfg.app_id !== app.id) { await d.stopBot(); try { fs.unlinkSync(d.dfile('state.json')); } catch { /* keiner */ } }
+    d.saveToken(t);
+    cfg.app_id = app.id;
+    cfg.bot_name = me.discriminator && me.discriminator !== '0' ? `${me.username}#${me.discriminator}` : me.username;
+    cfg.owner_id = (app.team && app.team.owner_user_id) || (app.owner && app.owner.id) || '';
+    d.saveDiscordConfig(cfg);
+    out(`Token gültig: ${cfg.bot_name}${cfg.owner_id ? ', Besitzer erkannt (wird bei Erwähnungen angesprochen)' : ''}.`);
+    out('Gespeichert nur auf diesem Rechner, nicht im Projekt.');
+    out(`\nBot auf deinen Server einladen:\n${d.inviteUrl(app.id)}\n\nDanach Kanal wählen: works discord channel`);
+    if (d.botInfo()) { await d.stopBot(); await d.ensureBot({ force: true }); out('Laufender Bot mit dem neuen Token neu gestartet.'); }
+    return;
+  }
+
+  if (sub === 'channel') {
+    needToken();
+    const rest = await restFor(token);
+    let chans = [];
+    let guilds = [];
+    try {
+      guilds = await rest.get('/users/@me/guilds');
+      for (const g of guilds) {
+        const list = await rest.get(`/guilds/${g.id}/channels`);
+        chans.push(...list.filter((c) => c.type === 0 || c.type === 5).sort((a, b) => (a.position || 0) - (b.position || 0)).map((c) => ({ ...c, guild: g })));
+      }
+    } catch (e) { fail(`Kanäle nicht lesbar: ${why(e)}`); }
+    if (!guilds.length) { out(`works ist noch auf keinem Server. Einladen:\n${d.inviteUrl(cfg.app_id)}`); return; }
+    if (!pos[1]) {
+      for (const g of guilds) out(`${g.name}: ${chans.filter((c) => c.guild.id === g.id).map((c) => `#${c.name}`).join(', ') || 'keine Textkanäle'}`);
+      out('\nWählen mit works discord channel <name>. Am besten ein eigener Kanal wie #works.');
+      return;
+    }
+    const want = String(pos[1]).replace(/^#/, '');
+    const hits = chans.filter((c) => c.id === want || c.name === want);
+    if (!hits.length) fail(`Kanal ${want} nicht gefunden. Vorhanden: ${chans.map((c) => `#${c.name}`).join(', ')}`);
+    if (hits.length > 1) fail(`#${want} gibt es mehrfach. Bitte die Kanal-ID angeben: ${hits.map((h) => `${h.guild.name}: ${h.id}`).join(', ')}`);
+    const c = hits[0];
+    Object.assign(cfg, { guild_id: c.guild.id, guild_name: c.guild.name, channel_id: c.id, channel_name: c.name });
+    d.saveDiscordConfig(cfg);
+    out(`Kanal: #${c.name} auf ${c.guild.name}. Der Bot startet mit dem Board, sofort mit works discord start.`);
+    return;
+  }
+
+  if (sub === 'set') {
+    const pairs = pos.slice(1);
+    if (!pairs.length) fail('works discord set schlüssel=wert ..., etwa delay.perm=60 quiet.on=aus privacy.costs=aus event.ci_red.at=an');
+    for (const p of pairs) {
+      const i = p.indexOf('=');
+      if (i < 1) fail(`${p}: schlüssel=wert erwartet.`);
+      try { d.applySetting(cfg, p.slice(0, i), p.slice(i + 1)); } catch (e) { fail(e.message); }
+    }
+    d.saveDiscordConfig(cfg);
+    out(`Gespeichert: ${pairs.join(', ')}`);
+    return;
+  }
+
+  if (sub === 'test') {
+    needToken();
+    if (!cfg.channel_id) fail('Erst einen Kanal wählen: works discord channel');
+    const rest = await restFor(token);
+    try { await rest.post(`/channels/${cfg.channel_id}/messages`, { embeds: [{ title: 'Testnachricht von works', description: 'Wenn du das siehst, klappt die Verbindung.', color: 0x5865f2 }], flags: 4096, allowed_mentions: { parse: [] } }); } catch (e) { fail(`Senden fehlgeschlagen: ${why(e)}`); }
+    out(`Testnachricht gesendet an #${cfg.channel_name}.`);
+    return;
+  }
+
+  if (sub === 'start' || sub === 'restart') {
+    if (!d.isConfigured(cfg)) fail('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.');
+    if (sub === 'restart') await d.stopBot();
+    const r = await d.ensureBot({ force: true });
+    if (r === 'läuft') { out(`Bot läuft schon (PID ${d.botInfo().pid}).`); return; }
+    const until = Date.now() + 15000;
+    while (Date.now() < until && !d.botInfo()) await new Promise((res) => setTimeout(res, 100));
+    const info = d.botInfo();
+    if (!info) {
+      let last = '';
+      try { last = fs.readFileSync(d.dfile('bot.log'), 'utf8').trim().split('\n').pop(); } catch { /* kein Log */ }
+      fail(`Bot startet nicht. ${last}`);
+    }
+    out(`Bot gestartet (PID ${info.pid}). Protokoll: ${d.dfile('bot.log')}`);
+    return;
+  }
+
+  if (sub === 'stop') { out(await d.stopBot() ? 'Bot gestoppt.' : 'Bot lief nicht.'); return; }
+
+  if (sub === 'emit') {
+    let data = {};
+    try { data = flags.json && flags.json !== true ? JSON.parse(String(flags.json)) : {}; } catch { fail('--json ist kein gültiges JSON.'); }
+    d.emit(String(pos[1] || ''), data, findRoot() || '');
+    return;
+  }
+
+  if (sub === 'run') {
+    const { runBot } = await import('./discord-bot.mjs');
+    process.exit(await runBot());
+  }
+
+  if (sub === 'disconnect') {
+    await d.stopBot();
+    d.removeToken();
+    out('Token gelöscht und Bot gestoppt. Die Nachrichten in Discord bleiben stehen.');
+    return;
+  }
+
+  fail(`Unbekannt: works discord ${sub}. Möglich: status, token, channel, set, test, start, stop, restart, disconnect`);
+}
+
 // ---------- Dispatcher ----------
 
 const commands = {
@@ -2821,7 +2996,7 @@ const commands = {
   sprint: cmdSprint, comment: cmdComment, comments: cmdComments, views: cmdViews, template: cmdTemplate,
   templates: cmdTemplate, time: cmdTime, checks: cmdChecks,
   design: cmdDesign, instruct: cmdInstruct, know: cmdKnow, wissen: cmdKnow, recur: cmdRecur, hub: cmdHub,
-  github: cmdGithub, gh: cmdGithub, ical: cmdIcal, undo: cmdUndo,
+  github: cmdGithub, gh: cmdGithub, ical: cmdIcal, undo: cmdUndo, discord: cmdDiscord,
   file: cmdFile, files: cmdFiles, parallel: cmdParallel, par: cmdParallel, import: cmdImport, shot: cmdShot, selftest: cmdSelftest, 'install-cli': cmdInstallCli, version: cmdVersion, '--version': cmdVersion,
 };
 

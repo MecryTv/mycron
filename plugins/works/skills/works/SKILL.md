@@ -92,6 +92,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Neue Kommentare gemeldet | `works comments <ID>` lesen, umsetzen, mit `works comment <ID> "..."` antworten | `references/planning.md` |
 | Aufgabe aus einer Vorlage, "wie immer bei Slash-Befehlen" | `works template list`, dann `works new --template ... --field ... --text "..."` | `references/planning.md` |
 | Wochenbericht fällig oder gewünscht | Woche zusammenfassen, `works report --week --summary "..."` | `references/planning.md` |
+| Hinweise aufs Handy, Discord, Bot einrichten | `works discord` zeigt den nächsten Schritt. Das Token gibt der Nutzer selbst ein (`works discord token`), nie in den Chat | `references/integrations.md` |
 | Wie lange hat das gedauert, passen die Schätzungen | `works time <ID>`, `works time` | `references/planning.md` |
 | Board sichern, in ein anderes Projekt übernehmen, alten Stand wiederherstellen | `works export --json`, einlesen mit `works import <datei.json>` (Vorschau, dann `--apply` oder `--apply --mode=restore`). Wiederherstellen ersetzt den Stand, vorher den Nutzer fragen | `references/board.md` |
 | Board mit jemandem teilen | Im selben Netzwerk `works board --restart --share`, Leselink aus der Ausgabe nennen. Für Leute außerhalb `works export` und die Datei schicken. Bearbeitungslink nur auf Nachfrage (`works share --owner`) | `references/board.md` |
@@ -130,7 +131,7 @@ Nur die Datei laden, die für den aktuellen Schritt gebraucht wird.
 - `references/task-format.md`: Ordnerstruktur, Frontmatter-Felder, Abschnitte je Typ, Schreibregeln
 - `references/workflow.md`: Abläufe für Erfassen, Planen, Arbeiten, Übergabe, Abschluss
 - `references/assets.md`: Bilder speichern, Inbox, Screenshots, Benennung, Komprimierung
-- `references/integrations.md`: Superpowers Brainstorming, UI UX Pro Max, git-workflow, code-audit, responsive-website-check, second-brain-sync, GitHub
+- `references/integrations.md`: Superpowers Brainstorming, UI UX Pro Max, git-workflow, code-audit, responsive-website-check, second-brain-sync, GitHub, Discord-Bot
 - `references/hooks.md`: SessionStart, Stop, UserPromptSubmit, PostToolUse, SubagentStop und pre-commit Hook
 - `references/board.md`: Kanban-Board, Ansichten, Bearbeiten im Board, Abnahme, Rückgängig, Kalender, Projektübersicht, Teilen und Sicherheit
 - `references/planning.md`: Sprint und Rückblick, Kommentare, Ansichten, Vorlagen, Zeit und Kosten, Prüfungen, Wochenbericht, Projektwissen, Wiederkehrendes, Aufräumen

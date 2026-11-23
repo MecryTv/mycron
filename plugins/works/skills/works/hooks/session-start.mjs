@@ -11,6 +11,7 @@ import { refreshBoardIfPresent } from '../scripts/board.mjs';
 import { refreshServers, ensureGitignore } from '../scripts/server-control.mjs';
 import { reportDue, reportName } from '../scripts/weekly.mjs';
 import { registerProject } from '../scripts/hub.mjs';
+import { ensureBot } from '../scripts/discord.mjs';
 import { syncSettings, syncState } from '../scripts/ghsync.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -56,6 +57,8 @@ async function main() {
   refreshBoardIfPresent(root);
   let notes = [];
   try { notes = await refreshServers(root); } catch (e) { notes = [`Board-Server konnte nicht aktualisiert werden: ${e.message}`]; }
+  // Discord-Bot (W-0036): nur wenn eingerichtet, einer je Rechner, eine neue Version ersetzt den alten.
+  try { await ensureBot(); } catch { /* Sitzung startet auch ohne Bot */ }
   process.stdout.write(sessionSummary(root) + '\n');
   if (recurNote) process.stdout.write(`[works] ${recurNote}\n`);
   if (repairNotes.length) process.stdout.write(`[works] ${repairNotes.join('. ')}.\n`);

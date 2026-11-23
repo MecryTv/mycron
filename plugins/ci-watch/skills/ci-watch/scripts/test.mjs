@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { repoFromUrl, errorExcerpt, failureLines, bugFor, fileBug, findWorksCli } from './ci-status.mjs';
+import { repoFromUrl, errorExcerpt, failureLines, bugFor, fileBug, findWorksCli, notifyWorks } from './ci-status.mjs';
 
 assert.equal(repoFromUrl('https://github.com/MecryTv/mycron.git'), 'MecryTv/mycron');
 assert.equal(repoFromUrl('git@github.com:MecryTv/mycron.git'), 'MecryTv/mycron');
@@ -68,6 +68,22 @@ try {
   const plain = path.join(tmp, 'ohne');
   fs.mkdirSync(plain);
   assert.equal(fileBug({ cwd: plain, bug, sha: 'a5cfc20aaaa', cli, env }), null);
+
+  // notifyWorks legt das CI-Ergebnis für den Discord-Bot von works ab (W-0036), nur wenn der Bot eingerichtet ist.
+  const outbox = path.join(tmp, '.works', 'discord', 'outbox');
+  const data = { ok: false, sha: 'a5cfc20aaaa', failed: 1, total: 3, job: 'build', error: 'Fehler', bug: r1.id, url: 'https://github.com/a/b/actions/runs/1' };
+  assert.equal(notifyWorks({ cwd: proj, data, cli, env }), true);
+  assert.ok(!fs.existsSync(outbox) || !fs.readdirSync(outbox).length, 'Ereignis ohne eingerichteten Bot abgelegt');
+  fs.mkdirSync(path.dirname(outbox), { recursive: true });
+  fs.writeFileSync(path.join(path.dirname(outbox), 'secret.json'), '{"token":"test-token-0123456789abcdef"}');
+  assert.equal(notifyWorks({ cwd: proj, data, cli, env }), true);
+  const files = fs.readdirSync(outbox);
+  assert.equal(files.length, 1);
+  const ev = JSON.parse(fs.readFileSync(path.join(outbox, files[0]), 'utf8'));
+  assert.equal(ev.type, 'ci');
+  assert.deepEqual(ev.data, data);
+  assert.equal(ev.project, 'p');
+  assert.equal(notifyWorks({ cwd: plain, data, cli, env }), false);
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

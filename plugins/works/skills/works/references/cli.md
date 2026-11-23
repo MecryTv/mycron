@@ -144,6 +144,21 @@ IDs können kurz angegeben werden: `12`, `w12`, `W-12` und `W-0012` sind gleichw
 | `hub [--port 4740]`, `hub --list` | Hub mit allen Projekten im Browser (dieselbe Seite wie `/hub` an jedem Board) oder als Text |
 | `time [<ID>]` | zusätzlich Tokens und geschätzte Kosten |
 
+## Discord-Bot works
+
+Ein Bot je Rechner für alle Projekte. Alles liegt in `~/.works/discord`, nie im Projekt. Details in integrations.md.
+
+| Befehl | Wirkung |
+|---|---|
+| `discord` | Stand und nächster Schritt der Einrichtung, Token nur maskiert |
+| `discord token` | Token prüfen und speichern. Liest von der Eingabe (versteckt) oder aus einer Pipe, nie als Argument: `Get-Clipboard \| works discord token`. Gibt den Einladungslink aus |
+| `discord channel [name\|id]` | Textkanäle der Server zeigen oder den Kanal für die Statusposts wählen |
+| `discord set k=v ..` | `autostart`, `auto_enroll`, `delay.perm`, `delay.idle` (Sekunden), `quiet.on`, `quiet.from`, `quiet.to` (HH:MM), `privacy.commands\|costs\|ci_error\|titles`, `event.<name>` und `event.<name>.at` (Erwähnung) |
+| `discord test` | Testnachricht in den Kanal |
+| `discord start\|stop\|restart` | Bot-Prozess; startet sonst mit dem Board und beim Sitzungsstart |
+| `discord emit <ship\|ci\|report> --json '{..}'` | Ereignis in die outbox legen (für ship, ci-watch, Berichte). Ohne Einrichtung passiert nichts |
+| `discord disconnect` | Token löschen und Bot stoppen |
+
 ## Dateien, Parallelarbeit, Import, Selbsttest
 
 | Befehl | Wirkung |
