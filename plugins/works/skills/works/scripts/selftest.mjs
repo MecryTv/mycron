@@ -1274,8 +1274,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const ci = await dwait(() => findMsg((e) => e.title === 'CI rot für feedbee'), 'CI-Nachricht');
       has(JSON.stringify(ci.e.fields), 'W-0099', 'Bug im Feld');
       expect(ci.m.components.length && ci.m.components[0].components.some((c) => c.style === 5 && c.url === 'https://github.com/a/b/actions/runs/1'), 'Link auf den Lauf fehlt');
-      emit('report', { kind: 'woche', title: 'Woche 47', summary: 'Discord-Bot gebaut.', done: 4 });
-      await dwait(() => findMsg((e) => /Woche 47/.test(e.title || '')), 'Wochenbericht');
+      emit('report', { kind: 'woche', title: 'Woche 47', summary: 'Discord-Bot gebaut.', done: 1, lists: { Erledigt: [{ id: 'W-0001', title: 'Eins' }], 'Braucht dich': ['W-0002: offene Frage, Welche Farbe?'] } });
+      const wr = await dwait(() => findMsg((e) => /Woche 47/.test(e.title || '')), 'Wochenbericht');
+      expect((wr.e.fields || []).some((f) => f.name === 'Erledigt (1)' && f.value.includes('W-0001 Eins')), `Liste im Wochenbericht fehlt: ${JSON.stringify(wr.e.fields)}`);
       await dwait(() => !fs.readdirSync(path.join(ddir, 'outbox')).length, 'outbox geleert');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
     } catch (e) { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); throw e; }

@@ -177,7 +177,13 @@ export async function writeWeekly(root, config, { date = today(), summary = '', 
     }
   }
   // Discord-Bot (W-0036): Bericht als Nachricht, wenn der Bot eingerichtet ist. Wartet nicht auf Discord.
-  if (emit('report', { kind: 'woche', title: `Wochenbericht ${project}, KW ${range.week}`, summary: sum, done: d.done.length }, root)) notes.push('Für den Discord-Bot abgelegt.');
+  const brief = (list) => list.slice(0, 15).map((t) => ({ id: t.id, title: t.title }));
+  const lists = {
+    ...(s.include.done ? { Erledigt: brief(d.done) } : {}),
+    ...(s.include.attention ? { 'Braucht dich': d.attention.slice(0, 15) } : {}),
+    ...(s.include.next ? { 'Nächste Woche': brief(d.next) } : {}),
+  };
+  if (emit('report', { kind: 'woche', title: `Wochenbericht ${project}, KW ${range.week}`, summary: sum, done: d.done.length, lists }, root)) notes.push('Für den Discord-Bot abgelegt.');
   return { name, md: path.join(dir, `${name}.md`), html: path.join(dir, `${name}.html`), notes, summary: sum, range };
 }
 

@@ -149,7 +149,12 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date() } = {}) {
       break;
     case 'report_week':
     case 'report_day':
-      e = { color: COLOR.status, title: cut(ev.title || 'Bericht', 256), description: cutBlock(ev.summary, 3000), ...(ev.done !== undefined ? { fields: [field('Erledigt', String(ev.done))] } : {}) };
+    {
+      // Listen wie im Wochenbericht: Aufgaben als {id, title} (Titel nur mit privacy.titles), sonst Text.
+      const item = (x) => cut(typeof x === 'object' && x ? label(cfg, x.id, x.title) : (cfg.privacy.titles ? x : (String(x).match(/^[A-Z]+-\d+/) || [''])[0]), 120);
+      const lists = Object.entries(ev.lists || {}).slice(0, 3).map(([n, items]) => field(`${n} (${items.length})`, items.map(item).filter(Boolean).map((x) => `• ${x}`).join('\n') || 'Keine.', false));
+      e = { color: COLOR.status, title: cut(ev.title || 'Bericht', 256), description: cutBlock(ev.summary, 3000), fields: lists.length ? lists : ev.done !== undefined ? [field('Erledigt', String(ev.done))] : [] };
+    }
       break;
     default:
       e = { color: COLOR.gone, title: cut(ev.type, 100) };
@@ -197,8 +202,10 @@ export function snapshotOf(root) {
   const cur = act && act.current;
   const usage = liveUsage(root, config);
   const queueIds = queueOf(config).filter((id) => byId.has(id) && OPEN_STATUSES.includes(byId.get(id).status));
-  const nextList = queueIds.length ? queueIds.map((id) => byId.get(id))
-    : sortTasks(live.filter((t) => ['backlog', 'geplant'].includes(t.status)));
+  // Als Nächstes: Warteschlange ohne das, was schon läuft; sonst die wichtigsten offenen Aufgaben.
+  const waiting = (t) => ['backlog', 'geplant'].includes(t.status);
+  const queued = queueIds.map((id) => byId.get(id)).filter(waiting);
+  const nextList = queued.length ? queued : sortTasks(live.filter(waiting));
   const counted = all.filter((t) => t.status !== 'verworfen');
   const day = today();
   return {

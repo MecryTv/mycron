@@ -71,7 +71,17 @@ Wunsch des Nutzers vom 2026-11-22/23 (P2): Discord-Anbindung für alles, nicht n
 Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Vorher: In Discord kam nur der Wochenbericht per Webhook, keine Hinweise zu Frei](assets/2026-11-23-vorher-in-discord-kam-nur-der-vorher.png)
+Beschreibung: Vorher: In Discord kam nur der Wochenbericht per Webhook, keine Hinweise zu Freigaben, Reviews oder CI, kein Statuspost
+Art: vorher · Hinzugefügt: 2026-11-23
+
+![Nachher: echte Nachrichten des Bots gegen das nachgebaute Discord, Statuspost an](assets/2026-11-23-nachher-echte-nachrichten-des-bots-nachher.png)
+Beschreibung: Nachher: echte Nachrichten des Bots gegen das nachgebaute Discord, Statuspost angeheftet, Review angenommen, ship mit Schritten, CI rot mit Bug, neue P1, Freigabe mit Erwähnung
+Art: nachher · Hinzugefügt: 2026-11-23
+
+![Nachher auf dem Handy, hell: dieselben Nachrichten in 390 px Breite](assets/2026-11-23-nachher-auf-dem-handy-hell-dieselben-nachher.png)
+Beschreibung: Nachher auf dem Handy, hell: dieselben Nachrichten in 390 px Breite
+Art: nachher · Hinzugefügt: 2026-11-23
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
@@ -98,3 +108,6 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: Entscheidung E3 dokumentiert: Ereignisse aus dem Stand der Projekte
 - 2026-11-23: Entscheidung E4 dokumentiert: Gateway ab Node 22, Nachrichten auch darunter
 - 2026-11-23: Entscheidung E5 dokumentiert: Rechte und Verzögerungen
+- 2026-11-23: Asset hinzugefügt: assets/2026-11-23-vorher-in-discord-kam-nur-der-vorher.png (vorher)
+- 2026-11-23: Asset hinzugefügt: assets/2026-11-23-nachher-echte-nachrichten-des-bots-nachher.png (nachher)
+- 2026-11-23: Asset hinzugefügt: assets/2026-11-23-nachher-auf-dem-handy-hell-dieselben-nachher.png (nachher)
