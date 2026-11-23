@@ -10,18 +10,14 @@ Angelegt am 2026-11-23. Diese Datei hält fest, was entschieden wurde, warum, un
 Das Token eines gemeinsamen Bots kann nicht ins Plugin (Übernahme, Sperre durch Discord). Deshalb ein Dienst auf dem VPS des Nutzers (Docker), der als einziger das Token hat. works koppelt sich mit einem einmaligen Code und bekommt einen Geräteschlüssel, der nur in die gekoppelten Kanäle schreiben und nur eigene Nachrichten bearbeiten darf. Der lokale Bot aus W-0036 bleibt (Ereignisse, F2, Statuspost) und schickt statt an Discord an den Dienst. Offen für den Nutzer: Kopplung P (Code aus Discord) oder Q (Code aus works), Einrichtung R, eigener Bot als Option (Empfehlung ja), Domain.
 
 ## Entscheidungen
-<!-- Pro Entscheidung ein Block. Neue Blöcke mit `works decisions <ID> --add "Titel" ...` oder von Hand im gleichen Format:
-
-### E1: Titel
-- Datum:
-- Quelle: Brainstorm | UI UX Pro Max | Gespräch | Analyse
+### E1: Einrichtung nach Entwurf R
+- Datum: 2026-11-23
+- Quelle: Nutzer
 - Kontext:
-- Entscheidung:
-- Begründung:
+- Entscheidung: Beim ersten Einrichten zuerst die Wahl: gemeinsamer Bot (empfohlen, Einladen und Code) oder eigener Bot (Token wie W-0036). Darunter der ehrliche Hinweis, was über den Dienst läuft. Der eigene Bot bleibt damit als Option.
+- Begründung: Wahl des Nutzers am 2026-11-23: R finde ich nicht schlecht
 - Verworfene Alternativen:
-  - Alternative: Grund
 - Konsequenzen:
--->
 
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->

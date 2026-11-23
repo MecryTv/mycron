@@ -66,3 +66,5 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: Entwurf Q „Kopplung: Code aus works“ angehängt
 - 2026-11-23: Entwurf R „Einrichtung: gemeinsam oder eigener Bot“ angehängt
 - 2026-11-23: Dokument übernommen: Konzept: gemeinsamer Bot (Ablauf, Sicherheit, Kosten)
+- 2026-11-23: Entscheidung E1 dokumentiert: Einrichtung nach Entwurf R
+- 2026-11-23: Nutzer hat Entwurf R (Einrichtung: gemeinsam oder eigener Bot) angenommen. Kopplung P oder Q noch offen.
