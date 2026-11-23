@@ -14,7 +14,7 @@ milestone:
 branch: feature/w-0040-gemeinsamer-discord-bot
 tags: [discord, design]
 blocked_by: []
-blocks: [W-0037, W-0038]
+blocks: []
 related: []
 source: manuell
 incomplete: false
@@ -101,3 +101,5 @@ Abgeschlossen am 2026-11-23. Keine offene Übergabe.
 - 2026-11-23: Entscheidung E3 dokumentiert: Kaputte Kopplungen und Schutz des gemeinsamen Bots
 - 2026-11-23: Umgesetzt: Dienst works-bot (Docker, Anleitung), works discord link/unlink, Bot über den Dienst. Audit mit 8 Funden, alle behoben und getestet. Selbsttest 37/37, Dienst-Test und ci-watch grün.
 - 2026-11-23: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
+- 2026-11-23: Beziehung entfernt: W-0037 blocked-by
+- 2026-11-23: Beziehung entfernt: W-0038 blocked-by

@@ -1,0 +1,38 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "D1",
+      "title": "Übersicht, Details nur für dich",
+      "file": "D1-uebersicht-details-nur-fuer.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "",
+      "at": "2026-11-23 20:13"
+    },
+    {
+      "name": "D2",
+      "title": "Umblättern",
+      "file": "D2-umblaettern.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "",
+      "at": "2026-11-23 20:13"
+    },
+    {
+      "name": "D3",
+      "title": "Mit Bild",
+      "file": "D3-mit-bild.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Fortschritt je Projekt und Woche als PNG, das works selbst zeichnet",
+      "at": "2026-11-23 20:13"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": {
+    "name": "D3",
+    "at": "2026-11-23 20:13",
+    "reason": "Wahl des Nutzers"
+  }
+}

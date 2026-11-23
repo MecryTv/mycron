@@ -13,7 +13,7 @@ completed:
 milestone:
 branch:
 tags: [ui, discord, board]
-blocked_by: [W-0036, W-0040]
+blocked_by: [W-0036]
 blocks: []
 related: []
 source: manuell
@@ -28,6 +28,8 @@ incomplete: false
 ## Beschreibung
 Teil der Discord-Anbindung (siehe W-0036), Wunsch des Nutzers vom 2026-11-23 (P2): Einstellungen nach Entwurf D, aber komplett verbessert. Verbindungsstatus, Einrichtung in Schritten (Bot anlegen, Token, Server einladen, Kanal wählen), Erwähnung, Ereignisse, Datenschutz, Befehle. Token nie im Board sichtbar. Gestaltung über Entwürfe, Wahl abwarten.
 
+Gewählt: Entwurf J2 (Dialog mit Reitern und Vorschau), Einrichtung nach R aus W-0040 (gemeinsamer oder eigener Bot). Wunsch des Nutzers am 2026-11-23 (P2): Im Board selbst den Kanal auswählen können, auf dem Discord-Server, auf den der Bot eingeladen ist. Gewählt: Entwurf K (Server und Kanäle live vom Bot, gesperrte ausgegraut, „Hierher verschieben“ legt das Dashboard aus W-0044 im neuen Kanal an und räumt den alten auf).
+
 ## Kontext und Problem
 <!-- Warum ist das nötig? Aktueller Zustand, Auslöser, Einschränkungen. -->
 
@@ -36,7 +38,11 @@ Teil der Discord-Anbindung (siehe W-0036), Wunsch des Nutzers vom 2026-11-23 (P2
 
 ## Akzeptanzkriterien
 <!-- Prüfbare Aussagen. Jede Zeile muss sich mit ja oder nein beantworten lassen. -->
-- [ ] 
+- [ ] Dialog Discord-Bot im Board nach J2 mit den Reitern Verbindung, Projekte, Ereignisse, Befehle, Datenschutz und Vorschau
+- [ ] Einrichtung nach R: gemeinsamer Bot mit Code oder eigener Bot mit Token, Token und Schlüssel nie sichtbar
+- [ ] Kanalwahl nach K: Server und Textkanäle live vom Bot, Kanäle ohne Schreibrecht ausgegraut, Verschieben des Dashboards
+- [ ] Änderungen wirken ohne Neustart des Bots
+- [ ] Selbsttest mit Browser deckt Dialog und Kanalwahl ab
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
@@ -67,3 +73,6 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: Entwurf J2 „J verbessert“ angehängt
 - 2026-11-23: Entwurf J2 „J verbessert“ gewählt. Grund: Wahl des Nutzers: J verbessert
 - 2026-11-23: Beziehung: blocked-by W-0040
+- 2026-11-23: Entwurf K „Kanal im Board wählen“ angehängt
+- 2026-11-23: Entwurf J2 „J verbessert“ gewählt. Grund: Wahl des Nutzers (J verbessert), dazu K für die Kanalwahl
+- 2026-11-23: Beziehung entfernt: blocked-by W-0040

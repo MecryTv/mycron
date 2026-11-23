@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-23 20:06 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-23 20:13 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 3 | 0 | 0 | 0 | 0 | 0 | 40 | 0 |
+| 4 | 0 | 0 | 0 | 1 | 0 | 40 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 3 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 4 · P3 Mittel: 0 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -25,6 +25,11 @@ _Keine Einträge._
 | [W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) | Discord-Bot works: Befehle und Knöpfe | Feature | P2 Hoch | Backlog | L |  |  |  |
 | [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | Backlog | M |  |  |  |
 | [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | Backlog | XL |  |  |  |
+| [W-0044](tasks/W-0044-discord-ein-dashboard-mit-bild-statt/task.md) | Discord: ein Dashboard mit Bild statt Statuspost je Projekt, Status des Bots | Feature | P2 Hoch | Backlog | L |  |  | blockiert durch W-0037 |
+
+## Blockiert
+
+- [W-0044](tasks/W-0044-discord-ein-dashboard-mit-bild-statt/task.md) Discord: ein Dashboard mit Bild statt Statuspost je Projekt, Status des Bots: wartet auf W-0037
 
 ## Zuletzt erledigt
 

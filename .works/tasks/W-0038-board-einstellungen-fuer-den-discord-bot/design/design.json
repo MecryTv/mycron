@@ -20,15 +20,6 @@
       "at": "2026-11-23 17:07"
     },
     {
-      "name": "K",
-      "title": "Einrichtung in Schritten",
-      "file": "K-einrichtung-in-schritten.html",
-      "kind": "html",
-      "source": "ui-ux-pro-max",
-      "note": "Erstes Mal, gilt für I und J: Bot anlegen, Token, Einladung, Kanal",
-      "at": "2026-11-23 17:07"
-    },
-    {
       "name": "J2",
       "title": "J verbessert",
       "file": "J2-j-verbessert.html",
@@ -36,12 +27,21 @@
       "source": "ui-ux-pro-max",
       "note": "Reiter Verbindung (mit Einrichtung), Projekte, Ereignisse (@ je Ereignis, Ruhezeit), Befehle, Datenschutz; Vorschau mit Sperrbildschirm",
       "at": "2026-11-23 17:20"
+    },
+    {
+      "name": "K",
+      "title": "Kanal im Board wählen",
+      "file": "K-kanal-im-board-waehlen.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Server und Kanäle live vom Bot, Dashboard verschieben",
+      "at": "2026-11-23 20:13"
     }
   ],
   "brainstorm": [],
   "chosen": {
     "name": "J2",
-    "at": "2026-11-23 17:22",
-    "reason": "Wahl des Nutzers: J verbessert"
+    "at": "2026-11-23 20:13",
+    "reason": "Wahl des Nutzers (J verbessert), dazu K für die Kanalwahl"
   }
 }
