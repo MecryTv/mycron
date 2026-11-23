@@ -126,7 +126,8 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
       if (req.method === 'PATCH' && (m = p.match(/^\/webhooks\/(\d+)\/itok-(\d+)\/messages\/@original$/))) {
         const cb = fake.callbacks.get(m[2]);
         if (!cb || cb.type !== 5) return json(res, 404, { message: 'Unknown Message', code: 10008 });
-        const probs = messageProblems(body || {});
+        // Beim Bearbeiten erlaubt Discord nur wenige Flags (Einbettungen unterdrücken, Components V2), nicht ephemeral.
+        const probs = [...messageProblems(body || {}), ...(body && body.flags & ~(4 | 32768) ? ['edit flags'] : [])];
         if (probs.length) { fake.problems.push(probs); return json(res, 400, { message: 'Invalid Form Body', code: 50035, errors: probs }); }
         fake.followups.set(m[2], body);
         return json(res, 200, { id: `orig-${m[2]}`, ...body }, rl);

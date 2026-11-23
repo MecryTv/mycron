@@ -52,9 +52,9 @@ Wunsch des Nutzers am 2026-11-23 (P2): Dem Bot einen Help-Befehl mit allen wicht
 - [x] Eigener Bot: Befehle registrieren, INTERACTION_CREATE vom Gateway, nur der Besitzer, sofort vorläufig antworten, dann Ergebnis
 - [x] Aktionen über die Board-API (Akteur Discord): Status, Aufgaben, neue Aufgabe, Anweisung, Annehmen, Zurückgeben, Bug ansehen
 - [x] Knöpfe an Nachrichten: Review (Annehmen, Zurück an Claude), Fertig (Anweisung an Claude), CI rot (Bug ansehen); nach Erledigung weg
-- [ ] Dienst: Hilfe selbst, Befehle und Knöpfe an das gekoppelte Gerät (Inbox mit Long-Poll, Antwort über den Dienst), Dialoge selbst öffnen, Besitzer prüfen, Gerät aus erkennen
-- [ ] Gerät im gemeinsamen Modus: Inbox abholen, beantworten
-- [ ] Tests: Selbsttest (eigener Bot) und Dienst-Test (gemeinsamer Bot), Doku
+- [x] Dienst: Hilfe selbst, Befehle und Knöpfe an das gekoppelte Gerät (Inbox mit Long-Poll, Antwort über den Dienst), Dialoge selbst öffnen, Besitzer prüfen, Gerät aus erkennen
+- [x] Gerät im gemeinsamen Modus: Inbox abholen, beantworten
+- [x] Tests: Selbsttest (eigener Bot) und Dienst-Test (gemeinsamer Bot), Doku
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -70,7 +70,7 @@ Wunsch des Nutzers am 2026-11-23 (P2): Dem Bot einen Help-Befehl mit allen wicht
 - Alle Antworten nur für den Aufrufer (ephemeral). Erst vorläufig antworten (Discord verlangt eine Antwort in 3 s, Annehmen kann Prüfungen laufen lassen), dann die vorläufige Antwort bearbeiten.
 - Dialoge (Zurück an Claude, Anweisung, Neue Aufgabe) müssen sofort aufgehen: Beim gemeinsamen Bot öffnet sie der Dienst selbst, das Gerät bekommt erst die Antwort aus dem Dialog. Deshalb liegen die Dialoge im gemeinsamen Modul.
 - Weiterleitung an das Gerät über eine Inbox mit Long-Poll (das Gerät hat kein Gateway). Das Interaktions-Token bleibt im Dienst, das Gerät antwortet über den Dienst.
-- Zuordnung: Knöpfe gehören zu der Nachricht, also zu dem Gerät, das sie geschrieben hat; Befehle zum zuletzt aktiven Gerät im Kanal.
+- Zuordnung: Knöpfe gehören zu der Nachricht, also zu dem Gerät, das sie geschrieben hat; Befehle zum zuletzt aktiven Gerät des Aufrufers im Kanal. Abgeholtes bestätigt das Gerät mit der nächsten Abfrage.
 - Aktionen laufen über dieselbe API wie das Board (Rückgängig im Board möglich), Verlaufseinträge mit [Discord].
 - Antworttexte deutsch oder englisch nach der Sprache des Discord-Clients; Befehle englisch mit deutscher Übersetzung (HS).
 - Der alte Unterbefehl status (gekoppelte Geräte) des Dienstes wird zu /works status für den Projektstand; die Geräte stehen in /works help.
@@ -102,3 +102,6 @@ Wunsch des Nutzers am 2026-11-23 (P2): Dem Bot einen Help-Befehl mit allen wicht
 - 2026-11-23: Entscheidung E2 dokumentiert: Dialoge im gemeinsamen Modul, beim gemeinsamen Bot öffnet sie der Dienst
 - 2026-11-23: Entscheidung E3 dokumentiert: Inbox mit Long-Poll für das Gerät
 - 2026-11-23: Entscheidung E4 dokumentiert: Aktionen über die Board-API
+- 2026-11-23: Umsetzungsplan: "Dienst: Hilfe selbst, Befehle und Knöpfe an das gekoppelte Gerät (Inbox mit Long-Poll, Antwort über den Dienst), Dialoge selbst öffnen, Besitzer prüfen, Gerät aus erkennen" abgehakt
+- 2026-11-23: Umsetzungsplan: "Gerät im gemeinsamen Modus: Inbox abholen, beantworten" abgehakt
+- 2026-11-23: Umsetzungsplan: "Tests: Selbsttest (eigener Bot) und Dienst-Test (gemeinsamer Bot), Doku" abgehakt

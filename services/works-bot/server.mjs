@@ -158,7 +158,10 @@ function newCode() {
 // ---------- Commands and buttons (W-0037) ----------
 // The device has no gateway: commands and clicks wait in an inbox per key, the device fetches them with a long poll
 // and answers through the service. The interaction token never leaves the service.
+// A request counts as fetched only when the device acknowledges it with its next poll (?ack=ids): an answer that
+// got lost on the way comes again instead of vanishing.
 const inbox = new Map();    // key hash -> interactions for the device
+const inflight = new Map(); // key hash -> interactions sent, not yet acknowledged
 const waiting = new Map();  // key hash -> { res, timer } of the open long poll
 const pending = new Map();  // interaction id -> { token, h, de, delivered, timer }
 
@@ -177,13 +180,18 @@ function expire(id) {
   const p = pending.get(id);
   if (!p) return;
   pending.delete(id);
-  const list = inbox.get(p.h);
-  if (list) { const keep = list.filter((x) => x.id !== id); if (keep.length) inbox.set(p.h, keep); else inbox.delete(p.h); }
+  for (const m of [inbox, inflight]) {
+    const list = m.get(p.h);
+    if (list) { const keep = list.filter((x) => x.id !== id); if (keep.length) m.set(p.h, keep); else m.delete(p.h); }
+  }
   const t = (g, e) => (p.de ? g : e);
+  // A device that never asked for its inbox runs a works without commands and buttons.
+  const old = store.links[p.h] && !store.links[p.h].polled;
   editOriginal(p.token, {
     embeds: [{ color: 0x80848e, title: t('works antwortet nicht', 'works does not answer'),
       description: p.delivered ? t('Das Gerät hat die Anfrage abgeholt, aber nicht geantwortet. Bitte später noch einmal.', 'The device picked up the request but did not answer. Please try again later.')
-        : t('Das gekoppelte Gerät ist gerade nicht erreichbar. Läuft der Rechner mit works? Der Bot startet mit dem Board oder einer Claude-Sitzung.', 'The linked device is not reachable right now. Is the computer with works running? The bot starts with the board or a Claude session.') }],
+        : old ? t('works auf dem gekoppelten Rechner kennt noch keine Befehle und Knöpfe. Bitte works aktualisieren (Plugin-Update), dann geht es.', 'works on the linked computer does not know commands and buttons yet. Please update works (plugin update), then it works.')
+          : t('Das gekoppelte Gerät ist gerade nicht erreichbar. Läuft der Rechner mit works? Der Bot startet mit dem Board oder einer Claude-Sitzung.', 'The linked device is not reachable right now. Is the computer with works running? The bot starts with the board or a Claude session.') }],
     allowed_mentions: { parse: [] },
   }).catch((e) => log('answer for a missing device failed:', e.message));
 }
@@ -195,8 +203,18 @@ function deliver(h) {
   waiting.delete(h);
   clearTimeout(w.timer);
   inbox.delete(h);
-  for (const x of items) markDelivered(x.id);
+  inflight.set(h, [...(inflight.get(h) || []), ...items]);
   send(w.res, 200, { interactions: items });
+}
+
+// Next poll of a device: acknowledged requests are fetched, the rest of the last answer comes again first.
+function acknowledge(h, ack) {
+  const sent = inflight.get(h) || [];
+  inflight.delete(h);
+  const ids = new Set(ack);
+  for (const x of sent) if (ids.has(x.id)) markDelivered(x.id);
+  const again = sent.filter((x) => !ids.has(x.id) && pending.has(x.id));
+  if (again.length) inbox.set(h, [...again, ...(inbox.get(h) || [])]);
 }
 
 // Only what the device needs: no token, no member list, no permissions.
@@ -245,9 +263,10 @@ async function onInteraction(i) {
   const channel = { id: i.channel_id, name: (i.channel && i.channel.name) || '' };
   if (sub === 'help') return answer(helpMessage({ locale: i.locale, shared: true, devices: deviceLines(i.guild_id, t) }));
   if (sub !== 'link' && sub !== 'unlink') {
-    // Every other command goes to the device linked in this channel that was active last.
-    const entry = Object.entries(store.links).filter(([, l]) => l.guild_id === i.guild_id && l.channel_id === channel.id && !l.broken)
-      .sort((x, y) => Date.parse(y[1].seen || y[1].created) - Date.parse(x[1].seen || x[1].created))[0];
+    // Every other command goes to a device of whoever typed it in this channel, the one active last.
+    const here = Object.entries(store.links).filter(([, l]) => l.guild_id === i.guild_id && l.channel_id === channel.id && !l.broken);
+    const entry = here.filter(([, l]) => l.user_id === who(i)).sort((x, y) => Date.parse(y[1].seen || y[1].created) - Date.parse(x[1].seen || x[1].created))[0];
+    if (!entry && here.length) return answer(notOwner(i.locale));
     if (!entry) return reply({ title: t('Noch nicht gekoppelt', 'Not linked yet'), description: t('In diesem Kanal ist kein Gerät gekoppelt. Erst /works verbinden, dann works discord link <Code>.', 'No device is linked in this channel. Run /works link first, then works discord link <code>.') });
     return forward(entry[0], entry[1]);
   }
@@ -425,8 +444,10 @@ async function handle(req, res) {
   // Long poll for commands and clicks: answers at once when something waits, otherwise after at most wait seconds.
   // One open poll per device; a new one ends the old.
   if (req.method === 'GET' && p === '/v1/inbox') {
+    if (!a.link.polled) { a.link.polled = new Date().toISOString(); save(); }
     const old = waiting.get(a.h);
     if (old) { waiting.delete(a.h); clearTimeout(old.timer); send(old.res, 200, { interactions: [] }); }
+    acknowledge(a.h, String(url.searchParams.get('ack') || '').split(',').filter((x) => /^\d{1,25}$/.test(x)).slice(0, 100));
     const secs = Math.min(Math.max(Number(url.searchParams.get('wait')) || 0, 0), 25);
     const w = { res, timer: setTimeout(() => { if (waiting.get(a.h) === w) { waiting.delete(a.h); send(res, 200, { interactions: [] }); } }, secs * 1000) };
     waiting.set(a.h, w);

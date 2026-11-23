@@ -1495,7 +1495,15 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     try {
       const cmds = await dwait(() => fake.guildCommands.get('1'), 'Befehle für Server 1 registriert');
       expect(cmds[0].name === 'works' && cmds[0].options.length === 5, `Befehle: ${JSON.stringify(cmds).slice(0, 200)}`);
-      const ask = async (opts, what) => { const id = fake.interact(opts); return dwait(() => fake.answerOf(id), what); };
+      // w() blockiert diesen Prozess und damit das Fake-Gateway; der Bot verbindet sich dann neu, und ein Klick in
+      // dieser Lücke geht verloren (echtes Discord liefert ihn nach). Kommt keine Eingangsbestätigung, noch einmal.
+      const send = async (opts, what) => {
+        for (let n = 1; ; n++) {
+          const id = fake.interact(opts);
+          try { await dwait(() => fake.callbacks.get(id), `${what}: Eingang`, 5000); return id; } catch (e) { if (n >= 3) throw e; }
+        }
+      };
+      const ask = async (opts, what) => { const id = await send(opts, what); return dwait(() => fake.answerOf(id), what); };
       const task = (id) => loadTasks(proj).find((t) => t.id === id);
       // Hilfe: sofort, nur für dich, Befehle in der Sprache des Clients.
       let a = await ask({ sub: 'help' }, 'Antwort auf /works help');
@@ -1509,7 +1517,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(loadTasks(proj).length === count, 'Fremder hat eine Aufgabe angelegt');
       // Neue Aufgabe vom Handy: erst vorläufig, dann das Ergebnis; Quelle discord, Verlauf mit [Discord].
       const P = { name: 'project', value: 'projekt' };
-      const nid = fake.interact({ sub: 'new', options: [{ name: 'title', value: 'Vom Handy notiert' }, { name: 'priority', value: 'P2' }, P] });
+      const nid = await send({ sub: 'new', options: [{ name: 'title', value: 'Vom Handy notiert' }, { name: 'priority', value: 'P2' }, P] }, '/works neu');
       a = await dwait(() => fake.answerOf(nid), 'Antwort auf /works neu');
       expect(fake.callbacks.get(nid).type === 5 && fake.callbacks.get(nid).data.flags & 64, 'nicht vorläufig oder für alle sichtbar');
       const created = loadTasks(proj).find((t) => t.title === 'Vom Handy notiert');

@@ -163,6 +163,25 @@ try {
   assert.deepEqual(kept.map((x) => x.components.map((c) => c.custom_id)), [['w:acc::W-1'], ['w:proj::']]);
   // Answers only for interactions of the own device.
   assert.equal((await api('POST', `/v1/interactions/${sid}/reply`, { content: 'x' }, key1)).status, 404, 'answered twice');
+  // A second person with an own device in the same channel: each command goes to the device of whoever typed it.
+  // That device never asked for its inbox (an older works), so the service suggests an update instead of "off".
+  const key88 = await linkKey({ user: '88' });
+  a = await ask({ sub: 'tasks' }, 'owner command with a second device in the channel');
+  assert.doesNotMatch(JSON.stringify(a.data), /Nicht für dich/, 'command of the owner went to the other device');
+  assert.match(JSON.stringify(a.data), /projekt/);
+  a = await ask({ sub: 'tasks', user: '88' }, 'command of the second person');
+  assert.doesNotMatch(JSON.stringify(a.data), /Nicht für dich/, 'command of the second person went to the other device');
+  assert.match(JSON.stringify(a.data), /aktualisier/i, 'no hint to update works');
+  // A poll whose answer gets lost: without the acknowledgement the request comes again with the next poll.
+  const btn = await api('POST', '/v1/channels/11/messages', { content: 'b', components: [{ type: 1, components: [{ type: 2, style: 3, label: 'ok', custom_id: 'w:acc::W-1' }] }] }, key88);
+  const cid88 = fake.interact({ type: 3, customId: 'w:acc::W-1', messageId: btn.body.id, user: '88' });
+  await wait(() => fake.callbacks.get(cid88), 'deferred click for the second device');
+  const got = (await api('GET', '/v1/inbox', null, key88)).body.interactions.map((x) => x.id);
+  assert.deepEqual(got, [cid88]);
+  assert.deepEqual((await api('GET', '/v1/inbox', null, key88)).body.interactions.map((x) => x.id), [cid88], 'lost delivery not repeated');
+  assert.deepEqual((await api('GET', `/v1/inbox?ack=${cid88}`, null, key88)).body.interactions, [], 'acknowledged request delivered again');
+  assert.equal((await api('POST', `/v1/interactions/${cid88}/reply`, { content: 'erledigt' }, key88)).status, 200);
+  assert.equal((await api('DELETE', '/v1/link', null, key88)).status, 200);
   // Device off: the service says so instead of leaving Discord waiting.
   await wa(['discord', 'stop']);
   a = await ask({ sub: 'tasks' }, 'answer for a device that is off');

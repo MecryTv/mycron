@@ -31,7 +31,7 @@
 - Datum: 2026-11-23
 - Quelle: Gespräch
 - Kontext:
-- Entscheidung: Der Dienst legt Befehle und Klicks in eine Inbox je Geräteschlüssel, das Gerät holt sie mit GET /v1/inbox ab und antwortet mit POST /v1/interactions/:id/reply. Das Token der Interaktion bleibt im Dienst. Klicks gehören zum Gerät, das die Nachricht geschrieben hat, Befehle zum zuletzt aktiven Gerät im Kanal. Nach 10 s ohne Abholung sagt der Dienst, dass das Gerät aus ist.
+- Entscheidung: Der Dienst legt Befehle und Klicks in eine Inbox je Geräteschlüssel, das Gerät holt sie mit GET /v1/inbox ab und antwortet mit POST /v1/interactions/:id/reply. Das Token der Interaktion bleibt im Dienst. Klicks gehören zum Gerät, das die Nachricht geschrieben hat, Befehle zum zuletzt aktiven Gerät des Aufrufers im Kanal. Das Gerät bestätigt Abgeholtes mit der nächsten Abfrage (ack), sonst kommt es noch einmal. Nach 10 s ohne Abholung sagt der Dienst, dass das Gerät aus ist.
 - Begründung: Das Gerät hat kein Gateway und keine öffentliche Adresse; Long-Poll braucht keine Abhängigkeit.
 - Verworfene Alternativen:
   - Interaktions-Token an das Gerät geben: unnötig weit gestreut

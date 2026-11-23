@@ -795,7 +795,8 @@ export class Bot {
       reply: (data) => cb({ type: 4, data: ephemeral(data) }),
       modal: (m) => cb({ type: 9, data: m }),
       defer: () => cb({ type: 5, data: { flags: 64 } }),
-      edit: (data) => this.rest.patch(`/webhooks/${i.application_id}/${i.token}/messages/@original`, ephemeral(data)),
+      // Nur für den Aufrufer ist sie schon durch die vorläufige Antwort; beim Bearbeiten nimmt Discord kein ephemeral-Flag.
+      edit: (data) => this.rest.patch(`/webhooks/${i.application_id}/${i.token}/messages/@original`, { ...data, allowed_mentions: { parse: [] } }),
     };
   }
 
@@ -935,10 +936,21 @@ export async function runBot() {
     if (cred.shared) {
       (async () => {
         let warned = false;
+        // Erhaltenes bestätigt das Gerät mit der nächsten Abfrage; der Dienst schickt sonst noch einmal. Doppelt
+        // Angekommenes (Bestätigung verloren) beantwortet es nur einmal.
+        let ack = [];
+        const seen = new Set();
         while (!stopping && !fatal) {
           try {
-            const r = await rest.get(`/inbox?wait=${FAST ? 1 : 10}`);
-            for (const i of (r && Array.isArray(r.interactions) ? r.interactions : [])) bot.onInteraction(i, bot.sharedIo(i));
+            const r = await rest.get(`/inbox?wait=${FAST ? 1 : 10}${ack.length ? `&ack=${ack.join(',')}` : ''}`);
+            const list = r && Array.isArray(r.interactions) ? r.interactions : [];
+            ack = list.map((i) => String(i.id));
+            for (const i of list) {
+              if (seen.has(String(i.id))) continue;
+              seen.add(String(i.id));
+              if (seen.size > 500) seen.delete(seen.values().next().value);
+              bot.onInteraction(i, bot.sharedIo(i));
+            }
           } catch (e) {
             if (fatalOf(e)) { fatal = fatalOf(e); break; }
             if (e.status === 404 && !warned) { warned = true; log('Der gemeinsame Bot kennt noch keine Befehle und Knöpfe (ältere Version).'); }

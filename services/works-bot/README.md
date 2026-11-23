@@ -111,7 +111,7 @@ Then in Discord, in the channel works should post to: `/works link` (shown as `/
 | Broken links | If Discord denies the channel (bot removed, permissions taken away, channel deleted), the link is marked broken and works gets status 410: its bot stops and asks to link again, instead of failing over and over. |
 | Discord bans | Discord bans an IP after 10 000 answers with 401, 403 or 429 in 10 minutes. The service paces all calls (40 per second) and pauses posting for everyone above 5 000 such answers. |
 | Mentions | Only the user who ran `/works link`, never `@everyone` or roles. |
-| Commands and buttons | Only the user who ran `/works link` may use them; everyone else gets a refusal. Clicks go to the device that wrote the message, commands to the device linked in the channel that was active last. Devices may only attach buttons and select menus with the works scheme (`w:…`), so a click can never reach another device. The interaction token stays in the service; answers are visible only to the person who clicked. |
+| Commands and buttons | Only the user who ran `/works link` may use them; everyone else gets a refusal. Clicks go to the device that wrote the message, commands to the device of whoever typed them in the channel that was active last. Devices may only attach buttons and select menus with the works scheme (`w:…`), so a click can never reach another device. The interaction token stays in the service; answers are visible only to the person who clicked. |
 | Contents | Messages pass through, nothing is stored except which message belongs to which key (30 days). |
 
 ## Limits
@@ -121,7 +121,7 @@ Then in Discord, in the channel works should post to: `/works link` (shown as `/
 
 ## Commands and buttons
 
-`/works help`, `link` and `unlink` are answered by the service. `status`, `tasks`, `new` and `instruct` and every click go to a device: the service answers Discord at once with a deferred reply (Discord waits only 3 seconds) and puts the request into the device's inbox. Dialogs (back to Claude, instruction, new task) cannot be deferred, the service opens them itself; the device gets the answer from the dialog. works fetches its inbox with a long poll and answers through the service. If no device fetches a request within 10 seconds, the service tells the user that the computer seems to be off.
+`/works help`, `link` and `unlink` are answered by the service. `status`, `tasks`, `new` and `instruct` and every click go to a device: the service answers Discord at once with a deferred reply (Discord waits only 3 seconds) and puts the request into the device's inbox. Dialogs (back to Claude, instruction, new task) cannot be deferred, the service opens them itself; the device gets the answer from the dialog. works fetches its inbox with a long poll and answers through the service. If no device fetches a request within 10 seconds, the service tells the user that the computer seems to be off, or that works there needs an update if that device never asked for its inbox.
 
 ## API
 
@@ -137,7 +137,7 @@ The message routes mirror the Discord routes works uses, so works needs no secon
 | `POST /v1/channels/:id/messages` | New message in the linked channel |
 | `PATCH /v1/channels/:id/messages/:mid` | Edit an own message |
 | `PUT /v1/channels/:id/messages/pins/:mid` | Pin an own message |
-| `GET /v1/inbox?wait=s` | Commands and clicks for this device, long poll up to 25 s |
+| `GET /v1/inbox?wait=s&ack=ids` | Commands and clicks for this device, long poll up to 25 s. `ack` confirms the ids of the last answer; unconfirmed ones come again |
 | `POST /v1/interactions/:id/reply` | Answer one of them (only once, only the own) |
 
 Every route except `/health`, `/v1/info` and `POST /v1/link` needs `Authorization: Bearer <device key>`.
