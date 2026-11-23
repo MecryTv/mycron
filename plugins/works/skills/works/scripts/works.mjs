@@ -2841,9 +2841,15 @@ async function cmdDiscord() {
     return new Rest({ token: t, base });
   };
   const needToken = () => { if (!token) fail('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.'); };
-  const why = (e) => (e.status === 401 ? 'Discord lehnt das Token ab.' : e.message);
-
   const shared = d.isShared(cfg);
+  const why = (e) => (e.status === 401 ? (shared ? 'Der Dienst lehnt den Geräteschlüssel ab (getrennt?).' : 'Discord lehnt das Token ab.') : e.status === 410 ? 'Kopplung kaputt (Bot entfernt, Rechte entzogen oder Kanal gelöscht). Neu koppeln mit /works verbinden.' : e.message);
+  // Geräteschlüssel beim Dienst widerrufen, bevor er lokal verschwindet (erneutes link, Wechsel zum eigenen Bot,
+  // disconnect, unlink). Ein Fehler hier hält nichts auf: lokal ist der Schlüssel danach trotzdem weg.
+  const revokeKey = async () => {
+    const k = d.loadKey();
+    if (!k) return;
+    try { await fetch(`${d.serviceBase(cfg)}/v1/link`, { method: 'DELETE', headers: { authorization: `Bearer ${k}` }, signal: AbortSignal.timeout(10000) }); } catch { /* lokal trotzdem weg */ }
+  };
   const key = d.loadKey();
   // Öffentliche Angaben des gemeinsamen Bots (Einladungslink). Kurz warten, der Status soll nicht hängen.
   const serviceInfo = async () => {
@@ -2894,6 +2900,8 @@ async function cmdDiscord() {
     try { me = await rest0.get('/users/@me'); app = await rest0.get('/oauth2/applications/@me'); } catch (e) { fail(e.status === 401 ? 'Token ungültig: Discord lehnt es ab.' : `Discord nicht erreichbar: ${e.message}`); }
     // Andere Bot-Anwendung: alte Nachrichten kann der neue Bot nicht bearbeiten, also Zustand verwerfen.
     if (cfg.app_id && cfg.app_id !== app.id) { await d.stopBot(); try { fs.unlinkSync(d.dfile('state.json')); } catch { /* keiner */ } }
+    // Vom gemeinsamen zum eigenen Bot: Schlüssel widerrufen, der Kanal der Kopplung gilt nicht mehr.
+    if (shared) { await d.stopBot(); await revokeKey(); Object.assign(cfg, { guild_id: '', guild_name: '', channel_id: '', channel_name: '' }); }
     d.saveToken(t);
     cfg.mode = 'own';
     cfg.app_id = app.id;
@@ -2917,6 +2925,8 @@ async function cmdDiscord() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) fail(r.status === 429 ? 'Zu viele falsche Codes, später erneut versuchen.' : `Kopplung fehlgeschlagen: ${j.message || `HTTP ${r.status}`}. In Discord mit /works verbinden einen neuen Code holen.`);
     if (d.botInfo()) await d.stopBot();
+    // Schon gekoppelt: den alten Schlüssel widerrufen, sonst bleibt er beim Dienst gültig.
+    await revokeKey();
     // Anderer Bot als bisher: Dessen Nachrichten kann dieser nicht bearbeiten, also mit neuen Statusposts beginnen.
     if (!shared || cfg.app_id !== j.app_id) { try { fs.unlinkSync(d.dfile('state.json')); } catch { /* keiner */ } }
     d.saveKey(j.key);
@@ -2930,7 +2940,7 @@ async function cmdDiscord() {
   if (sub === 'unlink') {
     if (!shared || !key) fail('Nicht mit dem gemeinsamen Bot gekoppelt.');
     await d.stopBot();
-    try { await fetch(`${d.serviceBase(cfg)}/v1/link`, { method: 'DELETE', headers: { authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(10000) }); } catch { /* Schlüssel ist lokal trotzdem weg */ }
+    await revokeKey();
     d.removeToken();
     out('Getrennt: Geräteschlüssel gelöscht, Bot gestoppt. Die Nachrichten in Discord bleiben stehen.');
     return;
@@ -3023,8 +3033,9 @@ async function cmdDiscord() {
 
   if (sub === 'disconnect') {
     await d.stopBot();
+    if (key) await revokeKey();
     d.removeToken();
-    out('Token gelöscht und Bot gestoppt. Die Nachrichten in Discord bleiben stehen.');
+    out(`${key ? 'Geräteschlüssel widerrufen und gelöscht' : 'Token gelöscht'}, Bot gestoppt. Die Nachrichten in Discord bleiben stehen.`);
     return;
   }
 

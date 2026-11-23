@@ -42,7 +42,8 @@ export class Rest {
       try { data = text ? JSON.parse(text) : null; } catch { data = null; }
       if (res.status === 429) {
         const after = Number((data && data.retry_after) || res.headers.get('retry-after') || 1);
-        await sleep(Math.min(Math.max(after, 0.05), 60) * 1000);
+        // Etwas Streuung: Alle wartenden Anfragen sollen nicht im selben Moment wieder losschießen.
+        await sleep(Math.min(Math.max(after, 0.05), 60) * 1000 + Math.random() * 250);
         continue;
       }
       if (res.ok) return data;

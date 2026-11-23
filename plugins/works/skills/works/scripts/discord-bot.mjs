@@ -553,7 +553,7 @@ export class Bot {
         }
       } catch (e) {
         if (e.retry) { this.retryAt = Date.now() + RETRY; this.log(e.message); return; }
-        if (e.status === 401) throw e;
+        if (e.status === 401 || e.status === 410) throw e;
         this.log(`Nachricht verworfen: ${e.message}`);
       }
       this.state.queue.shift();
@@ -591,7 +591,7 @@ export class Bot {
         this.dirty = true;
       } catch (e) {
         if (e.retry) { this.retryAt = Date.now() + RETRY; this.log(e.message); return; }
-        if (e.status === 401) throw e;
+        if (e.status === 401 || e.status === 410) throw e;
         pr.status = { ...s, at: Date.now() };
         if (!this.warned.has(`st:${rid}`)) { this.warned.add(`st:${rid}`); this.log(`Statuspost ${pr.name}: ${e.message}`); }
       }
@@ -720,12 +720,15 @@ export async function runBot() {
   let fatal = '';
   // Gemeinsamer Bot (W-0040): über den Dienst mit dem Geräteschlüssel; das Gateway hält der Dienst.
   const invalid = cred.shared ? 'Schlüssel ungültig (in Discord getrennt?). Neu koppeln mit /works verbinden und works discord link.' : 'Token ungültig. Neues Token mit works discord token.';
+  // 410 vom Dienst: Kopplung kaputt (Bot vom Server entfernt, Rechte entzogen oder Kanal gelöscht).
+  const broken = 'Kanal nicht mehr erreichbar (Bot entfernt, Rechte entzogen oder Kanal gelöscht). Neu koppeln: in Discord /works verbinden, dann works discord link <Code>.';
+  const fatalOf = (e) => (e.status === 410 ? broken : e.status === 401 ? invalid : '');
   try {
     const rest = new Rest({ token: cred.secret, base: cred.base, scheme: cred.scheme });
     for (;;) {
       if (stopping || stopRequested()) return 0;
       try { await rest.get('/users/@me'); break; } catch (e) {
-        if (e.status === 401) { log(`${invalid} Bot beendet.`); return 1; }
+        if (fatalOf(e)) { log(`${fatalOf(e)} Bot beendet.`); return 1; }
         log(`${e.message}, neuer Versuch`);
         await sleep(RETRY);
       }
@@ -746,7 +749,7 @@ export async function runBot() {
     while (!stopping && !stopRequested() && !fatal) {
       if (!cred.shared && !gw && hasWebSocket() && Date.now() >= gwRetry) await connectGateway();
       try { await bot.tick(); } catch (e) {
-        if (e.status === 401) { fatal = invalid; break; }
+        if (fatalOf(e)) { fatal = fatalOf(e); break; }
         log(`Fehler: ${e.message}`);
       }
       await sleep(TICK);

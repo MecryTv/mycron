@@ -41,6 +41,8 @@ The service listens on `127.0.0.1:8787`, reachable only from the server itself. 
 
 If you prefer Docker secrets: set `DISCORD_TOKEN_FILE` to the path of a file that contains the token, instead of `DISCORD_TOKEN`.
 
+Optional settings in `.env`: `WORKS_BOT_GUILD_CAP` (devices per server, default 20), `WORKS_BOT_MSG_CAP` (remembered messages per device, default 300).
+
 ## 3. Reverse proxy
 
 Caddy:
@@ -60,7 +62,7 @@ server {
     # ssl_certificate ... (certbot)
     location / {
         proxy_pass http://127.0.0.1:8787;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header Host $host;
     }
 }
@@ -68,7 +70,7 @@ server {
 
 Traefik: put the container on Traefik's network, remove the `ports:` block from `compose.yaml` and add a router for your domain with port 8080 as the service port.
 
-`TRUST_PROXY=1` (set in `compose.yaml`) makes the service read the client address from `X-Forwarded-For`. That address is used to block an address after five wrong codes within an hour. Only keep it on behind a proxy.
+`TRUST_PROXY=1` (set in `compose.yaml`) makes the service take the client address from the last `X-Forwarded-For` entry, the one your proxy adds; earlier entries come from the client and are ignored. That address is used to block it for an hour after five wrong codes. Only keep it on behind a proxy that sets the header (Caddy, nginx as above, Traefik).
 
 Check it:
 
@@ -93,7 +95,8 @@ Then in Discord, in the channel works should post to: `/works link` (shown as `/
 - Update: `git pull && docker compose up -d --build`
 - Logs: `docker compose logs -f works-bot`. They contain no tokens, keys or message contents.
 - Backup: the volume `works-bot-data` (`links.json`). Without it, every device has to link again.
-- Revoke: in Discord `/works unlink` in the channel (all devices there), or `works discord unlink` on a computer. `/works status` lists the linked devices of a server.
+- Revoke: in Discord `/works unlink` in the channel (all devices there), or `works discord unlink` on a computer. `/works status` lists the linked devices of a server, broken ones marked.
+- If `links.json` is not valid JSON, the service refuses to start instead of overwriting it. Fix the file or restore it from the backup.
 
 ## Security
 
@@ -101,9 +104,12 @@ Then in Discord, in the channel works should post to: `/works link` (shown as `/
 |---|---|
 | Bot token | Only in `.env` or a Docker secret on the server, never in the repository or the image. |
 | Who may link | Only members with **Manage Server**. `/works` is restricted to them, and the service checks again. |
-| Codes | 8 characters, valid for 10 minutes, single use. An address is blocked for an hour after 5 wrong codes. |
+| Codes | 8 characters (32^8 ≈ 10^12 possibilities), valid for 10 minutes, single use. An address (IPv6: its /64) is blocked for an hour after 5 wrong codes. |
 | Device keys | 256 bit, stored only as a SHA-256 hash, revocable at any time. |
-| What a key may do | Post into its linked channel, edit and pin only the messages it created. At most 30 new messages, 120 edits and 10 pins per minute. |
+| What a key may do | Post into its linked channel, edit and pin only the messages it created (the newest 300 per device). At most 30 new messages, 120 edits and 10 pins per minute. |
+| Devices | At most 20 per server. Links unused for 90 days expire. `/works link` only hands out a code if the bot can view, post and embed in the channel. |
+| Broken links | If Discord denies the channel (bot removed, permissions taken away, channel deleted), the link is marked broken and works gets status 410: its bot stops and asks to link again, instead of failing over and over. |
+| Discord bans | Discord bans an IP after 10 000 answers with 401, 403 or 429 in 10 minutes. The service paces all calls (40 per second) and pauses posting for everyone above 5 000 such answers. |
 | Mentions | Only the user who ran `/works link`, never `@everyone` or roles. |
 | Contents | Messages pass through, nothing is stored except which message belongs to which key (30 days). |
 
