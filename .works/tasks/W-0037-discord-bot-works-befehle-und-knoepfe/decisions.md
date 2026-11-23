@@ -2,4 +2,4 @@
 
 ## Gewählter Entwurf
 
-- 2026-11-23: Variante HS „C:/Program Files/Git/works help“ gewählt, Grund: Wahl des Nutzers. Datei: design/HS-c-program-files-git-works-help.html. Nicht gewählt: H Befehle und Dialoge
+- 2026-11-23: Variante HS „/works help“ gewählt, Grund: Wahl des Nutzers. Datei: design/HS-works-help.html. Nicht gewählt: H Befehle und Dialoge

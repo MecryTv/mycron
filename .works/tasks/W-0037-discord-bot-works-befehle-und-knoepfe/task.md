@@ -3,7 +3,7 @@ id: W-0037
 title: "Discord-Bot works: Befehle und Knöpfe"
 type: feature
 priority: P2
-status: backlog
+status: in-arbeit
 effort: L
 risk:
 created: 2026-11-23
@@ -11,7 +11,7 @@ updated: 2026-11-23
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0037-discord-bot-works-befehle-und
 tags: [discord, bot]
 blocked_by: [W-0036]
 blocks: [W-0044]
@@ -47,13 +47,33 @@ Wunsch des Nutzers am 2026-11-23 (P2): Dem Bot einen Help-Befehl mit allen wicht
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] 
+- [x] Gemeinsames Modul discord-ui.mjs: Befehlsdefinitionen, Hilfe nach HS, Dialoge (Modals), custom_id-Schema, Sprache nach Discord-Locale
+- [x] Fake-Discord: Gilden-Befehle, Knopfdruck, Dialog-Antwort, Bearbeiten der vorläufigen Antwort (Webhook)
+- [x] Eigener Bot: Befehle registrieren, INTERACTION_CREATE vom Gateway, nur der Besitzer, sofort vorläufig antworten, dann Ergebnis
+- [x] Aktionen über die Board-API (Akteur Discord): Status, Aufgaben, neue Aufgabe, Anweisung, Annehmen, Zurückgeben, Bug ansehen
+- [x] Knöpfe an Nachrichten: Review (Annehmen, Zurück an Claude), Fertig (Anweisung an Claude), CI rot (Bug ansehen); nach Erledigung weg
+- [ ] Dienst: Hilfe selbst, Befehle und Knöpfe an das gekoppelte Gerät (Inbox mit Long-Poll, Antwort über den Dienst), Dialoge selbst öffnen, Besitzer prüfen, Gerät aus erkennen
+- [ ] Gerät im gemeinsamen Modus: Inbox abholen, beantworten
+- [ ] Tests: Selbsttest (eigener Bot) und Dienst-Test (gemeinsamer Bot), Doku
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
+- plugins/works/skills/works/scripts/discord-ui.mjs: neu, gemeinsam für Bot und Dienst
+- plugins/works/skills/works/scripts/discord-bot.mjs: Interaktionen, Knöpfe, Inbox
+- plugins/works/skills/works/scripts/discord-fake.mjs: Interaktionen im Test
+- plugins/works/skills/works/scripts/api.mjs: Akteur und Quelle für Aktionen aus Discord
+- plugins/works/skills/works/scripts/selftest.mjs: Schritt Befehle und Knöpfe
+- services/works-bot/server.mjs, test.mjs, Dockerfile, README.md: Weiterleitung an das Gerät
 
 ## Designentscheidungen
 <!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
+- Alle Antworten nur für den Aufrufer (ephemeral). Erst vorläufig antworten (Discord verlangt eine Antwort in 3 s, Annehmen kann Prüfungen laufen lassen), dann die vorläufige Antwort bearbeiten.
+- Dialoge (Zurück an Claude, Anweisung, Neue Aufgabe) müssen sofort aufgehen: Beim gemeinsamen Bot öffnet sie der Dienst selbst, das Gerät bekommt erst die Antwort aus dem Dialog. Deshalb liegen die Dialoge im gemeinsamen Modul.
+- Weiterleitung an das Gerät über eine Inbox mit Long-Poll (das Gerät hat kein Gateway). Das Interaktions-Token bleibt im Dienst, das Gerät antwortet über den Dienst.
+- Zuordnung: Knöpfe gehören zu der Nachricht, also zu dem Gerät, das sie geschrieben hat; Befehle zum zuletzt aktiven Gerät im Kanal.
+- Aktionen laufen über dieselbe API wie das Board (Rückgängig im Board möglich), Verlaufseinträge mit [Discord].
+- Antworttexte deutsch oder englisch nach der Sprache des Discord-Clients; Befehle englisch mit deutscher Übersetzung (HS).
+- Der alte Unterbefehl status (gekoppelte Geräte) des Dienstes wird zu /works status für den Projektstand; die Geräte stehen in /works help.
 
 ## Assets
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
@@ -68,7 +88,13 @@ Wunsch des Nutzers am 2026-11-23 (P2): Dem Bot einen Help-Befehl mit allen wicht
 - 2026-11-23: Aufgabe angelegt
 - 2026-11-23: Entwurf H „Befehle und Dialoge“ angehängt
 - 2026-11-23: Beziehung: blocked-by W-0040
-- 2026-11-23: Entwurf HS „C:/Program Files/Git/works help“ angehängt
-- 2026-11-23: Entwurf HS „C:/Program Files/Git/works help“ gewählt. Grund: Wahl des Nutzers
+- 2026-11-23: Entwurf HS „/works help“ angehängt
+- 2026-11-23: Entwurf HS „/works help“ gewählt. Grund: Wahl des Nutzers
 - 2026-11-23: Beziehung: W-0044 blocked-by
 - 2026-11-23: Beziehung entfernt: blocked-by W-0040
+- 2026-11-23: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-23: Umsetzungsplan: "Gemeinsames Modul discord-ui.mjs: Befehlsdefinitionen, Hilfe nach HS, Dialoge (Modals), custom_id-Schema, Sprache nach Discord-Locale" abgehakt
+- 2026-11-23: Umsetzungsplan: "Fake-Discord: Gilden-Befehle, Knopfdruck, Dialog-Antwort, Bearbeiten der vorläufigen Antwort (Webhook)" abgehakt
+- 2026-11-23: Umsetzungsplan: "Eigener Bot: Befehle registrieren, INTERACTION_CREATE vom Gateway, nur der Besitzer, sofort vorläufig antworten, dann Ergebnis" abgehakt
+- 2026-11-23: Umsetzungsplan: "Aktionen über die Board-API (Akteur Discord): Status, Aufgaben, neue Aufgabe, Anweisung, Annehmen, Zurückgeben, Bug ansehen" abgehakt
+- 2026-11-23: Umsetzungsplan: "Knöpfe an Nachrichten: Review (Annehmen, Zurück an Claude), Fertig (Anweisung an Claude), CI rot (Bug ansehen); nach Erledigung weg" abgehakt
