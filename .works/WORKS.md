@@ -1,6 +1,6 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-23 20:45 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-23 20:50 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
@@ -12,7 +12,7 @@ Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 4 · P3 Mittel: 0 · P4 Niedri
 
 ## Aktive Aufgabe
 
-[W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) Discord-Bot works: Befehle und Knöpfe (In Arbeit), letzte Übergabe 2026-11-22 19:39
+[W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) Discord-Bot works: Befehle und Knöpfe (In Arbeit), letzte Übergabe 2026-11-23 20:49
 
 ## Kritisch (P1)
 

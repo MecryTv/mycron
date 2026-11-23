@@ -38,12 +38,12 @@ Wunsch des Nutzers am 2026-11-23 (P2): Dem Bot einen Help-Befehl mit allen wicht
 
 ## Akzeptanzkriterien
 <!-- Prüfbare Aussagen. Jede Zeile muss sich mit ja oder nein beantworten lassen. -->
-- [ ] /works help zeigt nur dem Aufrufer alle wichtigen Infos (Entwurf HS), englische Namen mit deutscher Übersetzung
-- [ ] /works status, tasks (aufgaben), new (neu), instruct (anweisung) funktionieren beim eigenen und beim gemeinsamen Bot
-- [ ] Knöpfe an Nachrichten: Review annehmen, Zurück an Claude (mit Begründung), Anweisung an Claude, Bug ansehen
-- [ ] Nur der eingetragene Nutzer darf Befehle und Knöpfe nutzen, andere bekommen eine freundliche Absage
-- [ ] Beim gemeinsamen Bot antwortet der Dienst sofort (vorläufig) und reicht die Anfrage an genau das gekoppelte Gerät weiter
-- [ ] Tests ohne echtes Discord
+- [x] /works help zeigt nur dem Aufrufer alle wichtigen Infos (Entwurf HS), englische Namen mit deutscher Übersetzung
+- [x] /works status, tasks (aufgaben), new (neu), instruct (anweisung) funktionieren beim eigenen und beim gemeinsamen Bot
+- [x] Knöpfe an Nachrichten: Review annehmen, Zurück an Claude (mit Begründung), Anweisung an Claude, Bug ansehen
+- [x] Nur der eingetragene Nutzer darf Befehle und Knöpfe nutzen, andere bekommen eine freundliche Absage
+- [x] Beim gemeinsamen Bot antwortet der Dienst sofort (vorläufig) und reicht die Anfrage an genau das gekoppelte Gerät weiter
+- [x] Tests ohne echtes Discord
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
@@ -82,7 +82,9 @@ Wunsch des Nutzers am 2026-11-23 (P2): Dem Bot einen Help-Befehl mit allen wicht
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Stand: 2026-11-23 20:49
+
+Fertig: Befehle (/works help, status, tasks, new, instruct), Knöpfe (Annehmen, Zurück an Claude, Anweisung, Bug ansehen) und Dialoge beim eigenen Bot (Gateway) und gemeinsamen Bot (Inbox mit Long-Poll und Bestätigung). Audit-Funde alle behoben. Selbsttest 38/38, Dienst-Test grün. Docker-Build nur in der CI geprüft. Weiter mit W-0044 (Dashboard D3, Aufräumen nach 24 h).
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -105,3 +107,10 @@ Wunsch des Nutzers am 2026-11-23 (P2): Dem Bot einen Help-Befehl mit allen wicht
 - 2026-11-23: Umsetzungsplan: "Dienst: Hilfe selbst, Befehle und Knöpfe an das gekoppelte Gerät (Inbox mit Long-Poll, Antwort über den Dienst), Dialoge selbst öffnen, Besitzer prüfen, Gerät aus erkennen" abgehakt
 - 2026-11-23: Umsetzungsplan: "Gerät im gemeinsamen Modus: Inbox abholen, beantworten" abgehakt
 - 2026-11-23: Umsetzungsplan: "Tests: Selbsttest (eigener Bot) und Dienst-Test (gemeinsamer Bot), Doku" abgehakt
+- 2026-11-23: Akzeptanzkriterien: "/works help zeigt nur dem Aufrufer alle wichtigen Infos (Entwurf HS), englische Namen mit deutscher Übersetzung" abgehakt
+- 2026-11-23: Akzeptanzkriterien: "/works status, tasks (aufgaben), new (neu), instruct (anweisung) funktionieren beim eigenen und beim gemeinsamen Bot" abgehakt
+- 2026-11-23: Akzeptanzkriterien: "Knöpfe an Nachrichten: Review annehmen, Zurück an Claude (mit Begründung), Anweisung an Claude, Bug ansehen" abgehakt
+- 2026-11-23: Akzeptanzkriterien: "Nur der eingetragene Nutzer darf Befehle und Knöpfe nutzen, andere bekommen eine freundliche Absage" abgehakt
+- 2026-11-23: Akzeptanzkriterien: "Beim gemeinsamen Bot antwortet der Dienst sofort (vorläufig) und reicht die Anfrage an genau das gekoppelte Gerät weiter" abgehakt
+- 2026-11-23: Akzeptanzkriterien: "Tests ohne echtes Discord" abgehakt
+- 2026-11-23: Übergabe aktualisiert

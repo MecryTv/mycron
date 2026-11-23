@@ -156,6 +156,9 @@ try {
   assert.match(JSON.stringify(a.data), /Claude/);
   const tdir = fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith(`${nid}-`));
   assert.match(fs.readFileSync(path.join(proj, '.works', 'tasks', tdir, 'comments.md'), 'utf8'), /Bitte nochmal ansehen/);
+  a = await ask({ sub: 'instruct', options: [{ name: 'text', value: 'Erst das Handy-Bild.' }, { name: 'task', value: nid }] }, 'instruction through the service');
+  assert.match(JSON.stringify(a.data), new RegExp(nid));
+  assert.match(fs.readFileSync(path.join(proj, '.works', 'instructions.json'), 'utf8'), /Erst das Handy-Bild/);
   // Buttons only with the own custom_id scheme; select menus stay alone in their row.
   const comp = await api('POST', '/v1/channels/11/messages', { content: 'k', components: [{ type: 1, components: [{ type: 2, style: 1, label: 'gut', custom_id: 'w:acc::W-1' }, { type: 2, style: 1, label: 'fremd', custom_id: 'anything' }] }, { type: 1, components: [{ type: 3, custom_id: 'w:proj::', options: [{ label: 'a', value: 'a' }] }, { type: 2, style: 1, label: 'x', custom_id: 'w:acc::W-2' }] }] }, key1);
   assert.equal(comp.status, 200, JSON.stringify(comp.body));
