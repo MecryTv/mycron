@@ -1477,6 +1477,105 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  await step('Discord: Befehle und Knöpfe nur für den Besitzer, Antworten nur für ihn (W-0037)', async () => {
+    const ui = await import(pathToFileURL(path.join(HERE, 'discord-ui.mjs')).href);
+    const { loadTasks } = await import('./lib.mjs');
+    // Gemeinsames Modul: Befehle englisch mit deutscher Übersetzung, Dialoge zu Knöpfen, custom_id-Schema.
+    const own = ui.commands()[0];
+    expect(own.options.map((o) => o.name).join() === 'help,status,tasks,new,instruct', `Unterbefehle: ${own.options.map((o) => o.name)}`);
+    expect(own.options.find((o) => o.name === 'tasks').name_localizations.de === 'aufgaben', 'Übersetzung fehlt');
+    expect(ui.commands({ shared: true })[0].options.some((o) => o.name === 'link'), 'link fehlt beim gemeinsamen Bot');
+    expect(JSON.stringify(ui.parseCid('w:acc:0123456789abcdef:W-0012')) === '{"act":"acc","rid":"0123456789abcdef","id":"W-0012"}', 'parseCid');
+    expect(ui.parseCid('w:acc:../x:W-1') === null, 'parseCid nimmt Unsinn an');
+    const md = ui.modalFor('w:ret:0123456789abcdef:W-0012', 'de');
+    expect(md && md.custom_id === 'w:retm:0123456789abcdef:W-0012' && md.title.length <= 45, `Dialog Zurück: ${JSON.stringify(md)}`);
+    expect(ui.modalFor('w:acc:0123456789abcdef:W-0012', 'de') === null, 'Annehmen öffnet einen Dialog');
+    if (!hasWs) return; // Ohne Gateway kommen keine Interaktionen an.
+    await wa(['discord', 'start'], { extraEnv: denv, ok: false });
+    try {
+      const cmds = await dwait(() => fake.guildCommands.get('1'), 'Befehle für Server 1 registriert');
+      expect(cmds[0].name === 'works' && cmds[0].options.length === 5, `Befehle: ${JSON.stringify(cmds).slice(0, 200)}`);
+      // w() blockiert diesen Prozess und damit das Fake-Gateway; der Bot verbindet sich dann neu, und ein Klick in
+      // dieser Lücke geht verloren (echtes Discord liefert ihn nach). Kommt keine Eingangsbestätigung, noch einmal.
+      const send = async (opts, what) => {
+        for (let n = 1; ; n++) {
+          const id = fake.interact(opts);
+          try { await dwait(() => fake.callbacks.get(id), `${what}: Eingang`, 5000); return id; } catch (e) { if (n >= 3) throw e; }
+        }
+      };
+      const ask = async (opts, what) => { const id = await send(opts, what); return dwait(() => fake.answerOf(id), what); };
+      const task = (id) => loadTasks(proj).find((t) => t.id === id);
+      // Hilfe: sofort, nur für dich, Befehle in der Sprache des Clients.
+      let a = await ask({ sub: 'help' }, 'Antwort auf /works help');
+      expect(a.type === 4 && a.data.flags & 64, `Hilfe nicht nur für dich: ${JSON.stringify(a).slice(0, 200)}`);
+      has(JSON.stringify(a.data), '/works aufgaben', 'Hilfe auf Deutsch');
+      has(JSON.stringify((await ask({ sub: 'help', locale: 'en-US' }, 'help in English')).data), '/works tasks', 'Hilfe auf Englisch');
+      // Jemand anders: freundliche Absage, nichts passiert.
+      const count = loadTasks(proj).length;
+      a = await ask({ sub: 'new', user: '777', options: [{ name: 'title', value: 'Fremd' }, { name: 'priority', value: 'P3' }] }, 'Absage für Fremde');
+      has(JSON.stringify(a.data), 'Nicht für dich'); expect(a.data.flags & 64, 'Absage für alle sichtbar');
+      expect(loadTasks(proj).length === count, 'Fremder hat eine Aufgabe angelegt');
+      // Neue Aufgabe vom Handy: erst vorläufig, dann das Ergebnis; Quelle discord, Verlauf mit [Discord].
+      const P = { name: 'project', value: 'projekt' };
+      const nid = await send({ sub: 'new', options: [{ name: 'title', value: 'Vom Handy notiert' }, { name: 'priority', value: 'P2' }, P] }, '/works neu');
+      a = await dwait(() => fake.answerOf(nid), 'Antwort auf /works neu');
+      expect(fake.callbacks.get(nid).type === 5 && fake.callbacks.get(nid).data.flags & 64, 'nicht vorläufig oder für alle sichtbar');
+      const created = loadTasks(proj).find((t) => t.title === 'Vom Handy notiert');
+      expect(created && created.priority === 'P2' && created.source === 'discord', `Aufgabe nicht wie erwartet: ${JSON.stringify(created ? { p: created.priority, s: created.source } : a)}`);
+      has(JSON.stringify(a.data), created.id, 'ID in der Antwort');
+      has(fs.readFileSync(created._file, 'utf8'), '[Discord]', 'Verlauf mit [Discord]');
+      has(JSON.stringify((await ask({ sub: 'status' }, '/works status')).data), 'projekt', 'Status nennt das Projekt');
+      has(JSON.stringify((await ask({ sub: 'tasks', options: [P] }, '/works aufgaben')).data), created.id, 'Aufgabenliste');
+      // Anweisung an die Aufgabe in Arbeit.
+      w(['start', created.id, '--force']);
+      has(JSON.stringify((await ask({ sub: 'instruct', options: [{ name: 'text', value: 'Bitte zuerst die Tests.' }, P] }, '/works anweisung')).data), created.id, 'Anweisung an die Aufgabe in Arbeit');
+      has(fs.readFileSync(path.join(proj, '.works', 'instructions.json'), 'utf8'), 'Bitte zuerst die Tests.', 'Anweisung gespeichert');
+      // Review mit Knöpfen. Zurück an Claude öffnet einen Dialog, die Begründung landet als Kommentar.
+      w(['set', created.id, 'status=review']);
+      const rv = await dwait(() => findMsg((e) => e.title === `${created.id} im Review`), 'Review-Nachricht');
+      const btns = rv.m.components.flatMap((r) => r.components);
+      const acc = btns.find((b) => /^w:acc:/.test(b.custom_id || '')); const ret = btns.find((b) => /^w:ret:/.test(b.custom_id || ''));
+      expect(acc && ret, `Knöpfe fehlen: ${JSON.stringify(btns)}`);
+      has(JSON.stringify((await ask({ type: 3, customId: acc.custom_id, messageId: rv.m.id, user: '777' }, 'Absage für fremden Klick')).data), 'Nicht für dich');
+      // Annehmen ohne erfüllte Definition of Done: Hinweis statt Abschluss.
+      has(JSON.stringify((await ask({ type: 3, customId: acc.custom_id, messageId: rv.m.id }, 'Annehmen ohne DoD')).data), 'Definition of Done', 'Hinweis auf die DoD');
+      expect(task(created.id).status === 'review', 'Trotz offener DoD abgeschlossen');
+      const dlg = await ask({ type: 3, customId: ret.custom_id, messageId: rv.m.id }, 'Dialog Zurück an Claude');
+      expect(dlg.type === 9 && dlg.data.custom_id === ret.custom_id.replace('w:ret:', 'w:retm:'), `Kein Dialog: ${JSON.stringify(dlg)}`);
+      a = await ask({ type: 5, customId: dlg.data.custom_id, messageId: rv.m.id, fields: { text: 'Das Handy-Bild fehlt.' } }, 'Antwort aus dem Dialog');
+      has(JSON.stringify(a.data), 'Claude', 'Bestätigung');
+      expect(task(created.id).status === 'in-arbeit', 'Aufgabe nicht zurück in Arbeit');
+      has(fs.readFileSync(path.join(task(created.id)._dir, 'comments.md'), 'utf8'), 'Das Handy-Bild fehlt.', 'Begründung als Kommentar');
+      await dwait(() => !fake.messages.get(rv.m.id).components.length, 'Knöpfe nach der Rückgabe weg');
+      // Annehmen mit erfüllter DoD: erledigt, die Review-Nachricht wird grün und verliert die Knöpfe.
+      const pid = (w(['new', '--type=chore', '--title=Abnahme-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0];
+      w(['check', pid, '1', '--section=Akzeptanzkriterien']); w(['set', pid, 'status=review']);
+      const rv2 = await dwait(() => findMsg((e) => e.title === `${pid} im Review`), 'Review-Nachricht 2');
+      const acc2 = rv2.m.components.flatMap((r) => r.components).find((b) => /^w:acc:/.test(b.custom_id || ''));
+      has(JSON.stringify((await ask({ type: 3, customId: acc2.custom_id, messageId: rv2.m.id }, 'Annehmen')).data), 'angenommen');
+      expect(task(pid).status === 'erledigt', `Nicht erledigt: ${task(pid).status}`);
+      await dwait(() => /angenommen/.test(fake.messages.get(rv2.m.id).embeds[0].title || '') && !fake.messages.get(rv2.m.id).components.length, 'Review-Nachricht angenommen, ohne Knöpfe');
+      // Fertig und wartet: Knopf Anweisung an Claude öffnet einen Dialog für die aktive Aufgabe.
+      w(['start', created.id, '--force']);
+      hook('prompt-submit.mjs', { cwd: proj, session_id: 's-k', prompt: 'los' }); hook('stop-reminder.mjs', { cwd: proj, session_id: 's-k' });
+      const fin = await dwait(() => findMsg((e, m) => e.title === 'Claude ist fertig und wartet auf dich' && m.components.length), 'Fertig-Nachricht mit Knopf');
+      const ins = fin.m.components.flatMap((r) => r.components).find((b) => /^w:ins:/.test(b.custom_id || ''));
+      const dlg2 = await ask({ type: 3, customId: ins.custom_id, messageId: fin.m.id }, 'Dialog Anweisung');
+      expect(dlg2.type === 9, 'Anweisung ohne Dialog');
+      has(JSON.stringify((await ask({ type: 5, customId: dlg2.data.custom_id, messageId: fin.m.id, fields: { text: 'Mach mit dem Board weiter.' } }, 'Anweisung aus dem Dialog')).data), created.id);
+      has(fs.readFileSync(path.join(proj, '.works', 'instructions.json'), 'utf8'), 'Mach mit dem Board weiter.', 'Anweisung aus dem Dialog gespeichert');
+      // CI rot mit Bug: Knopf Bug ansehen zeigt den Bug nur dir.
+      const bug = (w(['new', '--type=bug', '--title=Test rot unter Windows', '--priority=P2']).out.match(/W-\d+/) || [])[0];
+      w(['discord', 'emit', 'ci', `--json=${JSON.stringify({ ok: false, sha: 'c0ffee1234567', failed: 1, total: 3, bug })}`], { extraEnv: denv });
+      const ci = await dwait(() => findMsg((e) => e.title === 'CI rot für c0ffee1'), 'CI-Nachricht mit Bug');
+      const bb = ci.m.components.flatMap((r) => r.components).find((b) => /^w:bug:/.test(b.custom_id || ''));
+      expect(bb, `Knopf Bug ansehen fehlt: ${JSON.stringify(ci.m.components)}`);
+      has(JSON.stringify((await ask({ type: 3, customId: bb.custom_id, messageId: ci.m.id }, 'Bug ansehen')).data), 'Test rot unter Windows');
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+      expect(!fs.readFileSync(path.join(ddir, 'bot.log'), 'utf8').includes('itok-'), 'Interaktions-Token im Log');
+    } finally { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); }
+  });
+
   await step('Discord: Start mit Board und Sitzung nur mit Einrichtung, Nachrichten passen in die Grenzen', async () => {
     const bot = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
     const { embedProblems } = await import(fromUrl);

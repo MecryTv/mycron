@@ -12,8 +12,8 @@
     },
     {
       "name": "HS",
-      "title": "C:/Program Files/Git/works help",
-      "file": "HS-c-program-files-git-works-help.html",
+      "title": "/works help",
+      "file": "HS-works-help.html",
       "kind": "html",
       "source": "ui-ux-pro-max",
       "note": "Hilfe nur für den Aufrufer, englische Namen mit deutscher Übersetzung",

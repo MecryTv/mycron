@@ -4,7 +4,7 @@
 FROM node:22-alpine
 
 WORKDIR /app
-COPY plugins/works/skills/works/scripts/discord-api.mjs plugins/works/skills/works/scripts/discord-api.mjs
+COPY plugins/works/skills/works/scripts/discord-api.mjs plugins/works/skills/works/scripts/discord-ui.mjs plugins/works/skills/works/scripts/
 COPY services/works-bot/server.mjs services/works-bot/server.mjs
 
 ENV NODE_ENV=production PORT=8080 HOST=0.0.0.0 DATA_DIR=/data

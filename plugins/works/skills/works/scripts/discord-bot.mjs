@@ -14,6 +14,7 @@ import { projectList } from './hub.mjs';
 import { runningVersion, OWN_CLI, isAlive } from './server-control.mjs';
 import { dfile, discordDir, loadDiscordConfig, normalizeConfig, credential, readOutbox } from './discord.mjs';
 import { Rest, Gateway, hasWebSocket } from './discord-api.mjs';
+import { tr, who, subOf, parseCid, cid, MODAL, modalFor, modalValues, helpMessage, ephemeral, notOwner, commands } from './discord-ui.mjs';
 
 export { normalizeConfig };
 
@@ -56,7 +57,13 @@ const field = (name, value, inline = true) => ({ name: cut(name, 256) || '–', 
 const label = (cfg, id, title) => (cfg.privacy.titles && title ? `${id} ${title}` : String(id || ''));
 const colorOf = (name) => PALETTE[parseInt(crypto.createHash('md5').update(String(name)).digest('hex').slice(0, 6), 16) % PALETTE.length];
 const minutes = (from, to) => { const m = Math.max(0, Math.round((Date.parse(to || new Date().toISOString()) - Date.parse(from)) / 60000)); return Number.isNaN(m) ? '' : m < 1 ? 'unter 1 Minute' : m === 1 ? '1 Minute' : m < 60 ? `${m} Minuten` : `${Math.floor(m / 60)} h ${m % 60} min`; };
-const linkRow = (buttons) => (buttons.length ? [{ type: 1, components: buttons.slice(0, 5).map(([lbl, url]) => ({ type: 2, style: 5, label: cut(lbl, 80), url })) }] : []);
+// Eine Zeile Knöpfe: erst die mit Aktion (W-0037), dann Links.
+const row = (links, acts = []) => {
+  const c = [...acts, ...links.map(([lbl, url]) => ({ type: 2, style: 5, label: cut(lbl, 80), url }))].slice(0, 5);
+  return c.length ? [{ type: 1, components: c }] : [];
+};
+// Knopf mit Aktion; ohne gültige custom_id (etwa eine ungewöhnliche Aufgaben-ID) gibt es ihn nicht.
+const act = (style, lbl, id) => (parseCid(id) ? [{ type: 2, style, label: cut(lbl, 80), custom_id: id }] : []);
 
 export function isQuiet(cfg, now = new Date()) {
   if (!cfg.quiet || !cfg.quiet.on) return false;
@@ -109,13 +116,16 @@ const SHIP_STEP = {
 
 // Nachricht zu einem Ereignis. state: open (neu), resolved (Freigabe oder Warten erledigt),
 // accepted oder returned (Review). Erwähnung nur bei offenen Ereignissen mit @ und außerhalb der Ruhezeit.
-export function renderEvent(ev, cfg, { owner = '', now = new Date() } = {}) {
+// interactive: Knöpfe mit Aktion (W-0037) nur, wenn Klicks ankommen (Gateway oder gemeinsamer Bot); rid ist das Projekt.
+export function renderEvent(ev, cfg, { owner = '', now = new Date(), rid = '', interactive = false } = {}) {
   const p = cut(ev.project || '', 100);
   const who = ev.id ? cut(label(cfg, ev.id, ev.title), 200) : '–';
   const open = !ev.state || ev.state === 'open';
+  const acts = interactive && rid;
   let e = { color: COLOR.done };
   let text = '';
   let buttons = [];
+  let actions = [];
   switch (ev.type) {
     case 'perm':
       if (!open) { e = { color: COLOR.gone, title: '✓ Freigabe beantwortet', description: `Hat ${minutes(ev.since, ev.until)} gewartet${ev.tool ? ` · ${cut(ev.tool, 60)}` : ''}` }; break; }
@@ -126,6 +136,7 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date() } = {}) {
       if (!open) { e = { color: COLOR.gone, title: '↻ Weiter gearbeitet', description: `Nach ${minutes(ev.since, ev.until)}` }; break; }
       text = `${p}: Claude ist fertig und wartet auf dich`;
       e = { color: COLOR.need, title: 'Claude ist fertig und wartet auf dich', fields: [field('Aufgabe', who), field('Fertig seit', rel(ev.since))] };
+      if (acts) actions = act(1, 'Anweisung an Claude', cid('ins', rid, ev.id));
       break;
     case 'question':
       text = `${p}: Frage zu ${ev.id}`;
@@ -134,7 +145,8 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date() } = {}) {
     case 'review':
       if (ev.state === 'accepted') { e = { color: COLOR.done, title: `✓ ${ev.id} angenommen`, description: `${cfg.privacy.titles && ev.title ? `${cut(ev.title, 200)} · ` : ''}${hhmm(ev.at || now.toISOString())}` }; break; }
       if (ev.state === 'returned') { e = { color: COLOR.gone, title: `↩ ${ev.id} zurückgegeben`, description: cfg.privacy.titles ? cut(ev.title, 200) : '' }; break; }
-      e = { color: COLOR.done, title: `${ev.id} im Review`, fields: [...(cfg.privacy.titles && ev.title ? [field('Aufgabe', cut(ev.title, 200))] : []), field('Kriterien', ev.crit && ev.crit[1] ? `${ev.crit[0]} von ${ev.crit[1]}` : 'keine'), ...(cfg.privacy.costs && ev.cost ? [field('Kosten', ev.cost)] : [])], footer: { text: 'Abnehmen im Board oder mit works done' } };
+      e = { color: COLOR.done, title: `${ev.id} im Review`, fields: [...(cfg.privacy.titles && ev.title ? [field('Aufgabe', cut(ev.title, 200))] : []), field('Kriterien', ev.crit && ev.crit[1] ? `${ev.crit[0]} von ${ev.crit[1]}` : 'keine'), ...(cfg.privacy.costs && ev.cost ? [field('Kosten', ev.cost)] : [])], footer: { text: acts ? 'Abnehmen hier, im Board oder mit works done' : 'Abnehmen im Board oder mit works done' } };
+      if (acts) actions = [...act(3, 'Annehmen', cid('acc', rid, ev.id)), ...act(2, 'Zurück an Claude', cid('ret', rid, ev.id))];
       break;
     case 'returned':
       e = { color: COLOR.need, title: `${ev.id} zurückgegeben`, description: cfg.privacy.titles ? cut(ev.title, 200) : '' };
@@ -162,6 +174,7 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date() } = {}) {
       else {
         e = { color: COLOR.red, title: `CI rot für ${sha7(ev.sha)}`, fields: [...(ev.total ? [field('Rot', `${ev.failed || '?'} von ${ev.total} Jobs`)] : []), ...(ev.job ? [field('Erster Fehler', cut(ev.job, 200))] : []), ...(ev.bug ? [field('Bug', `${cut(ev.bug, 40)} angelegt`)] : [])] };
         if (cfg.privacy.ci_error && ev.error) e.footer = { text: cut(ev.error, 300) };
+        if (acts && ev.bug) actions = act(2, 'Bug ansehen', cid('bug', rid, ev.bug));
       }
       if (/^https:\/\//.test(ev.url || '')) buttons = [['Lauf auf GitHub', ev.url]];
       break;
@@ -185,7 +198,7 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date() } = {}) {
   return {
     content: at ? `<@${owner}> ${trimTo(text, 1800)}` : '',
     embeds: [fit(e)],
-    components: linkRow(buttons),
+    components: row(buttons, actions),
     allowed_mentions: at ? { parse: [], users: [owner] } : { parse: [] },
     flags: at ? 0 : SILENT,
   };
@@ -302,8 +315,10 @@ const emptyState = () => ({ projects: {}, msgs: {}, queue: [], open: {}, ships: 
 const DAY = 86400000;
 
 export class Bot {
-  constructor({ rest, log }) {
-    this.rest = rest; this.log = log;
+  // shared: gemeinsamer Bot über den Dienst. interactive: Klicks und Befehle kommen an (Gateway oder Dienst).
+  constructor({ rest, log, shared = false, interactive = false }) {
+    this.rest = rest; this.log = log; this.shared = shared; this.interactive = interactive;
+    this.commandsFor = '';
     const s = readJson(dfile('state.json'), null);
     this.state = { ...emptyState(), ...(s || {}) };
     this.timers = new Map();
@@ -424,7 +439,7 @@ export class Bot {
       const o = prev.tasks[t.id];
       const base = { id: t.id, title: t.title };
       if (!o) {
-        if (t.priority === 'P1' && t.source !== 'board' && OPEN_STATUSES.includes(t.status) && this.once(rid, `p1:${t.id}`)) this.event(rid, 'p1', base, cfg);
+        if (t.priority === 'P1' && !['board', 'discord'].includes(t.source) && OPEN_STATUSES.includes(t.status) && this.once(rid, `p1:${t.id}`)) this.event(rid, 'p1', base, cfg);
         // Neu und schon im Review (works new --status review, oder angelegt und gesetzt zwischen zwei Blicken des Bots).
         // Erledigte oder Fragen neuer Aufgaben nicht melden: Ein Import brächte sonst Dutzende Nachrichten.
         if (t.status === 'review' && this.once(rid, `review:${t.id}`)) {
@@ -544,7 +559,7 @@ export class Bot {
       const op = this.state.queue[0];
       const known = this.state.msgs[op.key];
       try {
-        const body = renderEvent(op.ev, cfg, { owner: cfg.owner_id });
+        const body = renderEvent(op.ev, cfg, { owner: cfg.owner_id, rid: op.rid, interactive: this.interactive });
         if (known) await this.rest.patch(`/channels/${known.channel_id}/messages/${known.message_id}`, { content: body.content, embeds: body.embeds, components: body.components, allowed_mentions: body.allowed_mentions });
         else {
           const ch = op.channel_id || this.channelFor(op.rid, cfg);
@@ -556,7 +571,10 @@ export class Bot {
         if (e.status === 401 || e.status === 410) throw e;
         this.log(`Nachricht verworfen: ${e.message}`);
       }
-      this.state.queue.shift();
+      // Genau diese Fassung entfernen: Befehle und Knöpfe (W-0037) laufen nebenher und können währenddessen eine
+      // neuere Fassung derselben Nachricht einreihen; die bleibt stehen und wird als Bearbeitung geschickt.
+      const at = this.state.queue.indexOf(op);
+      if (at >= 0) this.state.queue.splice(at, 1);
       // Nach jeder Nachricht speichern: Ein harter Stopp kann sie sonst nach dem Neustart noch einmal schicken.
       this.save();
     }
@@ -607,6 +625,7 @@ export class Bot {
 
   async tick() {
     const cfg = loadDiscordConfig();
+    if (!this.shared && this.interactive) await this.registerCommands(cfg);
     const done = [];
     // Ereignisse älter als zwei Tage (Bot lange aus) wären nur noch Lärm: verwerfen.
     for (const { file, ev } of readOutbox()) {
@@ -626,6 +645,166 @@ export class Bot {
     await this.flush(cfg);
     await this.statusposts(cfg);
     if (this.dirty) { this.prune(); this.save(); }
+  }
+
+  // ---------- Befehle und Knöpfe (W-0037) ----------
+
+  // Eigener Bot: /works für den Server des Kanals registrieren (Server-Befehle sind sofort da). Wieder bei einem
+  // anderen Server; nach einem Fehler frühestens in zehn Minuten erneut.
+  async registerCommands(cfg) {
+    const key = `${cfg.app_id}:${cfg.guild_id}`;
+    if (!cfg.app_id || !cfg.guild_id || this.commandsFor === key || Date.now() < (this.commandsRetry || 0)) return;
+    try {
+      await this.rest.put(`/applications/${cfg.app_id}/guilds/${cfg.guild_id}/commands`, commands());
+      this.commandsFor = key;
+      this.log(`Befehle /works für ${cfg.guild_name || cfg.guild_id} registriert`);
+    } catch (e) {
+      if (e.status === 401) throw e;
+      this.commandsRetry = Date.now() + (FAST ? 1000 : 600000);
+      this.log(`Befehle /works nicht registriert (${e.message}). Fehlt beim Einladen „applications.commands“? Neu einladen mit dem Link aus works discord.`);
+    }
+  }
+
+  // Projekte mit bekanntem Stand, die Hinweise schicken.
+  liveProjects(cfg) { return Object.entries(this.state.projects).filter(([rid, pr]) => pr.root && pr.snap && this.enrolled(rid, cfg)).map(([rid, pr]) => ({ rid, ...pr })); }
+
+  // Projekt zu einem Knopf (rid) oder Befehl (Name, Anfang reicht). Ohne Angabe nur, wenn es genau eines gibt.
+  // Liest den Stand vorher frisch ein: Eine Aufgabe, die gerade angelegt wurde, soll schon in der Antwort stehen.
+  pick(cfg, t, { rid = '', name = '' } = {}) {
+    const all = this.liveProjects(cfg);
+    const names = all.map((x) => x.name).join(', ');
+    const n = name.toLowerCase();
+    const p = rid ? all.find((x) => x.rid === rid)
+      : name ? all.find((x) => x.name.toLowerCase() === n) || all.find((x) => x.name.toLowerCase().startsWith(n))
+        : all.length === 1 ? all[0] : null;
+    if (!p) {
+      if (rid) throw new Error(t('Das Projekt ist nicht mehr da oder schickt keine Hinweise mehr.', 'The project is gone or no longer sends notifications.'));
+      if (!all.length) throw new Error(t('works kennt noch kein Projekt. Öffne ein Projekt mit works, dann geht es los.', 'works does not know any project yet. Open a project with works first.'));
+      throw new Error(name ? t(`Kein Projekt „${cut(name, 60)}“. Da sind: ${names}`, `No project “${cut(name, 60)}”. Known: ${names}`) : t(`Mehrere Projekte, bitte mit project angeben: ${names}`, `Several projects, please name one with project: ${names}`));
+    }
+    this.scanProject(p.root, p.rid, cfg);
+    return { rid: p.rid, ...this.state.projects[p.rid] };
+  }
+
+  projectLine(pr, cfg, t) {
+    const s = pr.snap;
+    const a = s.active;
+    const aL = a ? `${a.id}${cfg.privacy.titles && a.title ? ` ${cut(a.title, 60)}` : ''}` : '';
+    const [dot, text] = s.perm ? ['🟠', t('wartet auf deine Freigabe', 'waits for your approval')]
+      : s.busy ? ['🟢', a ? t(`arbeitet an ${aL}`, `working on ${aL}`) : t('arbeitet', 'working')]
+        : s.idleSince ? ['🟠', t('ist fertig und wartet auf dich', 'is done and waits for you')]
+          : ['⚪', a ? t(`in Arbeit: ${aL}`, `in progress: ${aL}`) : t('keine Aufgabe in Arbeit', 'no task in progress')];
+    const ci = this.state.ci[pr.rid];
+    const prog = s.progress && s.progress.total ? ` · ${s.progress.done}/${s.progress.total}` : '';
+    return `${dot} **${cut(s.name, 80)}** ${text}${prog}${ci && !ci.ok ? ' · 🔴 CI' : ''}`;
+  }
+
+  overview(cfg, t) {
+    const all = this.liveProjects(cfg);
+    return { embeds: [{ color: COLOR.status, title: t(`works · ${all.length} ${all.length === 1 ? 'Projekt' : 'Projekte'}`, `works · ${all.length} ${all.length === 1 ? 'project' : 'projects'}`), description: trimTo(all.map((p) => this.projectLine(p, cfg, t)).join('\n') || t('Noch kein Projekt bekannt.', 'No project known yet.'), 4000) }] };
+  }
+
+  taskList(pr, cfg, t) {
+    const order = { 'in-arbeit': 0, review: 1, geplant: 2, backlog: 3 };
+    const st = { 'in-arbeit': t('in Arbeit', 'in progress'), review: t('im Review', 'in review'), geplant: t('geplant', 'planned'), backlog: 'Backlog' };
+    const open = Object.values(pr.snap.tasks).filter((x) => OPEN_STATUSES.includes(x.status))
+      .sort((a, b) => String(a.priority || 'P9').localeCompare(String(b.priority || 'P9')) || (order[a.status] ?? 9) - (order[b.status] ?? 9) || a.id.localeCompare(b.id));
+    const lines = open.slice(0, 25).map((x) => `**${x.id}** ${x.priority || ''} · ${st[x.status] || x.status}${cfg.privacy.titles && x.title ? ` · ${cut(x.title, 90)}` : ''}`);
+    return { embeds: [{ color: colorOf(pr.snap.name), title: cut(t(`${pr.snap.name} · ${open.length} offen`, `${pr.snap.name} · ${open.length} open`), 256), description: trimTo(lines.join('\n') || t('Nichts offen.', 'Nothing open.'), 4000), ...(open.length > 25 ? { footer: { text: t(`und ${open.length - 25} weitere im Board`, `and ${open.length - 25} more in the board`) } } : {}) }] };
+  }
+
+  bugView(pr, id, cfg, t) {
+    const b = loadTasks(pr.root).find((x) => x.id === id);
+    if (!b) throw new Error(t(`${id} gibt es nicht mehr.`, `${id} no longer exists.`));
+    const text = cfg.privacy.titles ? (getSection(b._body, 'Beschreibung') || getSection(b._body, 'Fehlerbild') || '').replace(/<!--[\s\S]*?-->/g, '').trim() : '';
+    return { embeds: [{ color: COLOR.red, author: { name: cut(pr.snap.name, 100) }, title: cut(label(cfg, b.id, b.title), 256), ...(text ? { description: cutBlock(text, 1500) } : {}), fields: [field(t('Status', 'Status'), b.status), field(t('Priorität', 'Priority'), b.priority || '–')] }] };
+  }
+
+  // Aktion zu einem Befehl, Knopf oder Dialog. Schreibende Aktionen laufen über dieselbe API wie das Board (Rückgängig
+  // im Board, Verlauf mit [Discord]). Fehler kommen als Text für den Nutzer zurück.
+  async act(i, cfg, t) {
+    const { runActionWithUndo } = await import('./api.mjs');
+    const ok = (title, description = '') => ({ embeds: [{ color: COLOR.done, title: cut(title, 256), ...(description ? { description: trimTo(description, 4000) } : {}) }] });
+    const create = async (pr, title, prio) => {
+      const priority = String(prio || '').toUpperCase();
+      if (!/^P[1-4]$/.test(priority)) throw new Error(t('Priorität bitte als P1, P2, P3 oder P4.', 'Priority please as P1, P2, P3 or P4.'));
+      const r = await runActionWithUndo(pr.root, { action: 'create', type: 'feature', title, priority, source: 'discord' });
+      return ok(t(`✓ ${r.id} angelegt`, `✓ ${r.id} created`), `${cfg.privacy.titles ? `${cut(title, 200)} · ` : ''}${priority} · ${cut(pr.snap.name, 80)}\n${t('Claude ergänzt Beschreibung und Kriterien, sobald es die Aufgabe aufnimmt.', 'Claude fills in the description and criteria when it picks the task up.')}`);
+    };
+    const instruct = async (pr, id, text) => {
+      const tid = id || (pr.snap.active && pr.snap.active.id) || '';
+      if (!tid) throw new Error(t('Gerade ist keine Aufgabe in Arbeit. Gib die Aufgabe mit an (task).', 'No task is in progress right now. Name the task (task).'));
+      await runActionWithUndo(pr.root, { action: 'instruct', id: tid, text });
+      return ok(t(`✓ Anweisung an ${tid}`, `✓ Instruction for ${tid}`), t('Claude liest sie beim nächsten Schritt.', 'Claude reads it with its next step.'));
+    };
+    if (i.type === 2) {
+      const { sub, opts } = subOf(i);
+      if (sub === 'status' && !opts.project) return this.overview(cfg, t);
+      const pr = this.pick(cfg, t, { name: opts.project || '' });
+      if (sub === 'status') return renderStatus({ ...pr.snap, recent: pr.recent, ci: this.state.ci[pr.rid] || null }, cfg);
+      if (sub === 'tasks') return this.taskList(pr, cfg, t);
+      if (sub === 'new') return create(pr, opts.title, opts.priority);
+      if (sub === 'instruct') return instruct(pr, (opts.task || '').toUpperCase(), opts.text);
+      throw new Error(t('Unbekannter Befehl.', 'Unknown command.'));
+    }
+    const p = parseCid(i.data && i.data.custom_id);
+    if (!p) throw new Error(t('Unbekannter Knopf.', 'Unknown button.'));
+    const pr = this.pick(cfg, t, { rid: p.rid });
+    if (i.type === 3 && p.act === 'acc') {
+      const cur = pr.snap.tasks[p.id];
+      if (!cur || cur.status !== 'review') throw new Error(t(`${p.id} ist nicht mehr im Review${cur ? ` (${cur.status})` : ''}.`, `${p.id} is no longer in review${cur ? ` (${cur.status})` : ''}.`));
+      await runActionWithUndo(pr.root, { action: 'move', id: p.id, to: 'erledigt' });
+      return ok(t(`✓ ${p.id} angenommen`, `✓ ${p.id} accepted`), t('Die Aufgabe ist erledigt.', 'The task is done.'));
+    }
+    if (i.type === 3 && p.act === 'bug') return this.bugView(pr, p.id, cfg, t);
+    if (i.type === 5) {
+      const v = modalValues(i.data);
+      if (p.act === 'retm') {
+        await runActionWithUndo(pr.root, { action: 'review', id: p.id, text: v.text });
+        return ok(t(`↩ ${p.id} geht zurück an Claude`, `↩ ${p.id} goes back to Claude`), t('Deine Begründung steht als Kommentar an der Aufgabe.', 'Your reason is attached to the task as a comment.'));
+      }
+      if (p.act === 'insm') return instruct(pr, p.id, v.text);
+      if (p.act === 'newm') return create(pr, v.title, v.priority);
+    }
+    throw new Error(t('Unbekannte Aktion.', 'Unknown action.'));
+  }
+
+  // Eine Interaktion beantworten. io kapselt den Weg: eigener Bot direkt zu Discord, gemeinsamer Bot über den Dienst.
+  // Nur der Besitzer darf etwas auslösen. Dialoge und Hilfe sofort, alles andere erst vorläufig, dann das Ergebnis
+  // (Annehmen kann Prüfungen laufen lassen, Discord wartet aber nur 3 s).
+  async onInteraction(i, io) {
+    const cfg = loadDiscordConfig();
+    const t = tr(i.locale || i.guild_locale);
+    try {
+      if (!cfg.owner_id || who(i) !== cfg.owner_id) return await io.reply(notOwner(i.locale));
+      const p = i.type === 3 ? parseCid(i.data && i.data.custom_id) : null;
+      if (p && MODAL.has(p.act)) return await io.modal(modalFor(i.data.custom_id, i.locale));
+      if (i.type === 2 && subOf(i).sub === 'help') return await io.reply(helpMessage({ locale: i.locale, shared: this.shared }));
+      await io.defer();
+      let data;
+      try { data = await this.act(i, cfg, t); } catch (e) {
+        data = { embeds: [{ color: COLOR.red, title: t('Ging nicht', 'That did not work'), description: cut(e.message, 1500) }] };
+      }
+      await io.edit(data);
+    } catch (e) { this.log(`Antwort auf Befehl oder Knopf: ${e.message}`); }
+  }
+
+  ownIo(i) {
+    const cb = (body) => this.rest.post(`/interactions/${i.id}/${i.token}/callback`, body);
+    return {
+      reply: (data) => cb({ type: 4, data: ephemeral(data) }),
+      modal: (m) => cb({ type: 9, data: m }),
+      defer: () => cb({ type: 5, data: { flags: 64 } }),
+      // Nur für den Aufrufer ist sie schon durch die vorläufige Antwort; beim Bearbeiten nimmt Discord kein ephemeral-Flag.
+      edit: (data) => this.rest.patch(`/webhooks/${i.application_id}/${i.token}/messages/@original`, { ...data, allowed_mentions: { parse: [] } }),
+    };
+  }
+
+  // Gemeinsamer Bot: Der Dienst hat schon vorläufig geantwortet und Dialoge selbst geöffnet; das Gerät schickt nur das
+  // Ergebnis zurück, das Token der Interaktion kennt es nicht.
+  sharedIo(i) {
+    const send = (data) => this.rest.post(`/interactions/${i.id}/reply`, ephemeral(data));
+    return { reply: send, edit: send, defer: async () => {}, modal: () => send({ embeds: [{ color: COLOR.gone, title: '?' }] }) };
   }
 
   // Atomar und kompakt: erst in eine Zwischendatei, dann umbenennen. Unter Windows kann ein Virenscanner die Datei
@@ -741,11 +920,45 @@ export async function runBot() {
       gwRetry = Date.now() + 60000;
       try {
         const g = await rest.get('/gateway/bot');
-        gw = new Gateway({ token: cred.secret, url: g.url, log, onFatal: (code) => { fatal = code === 4004 ? 'Token ungültig' : `Gateway-Code ${code}`; } });
+        gw = new Gateway({
+          token: cred.secret, url: g.url, log,
+          onFatal: (code) => { fatal = code === 4004 ? 'Token ungültig' : `Gateway-Code ${code}`; },
+          onDispatch: (type, d) => { if (type === 'INTERACTION_CREATE' && d) bot.onInteraction(d, bot.ownIo(d)); },
+        });
         gw.start();
       } catch (e) { log(`Gateway nicht erreichbar (${e.message}), Nachrichten gehen trotzdem.`); }
     };
-    const bot = new Bot({ rest, log });
+    // Schreibende Aktionen aus Discord laufen über die Board-API; der Verlauf zeigt sie mit [Discord].
+    process.env.WORKS_API_ACTOR = 'Discord';
+    const bot = new Bot({ rest, log, shared: cred.shared, interactive: cred.shared || hasWebSocket() });
+    // Gemeinsamer Bot: Befehle und Klicks holt das Gerät beim Dienst ab (es hat kein Gateway). Der Dienst hält die
+    // Anfrage offen, bis etwas kommt; ein Dienst ohne Inbox (ältere Version) wird nur selten gefragt.
+    if (cred.shared) {
+      (async () => {
+        let warned = false;
+        // Erhaltenes bestätigt das Gerät mit der nächsten Abfrage; der Dienst schickt sonst noch einmal. Doppelt
+        // Angekommenes (Bestätigung verloren) beantwortet es nur einmal.
+        let ack = [];
+        const seen = new Set();
+        while (!stopping && !fatal) {
+          try {
+            const r = await rest.get(`/inbox?wait=${FAST ? 1 : 10}${ack.length ? `&ack=${ack.join(',')}` : ''}`);
+            const list = r && Array.isArray(r.interactions) ? r.interactions : [];
+            ack = list.map((i) => String(i.id));
+            for (const i of list) {
+              if (seen.has(String(i.id))) continue;
+              seen.add(String(i.id));
+              if (seen.size > 500) seen.delete(seen.values().next().value);
+              bot.onInteraction(i, bot.sharedIo(i));
+            }
+          } catch (e) {
+            if (fatalOf(e)) { fatal = fatalOf(e); break; }
+            if (e.status === 404 && !warned) { warned = true; log('Der gemeinsame Bot kennt noch keine Befehle und Knöpfe (ältere Version).'); }
+            await sleep(e.status === 404 ? 600000 : RETRY);
+          }
+        }
+      })();
+    }
     while (!stopping && !stopRequested() && !fatal) {
       if (!cred.shared && !gw && hasWebSocket() && Date.now() >= gwRetry) await connectGateway();
       try { await bot.tick(); } catch (e) {

@@ -68,7 +68,7 @@ try {
   const works = cmds.find((c) => c.name === 'works');
   assert.ok(works, 'command /works missing');
   assert.equal(works.default_member_permissions, '32', '/works must require Manage Server');
-  assert.deepEqual(works.options.map((o) => o.name).sort(), ['link', 'status', 'unlink']);
+  assert.deepEqual(works.options.map((o) => o.name).sort(), ['help', 'instruct', 'link', 'new', 'status', 'tasks', 'unlink']);
   assert.equal(works.options.find((o) => o.name === 'link').name_localizations.de, 'verbinden');
   await healthy();
   const info = (await api('GET', '/v1/info')).body;
@@ -126,6 +126,72 @@ try {
   assert.deepEqual(pm.allowed_mentions, { parse: [], users: ['4242'] });
   assert.match((await wa(['discord'])).out, /Gemeinsamer Bot/);
 
+  // W-0037: commands and buttons. Help comes from the service itself and lists the devices.
+  const ask = async (opts, what) => { const id = fake.interact(opts); return wait(() => fake.answerOf(id), what); };
+  let a = await ask({ sub: 'help' }, 'help');
+  assert.equal(a.type, 4); assert.equal(a.data.flags & 64, 64, 'help must be ephemeral');
+  assert.match(JSON.stringify(a.data), /\/works verbinden/);
+  assert.match(JSON.stringify(a.data), /#works · test|#works/);
+  // A command goes to the linked device: the service defers at once, the device answers through the service.
+  const sid = fake.interact({ sub: 'status' });
+  const deferred = await wait(() => fake.callbacks.get(sid), 'deferred answer');
+  assert.equal(deferred.type, 5); assert.equal(deferred.data.flags & 64, 64);
+  a = await wait(() => fake.answerOf(sid), 'status from the device');
+  assert.match(JSON.stringify(a.data), /projekt/);
+  // Someone else: the service says no, nothing reaches the device.
+  a = await ask({ sub: 'new', user: '77', options: [{ name: 'title', value: 'Fremd' }, { name: 'priority', value: 'P3' }] }, 'not the owner');
+  assert.match(JSON.stringify(a.data), /Nicht für dich/);
+  // New task from Discord, then the review buttons: the service opens the dialog, the device gets the answer.
+  a = await ask({ sub: 'new', options: [{ name: 'title', value: 'Vom Handy' }, { name: 'priority', value: 'P2' }] }, 'new task');
+  const nid = (JSON.stringify(a.data).match(/W-\d+/) || [])[0];
+  assert.ok(nid, `no task id in ${JSON.stringify(a.data)}`);
+  assert.equal((await wa(['set', nid, 'status=review'])).code, 0);
+  const rv = await wait(() => fake.inChannel('11').find((m) => (m.embeds[0] || {}).title === `${nid} im Review` && m.components.length), 'review message with buttons');
+  const ret = rv.components.flatMap((x) => x.components).find((b) => /^w:ret:/.test(b.custom_id || ''));
+  assert.ok(ret, `buttons dropped by the service: ${JSON.stringify(rv.components)}`);
+  a = await ask({ type: 3, customId: ret.custom_id, messageId: rv.id }, 'dialog from the service');
+  assert.equal(a.type, 9, `no dialog: ${JSON.stringify(a)}`);
+  assert.match(JSON.stringify((await ask({ type: 3, customId: ret.custom_id, messageId: rv.id, user: '77' }, 'foreign click')).data), /Nicht für dich/);
+  a = await ask({ type: 5, customId: a.data.custom_id, messageId: rv.id, fields: { text: 'Bitte nochmal ansehen.' } }, 'dialog answer from the device');
+  assert.match(JSON.stringify(a.data), /Claude/);
+  const tdir = fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith(`${nid}-`));
+  assert.match(fs.readFileSync(path.join(proj, '.works', 'tasks', tdir, 'comments.md'), 'utf8'), /Bitte nochmal ansehen/);
+  a = await ask({ sub: 'instruct', options: [{ name: 'text', value: 'Erst das Handy-Bild.' }, { name: 'task', value: nid }] }, 'instruction through the service');
+  assert.match(JSON.stringify(a.data), new RegExp(nid));
+  assert.match(fs.readFileSync(path.join(proj, '.works', 'instructions.json'), 'utf8'), /Erst das Handy-Bild/);
+  // Buttons only with the own custom_id scheme; select menus stay alone in their row.
+  const comp = await api('POST', '/v1/channels/11/messages', { content: 'k', components: [{ type: 1, components: [{ type: 2, style: 1, label: 'gut', custom_id: 'w:acc::W-1' }, { type: 2, style: 1, label: 'fremd', custom_id: 'anything' }] }, { type: 1, components: [{ type: 3, custom_id: 'w:proj::', options: [{ label: 'a', value: 'a' }] }, { type: 2, style: 1, label: 'x', custom_id: 'w:acc::W-2' }] }] }, key1);
+  assert.equal(comp.status, 200, JSON.stringify(comp.body));
+  const kept = fake.messages.get(comp.body.id).components;
+  assert.deepEqual(kept.map((x) => x.components.map((c) => c.custom_id)), [['w:acc::W-1'], ['w:proj::']]);
+  // Answers only for interactions of the own device.
+  assert.equal((await api('POST', `/v1/interactions/${sid}/reply`, { content: 'x' }, key1)).status, 404, 'answered twice');
+  // A second person with an own device in the same channel: each command goes to the device of whoever typed it.
+  // That device never asked for its inbox (an older works), so the service suggests an update instead of "off".
+  const key88 = await linkKey({ user: '88' });
+  a = await ask({ sub: 'tasks' }, 'owner command with a second device in the channel');
+  assert.doesNotMatch(JSON.stringify(a.data), /Nicht für dich/, 'command of the owner went to the other device');
+  assert.match(JSON.stringify(a.data), /projekt/);
+  a = await ask({ sub: 'tasks', user: '88' }, 'command of the second person');
+  assert.doesNotMatch(JSON.stringify(a.data), /Nicht für dich/, 'command of the second person went to the other device');
+  assert.match(JSON.stringify(a.data), /aktualisier/i, 'no hint to update works');
+  // A poll whose answer gets lost: without the acknowledgement the request comes again with the next poll.
+  const btn = await api('POST', '/v1/channels/11/messages', { content: 'b', components: [{ type: 1, components: [{ type: 2, style: 3, label: 'ok', custom_id: 'w:acc::W-1' }] }] }, key88);
+  const cid88 = fake.interact({ type: 3, customId: 'w:acc::W-1', messageId: btn.body.id, user: '88' });
+  await wait(() => fake.callbacks.get(cid88), 'deferred click for the second device');
+  const got = (await api('GET', '/v1/inbox', null, key88)).body.interactions.map((x) => x.id);
+  assert.deepEqual(got, [cid88]);
+  assert.deepEqual((await api('GET', '/v1/inbox', null, key88)).body.interactions.map((x) => x.id), [cid88], 'lost delivery not repeated');
+  assert.deepEqual((await api('GET', `/v1/inbox?ack=${cid88}`, null, key88)).body.interactions, [], 'acknowledged request delivered again');
+  assert.equal((await api('POST', `/v1/interactions/${cid88}/reply`, { content: 'erledigt' }, key88)).status, 200);
+  assert.equal((await api('DELETE', '/v1/link', null, key88)).status, 200);
+  // Device off: the service says so instead of leaving Discord waiting.
+  await wa(['discord', 'stop']);
+  a = await ask({ sub: 'tasks' }, 'answer for a device that is off');
+  assert.match(JSON.stringify(a.data), /nicht erreichbar/);
+  r = await wa(['discord', 'start']);
+  assert.match(r.out, /gestartet/, r.out);
+
   // Linking again revokes the old key at the service.
   r = await wa(['discord', 'link', await linkCode()]);
   assert.equal(r.code, 0, r.out);
@@ -179,8 +245,8 @@ try {
   await wait(() => !botRunning(), 'bot stops on a broken link');
   assert.match(fs.readFileSync(path.join(ddir, 'bot.log'), 'utf8'), /neu koppeln/i);
 
-  // /works status lists the devices, /works unlink removes those of the channel.
-  cb = await reply({ sub: 'status' });
+  // /works help lists the devices, /works unlink removes those of the channel.
+  cb = await reply({ sub: 'help' });
   assert.match(JSON.stringify(cb), /#works/);
   await reply({ sub: 'unlink' });
   assert.equal((await api('GET', '/v1/users/@me', null, key1b)).status, 401, 'key still valid after /works unlink');

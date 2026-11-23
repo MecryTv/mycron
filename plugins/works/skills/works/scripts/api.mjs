@@ -96,7 +96,7 @@ let queue = Promise.resolve();
 function cli(root, args, { timeout = 30000 } = {}) {
   const job = queue.then(() => new Promise((resolve) => {
     execFile(process.execPath, [CLI, ...args], {
-      cwd: root, env: { ...process.env, WORKS_ACTOR: 'Board' }, timeout, maxBuffer: 4 * 1024 * 1024, windowsHide: true,
+      cwd: root, env: { ...process.env, WORKS_ACTOR: process.env.WORKS_API_ACTOR || 'Board' }, timeout, maxBuffer: 4 * 1024 * 1024, windowsHide: true,
     }, (err, stdout, stderr) => {
       resolve({ ok: !err, code: err ? (err.code ?? 1) : 0, stdout: String(stdout), stderr: String(stderr) });
     });
@@ -333,7 +333,7 @@ const actions = {
     if (b.milestone) { if (!MS_RE.test(b.milestone)) bad('Ungültiger Meilenstein.'); args.push(`--milestone=${b.milestone.toUpperCase()}`); }
     const tags = list(b.tags, 'Tags', TAG_RE); if (tags.length) args.push(`--tags=${tags.join(',')}`);
     const blockedBy = list(b.blocked_by, 'Blockiert durch', ID_RE); if (blockedBy.length) args.push(`--blocked-by=${blockedBy.join(',')}`);
-    args.push('--source=board');
+    args.push(`--source=${b.source === 'discord' ? 'discord' : 'board'}`);
     const goal = str(b.goal, 'Ziel', { max: 20000 });
     const description = str(b.description, 'Beschreibung', { max: 50000 });
     const criteria = (Array.isArray(b.criteria) ? b.criteria : []).map((c) => str(c, 'Kriterium', { max: 500 })).filter(Boolean).slice(0, 50);

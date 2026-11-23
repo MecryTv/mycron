@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-23 20:13 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-23 20:50 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 4 | 0 | 0 | 0 | 1 | 0 | 40 | 0 |
+| 3 | 0 | 1 | 0 | 1 | 0 | 40 | 0 |
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 4 · P3 Mittel: 0 · P4 Niedrig: 0
+
+## Aktive Aufgabe
+
+[W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) Discord-Bot works: Befehle und Knöpfe (In Arbeit), letzte Übergabe 2026-11-23 20:49
 
 ## Kritisch (P1)
 
@@ -16,13 +20,14 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) | Discord-Bot works: Befehle und Knöpfe | Feature | P2 Hoch | In Arbeit | L |  |  |  |
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) | Discord-Bot works: Befehle und Knöpfe | Feature | P2 Hoch | Backlog | L |  |  |  |
 | [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | Backlog | M |  |  |  |
 | [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | Backlog | XL |  |  |  |
 | [W-0044](tasks/W-0044-discord-ein-dashboard-mit-bild-statt/task.md) | Discord: ein Dashboard mit Bild statt Statuspost je Projekt, Status des Bots | Feature | P2 Hoch | Backlog | L |  |  | blockiert durch W-0037 |

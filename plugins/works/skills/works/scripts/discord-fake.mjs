@@ -31,7 +31,13 @@ function messageProblems(b) {
   for (const e of b.embeds || []) p.push(...embedProblems(e));
   for (const row of b.components || []) {
     if (row.type !== 1 || !Array.isArray(row.components) || row.components.length > 5) p.push('components');
-    for (const c of row.components || []) if (c.style === 5 && !/^https:\/\//.test(c.url || '')) p.push('link button url');
+    for (const c of row.components || []) {
+      if (c.type === 2 && c.style === 5 && !/^https:\/\//.test(c.url || '')) p.push('link button url');
+      // Knöpfe mit Aktion und Auswahlmenüs brauchen eine custom_id (höchstens 100 Zeichen), Knöpfe eine Beschriftung.
+      if ((c.type === 2 && c.style !== 5) || c.type === 3) { if (!c.custom_id || String(c.custom_id).length > 100) p.push('custom_id'); }
+      if (c.type === 2 && (!c.label || String(c.label).length > 80)) p.push('button label');
+      if (c.type === 3 && (!Array.isArray(c.options) || !c.options.length || c.options.length > 25)) p.push('select options');
+    }
   }
   if (!String(b.content || '').trim() && !(b.embeds || []).length) p.push('empty');
   return p;
@@ -77,6 +83,8 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
     callbacks: new Map(),
     denyChannels: new Set(),
     commands: null,
+    guildCommands: new Map(),
+    followups: new Map(),
     requests: [],
     problems: [],
     limitNext: 0,
@@ -108,7 +116,22 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
       if (req.method === 'GET' && p === '/oauth2/applications/@me') return json(res, 200, { id: appId, name: 'works', owner: { id: ownerId, username: 'du' }, team: null }, rl);
       if (req.method === 'GET' && p === '/users/@me/guilds') return json(res, 200, fake.guilds.map((g) => ({ id: g.id, name: g.name })), rl);
       if (req.method === 'PUT' && (m = p.match(/^\/applications\/(\d+)\/commands$/))) { fake.commands = body; return json(res, 200, (body || []).map((c, i) => ({ id: String(7000 + i), application_id: m[1], ...c })), rl); }
-      if (req.method === 'POST' && (m = p.match(/^\/interactions\/(\d+)\/([\w-]+)\/callback$/))) { fake.callbacks.set(m[1], body); return json(res, 204, undefined, rl); }
+      if (req.method === 'PUT' && (m = p.match(/^\/applications\/(\d+)\/guilds\/(\d+)\/commands$/))) { fake.guildCommands.set(m[2], body); return json(res, 200, (body || []).map((c, i) => ({ id: String(7100 + i), application_id: m[1], guild_id: m[2], ...c })), rl); }
+      if (req.method === 'POST' && (m = p.match(/^\/interactions\/(\d+)\/([\w-]+)\/callback$/))) {
+        const probs = body && body.data && [4, 7].includes(body.type) ? messageProblems(body.data) : [];
+        if (probs.length) { fake.problems.push(probs); return json(res, 400, { message: 'Invalid Form Body', code: 50035, errors: probs }); }
+        fake.callbacks.set(m[1], body); return json(res, 204, undefined, rl);
+      }
+      // Vorläufige Antwort bearbeiten (nach Antworttyp 5). Das Token der Interaktion ist itok-<ID>.
+      if (req.method === 'PATCH' && (m = p.match(/^\/webhooks\/(\d+)\/itok-(\d+)\/messages\/@original$/))) {
+        const cb = fake.callbacks.get(m[2]);
+        if (!cb || cb.type !== 5) return json(res, 404, { message: 'Unknown Message', code: 10008 });
+        // Beim Bearbeiten erlaubt Discord nur wenige Flags (Einbettungen unterdrücken, Components V2), nicht ephemeral.
+        const probs = [...messageProblems(body || {}), ...(body && body.flags & ~(4 | 32768) ? ['edit flags'] : [])];
+        if (probs.length) { fake.problems.push(probs); return json(res, 400, { message: 'Invalid Form Body', code: 50035, errors: probs }); }
+        fake.followups.set(m[2], body);
+        return json(res, 200, { id: `orig-${m[2]}`, ...body }, rl);
+      }
       if (req.method === 'GET' && (m = p.match(/^\/guilds\/(\d+)$/))) {
         const g = fake.guilds.find((x) => x.id === m[1]);
         return g ? json(res, 200, { id: g.id, name: g.name }, rl) : json(res, 404, { message: 'Unknown Guild', code: 10004 });
@@ -211,15 +234,22 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
   let seqI = 0;
   // appPerms: Rechte des Bots im Kanal (Standard: sehen, senden, einbetten, Verlauf, anheften).
   const BOT_PERMS = String((1n << 10n) | (1n << 11n) | (1n << 14n) | (1n << 16n) | (1n << 51n));
-  fake.interact = ({ sub, guild = '1', channel: ch = '11', user = ownerId, perms = '32', appPerms = BOT_PERMS, name = 'works', options = [] } = {}) => {
+  // type 2: Slash-Befehl, 3: Knopf oder Auswahl an der Nachricht messageId, 5: Antwort aus einem Dialog (fields).
+  fake.interact = ({ sub, type = 2, customId = '', messageId = '', values = null, fields = null, locale = 'de', guild = '1', channel: ch = '11', user = ownerId, perms = '32', appPerms = BOT_PERMS, name = 'works', options = [] } = {}) => {
     const id = String(800000 + ++seqI);
     const c = fake.guilds.flatMap((g) => g.channels.map((x) => ({ ...x, guild_id: g.id }))).find((x) => x.id === ch);
-    const d = { id, application_id: appId, type: 2, token: `itok-${id}`, guild_id: guild, channel_id: ch, app_permissions: appPerms, channel: c ? { id: c.id, name: c.name, type: c.type } : { id: ch },
+    const msg = messageId ? fake.messages.get(messageId) : null;
+    const data = type === 2 ? { id: '7000', name, type: 1, options: [{ type: 1, name: sub, options }] }
+      : type === 3 ? { custom_id: customId, component_type: values ? 3 : 2, ...(values ? { values } : {}) }
+        : { custom_id: customId, components: Object.entries(fields || {}).map(([k, v]) => ({ type: 1, components: [{ type: 4, custom_id: k, value: v }] })) };
+    const d = { id, application_id: appId, type, token: `itok-${id}`, locale, guild_locale: 'de', guild_id: guild, channel_id: ch, app_permissions: appPerms, channel: c ? { id: c.id, name: c.name, type: c.type } : { id: ch },
       member: { user: { id: user, username: user === ownerId ? 'du' : `nutzer${user}` }, permissions: perms },
-      data: { id: '7000', name, type: 1, options: [{ type: 1, name: sub, options }] } };
+      data, ...(msg ? { message: { id: msg.id, channel_id: msg.channel_id, components: msg.components, embeds: msg.embeds } } : {}) };
     for (const s of fake.gateway.sockets) s.wsSend({ op: 0, t: 'INTERACTION_CREATE', s: 1000 + seqI, d });
     return id;
   };
+  // Endgültige Antwort: direkt (Typ 4 oder 9) oder nach Typ 5 die bearbeitete vorläufige Antwort.
+  fake.answerOf = (id) => { const cb = fake.callbacks.get(id); if (!cb) return null; if (cb.type === 5) return fake.followups.get(id) ? { type: 'edit', data: fake.followups.get(id) } : null; return { type: cb.type, data: cb.data }; };
   // Beliebiges Gateway-Ereignis, etwa CHANNEL_DELETE oder GUILD_DELETE.
   fake.dispatch = (t, d) => { for (const s of fake.gateway.sockets) s.wsSend({ op: 0, t, s: 2000 + ++seqI, d }); };
   fake.close = () => new Promise((r) => { for (const s of fake.gateway.sockets) s.destroy(); server.close(() => r()); server.closeAllConnections && server.closeAllConnections(); });

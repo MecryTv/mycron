@@ -226,7 +226,7 @@ Verwaiste Tabs: Endet ein Board und startet auf seinem Port ein anderes Projekt,
 
 - Sagt der Nutzer, das Board sehe alt aus oder verhalte sich falsch, zuerst `works board --status`, dann `works board --restart` und den Nutzer bitten, einen Tab, der noch eine sehr alte Version zeigt, einmal neu zu laden.
 - Vor jedem Edit an einer task.md die Datei neu lesen. Der Nutzer kann sie inzwischen im Board geändert haben.
-- Aufgaben mit `source: board` und `incomplete: true` hat der Nutzer schnell angelegt. Bei passender Gelegenheit Ziel und Akzeptanzkriterien mit ihm klären.
+- Aufgaben mit `source: board` oder `source: discord` und `incomplete: true` hat der Nutzer schnell angelegt. Bei passender Gelegenheit Ziel und Akzeptanzkriterien mit ihm klären.
 - Offene Fragen, die der Nutzer im Board notiert, sind oft an Claude gerichtet. Beim Start einer solchen Aufgabe zuerst darauf eingehen.
 - Die Warteschlange ist ein Auftrag des Nutzers. Beim Abarbeiten immer die oberste startbare Aufgabe nehmen und die Einstellungen `auto_next` und `ask_before` beachten.
 - Beim Teilen den Leselink nennen, den Bearbeitungslink nur, wenn der Nutzer ausdrücklich danach fragt.
