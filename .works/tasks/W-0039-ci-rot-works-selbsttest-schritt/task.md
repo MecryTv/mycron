@@ -3,13 +3,13 @@ id: W-0039
 title: "CI rot: works Selbsttest, Schritt Selbsttest"
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort:
 risk:
 created: 2026-11-23
 updated: 2026-11-23
 due:
-completed:
+completed: 2026-11-23
 milestone:
 branch: fix/w-0039-ci-rot-works-selbsttest
 tags: []
@@ -77,8 +77,10 @@ discord-bot.mjs meldet neue Aufgaben im Review wie einen Wechsel ins Review (ein
 ## Offene Fragen
 
 ## Übergabe
+Abgeschlossen am 2026-11-23. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
 - 2026-11-23: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-23: Ursache gefunden und behoben: neue Aufgaben im Review wurden nicht gemeldet. Regressionstest 'Review einer neuen Aufgabe'. Selbsttest Windows 37/37, Discord-Schritte auch ohne WebSocket grün.
+- 2026-11-23: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
