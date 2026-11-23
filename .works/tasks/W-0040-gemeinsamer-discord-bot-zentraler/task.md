@@ -3,13 +3,13 @@ id: W-0040
 title: "Gemeinsamer Discord-Bot: zentraler Dienst auf dem VPS"
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: XL
 risk:
 created: 2026-11-23
 updated: 2026-11-23
 due:
-completed:
+completed: 2026-11-23
 milestone:
 branch: feature/w-0040-gemeinsamer-discord-bot
 tags: [discord, design]
@@ -78,7 +78,7 @@ Art: nachher · Hinzugefügt: 2026-11-23
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-23. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -100,3 +100,4 @@ Art: nachher · Hinzugefügt: 2026-11-23
 - 2026-11-23: Entscheidung E2 dokumentiert: Dienst bildet die Discord-Routen nach
 - 2026-11-23: Entscheidung E3 dokumentiert: Kaputte Kopplungen und Schutz des gemeinsamen Bots
 - 2026-11-23: Umgesetzt: Dienst works-bot (Docker, Anleitung), works discord link/unlink, Bot über den Dienst. Audit mit 8 Funden, alle behoben und getestet. Selbsttest 37/37, Dienst-Test und ci-watch grün.
+- 2026-11-23: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
