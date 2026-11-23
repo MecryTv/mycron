@@ -20,6 +20,16 @@ Angelegt am 2026-11-23. Diese Datei hält fest, was entschieden wurde, warum, un
   - kein Rückweg; A kompakt und E Tabelle: vom Nutzer nicht gewählt
 - Konsequenzen: Nutzer legt Bot und Token im Entwicklerportal an; ein Bot-Prozess je Rechner, Node 22 oder neuer; Freigaben aus Claude Code bleiben in Claude Code
 
+### E2: Nachrichten nach Entwurf F
+- Datum: 2026-11-23
+- Quelle: Nutzer
+- Kontext:
+- Entscheidung: Angehefteter Statuspost je Projekt plus Ereignisse als eigene Nachrichten mit Feldern und Knöpfen (Entwurf F), vom Nutzer gewählt mit dem Wunsch, ihn zu verbessern. Verbesserte Fassung als F2.
+- Begründung: Wahl des Nutzers am 2026-11-23: F und J, aber verbessert
+- Verworfene Alternativen:
+  - G Statuspost mit Thread: nicht gewählt
+- Konsequenzen:
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 

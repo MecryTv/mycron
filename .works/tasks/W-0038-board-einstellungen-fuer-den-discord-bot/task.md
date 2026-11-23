@@ -46,7 +46,7 @@ Teil der Discord-Anbindung (siehe W-0036), Wunsch des Nutzers vom 2026-11-23 (P2
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
 
 ## Designentscheidungen
-<!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
+Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
@@ -62,3 +62,6 @@ Teil der Discord-Anbindung (siehe W-0036), Wunsch des Nutzers vom 2026-11-23 (P2
 - 2026-11-23: Entwurf I „Seitenleiste Discord-Bot“ angehängt
 - 2026-11-23: Entwurf J „Dialog mit Vorschau“ angehängt
 - 2026-11-23: Entwurf K „Einrichtung in Schritten“ angehängt
+- 2026-11-23: decisions.md angelegt
+- 2026-11-23: Entscheidung E1 dokumentiert: Einstellungen nach Entwurf J
+- 2026-11-23: Entwurf J2 „J verbessert“ angehängt

@@ -76,3 +76,5 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: Entscheidung E1 dokumentiert: Eigener Bot statt Webhook
 - 2026-11-23: Entwurf F „Statuspost und Nachrichten mit Knöpfen“ angehängt
 - 2026-11-23: Entwurf G „Statuspost mit Thread“ angehängt
+- 2026-11-23: Entscheidung E2 dokumentiert: Nachrichten nach Entwurf F
+- 2026-11-23: Entwurf F2 „F verbessert“ angehängt

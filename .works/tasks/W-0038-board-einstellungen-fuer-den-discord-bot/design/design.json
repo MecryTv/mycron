@@ -27,6 +27,15 @@
       "source": "ui-ux-pro-max",
       "note": "Erstes Mal, gilt für I und J: Bot anlegen, Token, Einladung, Kanal",
       "at": "2026-11-23 17:07"
+    },
+    {
+      "name": "J2",
+      "title": "J verbessert",
+      "file": "J2-j-verbessert.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Reiter Verbindung (mit Einrichtung), Projekte, Ereignisse (@ je Ereignis, Ruhezeit), Befehle, Datenschutz; Vorschau mit Sperrbildschirm",
+      "at": "2026-11-23 17:20"
     }
   ],
   "brainstorm": [],

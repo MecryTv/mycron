@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="de" data-v="F2">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Entwurf: Bot works, Nachrichten F2 (W-0036)</title>
+<style>
+/* Nachgezeichneter Discord-Kanal (nur für den Entwurf). Gezeigt wird nur, was Discord wirklich kann:
+   Text vor dem Embed, Embed mit Autor, Titel, Beschreibung, Feldern, Fußzeile und Farbe, Zeitstempel <t:..:R>, Knöpfe. */
+.ew-dc { --dc-bg: #ffffff; --dc-side: #f2f3f5; --dc-text: #313338; --dc-muted: #5c5e66; --dc-embed: #f2f3f5; --dc-link: #006ce7; --dc-mention: #e6e8fd; --dc-mention-text: #4752c4; --dc-line: #e3e5e8; --dc-btn2: #e3e5e8; --dc-btn2-text: #313338; --dc-ts: #e3e5e8; --dc-ping: #fdf4e4;
+  min-height: 100vh; background: var(--dc-bg); color: var(--dc-text); font: 15px/1.375 "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+:root[data-theme="dark"] .ew-dc { --dc-bg: #313338; --dc-side: #2b2d31; --dc-text: #dbdee1; --dc-muted: #949ba4; --dc-embed: #2b2d31; --dc-link: #00a8fc; --dc-mention: #3c4270; --dc-mention-text: #c9cdfb; --dc-line: #3f4147; --dc-btn2: #4e5058; --dc-btn2-text: #ffffff; --dc-ts: #3f4147; --dc-ping: #3b3529; }
+.ew-dc-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--dc-line); font-weight: 600; flex-wrap: wrap; }
+.ew-dc-head span { color: var(--dc-muted); font-weight: 400; font-size: 14px; }
+.ew-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); min-height: calc(100vh - 49px); }
+.ew-aside { background: var(--dc-side); border-left: 1px solid var(--dc-line); padding: 16px; display: grid; gap: 14px; align-content: start; }
+@media (max-width: 960px) { .ew-split { grid-template-columns: minmax(0, 1fr); } .ew-aside { border-left: 0; border-top: 1px solid var(--dc-line); } }
+.ew-dc-list { max-width: 900px; padding: 8px 0 24px; }
+.ew-day { display: flex; align-items: center; gap: 8px; margin: 10px 16px; font-size: 12px; color: var(--dc-muted); font-weight: 600; }
+.ew-day::before, .ew-day::after { content: ""; flex: 1; height: 1px; background: var(--dc-line); }
+.ew-msg { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0 16px; padding: 6px 16px; }
+.ew-msg.ew-pinged { background: var(--dc-ping); box-shadow: inset 2px 0 0 #f0b232; }
+.ew-av { width: 40px; height: 40px; border-radius: 50%; background: #5550d9; color: #fff; display: grid; place-items: center; font-weight: 800; }
+.ew-cont .ew-av { visibility: hidden; height: 0; }
+.ew-who { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.ew-who b { font-weight: 600; }
+.ew-app { font-size: 10px; font-weight: 600; padding: 0 4px; border-radius: 3px; background: #5865f2; color: #fff; line-height: 15px; }
+.ew-time { font-size: 12px; color: var(--dc-muted); }
+.ew-cont .ew-who { display: none; }
+.ew-mention { background: var(--dc-mention); color: var(--dc-mention-text); border-radius: 3px; padding: 0 2px; font-weight: 500; }
+.ew-ts { background: var(--dc-ts); border-radius: 3px; padding: 0 3px; }
+.ew-edited { font-size: 10px; color: var(--dc-muted); }
+.ew-silent { font-size: 12px; color: var(--dc-muted); display: inline-flex; align-items: center; gap: 4px; }
+.ew-silent svg { width: 12px; height: 12px; }
+.ew-embed { margin-top: 4px; max-width: 520px; display: grid; gap: 8px; padding: 10px 14px 12px 12px; border-radius: 4px; background: var(--dc-embed); border-left: 4px solid var(--c, #5865f2); font-size: 14px; }
+.ew-embed .ew-author { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.ew-embed .ew-author i { width: 16px; height: 16px; border-radius: 50%; background: var(--pc, #8e8cf7); display: inline-block; }
+.ew-embed .ew-title { font-weight: 600; font-size: 15px; }
+.ew-embed .ew-desc { white-space: pre-line; }
+.ew-embed a { color: var(--dc-link); text-decoration: none; }
+.ew-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
+.ew-fields div { min-width: 0; }
+.ew-fields .ew-full { grid-column: 1 / -1; }
+.ew-fields b { display: block; font-size: 13px; font-weight: 600; }
+.ew-fields span { font-size: 13.5px; white-space: pre-line; }
+.ew-foot { font-size: 12px; color: var(--dc-muted); }
+.ew-mono { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; letter-spacing: -.5px; }
+.ew-c-need { --c: #e8a33d; } .ew-c-done { --c: #23a55a; } .ew-c-red { --c: #f23f43; } .ew-c-run { --c: #5865f2; } .ew-c-status { --c: #8e8cf7; } .ew-c-gone { --c: #80848e; }
+.ew-gone .ew-embed { opacity: .72; }
+.ew-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.ew-b { font: 500 14px/1 inherit; height: 32px; padding: 0 16px; border-radius: 4px; border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.ew-b.ew-p { background: #5865f2; color: #fff; } .ew-b.ew-s { background: var(--dc-btn2); color: var(--dc-btn2-text); } .ew-b.ew-ok { background: #248046; color: #fff; }
+.ew-b svg { width: 14px; height: 14px; }
+.ew-pin { font-size: 12px; color: var(--dc-muted); padding: 2px 16px 0 72px; display: flex; align-items: center; gap: 6px; }
+.ew-pin svg { width: 14px; height: 14px; }
+.ew-ah { font-size: 12px; font-weight: 700; color: var(--dc-muted); text-transform: uppercase; letter-spacing: .02em; margin: 4px 0 0; }
+.ew-phone { border-radius: 22px; padding: 14px 12px; background: linear-gradient(160deg, #2b3a55, #47395a); display: grid; gap: 8px; }
+.ew-clock { color: #fff; text-align: center; font: 600 34px/1 system-ui, sans-serif; margin: 4px 0 8px; }
+.ew-note-card { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 2px 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, .82); color: #1d1d1f; font: 13px/1.35 system-ui, sans-serif; }
+.ew-note-card i { grid-row: span 2; width: 28px; height: 28px; border-radius: 7px; background: #5865f2; color: #fff; display: grid; place-items: center; font-style: normal; font-weight: 800; }
+.ew-note-card b { font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+.ew-note-card b small { font-weight: 400; color: #6e6e73; }
+.ew-quiet { font-size: 12.5px; color: rgba(255, 255, 255, .85); text-align: center; padding: 2px 6px; }
+.ew-list { margin: 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 4px; }
+.ew-list b { font-weight: 600; }
+@media (max-width: 560px) { .ew-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+
+/* Rahmen des Entwurfs, nicht Teil des Designs */
+.ew-frame { position: sticky; top: 0; z-index: 2147483000; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 16px; font: 13px/1.45 system-ui, sans-serif; background: #fff6cc; color: #3d3200; border-bottom: 1px dashed #a88a00; }
+:root[data-theme="dark"] .ew-frame { background: #2a2400; color: #f5e9a8; border-color: #8a7300; }
+.ew-frame b { font-weight: 600; }
+.ew-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid currentColor; border-radius: 9px; }
+.ew-seg button { font: inherit; color: inherit; background: none; border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.ew-seg button[aria-pressed="true"] { background: #3d3200; color: #fff6cc; }
+:root[data-theme="dark"] .ew-seg button[aria-pressed="true"] { background: #f5e9a8; color: #2a2400; }
+.ew-seg button:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.ew-note { flex-basis: 100%; margin: 0; }
+.ew-note:empty { display: none; }
+:root[data-frame="0"] .ew-frame { display: none; }
+body { margin: 0; }
+</style>
+</head>
+<body>
+<div class="ew-frame" role="region" aria-label="Entwurfsrahmen">
+  <b>Entwurf: Bot works, Nachrichten F2 (W-0036)</b>
+  <span class="ew-seg" id="ew-variants" role="group" aria-label="Variante"></span>
+  <span class="ew-seg" role="group" aria-label="Farbschema"><button type="button" data-ew-theme="light">Hell</button><button type="button" data-ew-theme="dark">Dunkel</button></span>
+  <p class="ew-note" id="ew-note"></p>
+</div>
+
+<section data-ew-variant="F2" data-ew-note="F2, F verbessert: Statuspost mit aktiver Aufgabe, Kriterien, Warteschlange und den letzten Ereignissen; Zeiten zählen in Discord von selbst weiter. Erledigtes wird nachträglich bearbeitet statt liegen zu bleiben (Freigabe grau, Review angenommen, Knöpfe weg). works ship ist eine Nachricht, die ihre Schritte abhakt. Nur Erwähnungen klingeln, alles andere kommt still; der Text vor dem Embed ist das, was auf dem Sperrbildschirm steht.">
+<div class="ew-dc">
+  <div class="ew-dc-head"># works <span>Bot works · Statusposts angeheftet · nur Erwähnungen klingeln</span></div>
+  <div class="ew-split">
+    <div class="ew-dc-list">
+      <div class="ew-pin"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M10 1l5 5-2 1-3 3 .5 3.5L9 15l-3-3-4 4-1-1 4-4-3-3 1.5-1.5L7 7l3-3z"/></svg>works hat eine Nachricht angeheftet.</div>
+      <div class="ew-msg"><div class="ew-av">w</div><div><div class="ew-who"><b>works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 09:12</span></div>
+        <div class="ew-embed ew-c-status"><div class="ew-author"><i style="--pc:#8e8cf7"></i>mycron · Stand</div>
+          <div class="ew-desc"><b>Claude</b> arbeitet an <b>W-0036</b> Discord-Bot works, seit <span class="ew-ts">1 Stunde</span>
+<span class="ew-mono">▰▰▰▱▱▱▱</span> 3 von 7 Kriterien</div>
+          <div class="ew-fields">
+            <div><b>Freigabe</b><span>keine offen</span></div>
+            <div><b>CI</b><span>✓ grün · <a href="#">b147ac6</a></span></div>
+            <div><b>Heute</b><span>4 erledigt · 12,40 $</span></div>
+            <div class="ew-full"><b>Als Nächstes</b><span>W-0037 Befehle und Knöpfe
+W-0038 Einstellungen im Board</span></div>
+            <div class="ew-full"><b>Zuletzt</b><span>14:01 W-0035 ausgeliefert
+13:55 W-0035 angenommen
+13:52 W-0035 im Review</span></div>
+          </div>
+          <div class="ew-foot"><span class="ew-mono">▰▰▰▰▰▰▰▰▰▱</span> 36 von 38 erledigt · aktualisiert <span class="ew-ts">vor 2 Minuten</span> <span class="ew-edited">(bearbeitet)</span></div></div>
+        <div class="ew-btns"><button class="ew-b ew-s" type="button">Aufgaben</button><button class="ew-b ew-s" type="button">Anweisung an Claude</button></div></div></div>
+
+      <div class="ew-day">Heute</div>
+      <div class="ew-msg ew-gone"><div class="ew-av">w</div><div><div class="ew-who"><b>works</b><span class="ew-app">APP</span><span class="ew-time">13:40</span></div>
+        <div class="ew-embed ew-c-gone"><div class="ew-author"><i style="--pc:#e8a33d"></i>Trainingsplan</div><div class="ew-title">✓ Freigabe erteilt</div>
+          <div class="ew-foot">Hat 1 Minute gewartet · Bash <span class="ew-edited">(bearbeitet)</span></div></div></div></div>
+      <div class="ew-msg ew-cont"><div class="ew-av">w</div><div>
+        <div class="ew-embed ew-c-done"><div class="ew-author"><i style="--pc:#8e8cf7"></i>mycron</div><div class="ew-title">✓ W-0035 angenommen</div>
+          <div class="ew-desc">Szenarien für works shot · von dir um 13:55</div>
+          <div class="ew-foot">4 von 4 Kriterien · Prüfungen grün <span class="ew-edited">(bearbeitet)</span></div></div></div></div>
+      <div class="ew-msg ew-cont"><div class="ew-av">w</div><div>
+        <div class="ew-embed ew-c-done"><div class="ew-author"><i style="--pc:#8e8cf7"></i>mycron</div><div class="ew-title">W-0035 ausgeliefert</div>
+          <div class="ew-desc">✓ in main gemergt
+✓ gepusht · <a href="#">b147ac6</a>
+✓ CI grün, 3 Workflows
+✓ Plugin aktualisiert, Board neu gestartet</div>
+          <div class="ew-foot">works ship · 4 Minuten <span class="ew-edited">(bearbeitet)</span></div></div>
+        <div class="ew-btns"><button class="ew-b ew-s" type="button">Commit auf GitHub <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 3h7v7M13 3L5 11M3 6v7h7"/></svg></button></div></div></div>
+      <div class="ew-msg ew-cont"><div class="ew-av">w</div><div>
+        <div class="ew-silent"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 6a4 4 0 018 0v3l1.5 2h-11L4 9zM2 2l12 12"/></svg>still</div>
+        <div class="ew-embed ew-c-red"><div class="ew-author"><i style="--pc:#e8a33d"></i>Trainingsplan</div><div class="ew-title">CI rot für 81fe2a0</div>
+          <div class="ew-fields"><div><b>Rot</b><span>2 von 6 Jobs</span></div><div><b>Erster Fehler</b><span>test (windows)</span></div><div><b>Bug</b><span>W-0011 angelegt, P2</span></div></div>
+          <div class="ew-foot">AssertionError: expected 3 to be 4 · tests/plan.test.mjs:42</div></div>
+        <div class="ew-btns"><button class="ew-b ew-s" type="button">Bug ansehen</button><button class="ew-b ew-s" type="button">Lauf auf GitHub <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 3h7v7M13 3L5 11M3 6v7h7"/></svg></button></div></div></div>
+      <div class="ew-msg ew-pinged"><div class="ew-av">w</div><div><div class="ew-who"><b>works</b><span class="ew-app">APP</span><span class="ew-time">14:20</span></div>
+        <div><span class="ew-mention">@du</span> Trainingsplan wartet auf deine Freigabe (Bash)</div>
+        <div class="ew-embed ew-c-need"><div class="ew-author"><i style="--pc:#e8a33d"></i>Trainingsplan</div><div class="ew-title">Wartet auf deine Freigabe</div>
+          <div class="ew-fields"><div><b>Aufgabe</b><span>W-0002 Trainingsseite</span></div><div><b>Werkzeug</b><span>Bash, Befehl ausgeblendet</span></div><div><b>Wartet seit</b><span><span class="ew-ts">3 Minuten</span></span></div></div>
+          <div class="ew-foot">Freigeben in Claude Code · die Nachricht wird grau, sobald erledigt</div></div></div></div>
+    </div>
+
+    <div class="ew-aside">
+      <p class="ew-ah">Auf dem Handy</p>
+      <div class="ew-phone" aria-label="Sperrbildschirm">
+        <div class="ew-clock">14:20</div>
+        <div class="ew-note-card"><i>w</i><b>works · #works <small>jetzt</small></b><span>@du Trainingsplan wartet auf deine Freigabe (Bash)</span></div>
+        <div class="ew-quiet">CI rot, Ergebnisse und Statuspost kommen still und klingeln nicht.</div>
+      </div>
+      <p class="ew-ah">Was sich gegenüber F ändert</p>
+      <ul class="ew-list">
+        <li><b>Statuspost</b> zeigt Kriterien der aktiven Aufgabe, Warteschlange und die letzten drei Ereignisse. Auch abgeschaltete Ereignisse stehen dort.</li>
+        <li><b>Zeiten</b> wie „seit 1 Stunde“ zählt Discord selbst weiter, ohne dass der Bot bearbeiten muss.</li>
+        <li><b>Erledigtes räumt sich auf:</b> Freigabe erteilt wird grau, Review angenommen wird grün, die Knöpfe verschwinden.</li>
+        <li><b>works ship</b> ist eine einzige Nachricht, die Merge, Push, CI und Update nacheinander abhakt.</li>
+        <li><b>Nur Erwähnungen klingeln.</b> Alles andere geht als stille Nachricht raus; die Zeile vor dem Embed ist der Text auf dem Sperrbildschirm.</li>
+        <li><b>CI rot</b> nennt den ersten Fehler und den angelegten Bug.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</section>
+
+<script>
+(() => {
+  const q = new URLSearchParams(location.search);
+  const root = document.documentElement;
+  const parts = [...document.querySelectorAll('[data-ew-variant]')];
+  let v = q.get('v') || root.dataset.v || (parts[0] && parts[0].dataset.ewVariant);
+  let theme = q.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  if (q.get('frame') === '0') root.dataset.frame = '0';
+  const seg = document.getElementById('ew-variants');
+  for (const p of parts) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.ewV = p.dataset.ewVariant;
+    b.textContent = p.dataset.ewVariant;
+    seg.append(b);
+  }
+  function render() {
+    root.dataset.v = v;
+    root.dataset.theme = theme;
+    for (const p of parts) p.style.display = p.dataset.ewVariant === v ? '' : 'none';
+    document.querySelectorAll('[data-ew-v]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ewV === v)));
+    document.querySelectorAll('[data-ew-theme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ewTheme === theme)));
+    const cur = parts.find((p) => p.dataset.ewVariant === v);
+    document.getElementById('ew-note').textContent = cur ? cur.dataset.ewNote || '' : '';
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ew-v], [data-ew-theme]');
+    if (!b) return;
+    if (b.dataset.ewV) v = b.dataset.ewV; else theme = b.dataset.ewTheme;
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>

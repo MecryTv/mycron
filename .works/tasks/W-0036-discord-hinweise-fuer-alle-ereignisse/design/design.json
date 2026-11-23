@@ -18,6 +18,15 @@
       "source": "ui-ux-pro-max",
       "note": "Im Kanal nur die Statusposts, alle Ereignisse im Thread darunter; ruhiger Kanal auch bei vielen Projekten",
       "at": "2026-11-23 17:07"
+    },
+    {
+      "name": "F2",
+      "title": "F verbessert",
+      "file": "F2-f-verbessert.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Statuspost mit Kriterien, Warteschlange und letzten Ereignissen; Erledigtes wird nachträglich bearbeitet; works ship als eine Nachricht mit Schritten; nur Erwähnungen klingeln",
+      "at": "2026-11-23 17:20"
     }
   ],
   "brainstorm": [],
