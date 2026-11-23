@@ -1,0 +1,22 @@
+# works-bot on your server. Start in this folder with: docker compose up -d --build
+# The token goes into .env next to this file (copy .env.example, then chmod 600 .env). Never commit .env.
+services:
+  works-bot:
+    build:
+      context: ../..
+      dockerfile: services/works-bot/Dockerfile
+    image: works-bot:latest
+    container_name: works-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Behind a reverse proxy: take the client address from X-Forwarded-For (limit for wrong codes per address).
+      TRUST_PROXY: "1"
+    volumes:
+      - works-bot-data:/data
+    # Only reachable from the server itself; the reverse proxy forwards your domain to it.
+    ports:
+      - "127.0.0.1:8787:8080"
+
+volumes:
+  works-bot-data:

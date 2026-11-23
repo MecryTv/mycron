@@ -1160,6 +1160,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eins']); w(['new', '--type=chore', '--title=Zwei', '--criteria=Fertig']); }
     let r = await wa(['discord'], { extraEnv: denv });
     has(r.out, 'nicht eingerichtet', 'Status ohne Einrichtung');
+    // Gemeinsamer Bot (W-0040): beide Wege im Status, ohne Adresse eine klare Meldung, Adresse nur mit https.
+    has(r.out, 'Gemeinsamer Bot', 'Status nennt den gemeinsamen Bot'); has(r.out, 'Eigener Bot', 'Status nennt den eigenen Bot');
+    r = await wa(['discord', 'link', 'ABCD-2345'], { extraEnv: denv, ok: false });
+    expect(r.code !== 0, 'link ohne Adresse lief durch'); has(r.out + r.err, 'keine Adresse');
+    r = await wa(['discord', 'set', 'service=http://example.org'], { extraEnv: denv, ok: false });
+    expect(r.code !== 0, 'Dienst ohne https angenommen'); has(r.out + r.err, 'https');
     r = await wa(['discord', 'start'], { extraEnv: denv, ok: false });
     expect(r.code !== 0, 'start ohne Einrichtung lief durch'); has(r.out + r.err, 'nicht eingerichtet');
     expect(!fs.existsSync(path.join(ddir, 'bot.pid')), 'Bot ohne Einrichtung gestartet');

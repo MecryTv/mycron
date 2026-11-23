@@ -12,7 +12,7 @@ import { loadLanes } from './parallel.mjs';
 import { liveUsage, fmtCost } from './usage.mjs';
 import { projectList } from './hub.mjs';
 import { runningVersion, OWN_CLI, isAlive } from './server-control.mjs';
-import { dfile, discordDir, loadDiscordConfig, loadToken, normalizeConfig, apiBase, readOutbox } from './discord.mjs';
+import { dfile, discordDir, loadDiscordConfig, normalizeConfig, credential, readOutbox } from './discord.mjs';
 import { Rest, Gateway, hasWebSocket } from './discord-api.mjs';
 
 export { normalizeConfig };
@@ -698,10 +698,11 @@ function stopRequested() {
 }
 
 export async function runBot() {
-  const token = loadToken();
-  const log = makeLog(token);
   const cfg = loadDiscordConfig();
-  if (!token || !cfg.channel_id) { log('Nicht eingerichtet, Bot beendet. Einrichten mit works discord.'); return 1; }
+  let cred;
+  try { cred = credential(cfg); } catch (e) { makeLog('')(`${e.message} Bot beendet.`); return 1; }
+  const log = makeLog(cred.secret);
+  if (!cred.secret || !cfg.channel_id) { log('Nicht eingerichtet, Bot beendet. Einrichten mit works discord.'); return 1; }
   // Nie in einem Projektordner oder Worktree laufen: Unter Windows ließe er sich sonst nicht löschen.
   try { fs.mkdirSync(discordDir(), { recursive: true }); process.chdir(discordDir()); } catch { /* bleibt */ }
   if (!await acquireLock()) { log('Ein anderer Bot läuft schon, dieser beendet sich.'); return 0; }
@@ -717,33 +718,35 @@ export async function runBot() {
   }, HEARTBEAT);
   let gw = null;
   let fatal = '';
+  // Gemeinsamer Bot (W-0040): über den Dienst mit dem Geräteschlüssel; das Gateway hält der Dienst.
+  const invalid = cred.shared ? 'Schlüssel ungültig (in Discord getrennt?). Neu koppeln mit /works verbinden und works discord link.' : 'Token ungültig. Neues Token mit works discord token.';
   try {
-    const rest = new Rest({ token, base: apiBase() });
+    const rest = new Rest({ token: cred.secret, base: cred.base, scheme: cred.scheme });
     for (;;) {
       if (stopping || stopRequested()) return 0;
       try { await rest.get('/users/@me'); break; } catch (e) {
-        if (e.status === 401) { log('Token ungültig, Bot beendet. Neues Token mit works discord token.'); return 1; }
+        if (e.status === 401) { log(`${invalid} Bot beendet.`); return 1; }
         log(`${e.message}, neuer Versuch`);
         await sleep(RETRY);
       }
     }
-    log(`Bot gestartet (PID ${process.pid}, Node ${process.version})`);
-    if (!hasWebSocket()) log(`Node ${process.version}: ohne Gateway, online erst ab Node 22. Nachrichten gehen trotzdem.`);
+    log(`Bot gestartet (PID ${process.pid}, Node ${process.version}${cred.shared ? ', gemeinsamer Bot' : ''})`);
+    if (!cred.shared && !hasWebSocket()) log(`Node ${process.version}: ohne Gateway, online erst ab Node 22. Nachrichten gehen trotzdem.`);
     // Gateway: beim Start und, falls Discord da nicht erreichbar war, jede Minute neu versuchen.
     let gwRetry = 0;
     const connectGateway = async () => {
       gwRetry = Date.now() + 60000;
       try {
         const g = await rest.get('/gateway/bot');
-        gw = new Gateway({ token, url: g.url, log, onFatal: (code) => { fatal = code === 4004 ? 'Token ungültig' : `Gateway-Code ${code}`; } });
+        gw = new Gateway({ token: cred.secret, url: g.url, log, onFatal: (code) => { fatal = code === 4004 ? 'Token ungültig' : `Gateway-Code ${code}`; } });
         gw.start();
       } catch (e) { log(`Gateway nicht erreichbar (${e.message}), Nachrichten gehen trotzdem.`); }
     };
     const bot = new Bot({ rest, log });
     while (!stopping && !stopRequested() && !fatal) {
-      if (!gw && hasWebSocket() && Date.now() >= gwRetry) await connectGateway();
+      if (!cred.shared && !gw && hasWebSocket() && Date.now() >= gwRetry) await connectGateway();
       try { await bot.tick(); } catch (e) {
-        if (e.status === 401) { fatal = 'Token ungültig'; break; }
+        if (e.status === 401) { fatal = invalid; break; }
         log(`Fehler: ${e.message}`);
       }
       await sleep(TICK);

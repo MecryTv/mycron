@@ -1,0 +1,47 @@
+name: works-bot Tests
+
+# Gemeinsamer Discord-Bot (W-0040). Läuft auch bei Änderungen an den Discord-Teilen von works: Der Dienst nutzt
+# deren REST- und Gateway-Code, und der Test koppelt die works-CLI aus dem Repo gegen den Dienst.
+on:
+  push:
+    paths:
+      - 'services/works-bot/**'
+      - 'plugins/works/skills/works/scripts/discord*.mjs'
+      - 'plugins/works/skills/works/scripts/works.mjs'
+      - '.github/workflows/works-bot.yml'
+  pull_request:
+    paths:
+      - 'services/works-bot/**'
+      - 'plugins/works/skills/works/scripts/discord*.mjs'
+      - 'plugins/works/skills/works/scripts/works.mjs'
+      - '.github/workflows/works-bot.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: works-bot auf ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tests
+        run: node services/works-bot/test.mjs
+
+  docker:
+    name: Docker-Image bauen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image bauen
+        run: docker build -f services/works-bot/Dockerfile -t works-bot:test .
+      - name: Start ohne Token bricht mit Meldung ab
+        run: |
+          out=$(docker run --rm works-bot:test 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "DISCORD_TOKEN"

@@ -34,6 +34,7 @@ const AT = new Set(['perm', 'idle', 'question']);
 const OFF = new Set(['report_day']);
 
 export const DEFAULTS = {
+  mode: 'own', service: '',
   app_id: '', bot_name: '', owner_id: '',
   guild_id: '', guild_name: '', channel_id: '', channel_name: '',
   autostart: true,
@@ -57,25 +58,30 @@ export function normalizeConfig(c = {}) {
 export function loadDiscordConfig() { return normalizeConfig(readJson(dfile('config.json'), {})); }
 export function saveDiscordConfig(cfg) { writeJson(dfile('config.json'), cfg); }
 
-export function loadToken() {
-  const s = readJson(dfile('secret.json'), null);
-  return s && typeof s.token === 'string' ? s.token : '';
-}
+// secret.json hält genau ein Geheimnis: das Token des eigenen Bots oder den Geräteschlüssel für den gemeinsamen Bot
+// (W-0040). Wer den Weg wechselt, verliert das andere.
+const readSecret = () => readJson(dfile('secret.json'), null) || {};
+export const loadToken = () => (typeof readSecret().token === 'string' ? readSecret().token : '');
+export const loadKey = () => (typeof readSecret().key === 'string' ? readSecret().key : '');
 
-// Das Token liegt allein in secret.json, angelegt mit Rechten nur für den Nutzer (unter Windows erbt die Datei
-// die Rechte des Benutzerordners).
-export function saveToken(token) {
+// Angelegt mit Rechten nur für den Nutzer (unter Windows erbt die Datei die Rechte des Benutzerordners).
+function writeSecret(obj) {
   fs.mkdirSync(discordDir(), { recursive: true, mode: 0o700 });
   const file = dfile('secret.json');
   try { fs.unlinkSync(file); } catch { /* neu */ }
-  fs.writeFileSync(file, JSON.stringify({ token }) + '\n', { mode: 0o600 });
+  fs.writeFileSync(file, JSON.stringify(obj) + '\n', { mode: 0o600 });
   try { fs.chmodSync(file, 0o600); } catch { /* Windows */ }
 }
+export const saveToken = (token) => writeSecret({ token });
+export const saveKey = (key) => writeSecret({ key });
 
 export function removeToken() { try { fs.unlinkSync(dfile('secret.json')); } catch { /* weg */ } }
 
 export const maskToken = (t) => (t ? `…${t.slice(-4)}` : '');
-export const isConfigured = (cfg = loadDiscordConfig()) => !!(loadToken() && cfg.channel_id);
+export const isShared = (cfg) => cfg.mode === 'shared';
+export const isConfigured = (cfg = loadDiscordConfig()) => !!((isShared(cfg) ? loadKey() : loadToken()) && cfg.channel_id);
+
+const LOOPBACK = ['127.0.0.1', 'localhost', '[::1]'];
 
 // Basis der REST-API. Überschreiben nur auf diesem Rechner (Tests), sonst ginge das Token an einen fremden Server.
 export function apiBase() {
@@ -83,8 +89,27 @@ export function apiBase() {
   if (!o) return 'https://discord.com/api/v10';
   let u;
   try { u = new URL(o); } catch { throw new Error('WORKS_DISCORD_API ist keine gültige Adresse.'); }
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname) || u.protocol !== 'http:') throw new Error('WORKS_DISCORD_API darf nur auf diesen Rechner zeigen (http://127.0.0.1:...).');
+  if (!LOOPBACK.includes(u.hostname) || u.protocol !== 'http:') throw new Error('WORKS_DISCORD_API darf nur auf diesen Rechner zeigen (http://127.0.0.1:...).');
   return o.replace(/\/$/, '');
+}
+
+// Adresse des gemeinsamen Bots (Dienst works-bot). Fest hinterlegt, sobald er läuft; einstellbar mit
+// works discord set service=https://…, für Tests auch über WORKS_DISCORD_SERVICE. Nur https, außer auf diesem Rechner.
+export const DEFAULT_SERVICE = '';
+export function serviceBase(cfg = loadDiscordConfig()) {
+  const o = process.env.WORKS_DISCORD_SERVICE || cfg.service || DEFAULT_SERVICE;
+  if (!o) throw new Error('Der gemeinsame Bot hat noch keine Adresse. Einstellen mit works discord set service=https://…');
+  let u;
+  try { u = new URL(o); } catch { throw new Error(`Adresse des gemeinsamen Bots ungültig: ${o}`); }
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && LOOPBACK.includes(u.hostname))) throw new Error('Der gemeinsame Bot braucht https (http nur auf diesem Rechner).');
+  return o.replace(/\/$/, '');
+}
+
+// Zugang für den Bot: eigener Bot direkt zu Discord mit Token, gemeinsamer Bot über den Dienst mit Schlüssel.
+export function credential(cfg = loadDiscordConfig()) {
+  return isShared(cfg)
+    ? { secret: loadKey(), scheme: 'Bearer', base: `${serviceBase(cfg)}/v1`, shared: true }
+    : { secret: loadToken(), scheme: 'Bot', base: apiBase(), shared: false };
 }
 
 export const inviteUrl = (appId) => `https://discord.com/oauth2/authorize?client_id=${appId}&scope=bot%20applications.commands&permissions=${INVITE_PERMISSIONS}`;
@@ -95,7 +120,7 @@ export const inviteUrl = (appId) => `https://discord.com/oauth2/authorize?client
 // passiert einfach nichts. Läuft der Bot nicht, holt er die Dateien beim nächsten Start ab.
 export function emit(type, data = {}, root = '') {
   try {
-    if (!loadToken()) return false;
+    if (!loadToken() && !loadKey()) return false;
     const dir = dfile('outbox');
     fs.mkdirSync(dir, { recursive: true });
     // Läuft der Bot lange nicht, wächst die outbox nicht unbegrenzt.
@@ -183,6 +208,11 @@ export function applySetting(cfg, key, value) {
   const bool = (v) => { if (/^(true|an|on|ja|1)$/i.test(v)) return true; if (/^(false|aus|off|nein|0)$/i.test(v)) return false; throw new Error(`${key}: an oder aus erwartet, nicht "${v}".`); };
   const [a, b, c] = parts;
   if (parts.length === 1 && ['autostart', 'auto_enroll'].includes(a)) { cfg[a] = bool(value); return; }
+  if (parts.length === 1 && a === 'service') {
+    if (value) serviceBase({ service: value });
+    cfg.service = value.replace(/\/$/, '');
+    return;
+  }
   if (a === 'delays' && b in DEFAULTS.delays && parts.length === 2) {
     const n = Number(value);
     if (!Number.isFinite(n) || n < 0 || n > 3600) throw new Error(`${key}: Sekunden von 0 bis 3600.`);
@@ -197,6 +227,6 @@ export function applySetting(cfg, key, value) {
     if (parts.length === 2) { cfg.events[b].on = bool(value); return; }
     if (c === 'on' || c === 'at') { cfg.events[b][c] = bool(value); return; }
   }
-  throw new Error(`Unbekannte Einstellung ${key}. Möglich: autostart, auto_enroll, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, event.<name>[.at]`);
+  throw new Error(`Unbekannte Einstellung ${key}. Möglich: autostart, auto_enroll, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, event.<name>[.at]`);
 }
 

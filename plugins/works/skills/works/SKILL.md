@@ -92,7 +92,7 @@ Claude Code ersetzt `${CLAUDE_SKILL_DIR}` beim Laden durch den Ordner dieses Ski
 | Neue Kommentare gemeldet | `works comments <ID>` lesen, umsetzen, mit `works comment <ID> "..."` antworten | `references/planning.md` |
 | Aufgabe aus einer Vorlage, "wie immer bei Slash-Befehlen" | `works template list`, dann `works new --template ... --field ... --text "..."` | `references/planning.md` |
 | Wochenbericht fällig oder gewünscht | Woche zusammenfassen, `works report --week --summary "..."` | `references/planning.md` |
-| Hinweise aufs Handy, Discord, Bot einrichten | `works discord` zeigt den nächsten Schritt. Das Token gibt der Nutzer selbst ein (`works discord token`), nie in den Chat | `references/integrations.md` |
+| Hinweise aufs Handy, Discord, Bot einrichten | `works discord` zeigt beide Wege: gemeinsamer Bot (`/works verbinden` in Discord, dann `works discord link <Code>`) oder eigener (`works discord token`). Code und Token gibt der Nutzer selbst ein, nie in den Chat | `references/integrations.md` |
 | Wie lange hat das gedauert, passen die Schätzungen | `works time <ID>`, `works time` | `references/planning.md` |
 | Board sichern, in ein anderes Projekt übernehmen, alten Stand wiederherstellen | `works export --json`, einlesen mit `works import <datei.json>` (Vorschau, dann `--apply` oder `--apply --mode=restore`). Wiederherstellen ersetzt den Stand, vorher den Nutzer fragen | `references/board.md` |
 | Board mit jemandem teilen | Im selben Netzwerk `works board --restart --share`, Leselink aus der Ausgabe nennen. Für Leute außerhalb `works export` und die Datei schicken. Bearbeitungslink nur auf Nachfrage (`works share --owner`) | `references/board.md` |
