@@ -48,3 +48,7 @@ Das Token eines gemeinsamen Bots kann nicht ins Plugin (Übernahme, Sperre durch
 
 ### Verworfene Varianten
 <!-- Was wurde gezeigt oder erwogen und warum nicht genommen? -->
+
+## Gewählter Entwurf
+
+- 2026-11-23: Variante P „Kopplung: Code aus Discord“ gewählt, Grund: Wahl des Nutzers: Code aus Discord. Datei: design/P-kopplung-code-aus-discord.html. Nicht gewählt: Q Kopplung: Code aus works, R Einrichtung: gemeinsam oder eigener Bot
