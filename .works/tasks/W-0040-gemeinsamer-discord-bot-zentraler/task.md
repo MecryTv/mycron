@@ -37,20 +37,20 @@ Wunsch des Nutzers am 2026-11-23: Er stellt den Discord-Bot works für alle bere
 ## Akzeptanzkriterien
 - [x] Konzept mit Ablauf, Sicherheit und Kosten hängt an der Aufgabe
 - [x] Entwürfe für Kopplung und Einrichtung sind gezeigt und gewählt (P und R)
-- [ ] Dienst ist als Docker-Container mit Anleitung für den VPS bereit (Inbetriebnahme macht der Nutzer)
-- [ ] works koppelt sich per Code aus `/works verbinden` ohne Token, der eigene Bot bleibt als Option
-- [ ] Das Bot-Token liegt nur beim Dienst; ein Geräteschlüssel darf nur in seinen Kanal schreiben und nur eigene Nachrichten bearbeiten
-- [ ] Tests ohne echtes Discord und ohne echten VPS
+- [x] Dienst ist als Docker-Container mit Anleitung für den VPS bereit (Inbetriebnahme macht der Nutzer)
+- [x] works koppelt sich per Code aus `/works verbinden` ohne Token, der eigene Bot bleibt als Option
+- [x] Das Bot-Token liegt nur beim Dienst; ein Geräteschlüssel darf nur in seinen Kanal schreiben und nur eigene Nachrichten bearbeiten
+- [x] Tests ohne echtes Discord und ohne echten VPS
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] discord-fake: Interaktionen über das Gateway schicken (INTERACTION_CREATE), Antworten und Befehle aufnehmen, dazu die Dienst-Routen /v1 nachbilden (für den Selbsttest von works)
-- [ ] Dienst services/works-bot/server.mjs: Gateway, Slash-Befehl /works (link/verbinden, unlink/trennen, status) nur mit „Server verwalten“, Codes (8 Zeichen, 10 Minuten, einmalig), Geräteschlüssel nur als Hash, Ablage als JSON im Volume
-- [ ] Dienst-API mit Discord-Routen: GET /v1/info, POST/DELETE /v1/link, GET /v1/users/@me, POST/PATCH Nachrichten, PUT Anheften; Kanal und Besitz geprüft, Erwähnungen nur für den Gekoppelten, Grenzen je Schlüssel, Fehlversuche je IP
-- [ ] Test des Dienstes gegen das nachgebaute Discord, mit works-CLI und Bot von Kopplung bis Statuspost, dazu die Sicherheitsfälle
-- [ ] works: Modus gemeinsam oder eigen, works discord link <Code> und unlink, Status nach Entwurf R, Bot über den Dienst (Bearer-Schlüssel, kein eigenes Gateway), Adresse einstellbar
-- [ ] Dockerfile, compose.yaml, README (englisch) mit Einrichtung auf dem VPS und Reverse-Proxy, CI-Workflow für den Dienst
-- [ ] Selbsttest, Audit, Doku in integrations.md und cli.md
+- [x] discord-fake: Interaktionen über das Gateway schicken (INTERACTION_CREATE), Antworten und Befehle aufnehmen, dazu die Dienst-Routen /v1 nachbilden (für den Selbsttest von works)
+- [x] Dienst services/works-bot/server.mjs: Gateway, Slash-Befehl /works (link/verbinden, unlink/trennen, status) nur mit „Server verwalten“, Codes (8 Zeichen, 10 Minuten, einmalig), Geräteschlüssel nur als Hash, Ablage als JSON im Volume
+- [x] Dienst-API mit Discord-Routen: GET /v1/info, POST/DELETE /v1/link, GET /v1/users/@me, POST/PATCH Nachrichten, PUT Anheften; Kanal und Besitz geprüft, Erwähnungen nur für den Gekoppelten, Grenzen je Schlüssel, Fehlversuche je IP
+- [x] Test des Dienstes gegen das nachgebaute Discord, mit works-CLI und Bot von Kopplung bis Statuspost, dazu die Sicherheitsfälle
+- [x] works: Modus gemeinsam oder eigen, works discord link <Code> und unlink, Status nach Entwurf R, Bot über den Dienst (Bearer-Schlüssel, kein eigenes Gateway), Adresse einstellbar
+- [x] Dockerfile, compose.yaml, README (englisch) mit Einrichtung auf dem VPS und Reverse-Proxy, CI-Workflow für den Dienst
+- [x] Selbsttest, Audit, Doku in integrations.md und cli.md
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -62,7 +62,17 @@ Wunsch des Nutzers am 2026-11-23: Er stellt den Discord-Bot works für alle bere
 Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Vorher: works discord kannte nur den eigenen Bot mit Token aus dem Entwicklerpor](assets/2026-11-23-vorher-works-discord-kannte-nur-den-vorher.png)
+Beschreibung: Vorher: works discord kannte nur den eigenen Bot mit Token aus dem Entwicklerportal
+Art: vorher · Hinzugefügt: 2026-11-23
+
+![Nachher: works discord zeigt beide Wege, /works link gibt einen Code nur für dic](assets/2026-11-23-nachher-works-discord-zeigt-beide-wege-nachher.png)
+Beschreibung: Nachher: works discord zeigt beide Wege, /works link gibt einen Code nur für dich, works discord link koppelt über den Dienst (echte Ausgaben gegen nachgebautes Discord)
+Art: nachher · Hinzugefügt: 2026-11-23
+
+![Nachher auf dem Handy: dieselben Ausgaben in 390 px Breite](assets/2026-11-23-nachher-auf-dem-handy-dieselben-nachher.png)
+Beschreibung: Nachher auf dem Handy: dieselben Ausgaben in 390 px Breite
+Art: nachher · Hinzugefügt: 2026-11-23
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
@@ -84,3 +94,9 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: Nutzer hat Entwurf R (Einrichtung: gemeinsam oder eigener Bot) angenommen. Kopplung P oder Q noch offen.
 - 2026-11-23: Entwurf P „Kopplung: Code aus Discord“ gewählt. Grund: Wahl des Nutzers: Code aus Discord
 - 2026-11-23: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-23: Asset hinzugefügt: assets/2026-11-23-vorher-works-discord-kannte-nur-den-vorher.png (vorher)
+- 2026-11-23: Asset hinzugefügt: assets/2026-11-23-nachher-works-discord-zeigt-beide-wege-nachher.png (nachher)
+- 2026-11-23: Asset hinzugefügt: assets/2026-11-23-nachher-auf-dem-handy-dieselben-nachher.png (nachher)
+- 2026-11-23: Entscheidung E2 dokumentiert: Dienst bildet die Discord-Routen nach
+- 2026-11-23: Entscheidung E3 dokumentiert: Kaputte Kopplungen und Schutz des gemeinsamen Bots
+- 2026-11-23: Umgesetzt: Dienst works-bot (Docker, Anleitung), works discord link/unlink, Bot über den Dienst. Audit mit 8 Funden, alle behoben und getestet. Selbsttest 37/37, Dienst-Test und ci-watch grün.
