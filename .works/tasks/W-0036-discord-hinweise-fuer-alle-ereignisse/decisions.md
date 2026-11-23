@@ -59,3 +59,7 @@ Angelegt am 2026-11-23. Diese Datei hält fest, was entschieden wurde, warum, un
 
 ### Verworfene Varianten
 <!-- Was wurde gezeigt oder erwogen und warum nicht genommen? -->
+
+## Gewählter Entwurf
+
+- 2026-11-23: Variante F2 „F verbessert“ gewählt, Grund: Wahl des Nutzers: F verbessert. Datei: design/F2-f-verbessert.html. Nicht gewählt: F Statuspost und Nachrichten mit Knöpfen, G Statuspost mit Thread

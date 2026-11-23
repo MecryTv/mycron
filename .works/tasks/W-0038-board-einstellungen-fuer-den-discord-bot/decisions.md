@@ -48,3 +48,7 @@ Angelegt am 2026-11-23. Diese Datei hält fest, was entschieden wurde, warum, un
 
 ### Verworfene Varianten
 <!-- Was wurde gezeigt oder erwogen und warum nicht genommen? -->
+
+## Gewählter Entwurf
+
+- 2026-11-23: Variante J2 „J verbessert“ gewählt, Grund: Wahl des Nutzers: J verbessert. Datei: design/J2-j-verbessert.html. Nicht gewählt: I Seitenleiste Discord-Bot, J Dialog mit Vorschau, K Einrichtung in Schritten

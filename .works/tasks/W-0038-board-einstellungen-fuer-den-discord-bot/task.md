@@ -65,3 +65,4 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: decisions.md angelegt
 - 2026-11-23: Entscheidung E1 dokumentiert: Einstellungen nach Entwurf J
 - 2026-11-23: Entwurf J2 „J verbessert“ angehängt
+- 2026-11-23: Entwurf J2 „J verbessert“ gewählt. Grund: Wahl des Nutzers: J verbessert
