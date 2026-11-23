@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="de" data-v="H">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Entwurf: Discord-Bot works, Nachrichten und Befehle (W-0036, W-0037)</title>
+<style>
+/* Nachgezeichneter Discord-Kanal (nur für den Entwurf) */
+.ew-dc { --dc-bg: #ffffff; --dc-side: #f2f3f5; --dc-text: #313338; --dc-muted: #5c5e66; --dc-embed: #f2f3f5; --dc-link: #006ce7; --dc-mention: #e6e8fd; --dc-mention-text: #4752c4; --dc-line: #e3e5e8; --dc-btn2: #e3e5e8; --dc-btn2-text: #313338; --dc-pop: #ffffff; --dc-input: #ebedef;
+  min-height: 100vh; background: var(--dc-bg); color: var(--dc-text); font: 15px/1.375 "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+:root[data-theme="dark"] .ew-dc { --dc-bg: #313338; --dc-side: #2b2d31; --dc-text: #dbdee1; --dc-muted: #949ba4; --dc-embed: #2b2d31; --dc-link: #00a8fc; --dc-mention: #3c4270; --dc-mention-text: #c9cdfb; --dc-line: #3f4147; --dc-btn2: #4e5058; --dc-btn2-text: #ffffff; --dc-pop: #2b2d31; --dc-input: #383a40; }
+.ew-dc-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--dc-line); font-weight: 600; }
+.ew-dc-head span { color: var(--dc-muted); font-weight: 400; font-size: 14px; }
+.ew-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); min-height: calc(100vh - 49px); }
+.ew-thread { background: var(--dc-side); border-left: 1px solid var(--dc-line); }
+@media (max-width: 900px) { .ew-split { grid-template-columns: minmax(0, 1fr); } .ew-thread { border-left: 0; border-top: 1px solid var(--dc-line); } }
+.ew-dc-list { max-width: 900px; padding: 8px 0 24px; }
+.ew-msg { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0 16px; padding: 6px 16px; }
+.ew-av { width: 40px; height: 40px; border-radius: 50%; background: #5550d9; color: #fff; display: grid; place-items: center; font-weight: 800; }
+.ew-av.ew-you { background: #e8a33d; }
+.ew-cont .ew-av { visibility: hidden; height: 0; }
+.ew-who { display: flex; align-items: baseline; gap: 6px; }
+.ew-who b { font-weight: 600; }
+.ew-app { font-size: 10px; font-weight: 600; padding: 0 4px; border-radius: 3px; background: #5865f2; color: #fff; line-height: 15px; }
+.ew-time { font-size: 12px; color: var(--dc-muted); }
+.ew-cont .ew-who { display: none; }
+.ew-mention { background: var(--dc-mention); color: var(--dc-mention-text); border-radius: 3px; padding: 0 2px; font-weight: 500; }
+.ew-embed { margin-top: 4px; max-width: 520px; display: grid; gap: 8px; padding: 10px 14px 12px 12px; border-radius: 4px; background: var(--dc-embed); border-left: 4px solid var(--c, #5865f2); font-size: 14px; }
+:root[data-theme="light"] .ew-thread .ew-embed { background: #ffffff; }
+.ew-embed .ew-author { font-size: 13px; font-weight: 600; }
+.ew-embed .ew-title { font-weight: 600; font-size: 15px; }
+.ew-embed a { color: var(--dc-link); text-decoration: none; }
+.ew-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
+.ew-fields.ew-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ew-fields div { min-width: 0; }
+.ew-fields b { display: block; font-size: 13px; font-weight: 600; }
+.ew-fields span { font-size: 13.5px; }
+.ew-foot { font-size: 12px; color: var(--dc-muted); }
+.ew-bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--dc-muted) 30%, transparent); overflow: hidden; }
+.ew-bar i { display: block; height: 100%; background: #23a55a; }
+.ew-c-need { --c: #e8a33d; } .ew-c-done { --c: #23a55a; } .ew-c-red { --c: #f23f43; } .ew-c-plan { --c: #5865f2; } .ew-c-status { --c: #8e8cf7; }
+.ew-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.ew-b { font: 500 14px/1 inherit; height: 32px; padding: 0 16px; border-radius: 4px; border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.ew-b.ew-p { background: #5865f2; color: #fff; } .ew-b.ew-s { background: var(--dc-btn2); color: var(--dc-btn2-text); } .ew-b.ew-ok { background: #248046; color: #fff; } .ew-b.ew-no { background: #da373c; color: #fff; }
+.ew-b svg { width: 14px; height: 14px; }
+.ew-pin { font-size: 12px; color: var(--dc-muted); padding: 2px 16px 0 72px; display: flex; align-items: center; gap: 6px; }
+.ew-pin svg { width: 14px; height: 14px; }
+.ew-status { display: grid; gap: 4px; }
+.ew-status div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; font-size: 13.5px; }
+.ew-status div b { font-weight: 600; }
+.ew-threadref { margin-top: 6px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; background: var(--dc-side); font-size: 13px; }
+.ew-threadref b { color: var(--dc-link); font-weight: 600; }
+.ew-th-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--dc-line); font-weight: 600; }
+.ew-th-head span { color: var(--dc-muted); font-weight: 400; font-size: 13px; }
+.ew-edited { font-size: 10px; color: var(--dc-muted); }
+.ew-cmd { margin: 16px; max-width: 560px; border-radius: 8px; background: var(--dc-pop); box-shadow: 0 8px 24px rgba(0,0,0,.24); overflow: hidden; }
+.ew-cmd-head { padding: 8px 12px; font-size: 12px; font-weight: 700; color: var(--dc-muted); text-transform: uppercase; letter-spacing: .02em; }
+.ew-cmd-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; }
+.ew-cmd-row.ew-on { background: color-mix(in srgb, var(--dc-muted) 18%, transparent); }
+.ew-cmd-row .ew-av { width: 28px; height: 28px; font-size: 13px; }
+.ew-cmd-row b { font-weight: 600; }
+.ew-cmd-row small { display: block; color: var(--dc-muted); font-size: 13px; }
+.ew-cmd-row em { font-style: normal; font-size: 12px; color: var(--dc-muted); }
+.ew-input { margin: 0 16px 16px; max-width: 560px; padding: 10px 14px; border-radius: 8px; background: var(--dc-input); color: var(--dc-text); }
+.ew-input b { color: var(--dc-text); }
+.ew-input span { color: var(--dc-muted); }
+.ew-modal { margin: 16px; max-width: 440px; border-radius: 8px; background: var(--dc-pop); box-shadow: 0 8px 24px rgba(0,0,0,.24); padding: 16px; display: grid; gap: 12px; }
+.ew-modal h3 { margin: 0; font-size: 18px; }
+.ew-modal label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--dc-muted); }
+.ew-modal .ew-field { padding: 10px; border-radius: 4px; background: var(--dc-input); color: var(--dc-text); font-size: 15px; font-weight: 400; text-transform: none; min-height: 20px; }
+.ew-modal .ew-field.ew-tall { min-height: 64px; }
+.ew-modal .ew-act { display: flex; justify-content: flex-end; gap: 8px; }
+.ew-eph { font-size: 12px; color: var(--dc-muted); display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.ew-cols3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 8px 24px; padding: 8px 0; }
+.ew-sec { padding: 8px 16px 0; font-size: 12px; font-weight: 700; color: var(--dc-muted); text-transform: uppercase; letter-spacing: .02em; }
+@media (max-width: 560px) { .ew-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .ew-status div { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+
+/* Rahmen des Entwurfs, nicht Teil des Designs */
+.ew-frame { position: sticky; top: 0; z-index: 2147483000; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 16px; font: 13px/1.45 system-ui, sans-serif; background: #fff6cc; color: #3d3200; border-bottom: 1px dashed #a88a00; }
+:root[data-theme="dark"] .ew-frame { background: #2a2400; color: #f5e9a8; border-color: #8a7300; }
+.ew-frame b { font-weight: 600; }
+.ew-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid currentColor; border-radius: 9px; }
+.ew-seg button { font: inherit; color: inherit; background: none; border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.ew-seg button[aria-pressed="true"] { background: #3d3200; color: #fff6cc; }
+:root[data-theme="dark"] .ew-seg button[aria-pressed="true"] { background: #f5e9a8; color: #2a2400; }
+.ew-seg button:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.ew-note { flex-basis: 100%; margin: 0; }
+.ew-note:empty { display: none; }
+:root[data-frame="0"] .ew-frame { display: none; }
+body { margin: 0; }
+</style>
+</head>
+<body>
+<div class="ew-frame" role="region" aria-label="Entwurfsrahmen">
+  <b>Entwurf: Discord-Bot works (W-0036, W-0037)</b>
+  <span class="ew-seg" id="ew-variants" role="group" aria-label="Variante"></span>
+  <span class="ew-seg" role="group" aria-label="Farbschema"><button type="button" data-ew-theme="light">Hell</button><button type="button" data-ew-theme="dark">Dunkel</button></span>
+  <p class="ew-note" id="ew-note"></p>
+</div>
+
+<!-- ===== F: Statuspost und Ereignisse mit Knöpfen ===== -->
+<section data-ew-variant="F" data-ew-note="F Statuspost und Ereignisse: Oben je Projekt ein angehefteter Statuspost mit Feldern, den der Bot laufend bearbeitet (B und C gemischt). Wichtige Ereignisse kommen als eigene Nachricht mit Feldern und Knöpfen: Review annehmen oder zurückgeben, Anweisung senden, Bug ansehen. Unwichtiges steht nur im Statuspost.">
+<div class="ew-dc">
+  <div class="ew-dc-head"># works <span>Bot works · Statusposts angeheftet</span></div>
+  <div class="ew-dc-list">
+    <div class="ew-pin"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M10 1l5 5-2 1-3 3 .5 3.5L9 15l-3-3-4 4-1-1 4-4-3-3 1.5-1.5L7 7l3-3z"/></svg>works hat eine Nachricht angeheftet.</div>
+    <div class="ew-msg"><div class="ew-av">w</div><div><div class="ew-who"><b>works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 09:12</span></div>
+      <div class="ew-embed ew-c-status"><div class="ew-author">mycron · Stand</div>
+        <div class="ew-status"><div><b>Claude</b><span>arbeitet an W-0036 Discord-Bot works</span></div><div><b>Freigabe</b><span>keine offen</span></div><div><b>CI</b><span>grün für b147ac6</span></div><div><b>Heute</b><span>4 erledigt, 1 im Review · 12,40 $</span></div><div><b>Als Nächstes</b><span>W-0037 Befehle und Knöpfe</span></div></div>
+        <div class="ew-bar" aria-label="Fortschritt 36 von 38"><i style="width:94%"></i></div>
+        <div class="ew-foot">36 von 38 erledigt · zuletzt 14:05 <span class="ew-edited">(bearbeitet)</span></div></div>
+      <div class="ew-btns"><button class="ew-b ew-s" type="button">Aufgaben</button><button class="ew-b ew-s" type="button">Anweisung an Claude</button></div></div></div>
+    <div class="ew-msg"><div class="ew-av">w</div><div><div class="ew-who"><b>works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 14:02</span></div>
+      <div><span class="ew-mention">@du</span></div>
+      <div class="ew-embed ew-c-need"><div class="ew-author">Trainingsplan</div><div class="ew-title">Wartet auf deine Freigabe</div>
+        <div class="ew-fields"><div><b>Aufgabe</b><span>W-0002 Trainingsseite</span></div><div><b>Werkzeug</b><span>Bash, Befehl ausgeblendet</span></div><div><b>Seit</b><span>14:02</span></div></div>
+        <div class="ew-foot">Freigaben erteilst du in Claude Code</div></div></div></div>
+    <div class="ew-msg ew-cont"><div class="ew-av">w</div><div>
+      <div class="ew-embed ew-c-done"><div class="ew-author">mycron</div><div class="ew-title">W-0035 im Review</div>
+        <div class="ew-fields"><div><b>Aufgabe</b><span>Szenarien für works shot</span></div><div><b>Kriterien</b><span>4 von 4 erfüllt</span></div><div><b>Prüfungen</b><span>alle grün</span></div></div></div>
+      <div class="ew-btns"><button class="ew-b ew-ok" type="button">Annehmen</button><button class="ew-b ew-s" type="button">Zurück an Claude</button><button class="ew-b ew-s" type="button">Details</button></div></div></div>
+    <div class="ew-msg ew-cont"><div class="ew-av">w</div><div>
+      <div class="ew-embed ew-c-red"><div class="ew-author">mycron</div><div class="ew-title">CI rot für a5cfc20</div>
+        <div class="ew-fields"><div><b>Rot</b><span>3 von 10 Jobs</span></div><div><b>Schritt</b><span>Selbsttest (Windows)</span></div><div><b>Bug</b><span>W-0039 angelegt</span></div></div>
+        <div class="ew-foot">works ship: Wechsel nach main fehlgeschlagen …</div></div>
+      <div class="ew-btns"><button class="ew-b ew-s" type="button">Bug ansehen</button><button class="ew-b ew-s" type="button">Lauf auf GitHub <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 3h7v7M13 3L5 11M3 6v7h7"/></svg></button></div></div></div>
+  </div>
+</div>
+</section>
+
+<!-- ===== G: Statuspost mit Thread ===== -->
+<section data-ew-variant="G" data-ew-note="G Statuspost mit Thread: Im Kanal stehen nur die angehefteten Statusposts, je Projekt einer. Alle Ereignisse landen in einem Thread unter dem Statuspost (rechts). Wichtiges erwähnt dich im Thread, das Handy klingelt trotzdem. Der Kanal bleibt ruhig, auch bei vielen Projekten.">
+<div class="ew-dc">
+  <div class="ew-dc-head"># works <span>Bot works · je Projekt ein Statuspost mit Thread</span></div>
+  <div class="ew-split">
+    <div class="ew-dc-list">
+      <div class="ew-msg"><div class="ew-av">w</div><div><div class="ew-who"><b>works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 09:12</span></div>
+        <div class="ew-embed ew-c-status"><div class="ew-author">mycron · Stand</div>
+          <div class="ew-status"><div><b>Claude</b><span>arbeitet an W-0036 Discord-Bot works</span></div><div><b>Freigabe</b><span>keine offen</span></div><div><b>CI</b><span>grün für b147ac6</span></div><div><b>Heute</b><span>4 erledigt, 1 im Review · 12,40 $</span></div></div>
+          <div class="ew-bar"><i style="width:94%"></i></div><div class="ew-foot">36 von 38 erledigt · zuletzt 14:05 <span class="ew-edited">(bearbeitet)</span></div></div>
+        <div class="ew-threadref"><b>mycron · Verlauf</b> 14 Nachrichten · zuletzt vor 2 min</div></div></div>
+      <div class="ew-msg"><div class="ew-av">w</div><div><div class="ew-who"><b>works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 10:30</span></div>
+        <div class="ew-embed ew-c-need"><div class="ew-author">Trainingsplan · Stand</div>
+          <div class="ew-status"><div><b>Claude</b><span>wartet auf deine Freigabe (Bash)</span></div><div><b>CI</b><span>rot für 81fe2a0</span></div><div><b>Heute</b><span>1 erledigt · 3,10 $</span></div></div>
+          <div class="ew-bar"><i style="width:30%;background:#e8a33d"></i></div><div class="ew-foot">3 von 10 erledigt · zuletzt 14:02 <span class="ew-edited">(bearbeitet)</span></div></div>
+        <div class="ew-threadref"><b>Trainingsplan · Verlauf</b> 5 Nachrichten · <span class="ew-mention">@du</span> erwähnt</div></div></div>
+    </div>
+    <div class="ew-thread">
+      <div class="ew-th-head">mycron · Verlauf <span>Thread</span></div>
+      <div class="ew-dc-list">
+        <div class="ew-msg"><div class="ew-av">w</div><div><div class="ew-who"><b>works</b><span class="ew-app">APP</span><span class="ew-time">13:48</span></div>
+          <div class="ew-embed ew-c-done"><div class="ew-title">W-0035 erledigt und gepusht</div><div class="ew-fields ew-two"><div><b>CI</b><span>grün, 3 Workflows</span></div><div><b>Commit</b><span><a href="#">b147ac6</a></span></div></div></div></div></div>
+        <div class="ew-msg ew-cont"><div class="ew-av">w</div><div>
+          <div class="ew-embed ew-c-done"><div class="ew-title">W-0036 im Review</div><div class="ew-fields ew-two"><div><b>Kriterien</b><span>7 von 7</span></div><div><b>Prüfungen</b><span>alle grün</span></div></div></div>
+          <div class="ew-btns"><button class="ew-b ew-ok" type="button">Annehmen</button><button class="ew-b ew-s" type="button">Zurück an Claude</button></div></div></div>
+        <div class="ew-msg ew-cont"><div class="ew-av">w</div><div>
+          <div><span class="ew-mention">@du</span></div>
+          <div class="ew-embed ew-c-need"><div class="ew-title">Claude ist fertig und wartet auf dich</div><div class="ew-fields ew-two"><div><b>Aufgabe</b><span>W-0036</span></div><div><b>Letzte Antwort</b><span>vor 1 min</span></div></div></div>
+          <div class="ew-btns"><button class="ew-b ew-s" type="button">Anweisung an Claude</button></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== H: Befehle und Dialoge ===== -->
+<section data-ew-variant="H" data-ew-note="H Befehle und Dialoge (W-0037, gilt für F und G): Slash-Befehle /status, /aufgaben, /neu, /anweisung; Antworten sieht nur der Nutzer (nur für dich sichtbar). Knöpfe öffnen Dialoge, etwa „Anweisung an Claude“ oder „Zurück an Claude“ mit Begründung. Nur der eingetragene Nutzer darf Befehle nutzen.">
+<div class="ew-dc">
+  <div class="ew-dc-head"># works <span>Befehle an den Bot works</span></div>
+  <div class="ew-cols3">
+    <div>
+      <div class="ew-sec">Befehle eintippen</div>
+      <div class="ew-cmd" role="listbox" aria-label="Befehle von works">
+        <div class="ew-cmd-head">works</div>
+        <div class="ew-cmd-row ew-on"><div class="ew-av">w</div><div><b>/status</b><small>Stand aller Projekte oder eines Projekts</small></div><em>projekt</em></div>
+        <div class="ew-cmd-row"><div class="ew-av">w</div><div><b>/aufgaben</b><small>Offene Aufgaben, nach Priorität</small></div><em>projekt</em></div>
+        <div class="ew-cmd-row"><div class="ew-av">w</div><div><b>/neu</b><small>Aufgabe notieren</small></div><em>titel priorität</em></div>
+        <div class="ew-cmd-row"><div class="ew-av">w</div><div><b>/anweisung</b><small>Anweisung an Claude, kommt beim nächsten Schritt an</small></div><em>text</em></div>
+      </div>
+      <div class="ew-input"><b>/status</b> <span>projekt: mycron</span></div>
+      <div class="ew-msg"><div class="ew-av">w</div><div><div class="ew-who"><b>works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 14:10</span></div>
+        <div class="ew-embed ew-c-status"><div class="ew-author">mycron · Stand</div>
+          <div class="ew-status"><div><b>Claude</b><span>arbeitet an W-0036</span></div><div><b>Offen</b><span>2 (1 in Arbeit, 1 im Review)</span></div><div><b>Heute</b><span>12,40 $ · 4 erledigt</span></div></div></div>
+        <div class="ew-eph"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>Nur für dich sichtbar</div></div></div>
+    </div>
+    <div>
+      <div class="ew-sec">Knopf „Anweisung an Claude“</div>
+      <div class="ew-modal" role="dialog" aria-label="Anweisung an Claude">
+        <h3>Anweisung an Claude</h3>
+        <label>Projekt<div class="ew-field">mycron · W-0036 Discord-Bot works</div></label>
+        <label>Anweisung<div class="ew-field ew-tall">Bitte zuerst die Einrichtung im Board fertig machen, die Befehle danach.</div></label>
+        <div class="ew-foot">Kommt bei Claude an, sobald es den nächsten Schritt macht.</div>
+        <div class="ew-act"><button class="ew-b ew-s" type="button">Abbrechen</button><button class="ew-b ew-p" type="button">Senden</button></div>
+      </div>
+      <div class="ew-sec">Knopf „Zurück an Claude“</div>
+      <div class="ew-modal" role="dialog" aria-label="Zurück an Claude">
+        <h3>W-0035 zurück an Claude</h3>
+        <label>Was fehlt oder stört?<div class="ew-field ew-tall">Im Szenario abnahme fehlt das Handy-Bild.</div></label>
+        <div class="ew-act"><button class="ew-b ew-s" type="button">Abbrechen</button><button class="ew-b ew-no" type="button">Zurückgeben</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<script>
+(() => {
+  const q = new URLSearchParams(location.search);
+  const root = document.documentElement;
+  const parts = [...document.querySelectorAll('[data-ew-variant]')];
+  let v = q.get('v') || root.dataset.v || (parts[0] && parts[0].dataset.ewVariant);
+  let theme = q.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  if (q.get('frame') === '0') root.dataset.frame = '0';
+  const seg = document.getElementById('ew-variants');
+  for (const p of parts) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.ewV = p.dataset.ewVariant;
+    b.textContent = p.dataset.ewVariant;
+    seg.append(b);
+  }
+  function render() {
+    root.dataset.v = v;
+    root.dataset.theme = theme;
+    for (const p of parts) p.style.display = p.dataset.ewVariant === v ? '' : 'none';
+    document.querySelectorAll('[data-ew-v]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ewV === v)));
+    document.querySelectorAll('[data-ew-theme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ewTheme === theme)));
+    const cur = parts.find((p) => p.dataset.ewVariant === v);
+    document.getElementById('ew-note').textContent = cur ? cur.dataset.ewNote || '' : '';
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ew-v], [data-ew-theme]');
+    if (!b) return;
+    if (b.dataset.ewV) v = b.dataset.ewV; else theme = b.dataset.ewTheme;
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>

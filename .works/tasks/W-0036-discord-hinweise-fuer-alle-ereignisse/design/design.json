@@ -2,49 +2,22 @@
   "direction": null,
   "variants": [
     {
-      "name": "A",
-      "title": "Nachrichten kompakt",
-      "file": "A-nachrichten-kompakt.html",
+      "name": "F",
+      "title": "Statuspost und Nachrichten mit Knöpfen",
+      "file": "F-statuspost-und-nachrichten.html",
       "kind": "html",
       "source": "ui-ux-pro-max",
-      "note": "Karte mit Farbleiste je Kategorie, Titel Projekt und Ereignis, eine Zeile Text, @-Erwähnung bei Claude braucht dich",
-      "at": "2026-11-23 16:52"
+      "note": "Angehefteter Statuspost je Projekt (vom Bot bearbeitet), wichtige Ereignisse als eigene Nachricht mit Feldern und Knöpfen, Erwähnung bei Claude braucht dich",
+      "at": "2026-11-23 17:07"
     },
     {
-      "name": "B",
-      "title": "Nachrichten ausführlich",
-      "file": "B-nachrichten-ausfuehrlich.html",
+      "name": "G",
+      "title": "Statuspost mit Thread",
+      "file": "G-statuspost-mit-thread.html",
       "kind": "html",
       "source": "ui-ux-pro-max",
-      "note": "Projekt als Kopfzeile, Felder für Aufgabe, Status, Dauer, Verbrauch, Link",
-      "at": "2026-11-23 16:52"
-    },
-    {
-      "name": "C",
-      "title": "Statuspost und Pings",
-      "file": "C-statuspost-und-pings.html",
-      "kind": "html",
-      "source": "ui-ux-pro-max",
-      "note": "Angeheftete Statusnachricht je Projekt wird bearbeitet, neue Nachrichten nur für Claude braucht dich und CI rot",
-      "at": "2026-11-23 16:52"
-    },
-    {
-      "name": "D",
-      "title": "Einstellungen: eigener Abschnitt",
-      "file": "D-einstellungen-eigener.html",
-      "kind": "html",
-      "source": "ui-ux-pro-max",
-      "note": "Abschnitt Discord unter Werkzeuge mit Webhook, Test, Erwähnung, vier Gruppen",
-      "at": "2026-11-23 16:52"
-    },
-    {
-      "name": "E",
-      "title": "Einstellungen: Tabelle Browser und Discord",
-      "file": "E-einstellungen-tabelle-browser.html",
-      "kind": "html",
-      "source": "ui-ux-pro-max",
-      "note": "Benachrichtigungen mit Spalten Browser und Discord je Ereignis",
-      "at": "2026-11-23 16:52"
+      "note": "Im Kanal nur die Statusposts, alle Ereignisse im Thread darunter; ruhiger Kanal auch bei vielen Projekten",
+      "at": "2026-11-23 17:07"
     }
   ],
   "brainstorm": [],

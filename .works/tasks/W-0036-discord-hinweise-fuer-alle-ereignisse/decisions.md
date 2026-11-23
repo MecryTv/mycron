@@ -9,18 +9,16 @@ Angelegt am 2026-11-23. Diese Datei hält fest, was entschieden wurde, warum, un
 <!-- Kernaussagen aus dem Brainstorming in eigenen Worten: Problemverständnis, betrachtete Ansätze, Ergebnis. -->
 
 ## Entscheidungen
-<!-- Pro Entscheidung ein Block. Neue Blöcke mit `works decisions <ID> --add "Titel" ...` oder von Hand im gleichen Format:
-
-### E1: Titel
-- Datum:
-- Quelle: Brainstorm | UI UX Pro Max | Gespräch | Analyse
-- Kontext:
-- Entscheidung:
-- Begründung:
+### E1: Eigener Bot statt Webhook
+- Datum: 2026-11-23
+- Quelle: Nutzer
+- Kontext: Entwürfe A bis E lagen vor, Empfehlung war Webhook mit A und D
+- Entscheidung: Eigener Discord-Bot works; Nachrichten als Mischung aus B und C; Einstellungen nach D, komplett überarbeitet; aufgeteilt in W-0036, W-0037, W-0038
+- Begründung: Wunsch des Nutzers am 2026-11-23: mehr Freiheiten; der Bot kann den Statuspost anheften und Knöpfe sowie Slash-Befehle anbieten
 - Verworfene Alternativen:
-  - Alternative: Grund
-- Konsequenzen:
--->
+  - Webhook allein: kein Anheften
+  - kein Rückweg; A kompakt und E Tabelle: vom Nutzer nicht gewählt
+- Konsequenzen: Nutzer legt Bot und Token im Entwicklerportal an; ein Bot-Prozess je Rechner, Node 22 oder neuer; Freigaben aus Claude Code bleiben in Claude Code
 
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->

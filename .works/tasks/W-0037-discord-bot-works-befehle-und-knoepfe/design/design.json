@@ -1,0 +1,16 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "H",
+      "title": "Befehle und Dialoge",
+      "file": "H-befehle-und-dialoge.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "/status, /aufgaben, /neu, /anweisung; Antworten nur für dich sichtbar; Knöpfe öffnen Dialoge",
+      "at": "2026-11-23 17:07"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": null
+}

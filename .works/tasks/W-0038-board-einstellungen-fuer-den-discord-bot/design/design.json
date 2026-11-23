@@ -1,0 +1,34 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "I",
+      "title": "Seitenleiste Discord-Bot",
+      "file": "I-seitenleiste-discord-bot.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Abschnitt unter Werkzeuge mit Verbindungsstatus, Projekt, Erwähnung, Ereignissen, Befehlen, Datenschutz; sofort gespeichert",
+      "at": "2026-11-23 17:07"
+    },
+    {
+      "name": "J",
+      "title": "Dialog mit Vorschau",
+      "file": "J-dialog-mit-vorschau.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Eigener Dialog mit Reitern und Vorschau der nächsten Nachricht; Speichern-Knopf",
+      "at": "2026-11-23 17:07"
+    },
+    {
+      "name": "K",
+      "title": "Einrichtung in Schritten",
+      "file": "K-einrichtung-in-schritten.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Erstes Mal, gilt für I und J: Bot anlegen, Token, Einladung, Kanal",
+      "at": "2026-11-23 17:07"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": null
+}
