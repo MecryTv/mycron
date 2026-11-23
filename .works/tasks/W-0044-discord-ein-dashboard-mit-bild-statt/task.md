@@ -3,7 +3,7 @@ id: W-0044
 title: "Discord: ein Dashboard mit Bild statt Statuspost je Projekt, Status des Bots"
 type: feature
 priority: P2
-status: backlog
+status: in-arbeit
 effort: L
 risk:
 created: 2026-11-23
@@ -11,7 +11,7 @@ updated: 2026-11-23
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0044-discord-ein-dashboard-mit
 tags: [discord, design]
 blocked_by: [W-0037]
 blocks: []
@@ -47,13 +47,30 @@ Wunsch des Nutzers am 2026-11-23: Der Kanal soll sauber bleiben. Dauerhaft steht
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] 
+- [ ] Bild nach D3 als PNG (discord-image.mjs): Raster, Pixelschrift, PNG über zlib
+- [ ] Hochladen: Rest mit Dateien (multipart, beim Dienst als base64 in JSON), Löschen eigener Nachrichten; Fake liest multipart, kennt DELETE
+- [ ] Dashboard je Kanal statt Statuspost je Projekt: Zeilen mit Ampel, Bild, Auswahlmenü, Knöpfe; alte Statusposts löschen
+- [ ] Knöpfe des Dashboards: Projekt wählen (Details nur für dich), Warteschlange, Anweisung, Neue Aufgabe, Hilfe
+- [ ] Status des Bots (eigener Bot über das Gateway, gemeinsamer Bot fest „/works help“)
+- [ ] Aufräumen: Frist 24 h (cleanup.hours), offene erst nach Erledigung, Fragen werden als beantwortet markiert
+- [ ] Dienst: Bild durchreichen, eigene Nachrichten löschen
+- [ ] Tests (Selbsttest, Dienst-Test) auf das Dashboard umstellen, Doku
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
+- plugins/works/skills/works/scripts/discord-image.mjs: neu, Bild
+- plugins/works/skills/works/scripts/discord-bot.mjs: Dashboard, Aufräumen, Status
+- plugins/works/skills/works/scripts/discord-api.mjs: Dateien, DELETE, Presence
+- plugins/works/skills/works/scripts/discord-ui.mjs: Dialog Neue Aufgabe mit Projekt
+- plugins/works/skills/works/scripts/discord.mjs: Einstellung cleanup.hours
+- plugins/works/skills/works/scripts/discord-fake.mjs, selftest.mjs; services/works-bot/server.mjs, test.mjs, Dockerfile, README.md
 
 ## Designentscheidungen
 <!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
+- Das Bild wird höchstens alle 5 Minuten neu gezeichnet, aber bei jeder Bearbeitung des Dashboards mit hochgeladen (gut 3 KB). So hängt nichts an Discords Umgang mit alten Anhängen beim Bearbeiten.
+- Pixelschrift nur mit Großbuchstaben, Ziffern und wenigen Zeichen: wenig Daten, sicher lesbar; Projektnamen stehen im Bild deshalb in Großbuchstaben.
+- Status des Bots nur beim eigenen Bot persönlich; der gemeinsame Bot ist einer für alle und zeigt „/works help“.
+- Aufräumen nur über die eigenen gemerkten Nachrichten; ein Durchsuchen des Kanalverlaufs entfällt (alle Nachrichten des Bots sind gemerkt).
 
 ## Assets
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
@@ -62,7 +79,12 @@ Wunsch des Nutzers am 2026-11-23: Der Kanal soll sauber bleiben. Dauerhaft steht
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Stand: 2026-11-23 21:00
+
+Erledigt: Plan und Kriterien (inkl. Wunsch sauberer Kanal: Frist 24 h, offene erst nach Erledigung). discord-image.mjs (Bild nach D3, Pixelschrift nur Großbuchstaben, PNG über zlib, GLYPHS exportiert) liegt im Repo, im Scratchpad geprüft. Fake-Discord kann multipart (payload_json + files[n]), Anhänge, DELETE eigener Nachrichten, vorläufige Antworten als echte Nachrichten (fake.ephemerals, klickbar). Selbsttest auf das Dashboard umgestellt (dashOf/isDash statt statusOf) und neuer Schritt W-0044 geschrieben, Rot-Probe noch nicht zu Ende gelaufen.
+Offen: (1) discord-api.mjs: Rest mit Dateien (multipart; beim Dienst als base64 in JSON), del(), Gateway-Presence (op 3, beim Identify mitschicken). (2) discord-bot.mjs: Dashboard je Kanal statt statusposts(), Titel 'works · N Projekte', Zeilen wie projectLine, Felder Heute/Wartet auf dich/Als Nächstes, Bild attachment://works.png bei jeder Bearbeitung mit hochladen, neu zeichnen höchstens alle 5 min; Zeile 1 Auswahl w:proj:: (Werte = rid), Zeile 2 Knöpfe w:queue:: w:ins:: w:new:: w:help::; alte Statusposts (pr.status.message_id) löschen; Handler proj (renderStatus + Knöpfe w:tasks:<rid>: und w:ins:<rid>:), tasks, queue, help; ins/new ohne rid: einziges oder gerade aktives Projekt bzw. Projektfeld; Presence nur eigener Bot. Aufräumen: msgs[key].done (offen = 0, sonst Zeit), cleanup.hours (Standard 24, Bruchteile erlaubt), Fragen als beantwortet markieren, prune anpassen. (3) discord-ui.mjs: Dialog Neue Aufgabe ohne rid mit Feld project. (4) discord.mjs: Einstellung cleanup.hours. (5) Dienst: files base64 prüfen (PNG, Größe) und als multipart weiter, DELETE eigener Nachrichten, own() für die IDs der Antworten (Klicks auf Knöpfe in Antworten), Presence '/works help', readBody-Grenze für Nachrichten erhöhen, attachments durchreichen; test.mjs statusPosts auf das Dashboard umstellen. (6) Doku integrations.md und README.
+Nächster Schritt: works selftest --only Discord laufen lassen (muss am fehlenden Dashboard scheitern), dann Rest mit Dateien in discord-api.mjs.
+Branch feature/w-0044-discord-dashboard, uncommittet: discord-image.mjs (neu), discord-fake.mjs, selftest.mjs. Keine offenen Fragen.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -71,3 +93,5 @@ Wunsch des Nutzers am 2026-11-23: Der Kanal soll sauber bleiben. Dauerhaft steht
 - 2026-11-23: Entwurf D3 „Mit Bild“ angehängt
 - 2026-11-23: Entwurf D3 „Mit Bild“ gewählt. Grund: Wahl des Nutzers
 - 2026-11-23: Beziehung: blocked-by W-0037
+- 2026-11-23: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-23: Übergabe aktualisiert
