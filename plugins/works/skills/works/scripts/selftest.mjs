@@ -601,6 +601,13 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       ? spawnSync('cmd.exe', ['/d', '/s', '/c', `"${shim}" init`], { cwd: other, env, encoding: 'utf8', windowsVerbatimArguments: true })
       : spawnSync(shim, ['init'], { cwd: other, env, encoding: 'utf8' });
     expect(r.status === 0 && fs.existsSync(path.join(other, '.works', 'config.json')), `Aufruf über ${path.basename(shim)}: ${r.stderr || r.stdout}`);
+    if (process.platform === 'win32') {
+      // works.ps1 reicht eine Pipe an Node weiter (W-0043): Get-Clipboard | works discord token. Ein zu kurzes Token
+      // zeigt, dass die Eingabe ankam; ohne sie hieße es „Kein Token eingegeben“.
+      const ps1 = path.join(bin, 'works.ps1');
+      const pr = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', `'kurz' | & '${ps1.replace(/'/g, "''")}' discord token`], { cwd: other, env, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+      has(pr.stdout + pr.stderr, 'nicht nach einem Bot-Token', 'Pipe durch works.ps1');
+    }
     has(w(['install-cli', '--uninstall', `--dir=${bin}`]).out, 'Entfernt');
     expect(!fs.existsSync(shim), 'Befehl nach --uninstall noch vorhanden');
   });

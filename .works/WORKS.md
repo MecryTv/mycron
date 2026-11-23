@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-23 19:19 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-23 19:20 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 4 | 0 | 0 | 0 | 2 | 0 | 38 | 0 |
+| 4 | 0 | 1 | 0 | 2 | 0 | 38 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 4 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 5 · P3 Mittel: 0 · P4 Niedrig: 0
+
+## Aktive Aufgabe
+
+[W-0043](tasks/W-0043-works-ps1-reicht-pipe-eingaben-nicht-an/task.md) works.ps1 reicht Pipe-Eingaben nicht an Node weiter (In Arbeit), letzte Übergabe 2026-11-22 19:39
 
 ## Kritisch (P1)
 
@@ -16,7 +20,9 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0043](tasks/W-0043-works-ps1-reicht-pipe-eingaben-nicht-an/task.md) | works.ps1 reicht Pipe-Eingaben nicht an Node weiter | Bug | P2 Hoch | In Arbeit | S |  |  |  |
 
 ## Geplant und Backlog
 
