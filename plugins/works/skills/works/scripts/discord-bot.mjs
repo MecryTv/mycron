@@ -380,6 +380,10 @@ export class Bot {
         s.status = d.step; s.ended = o.at;
         if (d.step === 'fail') s.note = d.note || '';
         this.addRecent(rid, `${d.id} ${d.step === 'done' ? 'ausgeliefert' : 'angehalten'}`);
+      }
+      // Auftauen, sobald die Git-Schritte vorbei sind (nach dem Push), nicht erst nach dem Warten auf die CI.
+      // Ohne Remote kommt kein Push, dann beim Ende oder Abbruch.
+      if (['push', 'done', 'fail'].includes(d.step)) {
         const fz = this.state.frozen[rid];
         if (fz) { if (fz.snap) this.project(rid).thaw = fz.snap; delete this.state.frozen[rid]; this.fingers.delete(rid); }
       }
@@ -521,7 +525,8 @@ export class Bot {
     const prev = pr.snap;
     if (pr.name !== next.name || pr.root !== root) { pr.name = next.name; pr.root = root; }
     const frozen = this.state.frozen[rid];
-    if (frozen && Date.now() - Date.parse(frozen.at) > 30 * 60000) { delete this.state.frozen[rid]; this.log(`${next.name}: ship ohne Ende, Einfrieren aufgehoben`); }
+    // Die Git-Schritte von ship dauern Minuten, nicht länger: Hängt ein Lauf (hart abgebrochen), nach 10 Minuten auftauen.
+    if (frozen && Date.now() - Date.parse(frozen.at) > 10 * 60000) { delete this.state.frozen[rid]; this.log(`${next.name}: ship ohne Push oder Ende, Einfrieren aufgehoben`); }
     if (prev && prev.tasks) {
       if (pr.thaw) { this.diffTasks(rid, pr.thaw, next, cfg); delete pr.thaw; }
       else if (this.state.frozen[rid]) { /* ship läuft: Aufgaben erst am Ende vergleichen */ }
