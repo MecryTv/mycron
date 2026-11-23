@@ -4,7 +4,7 @@
 
 export const isDe = (locale) => String(locale || '').toLowerCase().startsWith('de');
 export const tr = (locale) => (de, en) => (isDe(locale) ? de : en);
-export const DOCS = 'https://github.com/MecryTv/mycron/blob/main/plugins/works/skills/works/references/integrations.md#discord';
+export const DOCS = 'https://github.com/MecryTv/mycron/blob/main/plugins/works/skills/works/references/integrations.md#discord-bot-works';
 
 // custom_id an Knöpfen und Dialogen: w:<aktion>:<projekt>:<aufgabe>. Projekt ist die rootId (16 hex), Aufgabe eine ID
 // wie W-0037, beides darf fehlen. Aktionen: acc annehmen, ret zurück an Claude, ins Anweisung, new neue Aufgabe,

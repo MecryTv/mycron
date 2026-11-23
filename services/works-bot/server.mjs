@@ -12,14 +12,18 @@
 //   POST /v1/channels/:id/messages                new message in the linked channel
 //   PATCH /v1/channels/:id/messages/:mid          edit a message created with this key
 //   PUT  /v1/channels/:id/messages/pins/:mid      pin a message created with this key
+//   GET  /v1/inbox?wait=s                         commands and clicks for this device (long poll, W-0037)
+//   POST /v1/interactions/:id/reply               answer one of them (the interaction token stays here)
 // Status 410 means: the link is broken (bot removed, rights taken away, channel deleted); link again with /works link.
-// No dependencies. Discord REST and gateway come from the works plugin (discord-api.mjs).
+// No dependencies. Discord REST and gateway, commands, help and dialogs come from the works plugin
+// (discord-api.mjs, discord-ui.mjs).
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { Rest, Gateway } from '../../plugins/works/skills/works/scripts/discord-api.mjs';
+import { commands, helpMessage, modalFor, parseCid, MODAL, CID_RE, who, subOf, ephemeral, notOwner } from '../../plugins/works/skills/works/scripts/discord-ui.mjs';
 
 const env = process.env;
 const TOKEN = (env.DISCORD_TOKEN || (env.DISCORD_TOKEN_FILE && fs.existsSync(env.DISCORD_TOKEN_FILE) ? fs.readFileSync(env.DISCORD_TOKEN_FILE, 'utf8') : '')).trim();
@@ -38,7 +42,10 @@ const ADMIN = 1n << 3n;
 const NEEDED = { 'Kanal sehen / View Channel': 1n << 10n, 'Nachrichten senden / Send Messages': 1n << 11n, 'Links einbetten / Embed Links': 1n << 14n };
 const INVITE_PERMISSIONS = String((1n << 10n) | (1n << 11n) | (1n << 14n) | (1n << 16n) | (1n << 51n));
 // Per key and minute. The local bot bundles status post edits (at most every 10 s per project).
-const LIMITS = { post: 30, patch: 120, pin: 10 };
+const LIMITS = { post: 30, patch: 120, pin: 10, reply: 60 };
+// A command or click waits this long for its device to fetch it, then this long for the answer (W-0037).
+const PICKUP = FAST ? 2000 : 10000;
+const ANSWER = FAST ? 20000 : 120000;
 // Discord codes that mean the bot can no longer use the channel: the link is broken.
 const BROKEN = new Set([50001, 50013, 10003]);
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -142,35 +149,110 @@ async function guildName(id) {
   return name;
 }
 
-// English names with German localisations (W-0041: English by default, language switchable).
-const COMMANDS = [{
-  name: 'works', type: 1, contexts: [0], default_member_permissions: '32',
-  description: 'Link works to this channel', description_localizations: { de: 'works mit diesem Kanal koppeln' },
-  options: [
-    { type: 1, name: 'link', name_localizations: { de: 'verbinden' }, description: 'Get a one-time code to link works to this channel', description_localizations: { de: 'Einmaligen Code erzeugen, um works mit diesem Kanal zu koppeln' } },
-    { type: 1, name: 'unlink', name_localizations: { de: 'trennen' }, description: 'Disconnect all devices from this channel', description_localizations: { de: 'Alle Geräte in diesem Kanal trennen' } },
-    { type: 1, name: 'status', description: 'Show the linked devices', description_localizations: { de: 'Gekoppelte Geräte zeigen' } },
-  ],
-}];
-
 function newCode() {
   let s = '';
   for (let i = 0; i < 8; i++) s += ALPHABET[crypto.randomInt(ALPHABET.length)];
   return `${s.slice(0, 4)}-${s.slice(4)}`;
 }
 
+// ---------- Commands and buttons (W-0037) ----------
+// The device has no gateway: commands and clicks wait in an inbox per key, the device fetches them with a long poll
+// and answers through the service. The interaction token never leaves the service.
+const inbox = new Map();    // key hash -> interactions for the device
+const waiting = new Map();  // key hash -> { res, timer } of the open long poll
+const pending = new Map();  // interaction id -> { token, h, de, delivered, timer }
+
+const editOriginal = (token, data) => discord(() => rest.patch(`/webhooks/${app.id}/${token}/messages/@original`, data));
+
+function markDelivered(id) {
+  const p = pending.get(id);
+  if (!p || p.delivered) return;
+  p.delivered = true;
+  clearTimeout(p.timer);
+  p.timer = setTimeout(() => expire(id), ANSWER);
+}
+
+// Nobody fetched or answered in time: say so instead of leaving Discord "thinking".
+function expire(id) {
+  const p = pending.get(id);
+  if (!p) return;
+  pending.delete(id);
+  const list = inbox.get(p.h);
+  if (list) { const keep = list.filter((x) => x.id !== id); if (keep.length) inbox.set(p.h, keep); else inbox.delete(p.h); }
+  const t = (g, e) => (p.de ? g : e);
+  editOriginal(p.token, {
+    embeds: [{ color: 0x80848e, title: t('works antwortet nicht', 'works does not answer'),
+      description: p.delivered ? t('Das Gerät hat die Anfrage abgeholt, aber nicht geantwortet. Bitte später noch einmal.', 'The device picked up the request but did not answer. Please try again later.')
+        : t('Das gekoppelte Gerät ist gerade nicht erreichbar. Läuft der Rechner mit works? Der Bot startet mit dem Board oder einer Claude-Sitzung.', 'The linked device is not reachable right now. Is the computer with works running? The bot starts with the board or a Claude session.') }],
+    allowed_mentions: { parse: [] },
+  }).catch((e) => log('answer for a missing device failed:', e.message));
+}
+
+function deliver(h) {
+  const w = waiting.get(h);
+  const items = inbox.get(h);
+  if (!w || !items || !items.length) return;
+  waiting.delete(h);
+  clearTimeout(w.timer);
+  inbox.delete(h);
+  for (const x of items) markDelivered(x.id);
+  send(w.res, 200, { interactions: items });
+}
+
+// Only what the device needs: no token, no member list, no permissions.
+function toDevice(h, i, de) {
+  if ((inbox.get(h) || []).length >= 50) expire(inbox.get(h)[0].id);
+  const list = inbox.get(h) || [];
+  list.push({ id: i.id, type: i.type, application_id: i.application_id, data: i.data, locale: i.locale || '', guild_locale: i.guild_locale || '', guild_id: i.guild_id, channel_id: i.channel_id, member: { user: { id: who(i) } }, ...(i.message ? { message: { id: i.message.id } } : {}) });
+  inbox.set(h, list);
+  pending.set(i.id, { token: i.token, h, de, delivered: false, timer: setTimeout(() => expire(i.id), PICKUP) });
+  deliver(h);
+}
+
+const deviceLines = (guildId, t) => Object.values(store.links).filter((l) => l.guild_id === guildId).slice(0, 15)
+  .map((l) => `#${l.channel_name || l.channel_id} · ${l.device || '?'} · ${t('zuletzt', 'last seen')} <t:${Math.floor(Date.parse(l.seen || l.created) / 1000)}:R>${l.broken ? t(' · kaputt, neu koppeln', ' · broken, link again') : ''}`);
+
 async function onInteraction(i) {
-  if (!i || i.type !== 2 || !i.data || i.data.name !== 'works') return;
+  if (!i || ![2, 3, 5].includes(i.type) || !i.data) return;
+  if (i.type === 2 && i.data.name !== 'works') return;
   const de = String(i.locale || i.guild_locale || '').startsWith('de');
   const t = (g, e) => (de ? g : e);
   // Interaction callbacks do not count towards the bot's limits and must arrive within 3 s: no pace here.
-  const reply = (embed) => rest.post(`/interactions/${i.id}/${i.token}/callback`, { type: 4, data: { embeds: [{ color: 0x5865f2, ...embed }], flags: 64, allowed_mentions: { parse: [] } } })
-    .catch((e) => log('reply failed:', e.message));
-  const sub = (i.data.options && i.data.options[0] && i.data.options[0].name) || '';
+  const callback = (body) => rest.post(`/interactions/${i.id}/${i.token}/callback`, body);
+  const answer = (data) => callback({ type: 4, data: ephemeral(data) }).catch((e) => log('reply failed:', e.message));
+  const reply = (embed) => answer({ embeds: [{ color: 0x5865f2, ...embed }] });
   if (!i.guild_id || !i.member) return reply({ title: t('Nur in einem Server', 'Only in a server'), description: t('/works geht nur in einem Kanal eines Servers.', '/works only works in a server channel.') });
+  // Commands and clicks for a device: only its owner; dialogs open here (they cannot wait), the rest is deferred.
+  const forward = async (h, link) => {
+    if (who(i) !== link.user_id) return answer(notOwner(i.locale));
+    if (i.type === 3) {
+      const p = parseCid(i.data.custom_id);
+      if (!p) return reply({ title: '?', description: t('Unbekannter Knopf.', 'Unknown button.') });
+      if (MODAL.has(p.act)) return callback({ type: 9, data: modalFor(i.data.custom_id, i.locale) }).catch((e) => log('dialog failed:', e.message));
+    }
+    try { await callback({ type: 5, data: { flags: 64 } }); } catch (e) { log('defer failed:', e.message); return undefined; }
+    return toDevice(h, i, de);
+  };
+  if (i.type !== 2) {
+    // Buttons and dialogs belong to the device that wrote the message.
+    const mid = i.message && i.message.id;
+    const h = mid && Object.hasOwn(store.messages, mid) ? store.messages[mid].h : '';
+    const link = h && store.links[h];
+    if (!link || link.broken) return reply({ title: t('Nicht mehr gekoppelt', 'No longer linked'), description: t('Das Gerät, das diese Nachricht geschrieben hat, ist nicht mehr gekoppelt.', 'The device that wrote this message is no longer linked.') });
+    return forward(h, link);
+  }
+  const { sub } = subOf(i);
+  const channel = { id: i.channel_id, name: (i.channel && i.channel.name) || '' };
+  if (sub === 'help') return answer(helpMessage({ locale: i.locale, shared: true, devices: deviceLines(i.guild_id, t) }));
+  if (sub !== 'link' && sub !== 'unlink') {
+    // Every other command goes to the device linked in this channel that was active last.
+    const entry = Object.entries(store.links).filter(([, l]) => l.guild_id === i.guild_id && l.channel_id === channel.id && !l.broken)
+      .sort((x, y) => Date.parse(y[1].seen || y[1].created) - Date.parse(x[1].seen || x[1].created))[0];
+    if (!entry) return reply({ title: t('Noch nicht gekoppelt', 'Not linked yet'), description: t('In diesem Kanal ist kein Gerät gekoppelt. Erst /works verbinden, dann works discord link <Code>.', 'No device is linked in this channel. Run /works link first, then works discord link <code>.') });
+    return forward(entry[0], entry[1]);
+  }
   const perms = BigInt(i.member.permissions || '0');
   if (!(perms & MANAGE_GUILD) && !(perms & ADMIN)) return reply({ title: t('Keine Berechtigung', 'Not allowed'), description: t('Dafür brauchst du das Recht „Server verwalten“.', 'You need the “Manage Server” permission for this.') });
-  const channel = { id: i.channel_id, name: (i.channel && i.channel.name) || '' };
   if (sub === 'link') {
     // Only hand out a code when the bot can actually post here, and only up to GUILD_CAP devices per server.
     const app = BigInt(i.app_permissions || '0');
@@ -195,12 +277,7 @@ async function onInteraction(i) {
     log(`unlinked ${n} device(s) in guild ${i.guild_id}`);
     return reply({ title: t('Getrennt', 'Disconnected'), description: t(`${n} Gerät(e) in #${channel.name} getrennt. Sie können nicht mehr schreiben.`, `${n} device(s) in #${channel.name} disconnected. They can no longer post.`) });
   }
-  if (sub === 'status') {
-    const list = Object.values(store.links).filter((l) => l.guild_id === i.guild_id);
-    const line = (l) => `#${l.channel_name || l.channel_id} · ${l.device || '?'} · ${t('zuletzt', 'last seen')} <t:${Math.floor(Date.parse(l.seen || l.created) / 1000)}:R>${l.broken ? t(' · kaputt, neu koppeln', ' · broken, link again') : ''}`;
-    return reply({ title: t('Gekoppelte Geräte', 'Linked devices'), description: list.length ? list.slice(0, 25).map(line).join('\n') : t('Keine.', 'None.') });
-  }
-  return reply({ title: '?', description: t('Unbekannter Befehl.', 'Unknown command.') });
+  return undefined;
 }
 
 // Bot removed from a server, or a channel deleted: links there are broken.
@@ -258,14 +335,32 @@ function limited(h, kind) {
   return 0;
 }
 
+// One component, cleaned: https link buttons, buttons and select menus with the works custom_id scheme (w:…). Clicks
+// on them come back to the device that wrote the message, never to another one.
+const str = (v, n) => String(v ?? '').slice(0, n);
+function component(c) {
+  if (!c || typeof c !== 'object') return null;
+  if (c.type === 2 && c.style === 5 && /^https:\/\//.test(c.url || '')) return { type: 2, style: 5, label: str(c.label, 80), url: str(c.url, 512) };
+  if (c.type === 2 && [1, 2, 3, 4].includes(c.style) && CID_RE.test(c.custom_id || '')) return { type: 2, style: c.style, label: str(c.label, 80), custom_id: c.custom_id, ...(c.disabled ? { disabled: true } : {}) };
+  if (c.type === 3 && CID_RE.test(c.custom_id || '') && Array.isArray(c.options) && c.options.length) {
+    return { type: 3, custom_id: c.custom_id, ...(c.placeholder ? { placeholder: str(c.placeholder, 150) } : {}), options: c.options.slice(0, 25).map((o) => ({ label: str(o && o.label, 100), value: str(o && o.value, 100), ...(o && o.description ? { description: str(o.description, 100) } : {}), ...(o && o.default ? { default: true } : {}) })) };
+  }
+  return null;
+}
+
 // Only what works needs, and never more than it may: mentions only for the linked user, no @everyone,
-// only link buttons, only the "silent" flag.
+// only own buttons (see component), only the "silent" flag.
 function sanitize(body, link, create) {
   const out = {};
   if (typeof body.content === 'string') out.content = body.content.slice(0, 2000);
   if (Array.isArray(body.embeds)) out.embeds = body.embeds.slice(0, 10);
   if (Array.isArray(body.components)) {
-    out.components = body.components.slice(0, 5).map((row) => ({ type: 1, components: (Array.isArray(row && row.components) ? row.components : []).filter((c) => c && c.type === 2 && c.style === 5 && /^https:\/\//.test(c.url || '')).slice(0, 5).map((c) => ({ type: 2, style: 5, label: String(c.label || '').slice(0, 80), url: c.url })) })).filter((row) => row.components.length);
+    out.components = body.components.slice(0, 5).map((row) => {
+      const list = (Array.isArray(row && row.components) ? row.components : []).map(component).filter(Boolean);
+      // A select menu fills its row alone.
+      const select = list.find((c) => c.type === 3);
+      return { type: 1, components: select ? [select] : list.slice(0, 5) };
+    }).filter((row) => row.components.length);
   }
   const users = body.allowed_mentions && Array.isArray(body.allowed_mentions.users) ? body.allowed_mentions.users.filter((u) => u === link.user_id) : [];
   out.allowed_mentions = { parse: [], users };
@@ -275,13 +370,14 @@ function sanitize(body, link, create) {
 
 // Calls Discord for a client. Returns { ok: true, data } or sends the error itself and returns { ok: false }.
 // Discord rejecting the bot token (401) is the operator's problem: clients hear "try later", not "key invalid".
-// Missing access to the channel breaks the link (410), so the client stops instead of failing forever.
-async function forward(res, a, fn, { pin = false } = {}) {
+// Missing access to the channel breaks the link (410), so the client stops instead of failing forever. soft: a
+// failure here says nothing about the channel (pinning, answering an interaction), the link stays.
+async function forward(res, a, fn, { soft = false } = {}) {
   try { return { ok: true, data: await discord(fn) }; } catch (e) {
     if (e.paused) err(res, 503, 'Service paused, try again later', { retry_after: 60 });
     else if (e.retry) err(res, 502, 'Discord not reachable, try again later');
     else if (e.status === 401) { log('Discord rejects the bot token. Check DISCORD_TOKEN.'); err(res, 503, 'Service unavailable, try again later', { retry_after: 60 }); }
-    else if (!pin && BROKEN.has(e.code)) { markBroken((l) => l === a.link, `Discord ${e.code}`); err(res, 410, 'Link broken: the bot can no longer use this channel. Link again with /works link.', { code: 'link_broken' }); }
+    else if (!soft && BROKEN.has(e.code)) { markBroken((l) => l === a.link, `Discord ${e.code}`); err(res, 410, 'Link broken: the bot can no longer use this channel. Link again with /works link.', { code: 'link_broken' }); }
     else err(res, e.status || 502, e.message.replace(/^Discord \d+: /, ''), { code: e.code || 0 });
     return { ok: false };
   }
@@ -326,6 +422,31 @@ async function handle(req, res) {
   if (req.method === 'DELETE' && p === '/v1/link') { dropLink(a.h); saveNow(); log(`device unlinked in guild ${a.link.guild_id}`); return send(res, 200, { ok: true }); }
   if (a.link.broken) return err(res, 410, 'Link broken: the bot can no longer use this channel. Link again with /works link.', { code: 'link_broken' });
   if (req.method === 'GET' && p === '/v1/users/@me') return send(res, 200, { id: me.id, username: me.username, discriminator: me.discriminator || '0', bot: true, link: { guild_name: a.link.guild_name, channel_id: a.link.channel_id, channel_name: a.link.channel_name } });
+  // Long poll for commands and clicks: answers at once when something waits, otherwise after at most wait seconds.
+  // One open poll per device; a new one ends the old.
+  if (req.method === 'GET' && p === '/v1/inbox') {
+    const old = waiting.get(a.h);
+    if (old) { waiting.delete(a.h); clearTimeout(old.timer); send(old.res, 200, { interactions: [] }); }
+    const secs = Math.min(Math.max(Number(url.searchParams.get('wait')) || 0, 0), 25);
+    const w = { res, timer: setTimeout(() => { if (waiting.get(a.h) === w) { waiting.delete(a.h); send(res, 200, { interactions: [] }); } }, secs * 1000) };
+    waiting.set(a.h, w);
+    res.on('close', () => { if (waiting.get(a.h) === w) { waiting.delete(a.h); clearTimeout(w.timer); } });
+    deliver(a.h);
+    return undefined;
+  }
+  if (req.method === 'POST' && (m = p.match(/^\/v1\/interactions\/(\d+)\/reply$/))) {
+    const pe = pending.get(m[1]);
+    if (!pe || pe.h !== a.h) return err(res, 404, 'Unknown interaction', { code: 10062 });
+    const wait = limited(a.h, 'reply');
+    if (wait) return err(res, 429, 'You are being rate limited.', { retry_after: wait });
+    const body = await readBody(req);
+    if (pending.get(m[1]) !== pe) return err(res, 404, 'Unknown interaction', { code: 10062 });
+    pending.delete(m[1]);
+    clearTimeout(pe.timer);
+    const r = await forward(res, a, () => rest.patch(`/webhooks/${app.id}/${pe.token}/messages/@original`, sanitize(body, a.link, false)), { soft: true });
+    if (!r.ok) return undefined;
+    return send(res, 200, { ok: true });
+  }
   if ((m = p.match(/^\/v1\/channels\/(\d+)\/messages(?:\/(pins\/)?(\d+))?$/))) {
     const [, cid, pin, mid] = m;
     if (cid !== a.link.channel_id) return err(res, 403, 'Missing Access', { code: 50001 });
@@ -349,7 +470,7 @@ async function handle(req, res) {
       save();
       return send(res, 200, { id: mid, channel_id: cid });
     }
-    const r = await forward(res, a, () => rest.put(`/channels/${cid}/messages/pins/${mid}`), { pin: true });
+    const r = await forward(res, a, () => rest.put(`/channels/${cid}/messages/pins/${mid}`), { soft: true });
     if (!r.ok) return undefined;
     own(a.h, mid);
     save();
@@ -377,7 +498,7 @@ async function retrying(what, fn) {
 async function start() {
   me = await retrying('start', () => rest.get('/users/@me'));
   app = await retrying('start', () => rest.get('/oauth2/applications/@me'));
-  try { await rest.put(`/applications/${app.id}/commands`, COMMANDS); } catch (e) { log('registering /works failed:', e.message); }
+  try { await rest.put(`/applications/${app.id}/commands`, commands({ shared: true })); } catch (e) { log('registering /works failed:', e.message); }
   const g = await retrying('gateway', () => rest.get('/gateway/bot'));
   gateway = new Gateway({ token: TOKEN, url: g.url, intents: 1, log: (s) => log(s), onFatal: (code) => { log(`gateway closed for good (code ${code})`); process.exit(1); }, onDispatch });
   gateway.start();

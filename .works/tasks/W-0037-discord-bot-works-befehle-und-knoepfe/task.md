@@ -98,3 +98,7 @@ Wunsch des Nutzers am 2026-11-23 (P2): Dem Bot einen Help-Befehl mit allen wicht
 - 2026-11-23: Umsetzungsplan: "Eigener Bot: Befehle registrieren, INTERACTION_CREATE vom Gateway, nur der Besitzer, sofort vorläufig antworten, dann Ergebnis" abgehakt
 - 2026-11-23: Umsetzungsplan: "Aktionen über die Board-API (Akteur Discord): Status, Aufgaben, neue Aufgabe, Anweisung, Annehmen, Zurückgeben, Bug ansehen" abgehakt
 - 2026-11-23: Umsetzungsplan: "Knöpfe an Nachrichten: Review (Annehmen, Zurück an Claude), Fertig (Anweisung an Claude), CI rot (Bug ansehen); nach Erledigung weg" abgehakt
+- 2026-11-23: Entscheidung E1 dokumentiert: Erst vorläufig antworten, dann das Ergebnis
+- 2026-11-23: Entscheidung E2 dokumentiert: Dialoge im gemeinsamen Modul, beim gemeinsamen Bot öffnet sie der Dienst
+- 2026-11-23: Entscheidung E3 dokumentiert: Inbox mit Long-Poll für das Gerät
+- 2026-11-23: Entscheidung E4 dokumentiert: Aktionen über die Board-API
