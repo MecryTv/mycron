@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-22 22:28 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-23 16:52 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 0 | 0 | 0 | 0 | 0 | 0 | 35 | 0 |
+| 1 | 0 | 0 | 0 | 0 | 0 | 35 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 0 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -20,7 +20,9 @@ _Keine Einträge._
 
 ## Geplant und Backlog
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0036](tasks/W-0036-discord-hinweise-fuer-alle-ereignisse/task.md) | Discord: Hinweise für alle Ereignisse per Webhook | Feature | P2 Hoch | Backlog | L |  |  |  |
 
 ## Zuletzt erledigt
 
@@ -39,4 +41,4 @@ _Keine Einträge._
 
 ## Ideen
 
-0 offene Ideen in [ideas.md](ideas.md).
+1 offene Idee in [ideas.md](ideas.md).

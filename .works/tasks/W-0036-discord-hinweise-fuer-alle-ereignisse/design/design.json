@@ -1,0 +1,52 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Nachrichten kompakt",
+      "file": "A-nachrichten-kompakt.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Karte mit Farbleiste je Kategorie, Titel Projekt und Ereignis, eine Zeile Text, @-Erwähnung bei Claude braucht dich",
+      "at": "2026-11-23 16:52"
+    },
+    {
+      "name": "B",
+      "title": "Nachrichten ausführlich",
+      "file": "B-nachrichten-ausfuehrlich.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Projekt als Kopfzeile, Felder für Aufgabe, Status, Dauer, Verbrauch, Link",
+      "at": "2026-11-23 16:52"
+    },
+    {
+      "name": "C",
+      "title": "Statuspost und Pings",
+      "file": "C-statuspost-und-pings.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Angeheftete Statusnachricht je Projekt wird bearbeitet, neue Nachrichten nur für Claude braucht dich und CI rot",
+      "at": "2026-11-23 16:52"
+    },
+    {
+      "name": "D",
+      "title": "Einstellungen: eigener Abschnitt",
+      "file": "D-einstellungen-eigener.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Abschnitt Discord unter Werkzeuge mit Webhook, Test, Erwähnung, vier Gruppen",
+      "at": "2026-11-23 16:52"
+    },
+    {
+      "name": "E",
+      "title": "Einstellungen: Tabelle Browser und Discord",
+      "file": "E-einstellungen-tabelle-browser.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Benachrichtigungen mit Spalten Browser und Discord je Ereignis",
+      "at": "2026-11-23 16:52"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": null
+}
