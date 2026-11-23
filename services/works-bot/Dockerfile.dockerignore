@@ -1,0 +1,4 @@
+# Only the two files the image needs (BuildKit reads <Dockerfile>.dockerignore).
+*
+!plugins/works/skills/works/scripts/discord-api.mjs
+!services/works-bot/server.mjs

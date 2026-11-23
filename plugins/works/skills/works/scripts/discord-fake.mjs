@@ -74,6 +74,9 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
     token,
     guilds: guilds || [{ id: '1', name: 'Mein Server', channels: [{ id: '11', name: 'works', type: 0, position: 1 }, { id: '12', name: 'allgemein', type: 0, position: 0 }, { id: '13', name: 'Sprache', type: 2, position: 2 }] }],
     messages: new Map(),
+    callbacks: new Map(),
+    denyChannels: new Set(),
+    commands: null,
     requests: [],
     problems: [],
     limitNext: 0,
@@ -104,6 +107,16 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
       if (req.method === 'GET' && p === '/users/@me') return json(res, 200, { id: botId, username: 'works', discriminator: '4821', bot: true }, rl);
       if (req.method === 'GET' && p === '/oauth2/applications/@me') return json(res, 200, { id: appId, name: 'works', owner: { id: ownerId, username: 'du' }, team: null }, rl);
       if (req.method === 'GET' && p === '/users/@me/guilds') return json(res, 200, fake.guilds.map((g) => ({ id: g.id, name: g.name })), rl);
+      if (req.method === 'PUT' && (m = p.match(/^\/applications\/(\d+)\/commands$/))) { fake.commands = body; return json(res, 200, (body || []).map((c, i) => ({ id: String(7000 + i), application_id: m[1], ...c })), rl); }
+      if (req.method === 'POST' && (m = p.match(/^\/interactions\/(\d+)\/([\w-]+)\/callback$/))) { fake.callbacks.set(m[1], body); return json(res, 204, undefined, rl); }
+      if (req.method === 'GET' && (m = p.match(/^\/guilds\/(\d+)$/))) {
+        const g = fake.guilds.find((x) => x.id === m[1]);
+        return g ? json(res, 200, { id: g.id, name: g.name }, rl) : json(res, 404, { message: 'Unknown Guild', code: 10004 });
+      }
+      if (req.method === 'GET' && (m = p.match(/^\/channels\/(\d+)$/))) {
+        const c = channel(m[1]);
+        return c ? json(res, 200, c, rl) : json(res, 404, { message: 'Unknown Channel', code: 10003 });
+      }
       if (req.method === 'GET' && (m = p.match(/^\/guilds\/(\d+)\/channels$/))) {
         const g = fake.guilds.find((x) => x.id === m[1]);
         return g ? json(res, 200, g.channels.map((c) => ({ ...c, guild_id: g.id })), rl) : json(res, 404, { message: 'Unknown Guild', code: 10004 });
@@ -112,6 +125,8 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
         const { port } = server.address();
         return json(res, 200, { url: `ws://127.0.0.1:${port}/gateway`, shards: 1, session_start_limit: { total: 1000, remaining: 999, reset_after: 0, max_concurrency: 1 } }, rl);
       }
+      // denyChannels: Kanäle, in denen der Bot keine Rechte mehr hat (gekickt, Rechte entzogen).
+      if ((m = p.match(/^\/channels\/(\d+)\//)) && fake.denyChannels.has(m[1])) return json(res, 403, { message: 'Missing Access', code: 50001 });
       if (req.method === 'POST' && (m = p.match(/^\/channels\/(\d+)\/messages$/))) {
         if (!channel(m[1])) return json(res, 404, { message: 'Unknown Channel', code: 10003 });
         const probs = messageProblems(body || {});
@@ -191,6 +206,22 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
   // Gateway verlangt eine Neuverbindung (op 7) oder bricht hart ab.
   fake.reconnect = () => { for (const s of fake.gateway.sockets) s.wsSend({ op: 7, d: null }); };
   fake.dropGateway = () => { for (const s of fake.gateway.sockets) s.destroy(); };
+  // Slash-Befehl wie aus dem Discord-Client: /works <sub> im Kanal. perms ist die Rechte-Bitmaske des Mitglieds
+  // (32 = Server verwalten). Gibt die ID der Interaktion zurück; die Antwort landet in fake.callbacks.
+  let seqI = 0;
+  // appPerms: Rechte des Bots im Kanal (Standard: sehen, senden, einbetten, Verlauf, anheften).
+  const BOT_PERMS = String((1n << 10n) | (1n << 11n) | (1n << 14n) | (1n << 16n) | (1n << 51n));
+  fake.interact = ({ sub, guild = '1', channel: ch = '11', user = ownerId, perms = '32', appPerms = BOT_PERMS, name = 'works', options = [] } = {}) => {
+    const id = String(800000 + ++seqI);
+    const c = fake.guilds.flatMap((g) => g.channels.map((x) => ({ ...x, guild_id: g.id }))).find((x) => x.id === ch);
+    const d = { id, application_id: appId, type: 2, token: `itok-${id}`, guild_id: guild, channel_id: ch, app_permissions: appPerms, channel: c ? { id: c.id, name: c.name, type: c.type } : { id: ch },
+      member: { user: { id: user, username: user === ownerId ? 'du' : `nutzer${user}` }, permissions: perms },
+      data: { id: '7000', name, type: 1, options: [{ type: 1, name: sub, options }] } };
+    for (const s of fake.gateway.sockets) s.wsSend({ op: 0, t: 'INTERACTION_CREATE', s: 1000 + seqI, d });
+    return id;
+  };
+  // Beliebiges Gateway-Ereignis, etwa CHANNEL_DELETE oder GUILD_DELETE.
+  fake.dispatch = (t, d) => { for (const s of fake.gateway.sockets) s.wsSend({ op: 0, t, s: 2000 + ++seqI, d }); };
   fake.close = () => new Promise((r) => { for (const s of fake.gateway.sockets) s.destroy(); server.close(() => r()); server.closeAllConnections && server.closeAllConnections(); });
   return fake;
 }

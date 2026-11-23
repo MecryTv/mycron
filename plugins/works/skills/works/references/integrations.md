@@ -83,9 +83,11 @@ Weiterhin verfügbar: `works gh-import` für einen einmaligen Import alter Issue
 
 ## Discord-Bot works
 
-Hinweise aufs Handy für alle Projekte, auch ohne offenes Board. Den Bot legt der Nutzer selbst an; Claude fragt nie nach dem Token und gibt es nie aus.
+Hinweise aufs Handy für alle Projekte, auch ohne offenes Board. Zwei Wege, `works discord` zeigt beide (Entwurf R aus W-0040). Claude fragt nie nach Token, Schlüssel oder Code und gibt sie nie aus.
 
-Einrichtung (der Nutzer im eigenen Terminal):
+Gemeinsamer Bot (empfohlen, W-0040): Der Dienst `services/works-bot` läuft auf einem Server und kennt als einziger das Token. Der Nutzer lädt den Bot mit dem Link aus `works discord` ein, tippt im gewünschten Kanal `/works verbinden` (braucht „Server verwalten“) und trägt den Code ein: `works discord link <Code>`. works bekommt einen Geräteschlüssel (nur in `~/.works/discord/secret.json`), darf damit nur in diesen Kanal schreiben und nur eigene Nachrichten bearbeiten. Erwähnt wird, wer `/works verbinden` ausgeführt hat. Der lokale Bot läuft wie beim eigenen Bot, schickt aber über den Dienst und braucht kein Gateway. Adresse des Dienstes: `works discord set service=https://…` (bis sie im Plugin hinterlegt ist). Trennen: `works discord unlink` oder in Discord `/works trennen`. Betrieb des Dienstes: `services/works-bot/README.md`.
+
+Eigener Bot, Einrichtung (der Nutzer im eigenen Terminal):
 1. Im Discord-Entwicklerportal eine Anwendung mit Bot anlegen und das Token kopieren.
 2. `Get-Clipboard | works discord token` oder `works discord token` (fragt versteckt). Prüft das Token, erkennt den Besitzer der Anwendung (der wird erwähnt) und gibt den Einladungslink mit genau den nötigen Rechten aus: Kanal sehen, Nachrichten senden, Links einbetten, Verlauf lesen, Nachrichten anheften.
 3. Einladen, dann `works discord channel` und `works discord channel works`.

@@ -19,6 +19,24 @@ Das Token eines gemeinsamen Bots kann nicht ins Plugin (Übernahme, Sperre durch
 - Verworfene Alternativen:
 - Konsequenzen:
 
+### E2: Dienst bildet die Discord-Routen nach
+- Datum: 2026-11-23
+- Quelle: Claude
+- Kontext:
+- Entscheidung: works-bot bietet /v1/users/@me, /v1/channels/:id/messages, …/pins wie Discord an; der lokale Bot aus W-0036 spricht ihn mit Bearer-Schlüssel statt Bot-Token an und braucht im gemeinsamen Modus kein Gateway.
+- Begründung: Ein Codepfad für beide Wege: Ereignisse, Statuspost und Tests aus W-0036 gelten unverändert.
+- Verworfene Alternativen:
+- Konsequenzen:
+
+### E3: Kaputte Kopplungen und Schutz des gemeinsamen Bots
+- Datum: 2026-11-23
+- Quelle: Audit
+- Kontext:
+- Entscheidung: Verweigert Discord den Kanal (50001, 50013, 10003, Kanal gelöscht, Bot vom Server entfernt), wird die Kopplung als kaputt markiert und works bekommt 410; sein Bot hört auf. Dazu: Code nur, wenn der Bot im Kanal posten kann, höchstens 20 Geräte je Server, 300 gemerkte Nachrichten je Gerät, Ablauf nach 90 Tagen ohne Nutzung, gemeinsamer Takt 40/s und Pause über 5000 Fehlantworten in 10 Minuten.
+- Begründung: Audit: 403-Lawinen aus verwaisten oder böswilligen Kopplungen könnten Discord dazu bringen, die IP des Dienstes für alle zu sperren.
+- Verworfene Alternativen:
+- Konsequenzen:
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 

@@ -11,8 +11,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // und wiederholt bei 429 nach retry_after. 5xx und Netzfehler gibt er als retry-Fehler zurück; der Bot
 // versucht es dann später erneut, damit nichts verloren geht.
 export class Rest {
-  constructor({ token, base, timeoutMs = 15000 }) {
-    this.token = token; this.base = base; this.timeoutMs = timeoutMs;
+  constructor({ token, base, scheme = 'Bot', timeoutMs = 15000 }) {
+    this.token = token; this.base = base; this.scheme = scheme; this.timeoutMs = timeoutMs;
     this.blocked = new Map();
   }
 
@@ -27,7 +27,7 @@ export class Rest {
       try {
         res = await fetch(this.base + route, {
           method,
-          headers: { Authorization: `Bot ${this.token}`, 'Content-Type': 'application/json', 'User-Agent': 'DiscordBot (https://github.com, 1) works' },
+          headers: { Authorization: `${this.scheme} ${this.token}`, 'Content-Type': 'application/json', 'User-Agent': 'DiscordBot (https://github.com, 1) works' },
           body: body === undefined ? undefined : JSON.stringify(body),
           signal: AbortSignal.timeout(this.timeoutMs),
         });
@@ -42,7 +42,8 @@ export class Rest {
       try { data = text ? JSON.parse(text) : null; } catch { data = null; }
       if (res.status === 429) {
         const after = Number((data && data.retry_after) || res.headers.get('retry-after') || 1);
-        await sleep(Math.min(Math.max(after, 0.05), 60) * 1000);
+        // Etwas Streuung: Alle wartenden Anfragen sollen nicht im selben Moment wieder losschießen.
+        await sleep(Math.min(Math.max(after, 0.05), 60) * 1000 + Math.random() * 250);
         continue;
       }
       if (res.ok) return data;
