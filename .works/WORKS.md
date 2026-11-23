@@ -6,13 +6,9 @@
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 1 | 0 | 2 | 0 | 35 | 0 |
+| 2 | 0 | 0 | 0 | 0 | 0 | 36 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 3 · P3 Mittel: 0 · P4 Niedrig: 0
-
-## Aktive Aufgabe
-
-[W-0036](tasks/W-0036-discord-hinweise-fuer-alle-ereignisse/task.md) Discord-Bot works: Verbindung, Statuspost und Nachrichten (In Arbeit), letzte Übergabe 2026-11-22 19:39
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 2 · P3 Mittel: 0 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -20,26 +16,20 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
-|---|---|---|---|---|---|---|---|---|
-| [W-0036](tasks/W-0036-discord-hinweise-fuer-alle-ereignisse/task.md) | Discord-Bot works: Verbindung, Statuspost und Nachrichten | Feature | P2 Hoch | In Arbeit | XL |  |  |  |
+_Keine Einträge._
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) | Discord-Bot works: Befehle und Knöpfe | Feature | P2 Hoch | Backlog | L |  |  | blockiert durch W-0036 |
-| [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | Backlog | M |  |  | blockiert durch W-0036 |
-
-## Blockiert
-
-- [W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) Discord-Bot works: Befehle und Knöpfe: wartet auf W-0036
-- [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) Board: Einstellungen für den Discord-Bot: wartet auf W-0036
+| [W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) | Discord-Bot works: Befehle und Knöpfe | Feature | P2 Hoch | Backlog | L |  |  |  |
+| [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | Backlog | M |  |  |  |
 
 ## Zuletzt erledigt
 
 | ID | Titel | Typ | Prio | Erledigt am |
 |---|---|---|---|---|
+| [W-0036](tasks/W-0036-discord-hinweise-fuer-alle-ereignisse/task.md) | Discord-Bot works: Verbindung, Statuspost und Nachrichten | Feature | P2 Hoch | 2026-11-23 |
 | [W-0018](tasks/W-0018-design-add-warnt-bei-lokaler-css-im/task.md) | design add warnt bei lokaler CSS im Entwurf | Feature | P2 Hoch | 2026-11-22 |
 | [W-0019](tasks/W-0019-live-ansicht-lange-liste-heute/task.md) | Live-Ansicht: lange Liste Heute übersichtlicher | Design | P2 Hoch | 2026-11-22 |
 | [W-0020](tasks/W-0020-board-open-oeffnet-nur-wenn-noch-kein/task.md) | board --open öffnet nur, wenn noch kein Tab offen ist | Feature | P2 Hoch | 2026-11-22 |
@@ -49,7 +39,6 @@ _Keine Einträge._
 | [W-0024](tasks/W-0024-works-playwright-unterstuetzung-mit/task.md) | works: Playwright-Unterstützung mit works shot | Feature | P2 Hoch | 2026-11-22 |
 | [W-0025](tasks/W-0025-hub-alle-offenen-boards-in-einem-tab/task.md) | Hub: alle offenen Boards in einem Tab | Design | P3 Mittel | 2026-11-22 |
 | [W-0026](tasks/W-0026-skill-ship-abschluss-einer-aufgabe-in/task.md) | Skill ship: Abschluss einer Aufgabe in einem Rutsch | Feature | P2 Hoch | 2026-11-22 |
-| [W-0027](tasks/W-0027-ci-watch-rote-ci-legt-einen-bug-in/task.md) | ci-watch: rote CI legt einen Bug in works an | Feature | P3 Mittel | 2026-11-22 |
 
 ## Ideen
 

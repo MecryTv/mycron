@@ -3,13 +3,13 @@ id: W-0036
 title: "Discord-Bot works: Verbindung, Statuspost und Nachrichten"
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: XL
 risk:
 created: 2026-11-23
 updated: 2026-11-23
 due:
-completed:
+completed: 2026-11-23
 milestone:
 branch: feature/w-0036-discord-bot-works-verbindung
 tags: [ui, discord, notifications]
@@ -87,7 +87,7 @@ Art: nachher · Hinzugefügt: 2026-11-23
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-23. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -113,3 +113,4 @@ Art: nachher · Hinzugefügt: 2026-11-23
 - 2026-11-23: Asset hinzugefügt: assets/2026-11-23-nachher-auf-dem-handy-hell-dieselben-nachher.png (nachher)
 - 2026-11-23: Bot works umgesetzt: Einrichtung über works discord, REST und Gateway, Statuspost je Projekt, Ereignisse nach F2, ship, ci-watch und Wochenbericht über die outbox. Selbsttest gegen nachgebautes Discord.
 - 2026-11-23: code-audit durch frischen Prüfer: 12 Funde (5 wichtig), alle behoben und mit Tests abgesichert. Selbsttest Windows 37/37, ci-watch grün.
+- 2026-11-23: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
