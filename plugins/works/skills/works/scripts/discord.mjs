@@ -118,46 +118,58 @@ export function readOutbox() {
 
 // ---------- Prozess ----------
 
+// Ein Bot zählt nur, wenn sein Prozess lebt und bot.pid frisch ist (der Bot erneuert sie alle paar Sekunden).
+// Eine alte bot.pid, deren PID inzwischen ein anderer Prozess hat, wird so nie für einen Bot gehalten.
+const FRESH = 30000;
+const isFresh = (file) => { try { return Date.now() - fs.statSync(file).mtimeMs < FRESH; } catch { return false; } };
+
 export function botInfo() {
   const info = readJson(dfile('bot.pid'), null);
-  if (!info || !isAlive(info.pid)) return null;
+  if (!info || !isAlive(info.pid) || !isFresh(dfile('bot.pid'))) return null;
   return info;
 }
 
+// Arbeitsordner ~/.works/discord: Unter Windows sperrt ein laufender Prozess seinen Arbeitsordner.
 function startProcess(cli) {
   fs.mkdirSync(discordDir(), { recursive: true });
-  try { fs.unlinkSync(dfile('stop.req')); } catch { /* keine */ }
   const log = fs.openSync(dfile('bot.log'), 'a');
-  const child = spawn(process.execPath, [cli, 'discord', 'run'], { detached: true, windowsHide: true, stdio: ['ignore', log, log], env: { ...process.env, WORKS_ACTOR: '' } });
+  const child = spawn(process.execPath, [cli, 'discord', 'run'], { cwd: discordDir(), detached: true, windowsHide: true, stdio: ['ignore', log, log], env: { ...process.env, WORKS_ACTOR: '' } });
   child.unref();
   fs.closeSync(log);
   return child.pid;
 }
 
-// Bot starten, wenn eingerichtet und nicht schon da. Ein Bot mit älterer Version wird ersetzt.
+const requestStop = (pid) => fs.writeFileSync(dfile('stop.req'), String(pid));
+
+// Bot starten, wenn eingerichtet und nicht schon da. Eine ältere Version bekommt die Bitte zu gehen, die neue
+// startet sofort und übernimmt, sobald die alte weg ist. Board- und Sitzungsstart warten so nicht.
 // Rückgabe: 'aus' (nicht eingerichtet oder Autostart aus), 'läuft', 'gestartet', 'neu'.
 export async function ensureBot({ cli = newestCli(), force = false } = {}) {
   const cfg = loadDiscordConfig();
   if (!isConfigured(cfg) || (!force && cfg.autostart === false)) return 'aus';
   const info = botInfo();
   if (info) {
-    if (info.version && info.version !== cliVersion(cli)) { await stopBot(); startProcess(cli); return 'neu'; }
+    if (info.version && info.version !== cliVersion(cli)) { requestStop(info.pid); startProcess(cli); return 'neu'; }
     return 'läuft';
   }
   startProcess(cli);
   return 'gestartet';
 }
 
-// Erst höflich (stop.req, der Bot meldet sich am Gateway ab), dann hart.
+// Erst höflich (stop.req, der Bot meldet sich am Gateway ab), dann hart. Eine alte bot.pid eines fremden
+// Prozesses wird nur entfernt, der Prozess bleibt in Ruhe.
 export async function stopBot(timeoutMs = 8000) {
-  const info = readJson(dfile('bot.pid'), null);
-  if (!info || !isAlive(info.pid)) { try { fs.unlinkSync(dfile('bot.pid')); } catch { /* weg */ } return false; }
-  fs.writeFileSync(dfile('stop.req'), String(info.pid));
+  const file = dfile('bot.pid');
+  const info = readJson(file, null);
+  if (!info) return false;
+  if (!isAlive(info.pid) || !isFresh(file)) { try { fs.unlinkSync(file); } catch { /* weg */ } return false; }
+  requestStop(info.pid);
+  const ours = () => { const i = readJson(file, null); return i && i.pid === info.pid; };
   const until = Date.now() + timeoutMs;
-  while (Date.now() < until && isAlive(info.pid)) await new Promise((r) => setTimeout(r, 100));
-  if (isAlive(info.pid)) await stopProcess(info.pid);
-  try { fs.unlinkSync(dfile('bot.pid')); } catch { /* weg */ }
-  try { fs.unlinkSync(dfile('stop.req')); } catch { /* weg */ }
+  while (Date.now() < until && isAlive(info.pid) && ours()) await new Promise((r) => setTimeout(r, 100));
+  if (isAlive(info.pid) && ours()) await stopProcess(info.pid);
+  if (ours()) { try { fs.unlinkSync(file); } catch { /* weg */ } }
+  try { if (fs.readFileSync(dfile('stop.req'), 'utf8').trim() === String(info.pid)) fs.unlinkSync(dfile('stop.req')); } catch { /* weg */ }
   return true;
 }
 

@@ -121,6 +121,8 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
         return json(res, 200, msg, rl);
       }
       if (req.method === 'PATCH' && (m = p.match(/^\/channels\/(\d+)\/messages\/(\d+)$/))) {
+        // forbidEdit: Nachricht einer anderen Bot-Anwendung (50005), etwa nach einem Wechsel des Tokens.
+        if (fake.forbidEdit) return json(res, 403, { message: 'Cannot edit a message authored by another user', code: 50005 });
         const msg = fake.messages.get(m[2]);
         if (!msg || msg.channel_id !== m[1]) return json(res, 404, { message: 'Unknown Message', code: 10008 });
         const probs = messageProblems({ content: msg.content, embeds: msg.embeds, ...body });

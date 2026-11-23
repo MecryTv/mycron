@@ -2874,6 +2874,8 @@ async function cmdDiscord() {
     rest0.token = t;
     let me; let app;
     try { me = await rest0.get('/users/@me'); app = await rest0.get('/oauth2/applications/@me'); } catch (e) { fail(e.status === 401 ? 'Token ungültig: Discord lehnt es ab.' : `Discord nicht erreichbar: ${e.message}`); }
+    // Andere Bot-Anwendung: alte Nachrichten kann der neue Bot nicht bearbeiten, also Zustand verwerfen.
+    if (cfg.app_id && cfg.app_id !== app.id) { await d.stopBot(); try { fs.unlinkSync(d.dfile('state.json')); } catch { /* keiner */ } }
     d.saveToken(t);
     cfg.app_id = app.id;
     cfg.bot_name = me.discriminator && me.discriminator !== '0' ? `${me.username}#${me.discriminator}` : me.username;
@@ -2942,7 +2944,7 @@ async function cmdDiscord() {
     if (sub === 'restart') await d.stopBot();
     const r = await d.ensureBot({ force: true });
     if (r === 'läuft') { out(`Bot läuft schon (PID ${d.botInfo().pid}).`); return; }
-    const until = Date.now() + 8000;
+    const until = Date.now() + 15000;
     while (Date.now() < until && !d.botInfo()) await new Promise((res) => setTimeout(res, 100));
     const info = d.botInfo();
     if (!info) {

@@ -183,7 +183,7 @@ export async function writeWeekly(root, config, { date = today(), summary = '', 
     ...(s.include.attention ? { 'Braucht dich': d.attention.slice(0, 15) } : {}),
     ...(s.include.next ? { 'Nächste Woche': brief(d.next) } : {}),
   };
-  if (emit('report', { kind: 'woche', title: `Wochenbericht ${project}, KW ${range.week}`, summary: sum, done: d.done.length, lists }, root)) notes.push('Für den Discord-Bot abgelegt.');
+  if (send !== false && emit('report', { kind: 'woche', title: `Wochenbericht ${project}, KW ${range.week}`, summary: sum, done: d.done.length, lists }, root)) notes.push('Für den Discord-Bot abgelegt.');
   return { name, md: path.join(dir, `${name}.md`), html: path.join(dir, `${name}.html`), notes, summary: sum, range };
 }
 

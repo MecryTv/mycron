@@ -101,6 +101,10 @@ Was er schickt (Entwurf F2 aus W-0036):
 
 Wie Ereignisse entstehen: Der Bot liest den Stand der angemeldeten Projekte (Aufgaben, Warteschlange, `activity.json`) und vergleicht ihn mit dem letzten. Hooks tun dafür nichts zusätzlich. ship, ci-watch und `report --week` legen Ereignisse mit `works discord emit` in `~/.works/discord/outbox`; läuft der Bot nicht, holt er sie beim nächsten Start ab. Fehler bei Discord (429, 5xx, Netz) werden später wiederholt, nichts geht verloren.
 
+Doppelmeldungen vermeidet er so: Wechselt der Branch, übernimmt er den Stand ohne Vergleich; während `works ship` friert er ihn ein und vergleicht am Ende mit dem Stand davor; P1, Erledigung und Fragen meldet er je Aufgabe höchstens einmal am Tag. Freigaben aus parallelen Bahnen meldet er wie die der Hauptsitzung, solange die Bahn in `lanes.json` steht.
+
+Prozess: `bot.pid` ist die Sperrdatei, der Bot erneuert sie alle 5 s. Eine alte Datei, deren PID inzwischen ein anderer Prozess hat, zählt nicht; `stop` beendet nie einen fremden Prozess. Arbeitsordner ist `~/.works/discord`, damit kein Projekt- oder Worktree-Ordner gesperrt bleibt. Eine neue works-Version ersetzt den Bot, ohne dass Board oder Sitzungsstart warten. Wechselt das Token auf eine andere Bot-Anwendung, beginnt der Bot mit neuen Statusposts.
+
 Protokoll in `~/.works/discord/bot.log` (ohne Token). Befehle und Knöpfe in Discord kommen mit W-0037, die Einstellungen im Board mit W-0038.
 
 ## Playwright und Browser-Werkzeuge
