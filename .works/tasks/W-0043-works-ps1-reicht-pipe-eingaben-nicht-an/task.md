@@ -3,13 +3,13 @@ id: W-0043
 title: works.ps1 reicht Pipe-Eingaben nicht an Node weiter
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-23
 updated: 2026-11-23
 due:
-completed:
+completed: 2026-11-23
 milestone:
 branch: fix/w-0043-works-ps1-reicht-pipe
 tags: []
@@ -73,8 +73,10 @@ cli-install.mjs schreibt works.ps1 so, dass es mit Pipe (`$MyInvocation.Expectin
 ## Offene Fragen
 
 ## Übergabe
+Abgeschlossen am 2026-11-23. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
 - 2026-11-23: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-23: works.ps1 reicht Pipe an Node weiter; Test im Selbsttest (Windows). Bestehende Installation mit works install-cli --no-path auffrischen.
+- 2026-11-23: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
