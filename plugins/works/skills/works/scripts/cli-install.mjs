@@ -43,7 +43,10 @@ export function installCli({ dir, path: addPath = true, dryRun = false, home } =
   const node = process.execPath;
   if (WIN) {
     write(p.shims[0], `@echo off\r\nset "WORKS_NODE=node"\r\nwhere node >nul 2>nul || set "WORKS_NODE=${node}"\r\n"%WORKS_NODE%" "${p.launcher}" %*\r\n`);
-    write(p.shims[1], `$n = (Get-Command node -ErrorAction SilentlyContinue).Source; if (-not $n) { $n = '${node.replace(/'/g, "''")}' }\r\n& $n '${p.launcher.replace(/'/g, "''")}' @args\r\nexit $LASTEXITCODE\r\n`);
+    // Ein Skript gibt seine Pipeline nicht von selbst an native Befehle weiter (Get-Clipboard | works discord token, W-0043).
+    // Nur mit Pipe weiterreichen, sonst bekäme Node eine leere Pipe statt des Terminals und die versteckte Abfrage ginge nicht.
+    const la = p.launcher.replace(/'/g, "''");
+    write(p.shims[1], `$n = (Get-Command node -ErrorAction SilentlyContinue).Source; if (-not $n) { $n = '${node.replace(/'/g, "''")}' }\r\nif ($MyInvocation.ExpectingInput) { $input | & $n '${la}' @args } else { & $n '${la}' @args }\r\nexit $LASTEXITCODE\r\n`);
   } else {
     write(p.shims[0], `#!/bin/sh\n${MARK}\nif command -v node >/dev/null 2>&1; then exec node "${p.launcher}" "$@"; fi\nexec "${node}" "${p.launcher}" "$@"\n`, 0o755);
   }
