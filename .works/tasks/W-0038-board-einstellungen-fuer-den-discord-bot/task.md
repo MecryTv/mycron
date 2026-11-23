@@ -13,7 +13,7 @@ completed:
 milestone:
 branch:
 tags: [ui, discord, board]
-blocked_by: [W-0036]
+blocked_by: [W-0036, W-0040]
 blocks: []
 related: []
 source: manuell
@@ -66,3 +66,4 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: Entscheidung E1 dokumentiert: Einstellungen nach Entwurf J
 - 2026-11-23: Entwurf J2 „J verbessert“ angehängt
 - 2026-11-23: Entwurf J2 „J verbessert“ gewählt. Grund: Wahl des Nutzers: J verbessert
+- 2026-11-23: Beziehung: blocked-by W-0040

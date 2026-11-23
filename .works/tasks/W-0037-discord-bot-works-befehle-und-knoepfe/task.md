@@ -13,7 +13,7 @@ completed:
 milestone:
 branch:
 tags: [discord, bot]
-blocked_by: [W-0036]
+blocked_by: [W-0036, W-0040]
 blocks: []
 related: []
 source: manuell
@@ -60,3 +60,4 @@ Teil der Discord-Anbindung (siehe W-0036), Wunsch des Nutzers vom 2026-11-23 (P2
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
 - 2026-11-23: Entwurf H „Befehle und Dialoge“ angehängt
+- 2026-11-23: Beziehung: blocked-by W-0040

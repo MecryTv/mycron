@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-23 18:40 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-23 18:58 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 0 | 0 | 0 | 0 | 36 | 0 |
+| 4 | 0 | 1 | 0 | 2 | 0 | 36 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 2 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 5 · P3 Mittel: 0 · P4 Niedrig: 0
+
+## Aktive Aufgabe
+
+[W-0039](tasks/W-0039-ci-rot-works-selbsttest-schritt/task.md) CI rot: works Selbsttest, Schritt Selbsttest (In Arbeit), letzte Übergabe 2026-11-22 19:39
 
 ## Kritisch (P1)
 
@@ -16,14 +20,23 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0039](tasks/W-0039-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest | Bug | P2 Hoch | In Arbeit |  |  |  |  |
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) | Discord-Bot works: Befehle und Knöpfe | Feature | P2 Hoch | Backlog | L |  |  |  |
-| [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | Backlog | M |  |  |  |
+| [W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) | Discord-Bot works: Befehle und Knöpfe | Feature | P2 Hoch | Backlog | L |  |  | blockiert durch W-0040 |
+| [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | Backlog | M |  |  | blockiert durch W-0040 |
+| [W-0040](tasks/W-0040-gemeinsamer-discord-bot-zentraler/task.md) | Gemeinsamer Discord-Bot: zentraler Dienst auf dem VPS | Feature | P2 Hoch | Backlog | XL |  |  |  |
+| [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | Backlog | XL |  |  |  |
+
+## Blockiert
+
+- [W-0037](tasks/W-0037-discord-bot-works-befehle-und-knoepfe/task.md) Discord-Bot works: Befehle und Knöpfe: wartet auf W-0040
+- [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) Board: Einstellungen für den Discord-Bot: wartet auf W-0040
 
 ## Zuletzt erledigt
 
