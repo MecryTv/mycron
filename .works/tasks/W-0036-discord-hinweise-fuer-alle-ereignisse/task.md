@@ -37,13 +37,13 @@ Wunsch des Nutzers vom 2026-11-22/23 (P2): Discord-Anbindung für alles, nicht n
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] works discord richtet den Bot ein (Token, Server, Kanal) und speichert den Token nur lokal (nicht im Git, Datei nur für den Nutzer lesbar), nie in Logs oder URLs
-- [ ] Ein Bot-Prozess je Rechner verbindet sich mit Discord (Node 22 oder neuer), startet mit dem Board und läuft für alle Projekte; ohne Einrichtung startet nichts
-- [ ] Je Projekt gibt es einen angehefteten Statuspost, den der Bot bei Änderungen bearbeitet (gebündelt, Limits von Discord eingehalten)
-- [ ] Ereignisse der vier Gruppen kommen als eigene Nachrichten mit Feldern; bei „Claude braucht dich“ mit Erwähnung des Nutzers
-- [ ] Hooks und CLI bleiben schnell; läuft der Bot nicht, geht nichts verloren und es hängt nichts
-- [ ] Befehle aus Freigaben gehen nur mit eigenem Schalter mit
-- [ ] Tests ohne echtes Discord (nachgebaute API und Gateway)
+- [x] works discord richtet den Bot ein (Token, Server, Kanal) und speichert den Token nur lokal (nicht im Git, Datei nur für den Nutzer lesbar), nie in Logs oder URLs
+- [x] Ein Bot-Prozess je Rechner verbindet sich mit Discord (Node 22 oder neuer), startet mit dem Board und läuft für alle Projekte; ohne Einrichtung startet nichts
+- [x] Je Projekt gibt es einen angehefteten Statuspost, den der Bot bei Änderungen bearbeitet (gebündelt, Limits von Discord eingehalten)
+- [x] Ereignisse der vier Gruppen kommen als eigene Nachrichten mit Feldern; bei „Claude braucht dich“ mit Erwähnung des Nutzers
+- [x] Hooks und CLI bleiben schnell; läuft der Bot nicht, geht nichts verloren und es hängt nichts
+- [x] Befehle aus Freigaben gehen nur mit eigenem Schalter mit
+- [x] Tests ohne echtes Discord (nachgebaute API und Gateway)
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
@@ -111,3 +111,5 @@ Art: nachher · Hinzugefügt: 2026-11-23
 - 2026-11-23: Asset hinzugefügt: assets/2026-11-23-vorher-in-discord-kam-nur-der-vorher.png (vorher)
 - 2026-11-23: Asset hinzugefügt: assets/2026-11-23-nachher-echte-nachrichten-des-bots-nachher.png (nachher)
 - 2026-11-23: Asset hinzugefügt: assets/2026-11-23-nachher-auf-dem-handy-hell-dieselben-nachher.png (nachher)
+- 2026-11-23: Bot works umgesetzt: Einrichtung über works discord, REST und Gateway, Statuspost je Projekt, Ereignisse nach F2, ship, ci-watch und Wochenbericht über die outbox. Selbsttest gegen nachgebautes Discord.
+- 2026-11-23: code-audit durch frischen Prüfer: 12 Funde (5 wichtig), alle behoben und mit Tests abgesichert. Selbsttest Windows 37/37, ci-watch grün.
