@@ -3,13 +3,13 @@ id: W-0042
 title: "CI rot: works Selbsttest, Schritt Selbsttest"
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort:
 risk:
 created: 2026-11-23
 updated: 2026-11-23
 due:
-completed:
+completed: 2026-11-23
 milestone:
 branch: fix/w-0042-ci-rot-works-selbsttest
 tags: []
@@ -79,8 +79,10 @@ Der Bot taut schon nach dem Push auf (die Git-Schritte sind dann vorbei, das War
 ## Offene Fragen
 
 ## Übergabe
+Abgeschlossen am 2026-11-23. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
 - 2026-11-23: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-23: Behoben: Auftauen nach dem Push, Einfrieren höchstens 10 Minuten, Discord-Tests robust gegen langsame Runner. Selbsttest Windows grün (Discord 7/7 mit und ohne WebSocket).
+- 2026-11-23: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
