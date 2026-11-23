@@ -3,13 +3,13 @@ id: W-0037
 title: "Discord-Bot works: Befehle und Knöpfe"
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: L
 risk:
 created: 2026-11-23
 updated: 2026-11-23
 due:
-completed:
+completed: 2026-11-23
 milestone:
 branch: feature/w-0037-discord-bot-works-befehle-und
 tags: [discord, bot]
@@ -82,9 +82,7 @@ Wunsch des Nutzers am 2026-11-23 (P2): Dem Bot einen Help-Befehl mit allen wicht
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-23 20:49
-
-Fertig: Befehle (/works help, status, tasks, new, instruct), Knöpfe (Annehmen, Zurück an Claude, Anweisung, Bug ansehen) und Dialoge beim eigenen Bot (Gateway) und gemeinsamen Bot (Inbox mit Long-Poll und Bestätigung). Audit-Funde alle behoben. Selbsttest 38/38, Dienst-Test grün. Docker-Build nur in der CI geprüft. Weiter mit W-0044 (Dashboard D3, Aufräumen nach 24 h).
+Abgeschlossen am 2026-11-23. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -114,3 +112,4 @@ Fertig: Befehle (/works help, status, tasks, new, instruct), Knöpfe (Annehmen, 
 - 2026-11-23: Akzeptanzkriterien: "Beim gemeinsamen Bot antwortet der Dienst sofort (vorläufig) und reicht die Anfrage an genau das gekoppelte Gerät weiter" abgehakt
 - 2026-11-23: Akzeptanzkriterien: "Tests ohne echtes Discord" abgehakt
 - 2026-11-23: Übergabe aktualisiert
+- 2026-11-23: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
