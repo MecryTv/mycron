@@ -1,0 +1,34 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "P",
+      "title": "Kopplung: Code aus Discord",
+      "file": "P-kopplung-code-aus-discord.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "C:/Program Files/Git/works verbinden im Kanal, Code in works eintragen",
+      "at": "2026-11-23 19:18"
+    },
+    {
+      "name": "Q",
+      "title": "Kopplung: Code aus works",
+      "file": "Q-kopplung-code-aus-works.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "works zeigt den Code, in Discord /works verbinden CODE",
+      "at": "2026-11-23 19:18"
+    },
+    {
+      "name": "R",
+      "title": "Einrichtung: gemeinsam oder eigener Bot",
+      "file": "R-einrichtung-gemeinsam-oder.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Auswahl beim ersten Mal, gemeinsamer Bot empfohlen",
+      "at": "2026-11-23 19:18"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": null
+}

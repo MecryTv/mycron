@@ -45,7 +45,7 @@ Wunsch des Nutzers am 2026-11-23: Er stellt den Discord-Bot works für alle bere
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
 
 ## Designentscheidungen
-<!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
+Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
@@ -60,3 +60,9 @@ Wunsch des Nutzers am 2026-11-23: Er stellt den Discord-Bot works für alle bere
 - 2026-11-23: Aufgabe angelegt
 - 2026-11-23: Beziehung: W-0037 blocked-by
 - 2026-11-23: Beziehung: W-0038 blocked-by
+- 2026-11-23: decisions.md angelegt
+- 2026-11-23: Dokument verlinkt: konzept.md
+- 2026-11-23: Entwurf P „Kopplung: Code aus Discord“ angehängt
+- 2026-11-23: Entwurf Q „Kopplung: Code aus works“ angehängt
+- 2026-11-23: Entwurf R „Einrichtung: gemeinsam oder eigener Bot“ angehängt
+- 2026-11-23: Dokument übernommen: Konzept: gemeinsamer Bot (Ablauf, Sicherheit, Kosten)
