@@ -1,96 +1,98 @@
-# Bilder und Assets
+# Images and assets
 
-## Die technische Einschränkung
+## The technical limitation
 
-Ein Bild, das der Nutzer in Claude Code per Einfügen oder Drag and Drop in den Chat gibt, liegt nur im Kontext. Claude kann es ansehen, aber nicht als Datei speichern, weil die Binärdaten nicht zugänglich sind. Deshalb nie behaupten, ein eingefügtes Bild sei gespeichert worden, solange keine Datei kopiert wurde.
+An image the user pastes or drags into the chat in Claude Code exists only in the context. Claude can look at it but cannot save it as a file, because the binary data is not accessible. So never claim a pasted image has been saved unless a file was actually copied.
 
-Damit ein Bild in `assets/` landet, gibt es drei Wege.
+There are three ways to get an image into `assets/`.
 
-### 1. Dateipfad
+### 1. File path
 
-Der Nutzer nennt den Pfad oder zieht die Datei ins Terminal, dann steht der Pfad im Prompt. Häufige Orte, nach denen gefragt werden kann: `~/Bilder/Bildschirmfotos/`, `~/Pictures/Screenshots/`, `~/Downloads/`.
+The user names the path or drags the file into the terminal, which puts the path in the prompt. Common places to ask about: `~/Bilder/Bildschirmfotos/`, `~/Pictures/Screenshots/`, `~/Downloads/`.
 
 ```
-works asset W-0012 ~/Bilder/Bildschirmfotos/2026-10-29_19-02.png --kind vorher \
-  --desc "Login-Seite vor dem Umbau. Formular linksbündig, Logo 24 px, kein Dark Mode, Fehler als Toast oben rechts."
+works asset W-0012 ~/Pictures/Screenshots/2026-10-29_19-02.png --kind before \
+  --desc "Login page before the redesign. Form left-aligned, logo 24 px, no dark mode, errors as a toast top right."
 ```
 
-Ohne `--move` wird die Datei kopiert, das Original bleibt.
+Without `--move` the file is copied and the original stays.
 
 ### 2. Inbox
 
-Der Nutzer legt Screenshots in `.works/inbox/` ab, etwa indem er das Screenshot-Tool dorthin speichern lässt. Beim nächsten Aufruf:
+The user drops screenshots into `.works/inbox/`, for example by setting the screenshot tool to save there. On the next call:
 
 ```
 works inbox
-works asset W-0012 bildschirmfoto.png --kind fehler --desc "..."
+works asset W-0012 screenshot.png --kind error --desc "..."
 ```
 
-Dateien aus der Inbox werden verschoben, nicht kopiert. Vor der Zuordnung das Bild mit Read ansehen, damit die Beschreibung stimmt, und bei Unklarheit den Nutzer fragen, zu welcher Aufgabe es gehört.
+Files from the inbox are moved, not copied. Before assigning an image, look at it with Read so the description is accurate, and if it is unclear, ask the user which task it belongs to.
 
-### 3. Selbst erstellte Screenshots
+### 3. Screenshots you take yourself
 
-`works shot` macht Screenshots mit dem installierten Chrome über Playwright und hängt sie auf Wunsch gleich an die Aufgabe:
-
-```
-works shot --url http://localhost:5173/login --widths 1440,390 --themes light,dark --asset W-0012 --kind vorher --desc "Login vor der Änderung"
-works shot live --widths 390 --themes dark        # eine Ansicht des works-Boards
-works shot W-0012                                 # das Detail einer Aufgabe im Board
-```
-
-1. Vor der ersten Änderung: die Seite mit `--asset <ID> --kind vorher` aufnehmen.
-2. Nach der Umsetzung: gleiche Adresse, gleiche Breiten und Farbschemata, `--kind nachher`.
-3. Die Bilder mit Read ansehen. `works shot` meldet außerdem seitliches Scrollen, Seiten- und Konsolenfehler und Dateien, die nicht geladen wurden (Exit 1).
-
-Ohne `--asset` landen die Bilder in `.works/.tmp/shots/` (nicht im Git) oder in `--out`. Fehlt Playwright, nennt der Befehl den Installationsbefehl (Exit 2); Browser lädt er keine herunter. Einen anderen Browser setzt `WORKS_BROWSER=<Pfad>`.
-
-## Benennung
-
-Das CLI benennt automatisch: `JJJJ-MM-TT-<slug>[-<art>].<ext>`, bei Kollisionen mit Zähler. Der Slug kommt aus `--name`, sonst aus `--alt`, sonst aus dem ersten Satz von `--desc`.
-
-| `--kind` | Verwendung |
-|---|---|
-| ist | Aktueller Zustand ohne geplante Änderung |
-| vorher | Zustand vor einer Änderung, Gegenstück zu nachher |
-| nachher | Ergebnis nach der Änderung |
-| referenz | Vorbild, Inspiration, Markenvorgabe |
-| mockup | Entwurf, Wireframe, generiertes Design |
-| skizze | Handzeichnung, Whiteboard |
-| fehler | Fehlerzustand, Fehlermeldung |
-| diagramm | Architektur, Ablauf, Datenmodell |
-
-Für die DoD-Prüfung bei UI-Aufgaben zählen Dateien, die auf `-vorher` oder `-ist` und auf `-nachher` enden.
-
-## Beschreibung
-
-Jedes Bild bekommt in der task.md drei Zeilen:
+`works shot` takes screenshots with the installed Chrome via Playwright and can attach them to the task right away:
 
 ```
-![Login-Seite vor dem Umbau](assets/2026-10-29-login-seite-vor-dem-umbau-vorher.png)
-Beschreibung: Login-Seite vor dem Umbau. Formular linksbündig, Logo 24 px, kein Dark Mode, Fehler als Toast oben rechts.
-Art: vorher · Hinzugefügt: 2026-10-29
+works shot --url http://localhost:5173/login --widths 1440,390 --themes light,dark --asset W-0012 --kind before --desc "Login before the change"
+works shot live --widths 390 --themes dark        # one view of the works board
+works shot W-0012                                 # the detail view of a task in the board
 ```
 
-Die Beschreibung ist so zu schreiben, dass eine spätere Session das Bild nicht öffnen muss, um zu wissen, was zu sehen ist: Layout, auffällige Elemente, Farben, Texte, Fehlermeldungen im Wortlaut. Erst wenn Details fehlen, das Bild mit Read laden. Das spart Kontext.
+1. Before the first change: capture the page with `--asset <ID> --kind before`.
+2. After the implementation: same URL, same widths and color schemes, `--kind after`.
+3. Look at the images with Read. `works shot` also reports horizontal scrolling, page and console errors, and files that failed to load (exit 1).
 
-`works doctor` meldet Bilder ohne Beschreibungszeile, fehlende Dateien und Dateien in `assets/`, auf die nichts verweist.
+Without `--asset` the images go to `.works/.tmp/shots/` (not in Git) or to `--out`. If Playwright is missing, the command prints the install command (exit 2); it never downloads browsers. Set a different browser with `WORKS_BROWSER=<path>`.
 
-## Andere Dateien
+## Naming
 
-PDFs, Videos und andere Dateien funktionieren genauso und werden als normaler Link statt als Bild eingebunden.
+The CLI names files automatically: `YYYY-MM-DD-<slug>[-<kind>].<ext>`, with a counter on collisions. The slug comes from `--name`, otherwise from `--alt`, otherwise from the first sentence of `--desc`.
 
-## Komprimierung
+`--kind` takes the English names below. The files store the German value, which also ends up in the file name.
 
-Mit `sharp` als Entwicklungsabhängigkeit im Projekt (`npm i -D sharp`). Im Plugin-Ordner selbst nichts installieren, er wird bei jedem Update ersetzt.
+| `--kind` | Stored as | Use |
+|---|---|---|
+| current | ist | Current state, no change planned |
+| before | vorher | State before a change, counterpart to after |
+| after | nachher | Result after the change |
+| reference | referenz | Model, inspiration, brand guideline |
+| mockup | mockup | Draft, wireframe, generated design |
+| sketch | skizze | Hand drawing, whiteboard |
+| error | fehler | Error state, error message |
+| diagram | diagramm | Architecture, flow, data model |
+
+For the DoD check on UI tasks, files ending in `-vorher` or `-ist` and in `-nachher` count.
+
+## Description
+
+Every image gets three lines in task.md:
 
 ```
-works asset <ID> <pfad> --desc "..." --compress
-works compress            # alle Aufgaben
-works compress W-0012     # eine Aufgabe
+![Login page before the redesign](assets/2026-10-29-login-page-before-the-redesign-vorher.png)
+Description: Login page before the redesign. Form left-aligned, logo 24 px, no dark mode, errors as a toast top right.
+Kind: vorher · Added: 2026-10-29
 ```
 
-Breite und Qualität stehen in `config.json` unter `assets`. Mit `assets.compress_on_add: true` wird jedes neue Bild automatisch komprimiert. Ohne sharp wird nichts verändert.
+Write the description so that a later session does not need to open the image to know what it shows: layout, notable elements, colors, texts, error messages verbatim. Only load the image with Read when details are missing. That saves context.
+
+`works doctor` reports images without a description line, missing files, and files in `assets/` that nothing links to.
+
+## Other files
+
+PDFs, videos and other files work the same way and are included as a normal link instead of an image.
+
+## Compression
+
+Requires `sharp` as a dev dependency in the project (`npm i -D sharp`). Do not install anything in the plugin folder itself; it is replaced on every update.
+
+```
+works asset <ID> <path> --desc "..." --compress
+works compress            # all tasks
+works compress W-0012     # one task
+```
+
+Width and quality are set in `config.json` under `assets`. With `assets.compress_on_add: true` every new image is compressed automatically. Without sharp nothing is changed.
 
 ## Git
 
-Bei vielen großen Bildern `works init --gitignore assets` verwenden oder nachträglich `tasks/*/assets/` in `.works/.gitignore` eintragen. Alternativ Git LFS für `*.png` im Ordner `.works/` einrichten.
+With many large images use `works init --gitignore assets`, or add `tasks/*/assets/` to `.works/.gitignore` later. Alternatively set up Git LFS for `*.png` in the `.works/` folder.

@@ -1,108 +1,110 @@
 # Hooks
 
-Ein Skill wird nur geladen, wenn Claude ihn für relevant hält. Hooks sorgen dafür, dass die Aufgaben beim Sessionstart sichtbar sind und die Übergabe nicht vergessen wird. Alle Hooks bleiben still in Projekten ohne `.works/`.
+A skill is only loaded when Claude considers it relevant. Hooks make sure the tasks are visible at session start and the handoff isn't forgotten. All hooks stay silent in projects without `.works/`.
 
-## Installation über das Plugin mycron
+## Installation via the mycron plugin
 
-Wird works als Plugin aus dem Marketplace mycron installiert, bringt es SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, SubagentStop und Stop Hook selbst mit (`plugins/works/hooks/hooks.json`). Sie sind aktiv, solange das Plugin aktiviert ist, und werden mit jedem Plugin-Update automatisch aktualisiert. `works install-hooks --claude` ist dann nicht nötig und meldet das auch so.
+When works is installed as a plugin from the mycron marketplace, it brings the SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, SubagentStop and Stop hooks with it (`plugins/works/hooks/hooks.json`). They are active as long as the plugin is enabled and are updated automatically with every plugin update. `works install-hooks --claude` is then not needed and says so.
 
-Pro Projekt einrichten muss man nur den Git pre-commit Hook:
+The only thing to set up per project is the Git pre-commit hook:
 
 ```
 works install-hooks --git
 ```
 
-## Installation als einfacher Skill-Ordner
+## Installation as a plain skill folder
 
-Liegt der Skill direkt unter `~/.claude/skills/works`, richtet `works install-hooks` die Claude Code Hooks ein. Die Einrichtung ändert Konfigurationsdateien des Nutzers. Vorher fragen und mit `--dry-run` zeigen, was passiert.
+If the skill lives directly under `~/.claude/skills/works`, `works install-hooks` sets up the Claude Code hooks. This changes the user's configuration files. Ask first and show what will happen with `--dry-run`.
 
 ```
 works install-hooks --dry-run
-works install-hooks                     # Claude Code Hooks global plus Git pre-commit im aktuellen Repo
+works install-hooks                     # Claude Code hooks globally plus Git pre-commit in the current repo
 works install-hooks --claude --scope project
 works install-hooks --git
 ```
 
-| Option | Ziel |
+| Option | Target |
 |---|---|
-| `--scope user` (Standard) | `~/.claude/settings.json`, gilt für alle Projekte |
-| `--scope project` | `.claude/settings.json` im Projekt, wird mit dem Repo geteilt |
-| `--scope local` | `.claude/settings.local.json`, nur lokal |
+| `--scope user` (default) | `~/.claude/settings.json`, applies to all projects |
+| `--scope project` | `.claude/settings.json` in the project, shared with the repo |
+| `--scope local` | `.claude/settings.local.json`, local only |
 
-Liegt der Skill unter dem Home-Verzeichnis, wird der Pfad als `$HOME/...` eingetragen. Mehrfaches Ausführen legt keine Duplikate an.
+If the skill lives under the home directory, the path is written as `$HOME/...`. Running it more than once doesn't create duplicates.
 
-Ist das Plugin installiert und der Skill zusätzlich als Ordner vorhanden, die Hooks nur einmal einrichten, sonst laufen sie doppelt.
+If the plugin is installed and the skill also exists as a folder, set up the hooks only once, otherwise they run twice.
 
 ## SessionStart
 
-Datei: `hooks/session-start.mjs`, Matcher `startup|resume|clear|compact`.
+File: `hooks/session-start.mjs`, matcher `startup|resume|clear|compact`.
 
-Erzeugt WORKS.md und eine vorhandene board.html neu, ersetzt Board-Server dieses Projekts, die noch mit einer älteren works-Version laufen, und gibt eine Kurzübersicht in den Kontext: Anzahl offener Aufgaben, offene P1 und P2, Überfälliges, die aktive Aufgabe samt Übergabe (gekürzt auf 1500 Zeichen) und offene Fragen, sowie einen Hinweis auf Dateien in der Inbox. Dazu kommen der aktive Sprint, die Warteschlange, neue Kommentare vom Nutzer und ein Hinweis, wenn laut Einstellung ein Wochenbericht fällig ist. Gerade nach `compact` stellt das den Arbeitsstand wieder her.
+Regenerates WORKS.md and an existing board.html, replaces board servers of this project that still run an older works version, and puts a short overview into the context: number of open tasks, open P1 and P2, overdue items, the active task with its handoff (cut to 1500 characters) and open questions, plus a notice about files in the inbox. Added to that are the active sprint, the queue, new comments from the user and a notice if a weekly report is due according to the settings. Especially after `compact` this restores the working state.
 
-Außerdem: Das Projekt wird in `~/.works/projects.json` für `works hub` eingetragen, fällige wiederkehrende Aufgaben werden angelegt (Verlauf `[Wiederkehrend]`), und ist der GitHub-Abgleich fällig, startet er im Hintergrund. Die Übersicht nennt die Bereiche des Projektwissens, Vorschläge, die auf den Nutzer warten, und Aufgaben mit Entwürfen ohne Wahl.
+Also: the project is registered in `~/.works/projects.json` for `works hub`, due recurring tasks are created (history `[Wiederkehrend]`), and if the GitHub sync is due, it starts in the background. The overview names the areas of project knowledge, proposals waiting for the user, and tasks with design variants that have no choice yet.
 
-Abschalten pro Projekt: `"hooks": { "session_start": false }` in `.works/config.json`.
+The hook also tells Claude the configured language (`works lang`, see config.md), for example `Language: de, answer in German, German docs in SKILL.de.md and references/de/`. Claude then answers in that language and, for German, reads the German version of the docs.
+
+Turn off per project: `"hooks": { "session_start": false }` in `.works/config.json`.
 
 ## Stop
 
-Datei: `hooks/stop-reminder.mjs`.
+File: `hooks/stop-reminder.mjs`.
 
-Läuft, wenn Claude eine Antwort beendet, in dieser Reihenfolge:
+Runs when Claude finishes a reply, in this order:
 
-1. Zeit und Tokenverbrauch der Antwort der aktiven Aufgabe zuschreiben. Der Hook liest dazu das Transkript ab der zuletzt gelesenen Stelle (`.works/.usage-state.json`), zählt jede Nachricht nur einmal und schreibt `usage`-Zeilen in `time.jsonl`.
-2. Warten Anweisungen aus dem Board, die Claude noch nicht bekommen hat, setzt der Hook die Antwort mit diesen Anweisungen fort. Das passiert nur einmal pro Antwort (`stop_hook_active`).
-3. Die Anzeige "Claude arbeitet" im Board auf Pause stellen.
-4. Ist eine Aufgabe aktiv und wurden laut `git status` seit der letzten Änderung an ihrer task.md Projektdateien geändert, bittet der Hook einmalig, Verlauf, Häkchen und Übergabe zu aktualisieren. Ohne Git-Repository entfällt das.
+1. Attribute the time and token usage of the reply to the active task. The hook reads the transcript from the last position it read (`.works/.usage-state.json`), counts each message only once and writes `usage` lines to `time.jsonl`.
+2. If instructions from the board are waiting that Claude hasn't received yet, the hook continues the reply with these instructions. This happens only once per reply (`stop_hook_active`).
+3. Set the "Claude is working" display in the board to paused.
+4. If a task is active and, according to `git status`, project files changed since the last change to its task.md, the hook asks once to update history, checkmarks and handoff. Without a Git repository this is skipped.
 
-Reagieren: kurz `works log` und `works handoff` ausführen, Häkchen setzen. Ist nichts Relevantes passiert, einfach fortfahren.
+How to respond: briefly run `works log` and `works handoff`, tick the checkmarks. If nothing relevant happened, just carry on.
 
-Abschalten der Erinnerung pro Projekt: `"hooks": { "stop_reminder": false }`. Zeit und Verbrauch: `"time_tracking": false`.
+Turn off the reminder per project: `"hooks": { "stop_reminder": false }`. Time and usage: `"time_tracking": false`.
 
 ## UserPromptSubmit
 
-Datei: `hooks/prompt-submit.mjs`.
+File: `hooks/prompt-submit.mjs`.
 
-Merkt sich für die Zeiterfassung, wann eine Anfrage beginnt, und zeigt im Board "Claude arbeitet". Liegen Anweisungen für die aktive Aufgabe vor, kommen sie als Kontext mit. Nur wenn eine Aufgabe mit `works start` aktiv ist.
+Records when a request starts, for time tracking, and shows "Claude is working" in the board. If there are instructions for the active task, they come along as context. Only when a task is active via `works start`.
 
 ## PreToolUse
 
-Datei: `hooks/pre-tool.mjs`, ohne Matcher, Timeout 5 Sekunden.
+File: `hooks/pre-tool.mjs`, no matcher, timeout 5 seconds.
 
-Meldet jeden Werkzeugaufruf, bevor er läuft: `current` in `.works/activity.json` bekommt den Aufruf mit `running: true`, die Liste der letzten Aufrufe bleibt unverändert. Damit zeigt die Live-Ansicht während eines langen Befehls wie `npm test` den Befehl selbst und seine Laufzeit statt des Aufrufs davor. Der Hook schreibt sonst nichts und gibt nichts aus. Er kostet pro Werkzeugaufruf etwa 0,2 Sekunden (Start von Node, unter Windows gemessen). Abschalten mit `"live_activity": false`.
+Reports every tool call before it runs: `current` in `.works/activity.json` gets the call with `running: true`, the list of recent calls stays unchanged. That way, during a long command like `npm test`, the live view shows the command itself and its runtime instead of the call before it. Otherwise the hook writes nothing and prints nothing. It costs about 0.2 seconds per tool call (Node startup, measured on Windows). Turn off with `"live_activity": false`.
 
 ## PermissionRequest
 
-Datei: `hooks/permission.mjs`, ohne Matcher, Timeout 5 Sekunden.
+File: `hooks/permission.mjs`, no matcher, timeout 5 seconds.
 
-Läuft, wenn Claude Code den Nutzer gleich um eine Freigabe für einen Werkzeugaufruf bittet. Markiert den laufenden Aufruf in `.works/activity.json` mit `perm: true` und `permSince`, damit die Live-Ansicht "Claude wartet auf deine Freigabe" mit Befehl und Wartezeit zeigt. Der Hook gibt nichts aus und entscheidet nie über die Freigabe, das bleibt beim Nutzer.
+Runs when Claude Code is about to ask the user to approve a tool call. Marks the running call in `.works/activity.json` with `perm: true` and `permSince`, so the live view shows "Claude is waiting for your approval" with command and waiting time. The hook prints nothing and never decides on the approval, that stays with the user.
 
-Der Zustand endet mit dem nächsten PreToolUse oder PostToolUse desselben Agenten, mit Stop oder UserPromptSubmit. Aufrufe eines anderen Agenten (anderes `agent_id` in der Hook-Eingabe) landen im Verlauf, ersetzen die wartende Freigabe aber nicht. Eine Ablehnung und der Moment der Freigabe selbst melden keinen Hook: Nach einer Freigabe steht die Anzeige deshalb bis zum Ende dieses Aufrufs auf "wartet", nach einer Ablehnung bis zur nächsten Nachricht. Spätestens nach 60 Minuten gilt sie als veraltet. Abschalten mit `"live_activity": false`.
+The state ends with the next PreToolUse or PostToolUse of the same agent, with Stop or UserPromptSubmit. Calls of another agent (different `agent_id` in the hook input) go into the history but don't replace the pending approval. A denial and the moment of approval itself don't trigger a hook: after an approval the display therefore stays on "waiting" until that call ends, after a denial until the next message. After 60 minutes at the latest it counts as outdated. Turn off with `"live_activity": false`.
 
 ## PostToolUse
 
-Datei: `hooks/post-tool.mjs`, ohne Matcher, Timeout 5 Sekunden.
+File: `hooks/post-tool.mjs`, no matcher, timeout 5 seconds.
 
-Schreibt nach jedem Werkzeugaufruf eine kurze Zeile in `.works/activity.json` (zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test"), die das Board auf der aktiven Karte und in der Live-Ansicht zeigt, und hält in `.works/steps.json` fest, wann Schritte des Umsetzungsplans der Aufgabe abgehakt wurden. Inhalte von Dateien oder Befehlsausgaben werden nicht gespeichert, nur Werkzeug, Dateiname oder die ersten Zeichen des Befehls. Liegt eine neue Anweisung des Nutzers vor, kommt sie hier als Kontext an Claude, sodass sie schon während der Antwort ankommt. Claude soll sie berücksichtigen, sobald es sinnvoll ist.
+After every tool call, writes a short line to `.works/activity.json` (for example "Edited src/backup.ts" or "Command npm test"), which the board shows on the active card and in the live view, and records in `.works/steps.json` when steps of the task's implementation plan were ticked. File contents and command output are not stored, only the tool, the file name or the first characters of the command. If there is a new instruction from the user, it reaches Claude here as context, so it arrives while Claude is still answering. Claude should take it into account as soon as it makes sense.
 
-Außerdem merkt sich der Hook bei Edit, Write und NotebookEdit, welche Datei für welche Aufgabe geändert wurde (`.works/files.jsonl`, lokal). Wird eine Datei in einer Sitzung zum ersten Mal geändert und haben andere Aufgaben dort Entscheidungen getroffen oder laufen gerade, bekommt Claude einmalig einen Hinweis mit den Aufgaben und ihren Entscheidungen.
+The hook also records, for Edit, Write and NotebookEdit, which file was changed for which task (`.works/files.jsonl`, local). When a file is changed for the first time in a session and other tasks made decisions there or are currently running, Claude gets a one-time notice with those tasks and their decisions.
 
-Bei Parallelarbeit erkennt der Hook am Pfad, zu welchem Worktree ein Aufruf gehört. Aktivität, Dateien und Anweisungen gehen dann an diese Aufgabe, nicht an die aktive Aufgabe der Hauptsitzung.
+With parallel work, the hook recognizes from the path which worktree a call belongs to. Activity, files and instructions then go to that task, not to the active task of the main session.
 
-Abschalten: `"live_activity": false` in `.works/config.json` (Anweisungen kommen dann erst über den Stop Hook), `"file_tracking": false` für Dateien und Hinweise.
+Turn off: `"live_activity": false` in `.works/config.json` (instructions then only arrive via the Stop hook), `"file_tracking": false` for files and notices.
 
 ## SubagentStop
 
-Datei: `hooks/subagent-stop.mjs`.
+File: `hooks/subagent-stop.mjs`.
 
-Rechnet den Tokenverbrauch eines Agenten aus dessen eigenem Transkript (`agent_transcript_path`) der passenden Aufgabe zu: der Aufgabe seines Worktrees bei Parallelarbeit, sonst der aktiven Aufgabe. Ältere Claude Code Versionen ohne eigenes Agenten-Transkript zählen den Verbrauch im Stop Hook mit.
+Attributes an agent's token usage, from its own transcript (`agent_transcript_path`), to the matching task: the task of its worktree for parallel work, otherwise the active task. Older Claude Code versions without a separate agent transcript count the usage in the Stop hook.
 
 ## Git pre-commit
 
-Wird an `.git/hooks/pre-commit` angehängt (vorhandene Inhalte bleiben erhalten). Werden Dateien aus `.works/` committet, läuft `works doctor --quiet`. Bei Fehlern (nicht bei Warnungen) wird der Commit abgebrochen. Bei der Plugin-Installation sucht der Hook den aktuellen Pfad des CLI zur Laufzeit, weil sich der Installationsordner bei Updates ändert. Wird das CLI nicht gefunden, wird die Prüfung übersprungen statt den Commit zu blockieren. Umgehen im Notfall mit `git commit --no-verify`.
+Appended to `.git/hooks/pre-commit` (existing content is kept). If files from `.works/` are committed, `works doctor --quiet` runs. On errors (not on warnings) the commit is aborted. With the plugin installation, the hook looks up the current path of the CLI at runtime, because the installation folder changes with updates. If the CLI isn't found, the check is skipped instead of blocking the commit. In an emergency, bypass it with `git commit --no-verify`.
 
-## Manuell eintragen
+## Manual entry
 
-Nur für die Installation als Skill-Ordner:
+Only for the installation as a skill folder:
 
 ```json
 {
@@ -133,6 +135,6 @@ Nur für die Installation als Skill-Ordner:
 }
 ```
 
-## Entfernen
+## Removing
 
-Plugin: über `/plugin` deaktivieren oder deinstallieren. Skill-Ordner: die works-Einträge aus der jeweiligen settings.json löschen. In beiden Fällen den Block ab `# works-doctor` aus `.git/hooks/pre-commit` entfernen.
+Plugin: disable or uninstall it via `/plugin`. Skill folder: delete the works entries from the respective settings.json. In both cases remove the block starting at `# works-doctor` from `.git/hooks/pre-commit`.

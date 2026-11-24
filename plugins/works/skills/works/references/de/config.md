@@ -1,0 +1,118 @@
+# config.json
+
+Liegt unter `.works/config.json`. Fehlende Felder werden mit Standardwerten ergänzt, die Datei muss also nur enthalten, was abweicht. Änderungen an `next_id` und `milestones` übernimmt das CLI.
+
+| Feld | Standard | Bedeutung |
+|---|---|---|
+| `language` | nicht gesetzt | Sprache für dieses Projekt (`en`, `de`), hat Vorrang vor `~/.works/settings.json`. Setzen mit `works lang de --project`, siehe unten |
+| `id_prefix` | `"W"` | Präfix der IDs, beim Init mit `--prefix` setzbar |
+| `id_digits` | `4` | Stellen der Nummer |
+| `next_id` | `1` | Nächste freie Nummer (wird automatisch gepflegt, `doctor --fix` korrigiert) |
+| `next_idea_id` | `1` | Nächste Ideen-Nummer |
+| `milestones` | `[]` | Liste aus `{ id, title, due, description, status }` |
+| `dod.global` | siehe unten | Manuelle DoD-Punkte für alle Aufgaben |
+| `dod.by_type` | siehe unten | Zusätzliche manuelle Punkte je Typ |
+| `dod.by_tag` | `{ "ui": [...] }` | Zusätzliche manuelle Punkte je Tag |
+| `dod.commands` | `[]` | Shell-Befehle, die `works done --run` ausführt, zum Beispiel `["npm run build", "npm test"]` |
+| `assets.max_width` | `2400` | Maximale Bildbreite beim Komprimieren |
+| `assets.quality` | `82` | Qualität beim Komprimieren |
+| `assets.compress_on_add` | `false` | Neue Bilder automatisch komprimieren (braucht sharp) |
+| `brainstorm.mode` | `"link"` | Standard für `attach-doc`: link, copy oder move |
+| `github.label_priority` | Zuordnung | Labels zu P1, P2, P4 (alles andere wird P3) |
+| `github.label_type` | Zuordnung | Labels zu Typen (Standard feature) |
+| `scan.markers` | `["TODO","FIXME","HACK","XXX"]` | Gesuchte Marker |
+| `scan.ignore` | übliche Build-Ordner | Ignorierte Ordner, zusätzlich zur .gitignore |
+| `hooks.session_start` | `true` | SessionStart Hook in diesem Projekt aktiv |
+| `hooks.stop_reminder` | `true` | Stop Hook in diesem Projekt aktiv |
+| `report.days` | `7` | Standardzeitraum für `works report` |
+| `handoff_stale_days` | `3` | Ab wann `doctor` eine laufende Aufgabe ohne Aktualisierung meldet und das Board sie als still zeigt (Hinweis "seit 3 Tagen still", Etikett an der Karte, Punkt unter Wartet auf dich). Im Board zählen Antworten, Dateiänderungen, abgehakte Schritte und Änderungen an der task.md als Aktivität. `0` schaltet den Hinweis im Board ab |
+| `queue`, `queue_settings` | `[]`, siehe board.md | Warteschlange des Nutzers und Ablauf danach (`auto_next`, `ask_before`, `skip_blocked`) |
+| `sprints` | `[]` | Sprints mit `id`, `title`, `goal`, `start`, `end`, `capacity`, `status`, `tasks`, nach Abschluss `result` und `carry` |
+| `sprint_settings` | `{ "length_days": 14, "capacity": 20, "points": { "S": 1, "M": 2, "L": 4, "XL": 8 } }` | Standardlänge, Kapazität und Punkte je Aufwand |
+| `views` | `[]` | Gespeicherte Ansichten aus dem Board: `name`, `filter`, `view`, `sort` |
+| `checks` | `{}` | Prüfungen vor dem Abschluss, Name zu Befehl, `skill:code-audit` für Skills. Statt des Befehls auch `{ "cmd": "npm run check", "cwd": "Discord Bot" }` mit Arbeitsordner relativ zum Projekt (bei parallelen Aufgaben relativ zum Worktree), nie außerhalb davon |
+| `checks_by_type` | `{}` | Welche Prüfungen je Typ gelten, ohne Eintrag alle |
+| `time_tracking` | `true` | Zeiterfassung über die Hooks |
+| `effort_mode` | `"fixed"` | `measured` lässt Zeitleiste, Graph und Sprint mit gemessenen Dauern rechnen |
+| `effort_days` | `{ "S": 2, "M": 5, "L": 10, "XL": 15 }` | Feste Dauer je Aufwand in Kalendertagen |
+| `report.enabled`, `report.weekday`, `report.time` | `false`, `5`, `"16:00"` | Wochenbericht automatisch fällig, Wochentag 1 bis 7 und Uhrzeit |
+| `report.destinations` | `{ "file": true, "discord": false }` | Ziele des Wochenberichts. Die Discord-URL steht nur in `report.local.json` |
+| `report.include` | alle `true` | Abschnitte: `done`, `attention`, `next`, `milestones` |
+| `live_activity` | `true` | Board zeigt, was Claude gerade tut, und Anweisungen kommen schon während der Antwort an |
+| `recurring` | `[]` | Regeln für wiederkehrende Aufgaben, siehe unten |
+| `github_sync` | siehe unten | Automatischer Abgleich mit GitHub |
+| `prices` | siehe unten | Preise für die Kostenschätzung |
+| `parallel` | `{ "max": 3, "dir": "", "min_effort": "M" }` | Höchstzahl gleichzeitiger Bahnen, Ordner für Worktrees (Standard `<projekt>.works-lanes` neben dem Projekt), ab welchem Aufwand sich Parallelarbeit lohnt |
+| `file_tracking` | `true` | Dateien je Aufgabe merken und Hinweise beim Edit |
+| `cleanup_ignore` | `[]` | Paare wie `["W-0016", "W-0017"]`, die Aufräumen nicht mehr als Duplikat meldet |
+| `sprints[].retro` | | Antworten aus dem Sprint-Rückblick: `good`, `bad`, `change` |
+
+## Sprache
+
+Die Sprache bestimmt die Ausgaben von CLI und Hooks, die Fassung der Doku (Englisch: SKILL.md und references/, Deutsch: SKILL.de.md und references/de/) und die Überschriften neuer Aufgaben. Gespeicherte Werte wie Status und Priorität bleiben gleich, bestehende Aufgaben in der anderen Sprache bleiben gültig.
+
+Sie steht im Feld `language`, global in `~/.works/settings.json` oder für ein Projekt in `.works/config.json`:
+
+```json
+{ "language": "de" }
+```
+
+Vorrang hat die Umgebungsvariable `WORKS_LANG`, dann das Projekt, dann die globale Einstellung, sonst gilt Englisch (`en`). Am einfachsten über `works lang` (zeigen), `works lang de` (global), `works lang de --project` und `works lang --reset [--project]` (Einstellung entfernen).
+
+## Wiederkehrende Aufgaben
+
+```json
+"recurring": [
+  { "id": "R1", "title": "Abhängigkeiten aktualisieren ({Monat})", "kind": "monthly", "nth": 1, "weekday": 1,
+    "template": "", "type": "chore", "priority": "P3", "status": "geplant", "due_days": 7, "queue": false, "sprint": false, "active": true }
+]
+```
+
+`kind` ist `daily`, `weekly` (mit `weekday` 1 Montag bis 7 Sonntag und `interval` in Wochen), `monthly` (`nth` 1 bis 5 für den n-ten Wochentag, 5 heißt letzter, oder `day` für einen festen Tag) oder `days` (mit `interval`). `{Datum}` und `{Monat}` im Titel werden ersetzt. Ist die zuletzt angelegte Aufgabe einer Regel noch offen, wird keine zweite angelegt. `last` und `lastTask` pflegt works selbst. Am einfachsten über `works recur` oder das Board unter Werkzeuge.
+
+## GitHub-Abgleich
+
+```json
+"github_sync": { "enabled": true, "pr_review": true, "merge_done": true, "ci_checks": true, "review_comments": true,
+  "issues": true, "labels": [], "close_issues": true, "interval_min": 2 }
+```
+
+`labels` begrenzt den Import neuer Issues auf diese Labels, leer heißt alle. Der Stand des Abgleichs liegt lokal in `.works/github.json`.
+
+## Preise
+
+```json
+"prices": { "currency": "USD", "models": { "opus": { "input": 5, "output": 25 }, "sonnet": { "input": 3, "output": 15 },
+  "haiku": { "input": 1, "output": 5 }, "default": { "input": 3, "output": 15 } },
+  "cache_write_factor": 1.25, "cache_read_factor": 0.1 }
+```
+
+Dollar je Million Tokens. Das Modell wird über den Namen im Transkript zugeordnet (enthält er opus, sonnet oder haiku). Cache-Schreiben kostet den Faktor mal Eingabepreis, Cache-Lesen ebenso. Die Werte sind Schätzungen; bei einem Abo oder anderen Konditionen eigene Werte eintragen.
+
+## Definition of Done
+
+Die automatischen Prüfungen sind fest eingebaut (Akzeptanzkriterien, offene Fragen, Umsetzungsschritte, typbezogene Abschnitte, Screenshots und decisions.md bei UI). Die Listen in `dod` sind Punkte, die Claude selbst prüfen und bestätigen muss.
+
+Standard:
+
+```json
+"dod": {
+  "global": [
+    "Build und Tests laufen ohne Fehler",
+    "code-audit Skill wurde für die Änderungen ausgeführt",
+    "Verlauf ist aktuell und Designentscheidungen sind dokumentiert"
+  ],
+  "by_type": {
+    "bug": ["Regressionstest vorhanden oder Verzicht begründet"],
+    "refactor": ["Verhalten nach außen unverändert"],
+    "spike": ["Folgeaufgaben sind angelegt"],
+    "debt": ["Schuld ist vollständig getilgt oder die verbleibenden Folgekosten sind dokumentiert"]
+  },
+  "by_tag": {
+    "ui": ["responsive-website-check wurde ausgeführt"]
+  },
+  "commands": []
+}
+```
+
+Projektspezifische Punkte einfach ergänzen, zum Beispiel `"Discord Slash Commands neu registriert"` für einen Bot oder `"Migration auf Staging getestet"`.

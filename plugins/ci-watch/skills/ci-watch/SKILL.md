@@ -1,44 +1,46 @@
 ---
 name: ci-watch
-description: Verwenden, wenn der Nutzer nach einem Push wissen will, ob die CI durchläuft, ob GitHub Actions grün sind, ob der Build oder die Pipeline fertig ist, oder warum ein Workflow-Lauf rot ist. Auch wenn gh fehlt oder kein Token da ist.
+description: Use when the user wants to know after a push whether CI passes, whether GitHub Actions are green, whether the build or pipeline is finished, or why a workflow run is red. Also when gh is missing or there is no token.
 ---
 
-# CI-Wächter
+> **Language:** English is the default. If the configured language is German (`works lang` shows `de`, or the SessionStart hook says `Language: de`; without works: `"language": "de"` in `.works/config.json` or `~/.works/settings.json`), read [SKILL.de.md](SKILL.de.md) instead and answer the user in German. For any other language, use these English docs and answer in that language.
 
-Ein Node-Skript wartet auf die GitHub-Actions-Läufe zu einem Commit und meldet das Ergebnis. Es fragt in festen Abständen ab, hält das Abfragelimit ein und holt bei rot die Fehlerstellen. Eigene `curl`-Abfragen an die GitHub-API sind deshalb nicht nötig. Ohne Token kosten sie Abfragelimit (60 pro Stunde), und das Skript fragt dasselbe ab.
+# CI watch
 
-## Ablauf
+A Node script waits for the GitHub Actions runs for a commit and reports the result. It polls at fixed intervals, respects the rate limit and fetches the error locations when a run is red. So there is no need for your own `curl` calls to the GitHub API. Without a token they cost rate limit (60 per hour), and the script asks for the same thing.
 
-1. **Commit bestimmen.** Standard ist `HEAD`. Mit `git status -sb` prüfen, ob er gepusht ist. Steht dort `ahead`, gibt es auf GitHub noch keinen Lauf: das dem Nutzer sagen, nicht selbst pushen. Gingen mehrere Commits in einem Push raus, startet GitHub den Lauf nur für den letzten davon: diesen prüfen, nicht einen früheren Merge-Commit aus demselben Push.
-2. **Skript im Hintergrund starten** (Bash mit `run_in_background: true`, es kann bis zu 20 Minuten laufen):
+## Steps
+
+1. **Pick the commit.** The default is `HEAD`. Check with `git status -sb` whether it is pushed. If it says `ahead`, there is no run on GitHub yet: tell the user, do not push yourself. If several commits went out in one push, GitHub only starts the run for the last of them: check that one, not an earlier merge commit from the same push.
+2. **Start the script in the background** (Bash with `run_in_background: true`; it can run for up to 20 minutes):
    ```
    node "${CLAUDE_SKILL_DIR}/scripts/ci-status.mjs"
    ```
-   Optionen: `--sha <commit>`, `--repo owner/name` (sonst aus `origin`), `--timeout <Minuten>` (Standard 20), `--grace <Minuten>` (so lange darf noch kein Lauf existieren, Standard 3), `--no-bug` (bei rot keinen Bug in works anlegen).
-   Dem Nutzer in einem Satz sagen, dass du wartest. Bis zur Meldung des Hintergrundjobs anderes erledigen oder die Runde beenden. Nicht selbst zwischendurch abfragen, kein Monitor, keine `sleep`-Schleifen: Das Ende des Hintergrundjobs wird von selbst gemeldet.
-3. **Ergebnis nach Exit-Code melden**, mit der Ausgabe des Skripts als einziger Quelle:
+   Options: `--sha <commit>`, `--repo owner/name` (otherwise from `origin`), `--timeout <minutes>` (default 20), `--grace <minutes>` (how long there may be no run yet, default 3), `--no-bug` (do not create a bug in works when red).
+   Tell the user in one sentence that you are waiting. Until the background job reports, do other work or end the turn. Do not poll in between, no Monitor, no `sleep` loops: the end of the background job is reported automatically.
+3. **Report the result by exit code**, with the script's output as the only source:
 
-| Exit | Bedeutung | Meldung |
+| Exit | Meaning | Report |
 |---|---|---|
-| 0 | grün | Ein Satz: grün, welche Workflows. |
-| 1 | rot | Aufbau siehe unten. |
-| 2 | kein Lauf oder Zeitlimit | Den Satz des Skripts weitergeben. Bei „kein Lauf“ die `on:`-Bedingungen in `.github/workflows/*.yml` lesen und sagen, ob der Commit sie trifft (Pfade, Branches). |
-| 3 | Fehler | Die Meldung weitergeben (kein GitHub-Repo, Repo nicht gefunden, Rate-Limit mit Uhrzeit). |
+| 0 | green | One sentence: green, which workflows. |
+| 1 | red | Structure see below. |
+| 2 | no run or timeout | Pass on the script's sentence. For "no run", read the `on:` conditions in `.github/workflows/*.yml` and say whether the commit matches them (paths, branches). |
+| 3 | error | Pass on the message (not a GitHub repo, repo not found, rate limit with time). |
 
-## Meldung bei rot
+## Report when red
 
-In dieser Reihenfolge:
+In this order:
 
-1. **Urteil**: „CI rot für `<sha>`“ und der Workflow.
-2. **Was scheitert**, gleiche Fehler zusammengefasst: Job (bei Matrix-Jobs welche Kombinationen, und welche grün sind, laut Zeile „x von y Jobs rot. Grün: …“), Schritt, Fehlerstelle aus den Annotationen oder dem Log-Auszug. Jobs mit „keine Fehlerstelle abgefragt“ haben nur deshalb keine Fehlerstelle, nicht weil es keine gibt.
-3. **Link** zum ersten fehlgeschlagenen Job.
-4. **Bug**: Hat das Projekt `.works`, legt das Skript einen Bug mit P2 an („Bug W-… angelegt“) oder ergänzt den offenen Bug zum selben Workflow und Schritt („ergänzt“). Die ID nennen. Will der Nutzer das nicht, beim nächsten Mal mit `--no-bug` starten.
-5. **Nächster Schritt** als Angebot: „Soll ich mir den Schritt `<Name>` im Code ansehen?“ Nicht ungefragt reparieren, committen oder pushen.
+1. **Verdict**: "CI red for `<sha>`" and the workflow.
+2. **What fails**, with identical errors grouped: job (for matrix jobs, which combinations, and which are green, per the line "x of y jobs red. Green: …"), step, error location from the annotations or the log excerpt. Jobs marked "no error location fetched" lack an error location only for that reason, not because there is none.
+3. **Link** to the first failed job.
+4. **Bug**: if the project has `.works`, the script creates a P2 bug ("Bug W-… created") or adds to the open bug for the same workflow and step ("updated"). Give the ID. If the user does not want that, start with `--no-bug` next time.
+5. **Next step** as an offer: "Shall I look at the step `<name>` in the code?" Do not fix, commit or push unasked.
 
-Nur melden, was in der Ausgabe steht. Vermutungen zur Ursache (Pfade, Rechte, Zeilenenden) gehören nicht in die Meldung. Wer die Ursache wissen will, bekommt sie nach dem Lesen des Codes oder des Logs.
+Only report what is in the output. Guesses about the cause (paths, permissions, line endings) do not belong in the report. Whoever wants to know the cause gets it after reading the code or the log.
 
 ## Token
 
-Ohne Token: öffentliche Repos, eine Abfrage pro Minute, Annotationen statt Log-Auszug. Fehlt dem Nutzer der Log-Auszug, sagen: „Mit `GITHUB_TOKEN` in der Umgebung liest der Wächter auch den Log-Auszug, sonst steht er hinter dem Link.“
+Without a token: public repos, one request per minute, annotations instead of a log excerpt. If the user misses the log excerpt, say: "With `GITHUB_TOKEN` in the environment the watcher also reads the log excerpt; otherwise it is behind the link."
 
-Nie nach dem Token selbst fragen und nie einen Token in den Chat, in eine URL oder in eine Datei im Repo schreiben lassen. Der Nutzer setzt ihn in seiner eigenen Shell. Das Skript schickt ihn nur im `Authorization`-Header.
+Never ask for the token yourself, and never let a token be written into the chat, a URL or a file in the repo. The user sets it in their own shell. The script only sends it in the `Authorization` header.

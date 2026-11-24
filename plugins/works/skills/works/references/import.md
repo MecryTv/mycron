@@ -1,47 +1,47 @@
-# Import aus anderen Werkzeugen und Dateien
+# Import from other tools and files
 
-`works import` liest Aufgaben aus einer Datei, zeigt eine Vorschau und legt sie erst mit `--apply` an. Im Board unter Werkzeuge, Importieren, mit Vorschau und Auswahl.
+`works import` reads tasks from a file, shows a preview and only creates them with `--apply`. In the board under Tools, Import, with preview and selection.
 
-## Formate
+## Formats
 
-| Format | Datei | Was erkannt wird |
+| Format | File | What is recognized |
 |---|---|---|
-| Trello | JSON-Export eines Boards (Menü, Drucken und Exportieren, JSON) | Karten, Liste als Status, Labels als Tags und Priorität, Fälligkeit, Checklisten als Kriterien (Liste mit "Akzeptanz" oder die erste), weitere Checklisten als Schritte in der Beschreibung. Archivierte Karten nur mit `--include-archived` |
-| Notion | CSV-Export einer Datenbank, Markdown-Export oder ZIP mit beidem | Spalten wie bei CSV, Seiteninhalte als Beschreibung, Eigenschaften wie `Status: In progress` im Markdown |
-| Linear | CSV-Export | ID, Title, Description, Status, Priority, Estimate, Labels, Due Date |
-| CSV, TSV | beliebige Tabelle, auch aus Jira, Asana, GitHub Projects | Trennzeichen automatisch, Spalten über Namen auf Deutsch und Englisch |
-| Excel | .xlsx, .xlsm | erste Tabelle oder `--sheet Name`, Datumszellen, sonst wie CSV |
-| Word | .docx | Tabellen mit Kopfzeile wie CSV, Aufzählungen und nummerierte Listen als Aufgaben, eingerückte Punkte darunter als Kriterien, Kontrollkästchen (☐ ☒) als offen oder erledigt, Überschriften als Tags oder Status |
-| Markdown, Text | .md, .txt | `- [ ]` und `- [x]`, Listenpunkte, `TODO:` Zeilen, eingerückte Punkte als Kriterien, Überschriften als Tags. "Text: Beschreibung" teilt Titel und Beschreibung |
-| works | JSON mit einer Liste von Kandidaten | eigene, von Claude bereinigte Liste, siehe unten |
-| works-Sicherung | JSON aus `works export --json` oder dem Board (format works-board) | eigener Weg mit Zusammenführen oder Wiederherstellen, siehe cli.md und board.md, Abschnitt Sichern und Wiederherstellen |
+| Trello | JSON export of a board (menu, Print and export, JSON) | Cards, list as status, labels as tags and priority, due date, checklists as criteria (a list with "Acceptance" or "Akzeptanz" in its name, or the first one), further checklists as steps in the description. Archived cards only with `--include-archived` |
+| Notion | CSV export of a database, Markdown export, or a ZIP with both | Columns as with CSV, page content as description, properties like `Status: In progress` in the Markdown |
+| Linear | CSV export | ID, Title, Description, Status, Priority, Estimate, Labels, Due Date |
+| CSV, TSV | any table, also from Jira, Asana, GitHub Projects | Delimiter detected automatically, columns matched by name in English and German |
+| Excel | .xlsx, .xlsm | first sheet or `--sheet Name`, date cells, otherwise as CSV |
+| Word | .docx | Tables with a header row as CSV, bulleted and numbered lists as tasks, indented items below them as criteria, checkboxes (☐ ☒) as open or done, headings as tags or status |
+| Markdown, text | .md, .txt | `- [ ]` and `- [x]`, list items, `TODO:` lines, indented items as criteria, headings as tags. "Text: description" splits title and description |
+| works | JSON with a list of candidates | your own list, cleaned up by Claude, see below |
+| works backup | JSON from `works export --json` or from the board (format works-board) | separate path with merge or restore, see cli.md and board.md, section on backup and restore |
 
-Spalten, die keinem Feld zugeordnet sind, landen als Liste in der Beschreibung, damit nichts verloren geht. Werte werden übersetzt: Status (Done, Doing, In Bearbeitung, To Do …), Priorität (Urgent, Hoch, P1 …), Aufwand (Story Points, Stunden, Tage, S bis XL), Datum (ISO, 31.10.2026, 10/31/2026, Excel-Zahl, "31. Oktober 2026").
+Columns not mapped to a field end up as a list in the description so nothing is lost. Values are translated: status (Done, Doing, In Bearbeitung, To Do …), priority (Urgent, Hoch, P1 …), effort (story points, hours, days, S to XL), date (ISO, 31.10.2026, 10/31/2026, Excel number, "31. Oktober 2026").
 
-## Ablauf für Claude
+## Steps for Claude
 
-1. Vorschau: `works import <datei>`. Bei Tabellen zeigt die Ausgabe die Spaltenzuordnung. Stimmt sie nicht, mit `--map title=Aufgabe,status=Liste,description=Notiz` korrigieren. Felder: title, description, status, priority, tags, due, effort, type, key, criteria.
-2. Prüfen: Sind die Titel sinnvoll? Stimmen Typ und Priorität grob? Gibt es Einträge, die keine Aufgaben sind (Überschriften, Notizen)? Duplikate sind markiert (`schon importiert`, `ähnlich`, `doppelt in der Datei`) und abgewählt, Erledigtes ebenso.
-3. Bei mehr als etwa zehn Einträgen oder unsicherer Zuordnung dem Nutzer die Vorschau kurz zusammenfassen und fragen, ob alles übernommen werden soll, oder auf das Board verweisen, wo er auswählen kann.
-4. Anlegen: `works import <datei> --apply [--only 1,4,7 | --skip 3] [--status geplant] [--tags import]`. Mit `--include-done` werden erledigte Einträge als erledigt übernommen.
-5. Danach: Aufgaben ohne Beschreibung und Kriterien sind als unvollständig markiert. Nicht alle auf einmal nachfragen, sondern beim Start der jeweiligen Aufgabe.
+1. Preview: `works import <file>`. For tables the output shows the column mapping. If it is wrong, correct it with `--map title=Task,status=List,description=Note`. Fields: title, description, status, priority, tags, due, effort, type, key, criteria.
+2. Check: Do the titles make sense? Are type and priority roughly right? Are there entries that are not tasks (headings, notes)? Duplicates are marked (`already imported`, `similar`, `duplicate in file`) and deselected, and so is anything already done.
+3. With more than about ten entries or an uncertain mapping, briefly summarize the preview for the user and ask whether everything should be taken over, or point to the board, where they can pick.
+4. Create: `works import <file> --apply [--only 1,4,7 | --skip 3] [--status planned] [--tags import]`. With `--include-done`, done entries are imported as done. (Task files store the status as `geplant`, `in-arbeit`, `erledigt`, `verworfen`; the English inputs `planned`, `in-progress`, `done`, `dropped` work everywhere.)
+5. Afterwards: tasks without a description and criteria are marked incomplete. Do not ask about all of them at once, but when each task is started.
 
-Aufgaben, die im Quellsystem in Arbeit oder in Review waren, kommen nach Geplant, der Verlauf vermerkt den alten Status. Jede Aufgabe trägt `source: import:<format>:<schlüssel>`. Ein zweiter Import derselben Datei legt deshalb nichts doppelt an.
+Tasks that were in progress or in review in the source system go to Planned; the history records the old status. Every task carries `source: import:<format>:<key>`, so importing the same file a second time creates no duplicates.
 
-## Fließtext, Protokolle, E-Mails
+## Prose, minutes, emails
 
-Steht in einer Word-Datei oder einem Text keine Liste, sondern Fließtext ("Max kümmert sich bis Freitag um die Sponsorenseite"), erkennt der Import wenig. Dann liest Claude die Datei selbst (bei .docx mit dem docx Skill oder `works import --format md` für die Rohzeilen), schreibt die Aufgaben als JSON und importiert sie:
+If a Word file or text contains prose instead of a list ("Max will take care of the sponsor page by Friday"), the import recognizes little. Then Claude reads the file itself (for .docx with the docx skill, or `works import --format md` for the raw lines), writes the tasks as JSON and imports them:
 
 ```json
 [
-  { "title": "Sponsorenseite bauen", "description": "Aus dem Protokoll vom 30.10.", "priority": "P2", "due": "2026-11-06",
-    "tags": ["webseite"], "criteria": [{ "text": "Logos der drei Sponsoren", "done": false }], "type": "feature" }
+  { "title": "Build sponsor page", "description": "From the minutes of 30 Oct.", "priority": "P2", "due": "2026-11-06",
+    "tags": ["website"], "criteria": [{ "text": "Logos of the three sponsors", "done": false }], "type": "feature" }
 ]
 ```
 
 ```
-works import aufgaben.json            Vorschau
-works import aufgaben.json --apply
+works import tasks.json            preview
+works import tasks.json --apply
 ```
 
-So bleiben Duplikatschutz, Vorschau und Verlauf gleich. Erfundene Angaben (Termine, Prioritäten), die nicht im Text stehen, weglassen.
+That way duplicate protection, preview and history stay the same. Leave out invented details (dates, priorities) that are not in the text.

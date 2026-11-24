@@ -1,93 +1,95 @@
-# Aufgabenformat
+# Task format
 
-## Ordner einer Aufgabe
+## Folder of a task
 
 ```
-.works/tasks/W-0012-login-seite-ueberarbeiten/
-  task.md        Frontmatter und Inhalt der Aufgabe
-  decisions.md   Designentscheidungen (bei Typ design automatisch, sonst über works decisions)
-  assets/        Bilder und Dateien, gepflegt über works asset
-  docs/          kopierte oder verschobene Dokumente, etwa Brainstorm-Ergebnisse
+.works/tasks/W-0012-rework-login-page/
+  task.md        frontmatter and content of the task
+  decisions.md   design decisions (automatic for type design, otherwise via works decisions)
+  assets/        images and files, maintained via works asset
+  docs/          copied or moved documents, such as brainstorm results
 ```
 
-Der Ordnername entsteht beim Anlegen aus ID und Titel. Eine spätere Titeländerung benennt den Ordner nicht um, die ID bleibt die Referenz.
+The folder name is built from ID and title when the task is created. Changing the title later doesn't rename the folder; the ID stays the reference.
 
 ## Frontmatter
 
-Wird ausschließlich über das CLI geschrieben (`works new`, `works set`, `works link` und andere).
+Written only through the CLI (`works new`, `works set`, `works link` and others).
 
-| Feld | Werte | Bedeutung |
+| Field | Values | Meaning |
 |---|---|---|
-| id | `W-0012` | Eindeutige ID, Präfix in config.json |
-| title | Text | Kurz und konkret, beschreibt das Ergebnis |
-| type | feature, bug, refactor, spike, chore, design, debt | Bestimmt Vorlage und DoD-Prüfungen |
-| priority | P1 bis P4 | Siehe priorities.md |
-| status | backlog, geplant, in-arbeit, review, erledigt, verworfen | Siehe priorities.md |
-| effort | S, M, L, XL | Aufwandsschätzung |
-| risk | niedrig, mittel, hoch | Risikoeinschätzung |
-| created | Datum | Anlagedatum |
-| updated | Datum | Letzte Änderung über das CLI |
-| due | Datum | Optionale Frist |
-| completed | Datum | Abschluss- oder Verwerfungsdatum |
-| milestone | `M1` | Zugehöriger Meilenstein aus config.json |
-| branch | Text | Vorgeschlagener oder genutzter Git-Branch |
-| tags | Liste | Freie Schlagwörter. `ui` aktiviert zusätzliche DoD-Prüfungen, `intern` blendet die Aufgabe im Changelog aus |
-| blocked_by | Liste von IDs | Muss vorher erledigt sein |
-| blocks | Liste von IDs | Wartet auf diese Aufgabe (wird gegenseitig gepflegt) |
-| related | Liste von IDs | Inhaltlich verwandt |
-| source | Text | Herkunft: `manuell`, `todo:datei#hash`, `github#12`, `idee:I-003`, `stacktrace` |
-| incomplete | true, false | Schnell erfasst, Details fehlen noch |
-| reopened | Zahl | Wie oft wiedereröffnet |
-| issue | Text | Verknüpftes GitHub Issue nach `works gh-export` |
+| id | `W-0012` | Unique ID, prefix in config.json |
+| title | Text | Short and concrete, describes the result |
+| type | feature, bug, refactor, spike, chore, design, debt | Determines template and DoD checks |
+| priority | P1 to P4 | See priorities.md |
+| status | backlog, planned, in-progress, review, done, dropped | See priorities.md. The file stores `geplant`, `in-arbeit`, `erledigt` and `verworfen` for the planned, in-progress, done and dropped states |
+| effort | S, M, L, XL | Effort estimate |
+| risk | low, medium, high | Risk assessment. Stored as `niedrig`, `mittel`, `hoch` |
+| created | Date | Creation date |
+| updated | Date | Last change through the CLI |
+| due | Date | Optional deadline |
+| completed | Date | Date the task was done or dropped |
+| milestone | `M1` | Milestone from config.json |
+| branch | Text | Suggested or used Git branch |
+| tags | List | Free keywords. `ui` turns on additional DoD checks, `intern` hides the task in the changelog |
+| blocked_by | List of IDs | Must be done first |
+| blocks | List of IDs | Waits for this task (kept in sync on both sides) |
+| related | List of IDs | Related in content |
+| source | Text | Origin: `manuell`, `todo:file#hash`, `github#12`, `idee:I-003`, `stacktrace` |
+| incomplete | true, false | Captured quickly, details still missing |
+| reopened | Number | How often the task was reopened |
+| issue | Text | Linked GitHub issue after `works gh-export` |
 
-## Abschnitte je Typ
+## Sections per type
 
-Alle Typen haben am Ende: Assets, Offene Fragen, Übergabe, Verlauf.
+All types end with: Assets, Open questions, Handoff, History.
 
-| Typ | Abschnitte davor |
+| Type | Sections before that |
 |---|---|
-| feature | Ziel, Kontext und Problem, Nutzerperspektive, Akzeptanzkriterien, Umsetzungsplan, Betroffene Dateien, Designentscheidungen |
-| bug | Zusammenfassung, Reproduktion, Erwartetes Verhalten, Tatsächliches Verhalten, Umgebung, Logs und Fehlermeldungen, Ursache, Lösung, Akzeptanzkriterien, Betroffene Dateien |
-| refactor | Ziel, Ist-Zustand, Zielarchitektur, Motivation, Risiken, Rollback, Umsetzungsplan, Akzeptanzkriterien, Betroffene Dateien, Designentscheidungen |
-| spike | Forschungsfrage, Zeitlimit, Hypothesen, Vorgehen, Ergebnisse, Empfehlung, Folgeaufgaben, Akzeptanzkriterien |
-| chore | Beschreibung, Checkliste, Akzeptanzkriterien, Betroffene Dateien |
-| design | Ziel, Zielgruppe und Kontext, Referenzen, Varianten, Gewählte Lösung, Akzeptanzkriterien, Umsetzungsplan, Betroffene Dateien, Designentscheidungen |
-| debt | Abkürzung, Grund, Folgekosten und Risiko, Auslöser, Rückzahlung, Akzeptanzkriterien, Betroffene Dateien |
+| feature | Goal, Context and problem, User perspective, Acceptance criteria, Implementation plan, Affected files, Design decisions |
+| bug | Summary, Reproduction, Expected behavior, Actual behavior, Environment, Logs and error messages, Root cause, Solution, Acceptance criteria, Affected files |
+| refactor | Goal, Current state, Target architecture, Motivation, Risks, Rollback, Implementation plan, Acceptance criteria, Affected files, Design decisions |
+| spike | Research question, Timebox, Hypotheses, Approach, Results, Recommendation, Follow-up tasks, Acceptance criteria |
+| chore | Description, Checklist, Acceptance criteria, Affected files |
+| design | Goal, Audience and context, References, Variants, Chosen solution, Acceptance criteria, Implementation plan, Affected files, Design decisions |
+| debt | Shortcut taken, Reason, Follow-up costs and risk, Trigger, Repayment, Acceptance criteria, Affected files |
 
-Die Vorlagen liegen in `templates/`. Platzhalterkommentare (`<!-- ... -->`) beim Ausfüllen durch Inhalt ersetzen. Leere Abschnitte dürfen bestehen bleiben, Abschnittsüberschriften nicht umbenennen, weil das CLI sie für Prüfungen liest. Zusätzliche Abschnitte sind erlaubt (zum Beispiel `## Herkunft` bei importierten Aufgaben oder `## Commits` nach `works commits --write`).
+New tasks get their headings in the configured language. The CLI reads both the English and the German headings (Goal or Ziel, Acceptance criteria or Akzeptanzkriterien and so on), so older German tasks stay valid.
 
-## Abschnitt Beschreibung
+The templates are in `templates/`. Replace placeholder comments (`<!-- ... -->`) with content when filling them in. Empty sections may stay; don't rename section headings, because the CLI reads them for its checks. Additional sections are allowed (for example `## Origin` for imported tasks or `## Commits` after `works commits --write`).
 
-Die zentrale Stelle jeder Aufgabe: was passieren soll, warum, Hintergrund, Details, Links und Hinweise des Nutzers. Im Board-Dialog "Neue Aufgabe" gibt es dafür nur dieses eine Textfeld, im CLI `works new --description "..."`. Der Abschnitt steht direkt unter dem Hauptabschnitt der Vorlage (Ziel, Zusammenfassung und so weiter), bei Chores ist er selbst der Hauptabschnitt. Das Detailpanel zeigt ihn als ersten Abschnitt; ein Ziel nur, wenn es gefüllt ist. Claude liest die Beschreibung vor der Arbeit zuerst und behandelt sie als Vorgabe.
+## Description section
 
-## Schreibregeln für Inhalte
+The central place of every task: what should happen, why, background, details, links and notes from the user. The board's "New task" dialog has only this one text field for it, the CLI has `works new --description "..."`. The section sits directly below the template's main section (Goal, Summary and so on); for chores it is the main section itself. The detail panel shows it as the first section, and a goal only if it is filled in. Claude reads the description first before working and treats it as binding.
 
-- Ziel: Ein bis drei Sätze, die das Ergebnis beschreiben, nicht die Tätigkeit. Gut: "Neue Accounts erhalten nach der Verifizierung zuverlässig die Rolle Mitglied." Schlecht: "Verifizierung fixen."
-- Akzeptanzkriterien: Je Zeile eine prüfbare Aussage als Checkbox. Messbar, wo möglich ("Seite lädt unter 1,5 s auf 4G").
-- Umsetzungsplan: Kleine Schritte als Checkboxen. Unteraufgaben gehören hierher. Nur wenn ein Teil eigenständig priorisiert oder von jemand anderem erledigt wird, eine eigene Aufgabe anlegen und verknüpfen.
-- Betroffene Dateien: Pfade mit kurzer Notiz, zum Beispiel `src/commands/verify.ts: Rollenvergabe nach Captcha`.
-- Offene Fragen: `- [ ] Frage` über `works question`. Nach Klärung mit `works question <ID> --resolve <Nr> --answer "..."` abhaken, die Antwort fließt in den passenden Abschnitt ein.
-- Übergabe: Siehe workflow.md. Wird überschrieben, nicht ergänzt.
-- Verlauf: Nur über das CLI (`works log`). Format `- JJJJ-MM-TT: Text`. Hält Entscheidungen, Statuswechsel und wichtige Zwischenstände fest, kein Tagebuch jeder Kleinigkeit.
+## Writing rules for content
+
+- Goal: one to three sentences describing the result, not the activity. Good: "New accounts reliably get the Member role after verification." Bad: "Fix verification."
+- Acceptance criteria: one checkable statement per line as a checkbox. Measurable where possible ("Page loads in under 1.5 s on 4G").
+- Implementation plan: small steps as checkboxes. Subtasks belong here. Only create a separate task and link it if a part gets its own priority or is done by someone else.
+- Affected files: paths with a short note, for example `src/commands/verify.ts: role assignment after captcha`.
+- Open questions: `- [ ] Question` via `works question`. Once settled, check it off with `works question <ID> --resolve <no> --answer "..."`; the answer goes into the matching section.
+- Handoff: see workflow.md. It is overwritten, not appended to.
+- History: only through the CLI (`works log`). Format `- YYYY-MM-DD: text`. Records decisions, status changes and important milestones, not a diary of every small step.
 
 ## decisions.md
 
-Aufbau:
+Structure:
 
-- Quellen: Links auf Brainstorm-Dokumente, UI UX Pro Max Ausgaben, Referenzen
-- Brainstorm-Zusammenfassung: Problemverständnis, betrachtete Ansätze, Ergebnis in eigenen Worten
-- Entscheidungen: nummerierte Blöcke E1, E2 mit Datum, Quelle, Kontext, Entscheidung, Begründung, verworfenen Alternativen samt Grund und Konsequenzen
-- UI und UX: Stil, Farbpalette als Tabelle, Typografie, Layout und Abstände, Komponenten, Barrierefreiheit, verworfene Varianten
+- Sources: links to brainstorm documents, UI UX Pro Max output, references
+- Brainstorm summary: understanding of the problem, approaches considered, result in your own words
+- Decisions: numbered blocks E1, E2 with date, source, context, decision, reasoning, rejected alternatives with their reasons, and consequences
+- UI and UX: style, color palette as a table, typography, layout and spacing, components, accessibility, rejected variants
 
-Verworfene Alternativen sind Pflicht, sobald es welche gab. Gerade das Warum geht sonst als Erstes verloren.
+Rejected alternatives are mandatory as soon as there were any. The why is the first thing to get lost otherwise.
 
-Neue Entscheidung per CLI:
+New decision via the CLI:
 
 ```
-works decisions W-0012 --add "Kartenlayout statt Tabelle" \
-  --decision "Aufgaben als Karten im Raster" --why "Mobil besser lesbar" \
-  --rejected "Tabelle: horizontales Scrollen auf Mobil,Liste: zu wenig Platz für Vorschaubilder" \
+works decisions W-0012 --add "Card layout instead of table" \
+  --decision "Tasks as cards in a grid" --why "Easier to read on mobile" \
+  --rejected "Table: horizontal scrolling on mobile,List: too little room for preview images" \
   --source "UI UX Pro Max"
 ```
 
-`--rejected` trennt Alternativen mit Komma.
+`--rejected` separates alternatives with commas.

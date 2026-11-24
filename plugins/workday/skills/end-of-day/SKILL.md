@@ -1,60 +1,62 @@
 ---
 name: end-of-day
-description: Verwenden, wenn der Nutzer den Arbeitstag in einem Projekt beendet, etwa mit "Feierabend", "Schluss für heute", "wir machen morgen weiter", "für heute reicht's" oder "Board stoppen, morgen geht's weiter".
+description: Use when the user ends the workday in a project, for example with "end of day", "done for today", "let's continue tomorrow", "that's enough for today" or "stop the board, we'll continue tomorrow" (also the German "Feierabend", "Schluss für heute", "wir machen morgen weiter").
 ---
 
-# Feierabend
+> **Language:** English is the default. If the configured language is German (`works lang` shows `de`, or the SessionStart hook says `Language: de`; without works: `"language": "de"` in `.works/config.json` or `~/.works/settings.json`), read [SKILL.de.md](SKILL.de.md) instead and answer the user in German. For any other language, use these English docs and answer in that language.
 
-Schließt den Tag so ab, dass der Skill good-morning am nächsten Tag ohne Rückfragen weitermachen kann: Übergaben für alles in Arbeit, Stand gesichert, Board aus, kurze Bilanz.
+# End of day
 
-Braucht das works-Plugin. `works` steht unten für das works-CLI, aufgerufen wie im works-Skill beschrieben (Skill works:works), immer im Projektordner.
+Wraps up the day so the good-morning skill can continue the next day without asking: handoffs for everything in progress, state saved, board off, a short summary.
 
-## Ohne works
+Requires the works plugin. `works` below stands for the works CLI, called as described in the works skill (skill works:works), always in the project folder.
 
-Hat das Projekt kein `.works/`: sagen, dass Feierabend Übergaben und Board nur mit works kennt, offene Code-Änderungen nennen (`git status --short`) und anbieten, sie zu committen. Sonst nichts tun.
+## Without works
 
-## Ablauf
+If the project has no `.works/`: say that end of day only knows handoffs and the board with works, name uncommitted code changes (`git status --short`) and offer to commit them. Do nothing else.
 
-Alle neun Schritte, in dieser Reihenfolge:
+## Steps
 
-1. **Stand erheben:** `works status`, `works list --status in-arbeit`, `works report --days 1`, `works time --today` (Verbrauch von heute), `git status --short` und der aktuelle Branch.
-2. **Übergabe je Aufgabe in Arbeit:** `works handoff <ID> --text "..."`. Inhalt jeder Übergabe:
-   - was erledigt ist,
-   - was offen ist,
-   - der nächste konkrete Schritt (Datei, Funktion, Befehl),
-   - offene Fragen an den Nutzer,
-   - Branch und ob dort Code uncommittet liegt.
+All nine steps, in this order:
 
-   Die aktive Aufgabe (aus `works status`) als letzte schreiben: `works handoff` macht die Aufgabe, deren Übergabe es schreibt, zur aktiven.
-3. **Code nicht ungefragt committen:** Uncommittete Änderungen außerhalb von `.works` bleiben liegen und kommen in die Nachricht (Dateien, Branch).
-4. **Tagesbericht speichern:** `works report --days 1 --write`, die Ausgabe nennt die Datei in `.works/reports/`.
-5. **`.works` sichern:** Liefert `git ls-files .works` etwas, nur `.works` committen: `git add .works` und `git commit -m "works: Feierabend <Datum>"`. Nie pushen. Liegt `.works` nicht im Git, nichts committen.
-6. **Nicht Gepushtes ermitteln:** `git for-each-ref --format="%(refname:short) %(upstream:short) %(upstream:track)" refs/heads`. Zweige mit `ahead` haben Commits, die noch nicht auf dem Remote sind, der Feierabend-Commit aus Schritt 5 meist mit dabei. Zweige ohne Upstream zählen mit, wenn `git log --oneline origin/HEAD..<zweig>` etwas liefert (der Hauptbranch des Remotes; ein lokaler `main` muss nicht existieren). Nichts pushen, nur in die Nachricht nehmen.
-7. **Hintergrund aufräumen:** Was du in dieser Sitzung im Hintergrund gestartet hast und nicht mehr gebraucht wird, beenden: Test-Server (etwa ein Board aus einer Kopie auf einem anderen Port), Watcher, laufende Hintergrund-Befehle. Laufende Superpowers-Begleiter finden sich als Ordner unter `.superpowers/brainstorm/` mit `state/server-info` und ohne `state/server-stopped`; beenden mit `stop-server.sh <Sitzungsordner>` aus dem Skill superpowers:brainstorming. Prozesse, die der Nutzer selbst gestartet hat, und Programme wie Docker Desktop nicht anfassen.
-8. **Board stoppen:** `works board --stop`.
-9. **Nachricht an den Nutzer** in der Form unten.
+1. **Gather the state:** `works status`, `works list --status in-progress`, `works report --days 1`, `works time --today` (today's usage), `git status --short` and the current branch. Task files store the status as `in-arbeit`; the English input `in-progress` works too.
+2. **Handoff for each task in progress:** `works handoff <ID> --text "..."`. Each handoff contains:
+   - what is done,
+   - what is open,
+   - the next concrete step (file, function, command),
+   - open questions for the user,
+   - the branch and whether uncommitted code is lying there.
 
-## Nachricht
+   Write the active task (from `works status`) last: `works handoff` makes the task whose handoff it writes the active one.
+3. **Do not commit code unasked:** uncommitted changes outside `.works` stay where they are and go into the message (files, branch).
+4. **Save the daily report:** `works report --days 1 --write`; the output names the file in `.works/reports/`.
+5. **Save `.works`:** if `git ls-files .works` returns something, commit only `.works`: `git add .works` and `git commit -m "works: end of day <date>"`. Never push. If `.works` is not in Git, commit nothing.
+6. **Find what is not pushed:** `git for-each-ref --format="%(refname:short) %(upstream:short) %(upstream:track)" refs/heads`. Branches with `ahead` have commits that are not on the remote yet, usually including the end-of-day commit from step 5. Branches without an upstream count if `git log --oneline origin/HEAD..<branch>` returns something (the remote's main branch; a local `main` does not have to exist). Push nothing, only include it in the message.
+7. **Clean up the background:** stop whatever you started in the background in this session and no longer need: test servers (such as a board from a copy on a different port), watchers, running background commands. Running Superpowers companions show up as folders under `.superpowers/brainstorm/` with `state/server-info` and without `state/server-stopped`; stop them with `stop-server.sh <session folder>` from the superpowers:brainstorming skill. Do not touch processes the user started themselves, or programs like Docker Desktop.
+8. **Stop the board:** `works board --stop`.
+9. **Message to the user** in the form below.
 
-Kurz, in dieser Form:
+## Message
 
-- **Heute erledigt:** Aufgaben aus dem Tagesbericht, sonst "nichts abgeschlossen".
-- **In Arbeit:** je Aufgabe ID, Titel und der nächste Schritt aus der Übergabe.
-- **Wartet auf dich:** Aufgaben im Review und offene Fragen. Zeile weglassen, wenn nichts wartet.
-- **Morgen zuerst:** eine Aufgabe mit einem Satz Begründung. Reihenfolge: die aktive Aufgabe, dann andere Aufgaben in Arbeit nach Priorität, dann die Warteschlange des Nutzers (`works queue`), dann `works next`.
-- **Verbrauch heute:** Tokens und geschätzte Kosten aus `works time --today`.
-- **Gesichert:** was committet wurde, der gespeicherte Tagesbericht, was uncommittet liegen bleibt, welche Zweige wie viele Commits vor dem Remote liegen, was aufgeräumt wurde, Board gestoppt.
+Short, in this form:
 
-Die Nachricht endet mit höchstens zwei nummerierten Fragen, nur wenn es den Anlass gibt: ob uncommittete Code-Änderungen als Zwischenstand auf dem Branch committet werden sollen, und ob die nicht gepushten Commits gepusht werden sollen. Sonst endet sie ohne Frage.
+- **Done today:** tasks from the daily report, otherwise "nothing finished".
+- **In progress:** per task the ID, title and the next step from the handoff.
+- **Waiting for you:** tasks in review and open questions. Leave the line out if nothing is waiting.
+- **First tomorrow:** one task with one sentence of reasoning. Order: the active task, then other tasks in progress by priority, then the user's queue (`works queue`), then `works next`.
+- **Usage today:** tokens and estimated cost from `works time --today`.
+- **Saved:** what was committed, the saved daily report, what stays uncommitted, which branches are how many commits ahead of the remote, what was cleaned up, board stopped.
 
-## Häufige Fehler
+The message ends with at most two numbered questions, only when there is a reason: whether uncommitted code changes should be committed on the branch as work in progress, and whether the unpushed commits should be pushed. Otherwise it ends without a question.
 
-| Fehler | Richtig |
+## Common mistakes
+
+| Mistake | Instead |
 |---|---|
-| Übergabe nur für die aktive Aufgabe | Für jede Aufgabe mit Status in Arbeit |
-| Aktive Aufgabe wechselt still | Ihre Übergabe als letzte schreiben |
-| `.works` nicht gesichert, stattdessen nachgefragt | Committen, wenn `.works` im Git liegt |
-| Gepusht | Nie pushen, auch nicht bei grünem Stand; nur nennen und fragen |
-| Bilanz ohne Erledigtes | Tagesbericht lesen, Erledigtes nennen |
-| Tagesbericht nur gelesen | Mit `--write` speichern |
-| Prozesse des Nutzers beendet | Nur beenden, was du in dieser Sitzung gestartet hast |
+| Handoff only for the active task | For every task with status in progress |
+| Active task changes silently | Write its handoff last |
+| `.works` not saved, asked instead | Commit if `.works` is in Git |
+| Pushed | Never push, not even when everything is green; only name it and ask |
+| Summary without what got done | Read the daily report, name what is done |
+| Daily report only read | Save it with `--write` |
+| Stopped the user's processes | Only stop what you started in this session |
