@@ -3,13 +3,13 @@ id: W-0051
 title: Discord-Panel zeigt Projekte ohne .works-Ordner
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-24
 updated: 2026-11-24
 due:
-completed:
+completed: 2026-11-24
 milestone:
 branch: fix/w-0051-discord-panel-zeigt-projekte
 tags: [discord]
@@ -75,9 +75,7 @@ discord-bot.mjs: tick() merkt sich die rootIds aus projectList() und ruft forget
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-24 22:02
-
-Fertig: forget() im Bot (discord-bot.mjs), Test „Panel nur mit Projekten, die .works haben (W-0051)“ war rot und ist grün. Selbsttest mit Browser 56/56, ohne WebSocket 49/49, works-bot grün. Doku in integrations.md und cli.md (beide Sprachen).
+Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -90,3 +88,4 @@ Fertig: forget() im Bot (discord-bot.mjs), Test „Panel nur mit Projekten, die 
 - 2026-11-24: Akzeptanzkriterien: "Ein Projekt, das kurz nicht lesbar ist (etwa beim Branch-Wechsel), fällt nicht sofort heraus" abgehakt
 - 2026-11-24: Test zuerst (rot: Panel ohne gelöschte Projekte abgelaufen), Korrektur forget() im Bot, Discord-Schritte 15/15 grün
 - 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
