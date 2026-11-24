@@ -3,13 +3,13 @@ id: W-0047
 title: Status des Bots geht nach einer Gateway-Fortsetzung verloren
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-24
 updated: 2026-11-24
 due:
-completed:
+completed: 2026-11-24
 milestone:
 branch: fix/w-0047-status-des-bots-geht-nach
 tags: [discord]
@@ -70,9 +70,7 @@ setStatus merkt sich bei getrennter Verbindung, dass der Status noch aussteht; b
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-24 16:41
-
-Behoben: Gateway sendet einen während der Trennung geänderten Status nach RESUMED. Regressionstest im Selbsttest, Discord-Schritte 11/11 mit und ohne WebSocket. Code-Audit: kleine Änderung, nichts gefunden.
+Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -81,3 +79,4 @@ Behoben: Gateway sendet einen während der Trennung geänderten Status nach RESU
 - 2026-11-24: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
 - 2026-11-24: Akzeptanzkriterien: "Ein während der Trennung geänderter Status wird nach RESUMED gesendet" abgehakt
 - 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
