@@ -58,3 +58,4 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
+- 2026-11-24: Priorität: P3 → P3
