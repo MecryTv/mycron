@@ -76,8 +76,8 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
 
 ## Offene Fragen
-- [ ] Bestehende Projekte haben durch das alte works init "language": "de" in .works/config.json. Das zählt jetzt als Projekt-Einstellung und hat Vorrang vor der globalen Sprache (works lang zeigt das an, works lang --reset --project entfernt es). So lassen oder alte Einträge bei der Migration entfernen, damit nur die globale Einstellung gilt?
-- [ ] Sollen die README.md der Plugins und des Repos auch englisch werden (mit README.de.md), oder bleiben sie deutsch? Sie gehörten nicht zum Plan.
+- [x] Bestehende Projekte haben durch das alte works init "language": "de" in .works/config.json. Das zählt jetzt als Projekt-Einstellung und hat Vorrang vor der globalen Sprache (works lang zeigt das an, works lang --reset --project entfernt es). So lassen oder alte Einträge bei der Migration entfernen, damit nur die globale Einstellung gilt? Antwort: Nutzer am 2026-11-24: Migration entfernt den alten automatisch geschriebenen Eintrag language=de einmalig, dann gilt die globale Sprache.
+- [x] Sollen die README.md der Plugins und des Repos auch englisch werden (mit README.de.md), oder bleiben sie deutsch? Sie gehörten nicht zum Plan. Antwort: Nutzer am 2026-11-24: Ja, README.md englisch mit README.de.md daneben (Plugins und Repo).
 
 ## Übergabe
 Stand: 2026-11-24 16:56
@@ -108,3 +108,5 @@ Sonst offen: selftest.mjs gibt seine eigenen Zeilen (FEHLER, 'x von y Prüfungen
 - 2026-11-24: Umsetzungsplan: "Phase 7, Plugins workday, ci-watch, mockups: Skript-Ausgaben ebenso; Selbsttest und Plugin-Tests in beiden Sprachen grün (einmal WORKS_LANG=de, einmal en für die englischen Prüfungen)." abgehakt
 - 2026-11-24: Phase 7 fertig: ci-watch und mockups über tr() mit eigenem Katalog, Plugin-Tests in beiden Sprachen grün; Selbsttest 42/42 grün
 - 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Frage 1 geklärt: Nutzer am 2026-11-24: Migration entfernt den alten automatisch geschriebenen Eintrag language=de einmalig, dann gilt die globale Sprache.
+- 2026-11-24: Frage 1 geklärt: Nutzer am 2026-11-24: Ja, README.md englisch mit README.de.md daneben (Plugins und Repo).

@@ -7,6 +7,15 @@
         "rule": "overused-font",
         "value": "geist",
         "createdAt": "2026-11-21T13:18:24.074Z"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "plugins/works/skills/works/scripts/board/board.css"
+        ],
+        "createdAt": "2026-11-24T15:58:56.433Z",
+        "reason": "Claude: Die Discord-Vorschau (.dc-emb, W-0038) bildet den 4px-Farbrand von Discord-Embeds originalgetreu nach; sonst feuert die Regel in der Datei nicht"
       }
     ]
   }
