@@ -141,6 +141,17 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(!('language' in JSON.parse(fs.readFileSync(cfgFile, 'utf8'))), 'language bleibt in config.json');
     has(wl(['lang', '--reset']).out, 'Language: English (en), default');
     expect(wl(['lang', 'xx'], { ok: false }).code !== 0, 'unbekannte Sprache wird angenommen');
+    // Alte works init schrieben "language": "de" ungefragt: einmalig entfernen, danach gilt die globale Sprache.
+    // Eine mit works lang --project gesetzte Sprache bleibt (Kennzeichen language-1 in migrations).
+    const cfgNow = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+    fs.writeFileSync(cfgFile, JSON.stringify({ ...cfgNow(), language: 'de', migrations: (cfgNow().migrations || []).filter((x) => x !== 'language-1') }, null, 2));
+    has(wl(['lang']).out, 'Language: English (en), default', 'altes language aus works init wird ignoriert');
+    expect(!('language' in cfgNow()) && cfgNow().migrations.includes('language-1'), `Migration hat language nicht entfernt: ${JSON.stringify(cfgNow())}`);
+    has(wl(['lang', 'de', '--project']).out, 'Sprache: Deutsch (de), für dieses Projekt');
+    expect(cfgNow().language === 'de' && cfgNow().migrations.filter((x) => x === 'language-1').length === 1, 'Projekt-Sprache ohne Kennzeichen');
+    wl(['list']);
+    has(wl(['lang']).out, 'Sprache: Deutsch (de), für dieses Projekt', 'bewusst gesetzte Projekt-Sprache bleibt');
+    wl(['lang', '--reset', '--project']);
     const { placeholders } = await import(pathToFileURL(path.join(HERE, 'i18n.mjs')).href);
     const de = JSON.parse(fs.readFileSync(path.join(HERE, 'i18n', 'de.json'), 'utf8'));
     for (const [en, tr] of Object.entries(de)) expect(placeholders(en).join() === placeholders(tr).join(), `de.json: Platzhalter verschieden in "${en}"`);
@@ -149,7 +160,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const files = [...fs.readdirSync(HERE).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HERE, f)), ...fs.readdirSync(HOOKS).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HOOKS, f))];
     const missing = [];
     for (const f of files) {
-      const src = fs.readFileSync(f, 'utf8');
+      // Zeilenenden wie JavaScript in Template-Strings: CRLF zählt als \n (Git unter Windows checkt mit CRLF aus).
+      const src = fs.readFileSync(f, 'utf8').replace(/\r\n?/g, '\n');
       if (!/import \{[^}]*\btr?\b[^}]*\} from '[./]*(scripts\/)?i18n\.mjs'/.test(src)) continue;
       for (const m of src.matchAll(/\btr?\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.)*)`)\s*[,)]/g)) {
         const key = unesc(m[1] ?? m[2] ?? m[3]);

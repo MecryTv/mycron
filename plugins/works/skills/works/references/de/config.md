@@ -57,7 +57,7 @@ Sie steht im Feld `language`, global in `~/.works/settings.json` oder für ein P
 { "language": "de" }
 ```
 
-Vorrang hat die Umgebungsvariable `WORKS_LANG`, dann das Projekt, dann die globale Einstellung, sonst gilt Englisch (`en`). Am einfachsten über `works lang` (zeigen), `works lang de` (global), `works lang de --project` und `works lang --reset [--project]` (Einstellung entfernen).
+Vorrang hat die Umgebungsvariable `WORKS_LANG`, dann das Projekt, dann die globale Einstellung, sonst gilt Englisch (`en`). Am einfachsten über `works lang` (zeigen), `works lang de` (global), `works lang de --project` und `works lang --reset [--project]` (Einstellung entfernen). Eine Projekt-Sprache gilt nur, wenn sie mit `works lang --project` gesetzt wurde (Kennzeichen `language-1` in `migrations`). Ältere Projekte bekamen `"language": "de"` ungefragt von `works init`; works entfernt diesen Eintrag einmalig, danach gilt die globale Einstellung.
 
 ## Wiederkehrende Aufgaben
 

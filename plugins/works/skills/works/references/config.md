@@ -57,7 +57,7 @@ It is stored in the field `language`, globally in `~/.works/settings.json` or fo
 { "language": "de" }
 ```
 
-The environment variable `WORKS_LANG` takes precedence, then the project, then the global setting, otherwise English (`en`) applies. The easiest way is `works lang` (show), `works lang de` (global), `works lang de --project` and `works lang --reset [--project]` (remove the setting).
+The environment variable `WORKS_LANG` takes precedence, then the project, then the global setting, otherwise English (`en`) applies. The easiest way is `works lang` (show), `works lang de` (global), `works lang de --project` and `works lang --reset [--project]` (remove the setting). A project language only counts when set with `works lang --project` (marker `language-1` in `migrations`). Older projects got `"language": "de"` from `works init` without being asked; works removes that entry once, after that the global setting applies.
 
 ## Recurring tasks
 

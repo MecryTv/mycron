@@ -49,7 +49,7 @@ import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
 import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion, lastPort, OWN_CLI } from './server-control.mjs';
 import { BOARD_VIEWS, loadPlaywright, takeShots, boardPrepare } from './shot.mjs';
-import { tr, languages, languageSource, setLanguage, normLang, settingsFile, LANGUAGE_NAMES, variants } from './i18n.mjs';
+import { tr, languages, languageSource, setLanguage, normLang, settingsFile, LANGUAGE_NAMES, variants, LANG_MIGRATION } from './i18n.mjs';
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
 const ASSET_KINDS = ['ist', 'vorher', 'nachher', 'referenz', 'mockup', 'skizze', 'fehler', 'diagramm'];
@@ -2844,6 +2844,8 @@ function cmdLang() {
     const file = flags.project ? configFile : settingsFile();
     const data = readJson(file, {}) || {};
     if (lang) data.language = lang; else delete data.language;
+    // Kennzeichen der Migration: eine bewusst gesetzte Projekt-Sprache wird nie als Altlast entfernt (i18n.mjs).
+    if (flags.project && lang && !(data.migrations || []).includes(LANG_MIGRATION)) data.migrations = [...(data.migrations || []), LANG_MIGRATION];
     writeJson(file, data);
     setLanguage(null);
   }

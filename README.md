@@ -1,6 +1,8 @@
 # mycron
 
-Plugins für Claude Code von MecryTv.
+> English. Deutsche Fassung: [README.de.md](README.de.md)
+
+Plugins for Claude Code by MecryTv.
 
 ```
 /plugin marketplace add MecryTv/mycron
@@ -12,9 +14,9 @@ Plugins für Claude Code von MecryTv.
 
 ## Plugins
 
-| Plugin | Beschreibung |
+| Plugin | Description |
 |---|---|
-| [works](plugins/works/README.md) | Aufgabenverwaltung in `.works/` mit Live-Board, Warteschlange, Sprints, Zeitleiste, Abhängigkeitsgraph, Kommentaren an Claude, Vorlagen, automatischen Prüfungen, Zeiterfassung, Wochenbericht und Teilen im Netzwerk |
-| [workday](plugins/workday/README.md) | Feierabend und Guten Morgen: Übergaben schreiben, `.works` sichern, Board stoppen, Tag zusammenfassen und am nächsten Morgen dort weitermachen (braucht works) |
-| [ci-watch](plugins/ci-watch/README.md) | Wartet nach einem Push auf den GitHub-Actions-Lauf zum Commit und meldet grün oder rot, bei rot mit Job, Schritt und Fehlerstelle. Ohne `gh`, für öffentliche Repos ohne Token |
-| [mockups](plugins/mockups/README.md) | Varianten als HTML-Entwurf mit den echten Styles des Projekts, Screenshots in drei Breiten hell und dunkel, Prüfung auf seitliches Scrollen und Fehler, Anhängen an works-Aufgaben |
+| [works](plugins/works/README.md) | Task management in `.works/` with live board, queue, sprints, timeline, dependency graph, comments to Claude, templates, automatic checks, time tracking, weekly report and sharing on the network |
+| [workday](plugins/workday/README.md) | End of day and good morning: write handoffs, save `.works`, stop the board, sum up the day and pick up there the next morning (needs works) |
+| [ci-watch](plugins/ci-watch/README.md) | After a push, waits for the GitHub Actions run for the commit and reports green or red, for red with job, step and error location. Without `gh`, for public repos without a token |
+| [mockups](plugins/mockups/README.md) | Variants as HTML mockups with the project's real styles, screenshots at three widths in light and dark, checks for horizontal scrolling and errors, attaching to works tasks |
