@@ -1,18 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-24 19:57 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-24 21:39 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 1 | 0 | 1 | 0 | 1 | 0 | 47 | 0 |
+| 3 | 0 | 0 | 1 | 3 | 0 | 47 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 2 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 4 · P3 Mittel: 0 · P4 Niedrig: 0
 
 ## Aktive Aufgabe
 
-[W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) Alles auf Englisch, Sprache umschaltbar (In Arbeit), letzte Übergabe 2026-11-24 19:55
+[W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) Alles auf Englisch, Sprache umschaltbar (Review), letzte Übergabe 2026-11-24 20:46
 
 ## Kritisch (P1)
 
@@ -22,17 +22,21 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | In Arbeit | XL |  |  |  |
+| [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | Review | XL |  |  |  |
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
 | [W-0049](tasks/W-0049-hub-als-einstieg-zweites-board-startet/task.md) | Hub als Einstieg: zweites Board startet nicht selbst, Port erst beim Klick im Hub | Feature | P2 Hoch | Backlog | M |  |  | blockiert durch W-0041 |
+| [W-0050](tasks/W-0050-discord-nachrichten-nach-10-s-loeschen/task.md) | Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard | Feature | P2 Hoch | Backlog | M |  |  | blockiert durch W-0041 |
+| [W-0051](tasks/W-0051-discord-panel-zeigt-projekte-ohne-works/task.md) | Discord-Panel zeigt Projekte ohne .works-Ordner | Bug | P2 Hoch | Backlog | S |  |  | blockiert durch W-0041 |
 
 ## Blockiert
 
 - [W-0049](tasks/W-0049-hub-als-einstieg-zweites-board-startet/task.md) Hub als Einstieg: zweites Board startet nicht selbst, Port erst beim Klick im Hub: wartet auf W-0041
+- [W-0050](tasks/W-0050-discord-nachrichten-nach-10-s-loeschen/task.md) Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard: wartet auf W-0041
+- [W-0051](tasks/W-0051-discord-panel-zeigt-projekte-ohne-works/task.md) Discord-Panel zeigt Projekte ohne .works-Ordner: wartet auf W-0041
 
 ## Zuletzt erledigt
 

@@ -2,7 +2,7 @@
   "version": 1,
   "id_prefix": "W",
   "id_digits": 4,
-  "next_id": 50,
+  "next_id": 52,
   "next_idea_id": 2,
   "language": "de",
   "milestones": [],
@@ -125,7 +125,11 @@
     "days": 7
   },
   "handoff_stale_days": 3,
-  "queue": [],
+  "queue": [
+    "W-0051",
+    "W-0050",
+    "W-0049"
+  ],
   "queue_settings": {
     "auto_next": false,
     "skip_blocked": true,

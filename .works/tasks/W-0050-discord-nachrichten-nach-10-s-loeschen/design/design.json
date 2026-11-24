@@ -1,0 +1,83 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "V1",
+      "title": "Liste, neueste zuerst",
+      "file": "V1-liste-neueste-zuerst.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "",
+      "at": "2026-11-24 20:45"
+    },
+    {
+      "name": "V2",
+      "title": "Nach Tagen, Eintrag aufklappen",
+      "file": "V2-nach-tagen-eintrag-aufklappen.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "",
+      "at": "2026-11-24 20:45"
+    },
+    {
+      "name": "V3",
+      "title": "Filter nach Art",
+      "file": "V3-filter-nach-art.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "",
+      "at": "2026-11-24 20:45"
+    },
+    {
+      "name": "B1",
+      "title": "Zeitstrahl als Bild",
+      "file": "B1-zeitstrahl-als-bild.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Bild je Projekt eine Spur über 24 Stunden, darunter die letzten Einträge; Eintrag ansehen",
+      "at": "2026-11-24 20:50"
+    },
+    {
+      "name": "B2",
+      "title": "Karten wie im Kanal",
+      "file": "B2-karten-wie-im-kanal.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Bild mit Zahl je Art, darunter bis zu 8 Nachrichten als Karten in ihrer Farbe",
+      "at": "2026-11-24 20:50"
+    },
+    {
+      "name": "B3",
+      "title": "Tagesbild und Liste",
+      "file": "B3-tagesbild-und-liste.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Säulen je Stunde nach Art, Liste nach Tagen, tageweise blättern",
+      "at": "2026-11-24 20:50"
+    },
+    {
+      "name": "P1",
+      "title": "Panel im Feinschliff",
+      "file": "P1-panel-im-feinschliff.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Bisheriges Panel mit klarerem Text (Zusammenfassung, Aufgabe je Projekt, Kosten als Summe) und verbessertem Bild (Ampel je Projekt, Aufgabe am Balken, heute hervorgehoben), Knopf Verlauf",
+      "at": "2026-11-24 20:56"
+    },
+    {
+      "name": "P2",
+      "title": "Panel weiterentwickelt mit 24-Stunden-Spuren",
+      "file": "P2-panel-weiterentwickelt-mit-24.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Wie P1, Bild zusätzlich mit den letzten 24 Stunden je Projekt als Spur; Text knapper; Verlauf-Ansicht nach dem Klick",
+      "at": "2026-11-24 20:56"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": {
+    "name": "P2",
+    "at": "2026-11-24 20:58",
+    "reason": "Nutzer am 2026-11-24: P2 mit Spuren. Panel bleibt, Bild bekommt die letzten 24 Stunden je Projekt als Spur, Text knapper, Verlauf-Ansicht wie gezeigt"
+  }
+}
