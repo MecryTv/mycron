@@ -1,6 +1,6 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-24 14:46 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-24 14:57 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
@@ -12,7 +12,7 @@ Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 3 · P3 Mittel: 0 · P4 Niedri
 
 ## Aktive Aufgabe
 
-[W-0044](tasks/W-0044-discord-ein-dashboard-mit-bild-statt/task.md) Discord: ein Dashboard mit Bild statt Statuspost je Projekt, Status des Bots (In Arbeit), letzte Übergabe 2026-11-23 21:00
+[W-0044](tasks/W-0044-discord-ein-dashboard-mit-bild-statt/task.md) Discord: ein Dashboard mit Bild statt Statuspost je Projekt, Status des Bots (In Arbeit), letzte Übergabe 2026-11-24 14:54
 
 ## Kritisch (P1)
 

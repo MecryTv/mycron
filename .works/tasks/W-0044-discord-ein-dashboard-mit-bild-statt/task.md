@@ -37,13 +37,13 @@ Wunsch des Nutzers am 2026-11-23: Der Kanal soll sauber bleiben. Dauerhaft steht
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Eine angeheftete Dashboard-Nachricht statt je Projekt eine; alte Statusposts werden aufgeräumt
-- [ ] Bild nach D3 ohne Abhängigkeiten und ohne fremden Dienst, höchstens alle 5 Minuten neu
-- [ ] Auswahlmenü zeigt Projektdetails nur dem Aufrufer, die Knöpfe funktionieren
-- [ ] Status des Bots zeigt, was gerade wichtig ist
-- [ ] Im Kanal bleibt dauerhaft nur das Dashboard; andere Nachrichten löscht der Bot nach der Frist (Standard 24 h, einstellbar), offene erst 24 h nach ihrer Erledigung
-- [ ] Löschen geht beim eigenen und beim gemeinsamen Bot, nur eigene Nachrichten, nichts geht beim Neustart verloren
-- [ ] Discord-Grenzen eingehalten, Tests ohne echtes Discord
+- [x] Eine angeheftete Dashboard-Nachricht statt je Projekt eine; alte Statusposts werden aufgeräumt
+- [x] Bild nach D3 ohne Abhängigkeiten und ohne fremden Dienst, höchstens alle 5 Minuten neu
+- [x] Auswahlmenü zeigt Projektdetails nur dem Aufrufer, die Knöpfe funktionieren
+- [x] Status des Bots zeigt, was gerade wichtig ist
+- [x] Im Kanal bleibt dauerhaft nur das Dashboard; andere Nachrichten löscht der Bot nach der Frist (Standard 24 h, einstellbar), offene erst 24 h nach ihrer Erledigung
+- [x] Löschen geht beim eigenen und beim gemeinsamen Bot, nur eigene Nachrichten, nichts geht beim Neustart verloren
+- [x] Discord-Grenzen eingehalten, Tests ohne echtes Discord
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
@@ -81,12 +81,9 @@ Art: nachher · Hinzugefügt: 2026-11-24
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-23 21:00
+Stand: 2026-11-24 14:54
 
-Erledigt: Plan und Kriterien (inkl. Wunsch sauberer Kanal: Frist 24 h, offene erst nach Erledigung). discord-image.mjs (Bild nach D3, Pixelschrift nur Großbuchstaben, PNG über zlib, GLYPHS exportiert) liegt im Repo, im Scratchpad geprüft. Fake-Discord kann multipart (payload_json + files[n]), Anhänge, DELETE eigener Nachrichten, vorläufige Antworten als echte Nachrichten (fake.ephemerals, klickbar). Selbsttest auf das Dashboard umgestellt (dashOf/isDash statt statusOf) und neuer Schritt W-0044 geschrieben, Rot-Probe noch nicht zu Ende gelaufen.
-Offen: (1) discord-api.mjs: Rest mit Dateien (multipart; beim Dienst als base64 in JSON), del(), Gateway-Presence (op 3, beim Identify mitschicken). (2) discord-bot.mjs: Dashboard je Kanal statt statusposts(), Titel 'works · N Projekte', Zeilen wie projectLine, Felder Heute/Wartet auf dich/Als Nächstes, Bild attachment://works.png bei jeder Bearbeitung mit hochladen, neu zeichnen höchstens alle 5 min; Zeile 1 Auswahl w:proj:: (Werte = rid), Zeile 2 Knöpfe w:queue:: w:ins:: w:new:: w:help::; alte Statusposts (pr.status.message_id) löschen; Handler proj (renderStatus + Knöpfe w:tasks:<rid>: und w:ins:<rid>:), tasks, queue, help; ins/new ohne rid: einziges oder gerade aktives Projekt bzw. Projektfeld; Presence nur eigener Bot. Aufräumen: msgs[key].done (offen = 0, sonst Zeit), cleanup.hours (Standard 24, Bruchteile erlaubt), Fragen als beantwortet markieren, prune anpassen. (3) discord-ui.mjs: Dialog Neue Aufgabe ohne rid mit Feld project. (4) discord.mjs: Einstellung cleanup.hours. (5) Dienst: files base64 prüfen (PNG, Größe) und als multipart weiter, DELETE eigener Nachrichten, own() für die IDs der Antworten (Klicks auf Knöpfe in Antworten), Presence '/works help', readBody-Grenze für Nachrichten erhöhen, attachments durchreichen; test.mjs statusPosts auf das Dashboard umstellen. (6) Doku integrations.md und README.
-Nächster Schritt: works selftest --only Discord laufen lassen (muss am fehlenden Dashboard scheitern), dann Rest mit Dateien in discord-api.mjs.
-Branch feature/w-0044-discord-dashboard, uncommittet: discord-image.mjs (neu), discord-fake.mjs, selftest.mjs. Keine offenen Fragen.
+Fertig umgesetzt: Dashboard nach D3 je Kanal (Zeilen mit Ampel, Felder, selbst gezeichnetes PNG, Auswahlmenü, Knöpfe Warteschlange, Anweisung, Neue Aufgabe, Hilfe), alte Statusposts werden gelöscht, Status des Bots (eigener Bot; gemeinsamer zeigt /works help), Aufräumen nach cleanup.hours (Standard 24, offene erst nach Erledigung, Fragen werden grau). Dienst: Bild als base64, Löschen eigener Nachrichten, Antworten auf Klicks getrennt gemerkt. Audit-Funde alle behoben. Discord-Schritte und Dienst-Test grün; voller Selbsttest läuft. Danach: works ship W-0044.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -110,3 +107,11 @@ Branch feature/w-0044-discord-dashboard, uncommittet: discord-image.mjs (neu), d
 - 2026-11-24: Umsetzungsplan: "Aufräumen: Frist 24 h (cleanup.hours), offene erst nach Erledigung, Fragen werden als beantwortet markiert" abgehakt
 - 2026-11-24: Umsetzungsplan: "Dienst: Bild durchreichen, eigene Nachrichten löschen" abgehakt
 - 2026-11-24: Umsetzungsplan: "Tests (Selbsttest, Dienst-Test) auf das Dashboard umstellen, Doku" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Eine angeheftete Dashboard-Nachricht statt je Projekt eine; alte Statusposts werden aufgeräumt" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Bild nach D3 ohne Abhängigkeiten und ohne fremden Dienst, höchstens alle 5 Minuten neu" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Auswahlmenü zeigt Projektdetails nur dem Aufrufer, die Knöpfe funktionieren" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Status des Bots zeigt, was gerade wichtig ist" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Im Kanal bleibt dauerhaft nur das Dashboard; andere Nachrichten löscht der Bot nach der Frist (Standard 24 h, einstellbar), offene erst 24 h nach ihrer Erledigung" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Löschen geht beim eigenen und beim gemeinsamen Bot, nur eigene Nachrichten, nichts geht beim Neustart verloren" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Discord-Grenzen eingehalten, Tests ohne echtes Discord" abgehakt
+- 2026-11-24: Übergabe aktualisiert
