@@ -197,6 +197,8 @@ export class Gateway {
   reconnect(resume) {
     const ws = this.ws;
     this.ws = null;
+    // Ab hier ist die Verbindung weg: Ein Status aus dieser Lücke muss nach der Fortsetzung nachkommen (W-0048).
+    this.ready = false;
     this.stopBeat();
     if (ws) { ws.onclose = null; try { ws.close(4000); } catch { /* schon zu */ } }
     if (!resume) { this.session = null; this.seq = null; }
