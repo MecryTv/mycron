@@ -1707,6 +1707,171 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     // Ereignisse landen weiter in der outbox (geprüft bei works ship).
     await wa(['discord', 'set', 'autostart=false'], { extraEnv: denv });
   });
+
+  // Einstellungen im Board (W-0038): eine Kategorie mit Kanal und ein Kanal, in dem der Bot nicht senden darf.
+  const g1 = fake.guilds[0];
+  if (!g1.channels.some((c) => c.id === '14')) {
+    g1.channels.push({ id: '14', name: 'Projekte', type: 4, position: 3 }, { id: '15', name: 'dev', type: 0, position: 0, parent_id: '14' },
+      { id: '16', name: 'regeln', type: 0, position: 4, permission_overwrites: [{ id: g1.id, type: 0, allow: '0', deny: String(1n << 11n) }] });
+  }
+  const boardFor = async () => {
+    if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
+    const port = await highPort();
+    w(['board', '--serve', '--detach', `--port=${port}`], { extraEnv: denv });
+    const url = `http://127.0.0.1:${port}`;
+    const token = ((await (await fetch(url + '/')).text()).match(/"token":"([a-f0-9]{20,})"/) || [])[1];
+    const call = async (m, p, body, ok = true) => {
+      const r = await fetch(url + p, { method: m, headers: { 'X-Works-Token': token, 'Content-Type': 'application/json', Connection: 'close' }, body: body ? JSON.stringify(body) : undefined });
+      const j = await r.json().catch(() => ({}));
+      if (ok && !r.ok) throw new Error(`${m} ${p} ${body ? body.op : ''}: ${j.error}`);
+      return { status: r.status, ...j };
+    };
+    return { url, token, call };
+  };
+  const dashIn = (ch) => fake.inChannel(ch).filter((m) => isDash(m.embeds[0]) && m.pinned).pop();
+  const botPid = () => { try { return JSON.parse(fs.readFileSync(path.join(ddir, 'bot.pid'), 'utf8')).pid; } catch { return 0; } };
+
+  await step('Discord: Einstellungen im Board über die API, Kanal live wählen, Dashboard ohne Neustart verschieben (W-0038)', async () => {
+    const { url, call } = await boardFor();
+    try {
+      expect((await fetch(url + '/api/discord')).status === 403, '/api/discord ohne Token');
+      // Neu einrichten über das Board: falsches Token abgelehnt, das richtige nie zurückgegeben, nur maskiert.
+      await call('POST', '/api/discord', { op: 'disconnect' });
+      let s = await call('GET', '/api/discord');
+      expect(!s.ready && !s.secret, `nach dem Trennen noch eingerichtet: ${JSON.stringify(s).slice(0, 200)}`);
+      let r = await call('POST', '/api/discord', { op: 'token', token: 'falsch' }, false);
+      expect(r.status === 400 && /ungültig/.test(r.error), `falsches Token: ${r.status} ${r.error}`);
+      r = await call('POST', '/api/discord', { op: 'token', token: DTOKEN });
+      has(r.invite_url, 'client_id=1000', 'Einladungslink');
+      s = await call('GET', '/api/discord');
+      expect(s.mode === 'own' && s.secret === `…${DTOKEN.slice(-4)}` && s.bot_name === 'works#4821', `Stand nach dem Token: ${JSON.stringify(s).slice(0, 300)}`);
+      for (const x of [r, s]) expect(!JSON.stringify(x).includes(DTOKEN), 'Token in einer Antwort');
+      expect(s.events.length === 4 && s.events[0].items.some((e) => e.key === 'perm' && e.at), 'Ereignisse fehlen');
+      expect(s.commands.some((c) => c.cmd === '/works status'), `Befehle fehlen: ${JSON.stringify(s.commands)}`);
+      const here = s.projects.find((p) => p.here);
+      expect(here && here.name === 'projekt', `Projekt fehlt: ${JSON.stringify(s.projects)}`);
+      // Kanäle live vom Bot: nach Kategorie, ohne Schreibrecht ausgegraut mit Grund, keine Sprachkanäle und Kategorien.
+      const ch = await call('GET', '/api/discord/channels');
+      const list = ch.guilds[0].channels;
+      expect(ch.guilds[0].name === 'Mein Server' && list.find((c) => c.id === '15').category === 'Projekte', `Kategorie fehlt: ${JSON.stringify(list)}`);
+      const reg = list.find((c) => c.id === '16');
+      expect(reg && !reg.can && /senden/.test(reg.why), `#regeln nicht ausgegraut: ${JSON.stringify(reg)}`);
+      expect(!list.some((c) => c.id === '13' || c.id === '14') && list.find((c) => c.id === '11').can, `Kanalliste: ${JSON.stringify(list)}`);
+      r = await call('POST', '/api/discord', { op: 'move', channel_id: '16' }, false);
+      expect(r.status === 400 && /senden/.test(r.error), `Kanal ohne Schreibrecht angenommen: ${r.status} ${r.error}`);
+      await call('POST', '/api/discord', { op: 'move', channel_id: '11' });
+      expect((await call('GET', '/api/discord')).ready && dcfg().channel_id === '11', 'nach der Kanalwahl nicht eingerichtet');
+      // Einstellungen über applySetting, falsche Werte abgelehnt, ohne dass etwas halb gespeichert wird.
+      await call('POST', '/api/discord', { op: 'set', values: { 'event.ci_red.at': 'an', 'privacy.costs': 'aus', 'cleanup.hours': '12' } });
+      expect(dcfg().events.ci_red.at === true && dcfg().privacy.costs === false && dcfg().cleanup.hours === 12, 'Einstellungen nicht gespeichert');
+      r = await call('POST', '/api/discord', { op: 'set', values: { 'privacy.costs': 'an', 'quiet.from': '25:00' } }, false);
+      expect(r.status === 400 && dcfg().privacy.costs === false, `ungültige Uhrzeit: ${r.status}, costs ${dcfg().privacy.costs}`);
+      await call('POST', '/api/discord', { op: 'set', values: { [`project.${here.rid}`]: 'aus' } });
+      expect(dcfg().projects[here.rid].enabled === false, 'Projekt nicht abgeschaltet');
+      await call('POST', '/api/discord', { op: 'set', values: { [`project.${here.rid}`]: 'an', 'event.ci_red.at': 'aus', 'privacy.costs': 'an', 'cleanup.hours': '24', 'delay.perm': '0', 'delay.idle': '0', 'quiet.on': 'aus' } });
+      // Vorschau mit dem ungespeicherten Stand: Erwähnung nur mit @, ohne @ still.
+      let pv = await call('POST', '/api/discord', { op: 'preview', type: 'perm' });
+      expect(pv.ring && /<@4242>/.test(pv.content) && pv.embeds[0].title === 'Wartet auf deine Freigabe', `Vorschau Freigabe: ${JSON.stringify(pv).slice(0, 300)}`);
+      pv = await call('POST', '/api/discord', { op: 'preview', type: 'perm', draft: { 'event.perm.at': 'aus' } });
+      expect(!pv.ring && /still/.test(pv.why), `Vorschau ohne @: ${JSON.stringify(pv).slice(0, 300)}`);
+      pv = await call('POST', '/api/discord', { op: 'preview', type: 'dashboard' });
+      expect(isDash(pv.embeds[0]) && !pv.ring, `Vorschau Dashboard: ${JSON.stringify(pv).slice(0, 300)}`);
+      // Kanal wechseln, während der Bot läuft: Dashboard im neuen Kanal, das alte weg, derselbe Prozess.
+      await wa(['discord', 'start'], { extraEnv: denv, ok: false });
+      const d11 = await dwait(() => dashIn('11'), 'Dashboard in #works');
+      const pid = botPid();
+      r = await call('POST', '/api/discord', { op: 'move', channel_id: '15' });
+      expect(r.channel_name === 'dev' && dcfg().channel_id === '15', `Umzug: ${JSON.stringify(r)}`);
+      await dwait(() => dashIn('15'), 'Dashboard in #dev');
+      await dwait(() => !fake.messages.has(d11.id), 'altes Dashboard gelöscht');
+      expect(botPid() === pid, 'Bot für den Kanalwechsel neu gestartet');
+      s = await call('GET', '/api/discord');
+      expect(s.channel_name === 'dev' && s.running, `Stand nach dem Umzug: ${JSON.stringify(s).slice(0, 200)}`);
+      await call('POST', '/api/discord', { op: 'move', channel_id: '11' });
+      await dwait(() => dashIn('11') && !fake.inChannel('15').some((m) => isDash(m.embeds[0])), 'Dashboard zurück in #works');
+      expect(!fs.readFileSync(path.join(ddir, 'bot.log'), 'utf8').includes(DTOKEN), 'Token im Log');
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+    } finally {
+      await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+      w(['board', '--stop'], { ok: false });
+    }
+  });
+
+  if (browser) {
+    await step('Discord: Dialog Discord-Bot im Browser mit Reitern, Vorschau, Kanalwahl und Einrichtung (W-0038)', async () => {
+      const br = await launchChromium(log);
+      if (!br) return;
+      const { url, call } = await boardFor();
+      try {
+        if (!(await call('GET', '/api/discord')).ready) { await call('POST', '/api/discord', { op: 'token', token: DTOKEN }); await call('POST', '/api/discord', { op: 'move', channel_id: '11' }); }
+        const p = await br.newPage({ viewport: { width: 1280, height: 900 } });
+        const errs = [];
+        p.on('pageerror', (e) => errs.push(e.message));
+        const noSecret = async (what) => {
+          const leak = await p.evaluate((t) => document.documentElement.outerHTML.includes(t) || [...document.querySelectorAll('input')].some((i) => i.value.includes(t)), DTOKEN);
+          expect(!leak, `Token im DOM (${what})`);
+        };
+        const open = async () => {
+          await p.goto(url + '/'); await p.waitForSelector('.card');
+          await p.click('#btnTools'); await p.waitForSelector('#btnDiscord');
+          await p.click('#btnDiscord'); await p.waitForSelector('dialog[open] .dc');
+        };
+        await open();
+        const tabs = await p.$$eval('dialog[open] .dc-tabs [role="tab"]', (b) => b.map((x) => x.textContent.trim()));
+        for (const t of ['Verbindung', 'Projekte', 'Ereignisse', 'Befehle', 'Datenschutz']) expect(tabs.some((x) => x.startsWith(t)), `Reiter ${t} fehlt: ${tabs.join(', ')}`);
+        has(await p.textContent('dialog[open] .dc-side'), 'Vorschau', 'Vorschau');
+        has(await p.textContent('dialog[open] .dc-main'), `…${DTOKEN.slice(-4)}`, 'maskiertes Token');
+        await noSecret('verbunden');
+        // Kanalwahl: Kategorie, #regeln ausgegraut mit Grund, Verschieben nach #dev und zurück.
+        await p.waitForSelector('dialog[open] input[name="dcch"][value="15"]');
+        expect(await p.isDisabled('dialog[open] input[name="dcch"][value="16"]'), '#regeln wählbar');
+        has(await p.textContent('dialog[open] .dc-list'), 'darf nicht senden', 'Grund bei #regeln');
+        has(await p.textContent('dialog[open] .dc-list'), 'Projekte', 'Kategorie');
+        await p.check('dialog[open] input[name="dcch"][value="15"]');
+        await p.click('dialog[open] #dcMove');
+        await dwait(() => dcfg().channel_id === '15', 'Kanal #dev gespeichert', 10000);
+        await p.waitForFunction(() => /#dev/.test(document.querySelector('dialog[open] .dc-head small').textContent));
+        await call('POST', '/api/discord', { op: 'move', channel_id: '11' });
+        // Ereignisse: @ bei CI rot an, die Vorschau folgt dem ungespeicherten Stand, Speichern schreibt config.json.
+        await p.click('dialog[open] [data-dc-tab="ereignisse"]');
+        await p.click('dialog[open] [data-k="event.ci_red.at"]');
+        has(await p.textContent('dialog[open] .dc-dirty'), '1 Änderung', 'Zähler ungespeichert');
+        await p.selectOption('dialog[open] #dcPv', 'ci_red');
+        await p.waitForFunction(() => /Klingelt/.test(document.querySelector('dialog[open] .dc-cap').textContent));
+        await p.click('dialog[open] [data-k="event.ci_red.at"]');
+        await p.waitForFunction(() => /still/.test(document.querySelector('dialog[open] .dc-cap').textContent));
+        await p.click('dialog[open] [data-dc-tab="datenschutz"]');
+        await p.locator('dialog[open] [data-k="privacy.titles"]').setChecked(false, { force: true });
+        has(await p.textContent('dialog[open] .dc-dirty'), '1 Änderung', 'Zähler nach Hin und Zurück');
+        await p.click('dialog[open] button[value="save"]');
+        await dwait(() => dcfg().privacy.titles === false, 'Datenschutz gespeichert', 10000);
+        await call('POST', '/api/discord', { op: 'set', values: { 'privacy.titles': 'an' } });
+        await p.click('dialog[open] [data-dc-tab="befehle"]');
+        has(await p.textContent('dialog[open] .dc-main'), '/works status', 'Befehle');
+        // Handy: der Dialog füllt die Breite, nichts ragt heraus.
+        await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(200);
+        const over = await p.evaluate(() => { const d = document.querySelector('dialog[open]'); return d.scrollWidth - d.clientWidth; });
+        expect(over <= 1, `Dialog auf 390 px ${over} px zu breit`);
+        await p.setViewportSize({ width: 1280, height: 900 });
+        // Erstes Mal: Wahl nach R, eigener Bot mit Token (Passwortfeld, danach leer), dann verbunden.
+        await call('POST', '/api/discord', { op: 'disconnect' });
+        await open();
+        await p.waitForSelector('dialog[open] [data-dc-path="shared"]');
+        await p.click('dialog[open] [data-dc-path="own"]');
+        expect(await p.getAttribute('dialog[open] #dcToken', 'type') === 'password', 'Token-Feld ist kein Passwortfeld');
+        await p.fill('dialog[open] #dcToken', DTOKEN);
+        await p.click('dialog[open] #dcTokenGo');
+        await p.waitForSelector('dialog[open] .dc-conn', { timeout: 15000 });
+        await noSecret('nach dem Speichern');
+        expect(JSON.parse(fs.readFileSync(path.join(ddir, 'secret.json'), 'utf8')).token === DTOKEN, 'Token aus dem Board nicht gespeichert');
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+        w(['board', '--stop'], { ok: false });
+      }
+    });
+  }
   await wa(['discord', 'stop'], { extraEnv: denv, ok: false }).catch(() => {});
   await fake.close();
 
