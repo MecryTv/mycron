@@ -44,7 +44,8 @@ const api = async (method, p, body, key, headers = {}) => {
   let j = null; try { j = await r.json(); } catch { /* leer */ }
   return { status: r.status, body: j };
 };
-const env = { ...process.env, HOME: home, USERPROFILE: home, WORKS_ACTOR: '', WORKS_DRY_OPEN: '1', WORKS_DISCORD_SERVICE: base, WORKS_DISCORD_FAST: '1' };
+// WORKS_LANG=de: works auf dem Gerät spricht seit W-0041 standardmäßig Englisch, die Prüfungen erwarten Deutsch.
+const env = { ...process.env, HOME: home, USERPROFILE: home, WORKS_ACTOR: '', WORKS_DRY_OPEN: '1', WORKS_DISCORD_SERVICE: base, WORKS_DISCORD_FAST: '1', WORKS_LANG: 'de' };
 const wa = (args, { input = '', cwd = proj } = {}) => new Promise((resolve) => {
   const c = spawn(process.execPath, [CLI, ...args], { cwd, env, windowsHide: true });
   let out = ''; c.stdout.on('data', (d) => { out += d; }); c.stderr.on('data', (d) => { out += d; });

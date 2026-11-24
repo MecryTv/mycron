@@ -15,10 +15,17 @@ import { projectList } from './hub.mjs';
 import { runningVersion, OWN_CLI, isAlive } from './server-control.mjs';
 import { dfile, discordDir, loadDiscordConfig, normalizeConfig, credential, readOutbox, channelOf } from './discord.mjs';
 import { Rest, Gateway, hasWebSocket } from './discord-api.mjs';
-import { tr, who, subOf, parseCid, cid, MODAL, modalFor, modalValues, helpMessage, ephemeral, notOwner, commandsOff, commands } from './discord-ui.mjs';
+import { tr, useCatalog, who, subOf, parseCid, cid, MODAL, modalFor, modalValues, helpMessage, ephemeral, notOwner, commandsOff, commands } from './discord-ui.mjs';
+import { language, catalog, normLang, setLanguage } from './i18n.mjs';
 import { dashboardPng } from './discord-image.mjs';
 
 export { normalizeConfig };
+
+// Sprache (W-0041): Nachrichten im Kanal (Dashboard, Hinweise, Status des Bots) in der globalen Sprache, bei jedem
+// Aufbau frisch, damit works lang ohne Neustart wirkt; Antworten auf Befehle und Knöpfe in der Sprache des Clients.
+// Weitere Sprachen über den Katalog aus i18n (Deutsch steht als Paar im Code).
+useCatalog((lang, en) => catalog(lang)[en]);
+const langOf = (lang) => tr(lang || language(null));
 
 const FAST = process.env.WORKS_DISCORD_FAST === '1';
 const TICK = FAST ? 100 : 2000;
@@ -60,7 +67,7 @@ const sha7 = (s) => String(s || '').slice(0, 7);
 const field = (name, value, inline = true) => ({ name: cut(name, 256) || '–', value: trimTo(String(value ?? '').trim(), 1024) || '–', inline });
 const label = (cfg, id, title) => (cfg.privacy.titles && title ? `${id} ${title}` : String(id || ''));
 const colorOf = (name) => PALETTE[parseInt(crypto.createHash('md5').update(String(name)).digest('hex').slice(0, 6), 16) % PALETTE.length];
-const minutes = (from, to) => { const m = Math.max(0, Math.round((Date.parse(to || new Date().toISOString()) - Date.parse(from)) / 60000)); return Number.isNaN(m) ? '' : m < 1 ? 'unter 1 Minute' : m === 1 ? '1 Minute' : m < 60 ? `${m} Minuten` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+const minutes = (from, to, t) => { const m = Math.max(0, Math.round((Date.parse(to || new Date().toISOString()) - Date.parse(from)) / 60000)); return Number.isNaN(m) ? '' : m < 1 ? t('unter 1 Minute', 'under 1 minute') : m === 1 ? t('1 Minute', '1 minute') : m < 60 ? t(`${m} Minuten`, `${m} minutes`) : `${Math.floor(m / 60)} h ${m % 60} min`; };
 // Eine Zeile Knöpfe: erst die mit Aktion (W-0037), dann Links.
 const row = (links, acts = []) => {
   const c = [...acts, ...links.map(([lbl, url]) => ({ type: 2, style: 5, label: cut(lbl, 80), url }))].slice(0, 5);
@@ -77,35 +84,37 @@ export function isQuiet(cfg, now = new Date()) {
   return f < t ? m >= f && m < t : m >= f || m < t;
 }
 
-// Statuspost je Projekt. snap kommt aus snapshotOf, ergänzt um recent und ci.
-export function renderStatus(s, cfg, now = new Date()) {
+// Statuspost je Projekt. snap kommt aus snapshotOf, ergänzt um recent und ci. lang: Sprache, sonst die globale.
+export function renderStatus(s, cfg, { now = new Date(), lang = '' } = {}) {
+  const t = langOf(lang);
   const name = cut(s.name, 200);
   const a = s.active;
   const lines = [];
   const aLabel = a ? `**${a.id}**${cfg.privacy.titles && a.title ? ` ${cut(a.title, 120)}` : ''}` : '';
-  if (s.perm) lines.push(`**Claude** wartet auf deine Freigabe${s.perm.tool ? ` (${cut(s.perm.tool, 40)})` : ''}, seit ${rel(s.perm.since)}`);
-  else if (s.busy) lines.push(`**Claude** arbeitet${a ? ` an ${aLabel}` : ''}${s.since ? `, seit ${rel(s.since)}` : ''}`);
-  else if (s.idleSince) lines.push(`**Claude** ist fertig und wartet auf dich, seit ${rel(s.idleSince)}`);
-  if (a && (s.perm || !s.busy)) lines.push(`In Arbeit: ${aLabel}`);
-  if (!a && !s.busy && !s.perm) lines.push('Keine Aufgabe in Arbeit');
-  if (a && a.crit && a.crit[1]) lines.push(`${bar(a.crit[0], a.crit[1], 7)} ${a.crit[0]} von ${a.crit[1]} Kriterien`);
-  const t = s.today || {};
+  const tool = s.perm && s.perm.tool ? ` (${cut(s.perm.tool, 40)})` : '';
+  if (s.perm) lines.push(t(`**Claude** wartet auf deine Freigabe${tool}, seit ${rel(s.perm.since)}`, `**Claude** is waiting for your approval${tool}, since ${rel(s.perm.since)}`));
+  else if (s.busy) lines.push(t(`**Claude** arbeitet${a ? ` an ${aLabel}` : ''}${s.since ? `, seit ${rel(s.since)}` : ''}`, `**Claude** is working${a ? ` on ${aLabel}` : ''}${s.since ? `, since ${rel(s.since)}` : ''}`));
+  else if (s.idleSince) lines.push(t(`**Claude** ist fertig und wartet auf dich, seit ${rel(s.idleSince)}`, `**Claude** is done and waiting for you, since ${rel(s.idleSince)}`));
+  if (a && (s.perm || !s.busy)) lines.push(t(`In Arbeit: ${aLabel}`, `In progress: ${aLabel}`));
+  if (!a && !s.busy && !s.perm) lines.push(t('Keine Aufgabe in Arbeit', 'No task in progress'));
+  if (a && a.crit && a.crit[1]) lines.push(`${bar(a.crit[0], a.crit[1], 7)} ${t(`${a.crit[0]} von ${a.crit[1]} Kriterien`, `${a.crit[0]} of ${a.crit[1]} criteria`)}`);
+  const td = s.today || {};
   const fields = [
-    field('Freigabe', s.perm ? `wartet seit ${rel(s.perm.since)}` : 'keine offen'),
-    field('CI', s.ci ? `${s.ci.ok ? '✓ grün' : '✗ rot'}${s.ci.sha ? ` · ${sha7(s.ci.sha)}` : ''}` : 'noch kein Lauf'),
-    field('Heute', `${t.done || 0} erledigt${cfg.privacy.costs && t.cost ? ` · ${t.cost}` : ''}`),
-    field('Als Nächstes', (s.queue || []).slice(0, 2).map((q) => cut(label(cfg, q.id, q.title), 150)).join('\n') || 'nichts eingeplant', false),
+    field(t('Freigabe', 'Approval'), s.perm ? t(`wartet seit ${rel(s.perm.since)}`, `waiting since ${rel(s.perm.since)}`) : t('keine offen', 'none open')),
+    field('CI', s.ci ? `${s.ci.ok ? t('✓ grün', '✓ green') : t('✗ rot', '✗ red')}${s.ci.sha ? ` · ${sha7(s.ci.sha)}` : ''}` : t('noch kein Lauf', 'no run yet')),
+    field(t('Heute', 'Today'), `${t(`${td.done || 0} erledigt`, `${td.done || 0} done`)}${cfg.privacy.costs && td.cost ? ` · ${td.cost}` : ''}`),
+    field(t('Als Nächstes', 'Up next'), (s.queue || []).slice(0, 2).map((q) => cut(label(cfg, q.id, q.title), 150)).join('\n') || t('nichts eingeplant', 'nothing planned'), false),
   ];
   const recent = (s.recent || []).slice(0, 3);
-  if (recent.length) fields.push(field('Zuletzt', recent.map((r) => `${hhmm(r.at)} ${cut(r.text, 150)}`).join('\n'), false));
+  if (recent.length) fields.push(field(t('Zuletzt', 'Recent'), recent.map((r) => `${hhmm(r.at)} ${cut(r.text, 150)}`).join('\n'), false));
   const p = s.progress;
   return {
     embeds: [fit({
-      author: { name: `${name} · Stand` },
+      author: { name: t(`${name} · Stand`, `${name} · Status`) },
       color: colorOf(s.name),
       description: trimTo(lines.join('\n'), 4000),
       fields,
-      footer: { text: p && p.total ? `${bar(p.done, p.total)} ${p.done} von ${p.total} erledigt` : 'works' },
+      footer: { text: p && p.total ? `${bar(p.done, p.total)} ${t(`${p.done} von ${p.total} erledigt`, `${p.done} of ${p.total} done`)}` : 'works' },
       timestamp: now.toISOString(),
     })],
   };
@@ -131,28 +140,29 @@ export function projectLineOf(s, ci, cfg, t) {
   return `${dot} **${cut(s.name, 80)}** ${text}${prog}${ci && !ci.ok ? ' · 🔴 CI' : ''}`;
 }
 
-const WEEKDAY = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'];
+const WEEKDAY = [['SO', 'SUN'], ['MO', 'MON'], ['DI', 'TUE'], ['MI', 'WED'], ['DO', 'THU'], ['FR', 'FRI'], ['SA', 'SAT']];
 // Projektfarben im Bild der Reihe nach, damit sich keine zwei gleichen; ohne Grün (das steht für erledigt).
 const IMAGE_COLORS = [0x8e8cf7, 0xe8a33d, 0x3aa7a3, 0xd16ba5, 0x5aa9e6, 0xf08a4b, 0xc9b458];
 
-// Daten für das Bild: Fortschritt je Projekt und erledigt je Tag, gestapelt nach Projekt.
-export function dashImageData(list) {
+// Daten für das Bild: Fortschritt je Projekt und erledigt je Tag, gestapelt nach Projekt; Überschriften in der Sprache t.
+export function dashImageData(list, t = langOf()) {
   const days = (list[0] && list[0].snap.doneDays) || [];
   return {
+    labels: { progress: t('FORTSCHRITT', 'PROGRESS'), open: t('OFFEN', 'OPEN'), wip: t('IN ARBEIT', 'IN PROGRESS'), done: t('ERLEDIGT', 'DONE'), more: t('+{n} WEITERE', '+{n} MORE'), chart: t('ERLEDIGT · LETZTE 7 TAGE', 'DONE · LAST 7 DAYS') },
     projects: list.map((p, i) => {
       const g = p.snap.progress || {};
       const done = g.done || 0; const wip = g.wip || 0;
       return { name: p.snap.name, done, wip, open: Math.max(0, (g.total || 0) - done - wip), color: IMAGE_COLORS[i % IMAGE_COLORS.length] };
     }),
-    days: days.map(([d], i) => ({ label: WEEKDAY[new Date(`${d}T12:00:00`).getDay()], counts: list.map((p) => ((p.snap.doneDays || [])[i] || [])[1] || 0) })),
+    days: days.map(([d], i) => ({ label: t(...WEEKDAY[new Date(`${d}T12:00:00`).getDay()]), counts: list.map((p) => ((p.snap.doneDays || [])[i] || [])[1] || 0) })),
   };
 }
 
 const button = (style, lbl, custom_id) => ({ type: 2, style, label: lbl, custom_id });
 
-// list: [{ rid, snap }]. interactive: Auswahlmenü und Knöpfe nur, wenn Klicks ankommen.
-export function renderDashboard(list, cfg, { ci = {}, interactive = false, now = new Date() } = {}) {
-  const t = tr('de');
+// list: [{ rid, snap }]. interactive: Auswahlmenü und Knöpfe nur, wenn Klicks ankommen. lang: sonst die globale Sprache.
+export function renderDashboard(list, cfg, { ci = {}, interactive = false, now = new Date(), lang = '' } = {}) {
+  const t = langOf(lang);
   const waiting = list.filter((p) => p.snap.perm || (!p.snap.busy && p.snap.idleSince)).map((p) => cut(p.snap.name, 60));
   const done = list.reduce((s, p) => s + ((p.snap.today && p.snap.today.done) || 0), 0);
   const costs = list.map((p) => p.snap.today && p.snap.today.cost).filter(Boolean);
@@ -160,36 +170,38 @@ export function renderDashboard(list, cfg, { ci = {}, interactive = false, now =
   const options = list.slice(0, 25).map((p) => ({ label: cut(p.snap.name, 100), value: p.rid, description: cut(stateOf(p.snap, cfg, t)[1], 100) }));
   return {
     embeds: [fit({
-      title: `works · ${list.length} ${list.length === 1 ? 'Projekt' : 'Projekte'}`,
+      title: t(`works · ${list.length} ${list.length === 1 ? 'Projekt' : 'Projekte'}`, `works · ${list.length} ${list.length === 1 ? 'project' : 'projects'}`),
       color: COLOR.status,
-      description: trimTo(list.map((p) => projectLineOf(p.snap, ci[p.rid], cfg, t)).join('\n') || 'Noch kein Projekt.', 4000),
+      description: trimTo(list.map((p) => projectLineOf(p.snap, ci[p.rid], cfg, t)).join('\n') || t('Noch kein Projekt.', 'No project yet.'), 4000),
       fields: [
-        field('Heute', `${done} erledigt${cfg.privacy.costs && costs.length ? ` · ${costs.join(' + ')}` : ''}`),
-        field('Wartet auf dich', waiting.join(', ') || 'nichts'),
-        field('Als Nächstes', next.join('\n') || 'nichts eingeplant', false),
+        field(t('Heute', 'Today'), `${t(`${done} erledigt`, `${done} done`)}${cfg.privacy.costs && costs.length ? ` · ${costs.join(' + ')}` : ''}`),
+        field(t('Wartet auf dich', 'Waiting for you'), waiting.join(', ') || t('nichts', 'nothing')),
+        field(t('Als Nächstes', 'Up next'), next.join('\n') || t('nichts eingeplant', 'nothing planned'), false),
       ],
       image: { url: 'attachment://works.png' },
-      footer: { text: `Bild höchstens alle 5 Minuten neu${interactive ? ' · Details nur für dich über das Menü' : ''}` },
+      footer: { text: `${t('Bild höchstens alle 5 Minuten neu', 'Image redrawn at most every 5 minutes')}${interactive ? t(' · Details nur für dich über das Menü', ' · Details only for you via the menu') : ''}` },
       timestamp: now.toISOString(),
     })],
     components: interactive ? [
-      ...(options.length ? [{ type: 1, components: [{ type: 3, custom_id: 'w:proj::', placeholder: 'Projekt wählen · Details nur für dich', options }] }] : []),
-      { type: 1, components: [button(2, 'Warteschlange', 'w:queue::'), button(1, 'Anweisung an Claude', 'w:ins::'), button(2, 'Neue Aufgabe', 'w:new::'), button(2, 'Hilfe', 'w:help::')] },
+      ...(options.length ? [{ type: 1, components: [{ type: 3, custom_id: 'w:proj::', placeholder: t('Projekt wählen · Details nur für dich', 'Pick a project · details only for you'), options }] }] : []),
+      { type: 1, components: [button(2, t('Warteschlange', 'Queue'), 'w:queue::'), button(1, t('Anweisung an Claude', 'Instruction for Claude'), 'w:ins::'), button(2, t('Neue Aufgabe', 'New task'), 'w:new::'), button(2, t('Hilfe', 'Help'), 'w:help::')] },
     ] : [],
   };
 }
 
 const SHIP_STEP = {
-  merge: () => 'in main gemergt',
-  push: (x) => `gepusht${x.sha ? ` · ${sha7(x.sha)}` : ''}`,
-  ci: (x) => (x.ok ? `CI grün${x.workflows ? `, ${x.workflows} Workflows` : ''}` : 'CI rot'),
-  update: () => 'Plugin aktualisiert, Board neu gestartet',
+  merge: (x, t) => t('in main gemergt', 'merged into main'),
+  push: (x, t) => `${t('gepusht', 'pushed')}${x.sha ? ` · ${sha7(x.sha)}` : ''}`,
+  ci: (x, t) => (x.ok ? t(`CI grün${x.workflows ? `, ${x.workflows} Workflows` : ''}`, `CI green${x.workflows ? `, ${x.workflows} workflows` : ''}`) : t('CI rot', 'CI red')),
+  update: (x, t) => t('Plugin aktualisiert, Board neu gestartet', 'Plugin updated, board restarted'),
 };
 
 // Nachricht zu einem Ereignis. state: open (neu), resolved (Freigabe oder Warten erledigt),
 // accepted oder returned (Review). Erwähnung nur bei offenen Ereignissen mit @ und außerhalb der Ruhezeit.
 // interactive: Knöpfe mit Aktion (W-0037) nur, wenn Klicks ankommen (Gateway oder gemeinsamer Bot); rid ist das Projekt.
-export function renderEvent(ev, cfg, { owner = '', now = new Date(), rid = '', interactive = false } = {}) {
+// lang: Sprache der Nachricht, sonst die globale.
+export function renderEvent(ev, cfg, { owner = '', now = new Date(), rid = '', interactive = false, lang = '' } = {}) {
+  const t = langOf(lang);
   const p = cut(ev.project || '', 100);
   const who = ev.id ? cut(label(cfg, ev.id, ev.title), 200) : '–';
   const open = !ev.state || ev.state === 'open';
@@ -199,57 +211,60 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date(), rid = '', i
   let buttons = [];
   let actions = [];
   switch (ev.type) {
-    case 'perm':
-      if (!open) { e = { color: COLOR.gone, title: '✓ Freigabe beantwortet', description: `Hat ${minutes(ev.since, ev.until)} gewartet${ev.tool ? ` · ${cut(ev.tool, 60)}` : ''}` }; break; }
-      text = `${p} wartet auf deine Freigabe (${cut(ev.tool || 'Werkzeug', 40)})`;
-      e = { color: COLOR.need, title: 'Wartet auf deine Freigabe', fields: [field('Aufgabe', who), field('Werkzeug', cfg.privacy.commands && ev.what ? cut(`${ev.tool}: ${ev.what}`, 1000) : `${cut(ev.tool, 60) || '–'}${ev.what ? ', Befehl ausgeblendet' : ''}`), field('Wartet seit', rel(ev.since))], footer: { text: 'Freigeben in Claude Code · die Nachricht wird grau, sobald erledigt' } };
+    case 'perm': {
+      const tool = ev.tool ? ` · ${cut(ev.tool, 60)}` : '';
+      if (!open) { e = { color: COLOR.gone, title: t('✓ Freigabe beantwortet', '✓ Approval answered'), description: t(`Hat ${minutes(ev.since, ev.until, t)} gewartet${tool}`, `Waited ${minutes(ev.since, ev.until, t)}${tool}`) }; break; }
+      const which = cut(ev.tool || t('Werkzeug', 'tool'), 40);
+      text = t(`${p} wartet auf deine Freigabe (${which})`, `${p} is waiting for your approval (${which})`);
+      e = { color: COLOR.need, title: t('Wartet auf deine Freigabe', 'Waiting for your approval'), fields: [field(t('Aufgabe', 'Task'), who), field(t('Werkzeug', 'Tool'), cfg.privacy.commands && ev.what ? cut(`${ev.tool}: ${ev.what}`, 1000) : `${cut(ev.tool, 60) || '–'}${ev.what ? t(', Befehl ausgeblendet', ', command hidden') : ''}`), field(t('Wartet seit', 'Waiting since'), rel(ev.since))], footer: { text: t('Freigeben in Claude Code · die Nachricht wird grau, sobald erledigt', 'Approve in Claude Code · the message turns grey once done') } };
       break;
+    }
     case 'idle':
-      if (!open) { e = { color: COLOR.gone, title: '↻ Weiter gearbeitet', description: `Nach ${minutes(ev.since, ev.until)}` }; break; }
-      text = `${p}: Claude ist fertig und wartet auf dich`;
-      e = { color: COLOR.need, title: 'Claude ist fertig und wartet auf dich', fields: [field('Aufgabe', who), field('Fertig seit', rel(ev.since))] };
-      if (acts) actions = act(1, 'Anweisung an Claude', cid('ins', rid, ev.id));
+      if (!open) { e = { color: COLOR.gone, title: t('↻ Weiter gearbeitet', '↻ Work resumed'), description: t(`Nach ${minutes(ev.since, ev.until, t)}`, `After ${minutes(ev.since, ev.until, t)}`) }; break; }
+      text = t(`${p}: Claude ist fertig und wartet auf dich`, `${p}: Claude is done and waiting for you`);
+      e = { color: COLOR.need, title: t('Claude ist fertig und wartet auf dich', 'Claude is done and waiting for you'), fields: [field(t('Aufgabe', 'Task'), who), field(t('Fertig seit', 'Done since'), rel(ev.since))] };
+      if (acts) actions = act(1, t('Anweisung an Claude', 'Instruction for Claude'), cid('ins', rid, ev.id));
       break;
     case 'question':
-      if (!open) { e = { color: COLOR.gone, title: `✓ Frage zu ${ev.id} beantwortet` }; break; }
-      text = `${p}: Frage zu ${ev.id}`;
-      e = { color: COLOR.need, title: `Frage zu ${ev.id}`, description: cfg.privacy.titles ? cutBlock(ev.text, 1500) : 'Frage im Board ansehen' };
+      if (!open) { e = { color: COLOR.gone, title: t(`✓ Frage zu ${ev.id} beantwortet`, `✓ Question about ${ev.id} answered`) }; break; }
+      text = t(`${p}: Frage zu ${ev.id}`, `${p}: question about ${ev.id}`);
+      e = { color: COLOR.need, title: t(`Frage zu ${ev.id}`, `Question about ${ev.id}`), description: cfg.privacy.titles ? cutBlock(ev.text, 1500) : t('Frage im Board ansehen', 'See the question in the board') };
       break;
     case 'review':
-      if (ev.state === 'accepted') { e = { color: COLOR.done, title: `✓ ${ev.id} angenommen`, description: `${cfg.privacy.titles && ev.title ? `${cut(ev.title, 200)} · ` : ''}${hhmm(ev.at || now.toISOString())}` }; break; }
-      if (ev.state === 'returned') { e = { color: COLOR.gone, title: `↩ ${ev.id} zurückgegeben`, description: cfg.privacy.titles ? cut(ev.title, 200) : '' }; break; }
-      e = { color: COLOR.done, title: `${ev.id} im Review`, fields: [...(cfg.privacy.titles && ev.title ? [field('Aufgabe', cut(ev.title, 200))] : []), field('Kriterien', ev.crit && ev.crit[1] ? `${ev.crit[0]} von ${ev.crit[1]}` : 'keine'), ...(cfg.privacy.costs && ev.cost ? [field('Kosten', ev.cost)] : [])], footer: { text: acts ? 'Abnehmen hier, im Board oder mit works done' : 'Abnehmen im Board oder mit works done' } };
-      if (acts) actions = [...act(3, 'Annehmen', cid('acc', rid, ev.id)), ...act(2, 'Zurück an Claude', cid('ret', rid, ev.id))];
+      if (ev.state === 'accepted') { e = { color: COLOR.done, title: t(`✓ ${ev.id} angenommen`, `✓ ${ev.id} accepted`), description: `${cfg.privacy.titles && ev.title ? `${cut(ev.title, 200)} · ` : ''}${hhmm(ev.at || now.toISOString())}` }; break; }
+      if (ev.state === 'returned') { e = { color: COLOR.gone, title: t(`↩ ${ev.id} zurückgegeben`, `↩ ${ev.id} returned`), description: cfg.privacy.titles ? cut(ev.title, 200) : '' }; break; }
+      e = { color: COLOR.done, title: t(`${ev.id} im Review`, `${ev.id} in review`), fields: [...(cfg.privacy.titles && ev.title ? [field(t('Aufgabe', 'Task'), cut(ev.title, 200))] : []), field(t('Kriterien', 'Criteria'), ev.crit && ev.crit[1] ? t(`${ev.crit[0]} von ${ev.crit[1]}`, `${ev.crit[0]} of ${ev.crit[1]}`) : t('keine', 'none')), ...(cfg.privacy.costs && ev.cost ? [field(t('Kosten', 'Costs'), ev.cost)] : [])], footer: { text: acts ? t('Abnehmen hier, im Board oder mit works done', 'Accept here, in the board or with works done') : t('Abnehmen im Board oder mit works done', 'Accept in the board or with works done') } };
+      if (acts) actions = [...act(3, t('Annehmen', 'Accept'), cid('acc', rid, ev.id)), ...act(2, t('Zurück an Claude', 'Back to Claude'), cid('ret', rid, ev.id))];
       break;
     case 'returned':
-      e = { color: COLOR.need, title: `${ev.id} zurückgegeben`, description: cfg.privacy.titles ? cut(ev.title, 200) : '' };
+      e = { color: COLOR.need, title: t(`${ev.id} zurückgegeben`, `${ev.id} returned`), description: cfg.privacy.titles ? cut(ev.title, 200) : '' };
       break;
     case 'done':
-      e = { color: COLOR.done, title: `✓ ${ev.id} erledigt`, description: cfg.privacy.titles ? cut(ev.title, 200) : '' };
+      e = { color: COLOR.done, title: t(`✓ ${ev.id} erledigt`, `✓ ${ev.id} done`), description: cfg.privacy.titles ? cut(ev.title, 200) : '' };
       break;
     case 'p1':
-      e = { color: COLOR.red, title: `Neue P1: ${ev.id}`, description: cfg.privacy.titles ? cut(ev.title, 200) : '' };
+      e = { color: COLOR.red, title: t(`Neue P1: ${ev.id}`, `New P1: ${ev.id}`), description: cfg.privacy.titles ? cut(ev.title, 200) : '' };
       break;
     case 'queue_empty':
-      e = { color: COLOR.run, title: 'Warteschlange leer', description: 'Claude hat alle eingereihten Aufgaben abgearbeitet.' };
+      e = { color: COLOR.run, title: t('Warteschlange leer', 'Queue empty'), description: t('Claude hat alle eingereihten Aufgaben abgearbeitet.', 'Claude has worked through all queued tasks.') };
       break;
     case 'ship': {
-      const lines = (ev.steps || []).map((x) => `${x.ok === false ? '✗' : '✓'} ${(SHIP_STEP[x.step] || (() => x.step))(x)}`);
-      if (ev.status === 'run') lines.push('◌ läuft …');
-      if (ev.status === 'fail') lines.push(`✗ angehalten${ev.note ? `: ${cut(ev.note, 300)}` : ''}`);
-      e = { color: ev.status === 'done' ? COLOR.done : ev.status === 'fail' ? COLOR.red : COLOR.run, title: ev.status === 'done' ? `${ev.id} ausgeliefert` : ev.status === 'fail' ? `${ev.id}: Auslieferung angehalten` : `${ev.id} wird ausgeliefert`, description: lines.join('\n') || '◌ beginnt …', footer: { text: `works ship${ev.ended ? ` · ${minutes(ev.started, ev.ended)}` : ''}` } };
-      if (ev.commitUrl) buttons = [['Commit auf GitHub', ev.commitUrl]];
+      const lines = (ev.steps || []).map((x) => `${x.ok === false ? '✗' : '✓'} ${(SHIP_STEP[x.step] || (() => x.step))(x, t)}`);
+      if (ev.status === 'run') lines.push(t('◌ läuft …', '◌ running …'));
+      if (ev.status === 'fail') lines.push(`${t('✗ angehalten', '✗ stopped')}${ev.note ? `: ${cut(ev.note, 300)}` : ''}`);
+      e = { color: ev.status === 'done' ? COLOR.done : ev.status === 'fail' ? COLOR.red : COLOR.run, title: ev.status === 'done' ? t(`${ev.id} ausgeliefert`, `${ev.id} shipped`) : ev.status === 'fail' ? t(`${ev.id}: Auslieferung angehalten`, `${ev.id}: shipping stopped`) : t(`${ev.id} wird ausgeliefert`, `${ev.id} is being shipped`), description: lines.join('\n') || t('◌ beginnt …', '◌ starting …'), footer: { text: `works ship${ev.ended ? ` · ${minutes(ev.started, ev.ended, t)}` : ''}` } };
+      if (ev.commitUrl) buttons = [[t('Commit auf GitHub', 'Commit on GitHub'), ev.commitUrl]];
       break;
     }
     case 'ci_red':
     case 'ci_green':
-      if (ev.type === 'ci_green') { e = { color: COLOR.done, title: `CI grün für ${sha7(ev.sha)}`, description: ev.workflows ? `${ev.workflows} Workflows grün` : 'Wieder grün' }; }
+      if (ev.type === 'ci_green') { e = { color: COLOR.done, title: t(`CI grün für ${sha7(ev.sha)}`, `CI green for ${sha7(ev.sha)}`), description: ev.workflows ? t(`${ev.workflows} Workflows grün`, `${ev.workflows} workflows green`) : t('Wieder grün', 'Green again') }; }
       else {
-        e = { color: COLOR.red, title: `CI rot für ${sha7(ev.sha)}`, fields: [...(ev.total ? [field('Rot', `${ev.failed || '?'} von ${ev.total} Jobs`)] : []), ...(ev.job ? [field('Erster Fehler', cut(ev.job, 200))] : []), ...(ev.bug ? [field('Bug', `${cut(ev.bug, 40)} angelegt`)] : [])] };
+        e = { color: COLOR.red, title: t(`CI rot für ${sha7(ev.sha)}`, `CI red for ${sha7(ev.sha)}`), fields: [...(ev.total ? [field(t('Rot', 'Red'), t(`${ev.failed || '?'} von ${ev.total} Jobs`, `${ev.failed || '?'} of ${ev.total} jobs`))] : []), ...(ev.job ? [field(t('Erster Fehler', 'First error'), cut(ev.job, 200))] : []), ...(ev.bug ? [field('Bug', t(`${cut(ev.bug, 40)} angelegt`, `${cut(ev.bug, 40)} created`))] : [])] };
         if (cfg.privacy.ci_error && ev.error) e.footer = { text: cut(ev.error, 300) };
-        if (acts && ev.bug) actions = act(2, 'Bug ansehen', cid('bug', rid, ev.bug));
+        if (acts && ev.bug) actions = act(2, t('Bug ansehen', 'View bug'), cid('bug', rid, ev.bug));
       }
-      if (/^https:\/\//.test(ev.url || '')) buttons = [['Lauf auf GitHub', ev.url]];
+      if (/^https:\/\//.test(ev.url || '')) buttons = [[t('Lauf auf GitHub', 'Run on GitHub'), ev.url]];
       break;
     case 'report_week':
     case 'report_day':
@@ -257,8 +272,8 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date(), rid = '', i
       // Listen wie im Wochenbericht: Aufgaben als {id, title} (Titel nur mit privacy.titles), sonst Text.
       const item = (x) => cut(typeof x === 'object' && x ? label(cfg, x.id, x.title) : (cfg.privacy.titles ? x : (String(x).match(/^[A-Z]+-\d+/) || [''])[0]), 120);
       const lists = Object.entries(ev.lists && typeof ev.lists === 'object' ? ev.lists : {}).slice(0, 3).filter(([, items]) => Array.isArray(items))
-        .map(([n, items]) => field(`${n} (${items.length})`, items.map(item).filter(Boolean).map((x) => `• ${x}`).join('\n') || 'Keine.', false));
-      e = { color: COLOR.status, title: cut(ev.title || 'Bericht', 256), description: cutBlock(ev.summary, 3000), fields: lists.length ? lists : ev.done !== undefined ? [field('Erledigt', String(ev.done))] : [] };
+        .map(([n, items]) => field(`${n} (${items.length})`, items.map(item).filter(Boolean).map((x) => `• ${x}`).join('\n') || t('Keine.', 'None.'), false));
+      e = { color: COLOR.status, title: cut(ev.title || t('Bericht', 'Report'), 256), description: cutBlock(ev.summary, 3000), fields: lists.length ? lists : ev.done !== undefined ? [field(t('Erledigt', 'Done'), String(ev.done))] : [] };
     }
       break;
     default:
@@ -277,10 +292,11 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date(), rid = '', i
   };
 }
 
+// Zuletzt im Statuspost: in der globalen Sprache beim Merken (W-0041).
 const RECENT = {
-  perm: () => 'Freigabe angefragt', idle: () => 'Claude fertig', question: (e) => `Frage zu ${e.id}`, review: (e) => `${e.id} im Review`,
-  returned: (e) => `${e.id} zurückgegeben`, done: (e) => `${e.id} erledigt`, p1: (e) => `Neue P1 ${e.id}`, queue_empty: () => 'Warteschlange leer',
-  ci_red: (e) => `CI rot ${sha7(e.sha)}`, ci_green: (e) => `CI grün ${sha7(e.sha)}`, report_week: (e) => cut(e.title, 80), report_day: (e) => cut(e.title, 80),
+  perm: (e, t) => t('Freigabe angefragt', 'Approval requested'), idle: (e, t) => t('Claude fertig', 'Claude done'), question: (e, t) => t(`Frage zu ${e.id}`, `Question about ${e.id}`), review: (e, t) => t(`${e.id} im Review`, `${e.id} in review`),
+  returned: (e, t) => t(`${e.id} zurückgegeben`, `${e.id} returned`), done: (e, t) => t(`${e.id} erledigt`, `${e.id} done`), p1: (e, t) => t(`Neue P1 ${e.id}`, `New P1 ${e.id}`), queue_empty: (e, t) => t('Warteschlange leer', 'Queue empty'),
+  ci_red: (e, t) => t(`CI rot ${sha7(e.sha)}`, `CI red ${sha7(e.sha)}`), ci_green: (e, t) => t(`CI grün ${sha7(e.sha)}`, `CI green ${sha7(e.sha)}`), report_week: (e) => cut(e.title, 80), report_day: (e) => cut(e.title, 80),
 };
 
 // ---------- Stand eines Projekts ----------
@@ -374,8 +390,9 @@ export function snapshotOf(root, cache = null) {
     idleSince: (act && !act.busy && act.idleSince) || '',
     perm: perms[0] || null,
     perms,
-    today: { done: part.doneToday, cost: usage.today.cost > 0 ? fmtCost(usage.today.cost, usage.currency) : '' },
-    costs: Object.fromEntries(Object.entries(usage.byTask).filter(([, v]) => v.cost > 0).map(([k, v]) => [k, fmtCost(v.cost, usage.currency)])),
+    // Kosten stehen in Kanalnachrichten: Format der globalen Sprache.
+    today: { done: part.doneToday, cost: usage.today.cost > 0 ? fmtCost(usage.today.cost, usage.currency, language(null)) : '' },
+    costs: Object.fromEntries(Object.entries(usage.byTask).filter(([, v]) => v.cost > 0).map(([k, v]) => [k, fmtCost(v.cost, usage.currency, language(null))])),
   };
 }
 
@@ -444,7 +461,7 @@ export class Bot {
 
   event(rid, type, data, cfg, key = `${type}:${rid}:${data.id || ''}:${Date.now()}:${crypto.randomBytes(2).toString('hex')}`) {
     const ev = { type, project: (this.state.projects[rid] && this.state.projects[rid].name) || data.project || '', ...data, state: 'open', at: new Date().toISOString() };
-    if (RECENT[type]) this.addRecent(rid, RECENT[type](ev));
+    if (RECENT[type]) this.addRecent(rid, RECENT[type](ev, langOf()));
     if (!cfg.events[type] || !cfg.events[type].on) return null;
     this.upsert(key, ev, rid, cfg);
     return { key, ev };
@@ -475,7 +492,7 @@ export class Bot {
       if (d.step === 'done' || d.step === 'fail') {
         s.status = d.step; s.ended = o.at;
         if (d.step === 'fail') s.note = d.note || '';
-        this.addRecent(rid, `${d.id} ${d.step === 'done' ? 'ausgeliefert' : 'angehalten'}`);
+        this.addRecent(rid, d.step === 'done' ? langOf()(`${d.id} ausgeliefert`, `${d.id} shipped`) : langOf()(`${d.id} angehalten`, `${d.id} stopped`));
       }
       // Auftauen, sobald die Git-Schritte vorbei sind (nach dem Push), nicht erst nach dem Warten auf die CI.
       // Ohne Remote kommt kein Push, dann beim Ende oder Abbruch.
@@ -493,7 +510,7 @@ export class Bot {
       const before = this.state.ci[rid];
       this.state.ci[rid] = { ok: !!d.ok, sha: d.sha || '', at: o.at };
       this.dirty = true;
-      if (d.ok && !(before && !before.ok)) { this.addRecent(rid, `CI grün ${sha7(d.sha)}`); return; }
+      if (d.ok && !(before && !before.ok)) { this.addRecent(rid, langOf()(`CI grün ${sha7(d.sha)}`, `CI green ${sha7(d.sha)}`)); return; }
       const type = d.ok ? 'ci_green' : 'ci_red';
       this.event(rid, type, { ...d, project: o.project }, cfg, key(type));
       return;
@@ -542,7 +559,7 @@ export class Bot {
         const accepted = t.status === 'erledigt';
         if (op) { this.upsert(op.key, { ...op.ev, state: accepted ? 'accepted' : 'returned', at: new Date().toISOString() }, rid, cfg); delete this.state.open[slot]; }
         delete (this.state.sent[rid] || {})[`review:${t.id}`];
-        if (accepted) { this.once(rid, `done:${t.id}`); this.addRecent(rid, `${t.id} angenommen`); }
+        if (accepted) { this.once(rid, `done:${t.id}`); this.addRecent(rid, langOf()(`${t.id} angenommen`, `${t.id} accepted`)); }
         else if (OPEN_STATUSES.includes(t.status)) this.event(rid, 'returned', base, cfg);
       } else if (o.status !== 'erledigt' && t.status === 'erledigt' && !this.shipping(rid, t.id) && this.once(rid, `done:${t.id}`)) this.event(rid, 'done', base, cfg);
       if (t.q > o.q && this.once(rid, `question:${t.id}:${String(t.lastQ).slice(0, 80)}`)) {
@@ -764,15 +781,16 @@ export class Bot {
 
   // Status des Bots (eigener Bot): das Wichtigste über alle Projekte, je Art das jüngste; höchstens alle 20 s neu.
   statusLine(cfg) {
+    const t = langOf();
     const all = this.liveProjects(cfg);
     const newest = (list, at) => list.sort((x, y) => String(at(y)).localeCompare(String(at(x))))[0];
     const perm = newest(all.filter((p) => p.snap.perm), (p) => p.snap.perm.since);
-    if (perm) return `${perm.snap.name} wartet auf deine Freigabe`;
+    if (perm) return t(`${perm.snap.name} wartet auf deine Freigabe`, `${perm.snap.name} is waiting for your approval`);
     const idle = newest(all.filter((p) => !p.snap.busy && p.snap.idleSince), (p) => p.snap.idleSince);
-    if (idle) return `${idle.snap.name} wartet auf dich`;
+    if (idle) return t(`${idle.snap.name} wartet auf dich`, `${idle.snap.name} is waiting for you`);
     const busy = newest(all.filter((p) => p.snap.busy && p.snap.active), (p) => p.snap.since);
-    if (busy) return `arbeitet an ${busy.snap.active.id} (${busy.snap.name})`;
-    return `${all.length} ${all.length === 1 ? 'Projekt' : 'Projekte'} im Blick`;
+    if (busy) return t(`arbeitet an ${busy.snap.active.id} (${busy.snap.name})`, `working on ${busy.snap.active.id} (${busy.snap.name})`);
+    return t(`${all.length} ${all.length === 1 ? 'Projekt' : 'Projekte'} im Blick`, `watching ${all.length} ${all.length === 1 ? 'project' : 'projects'}`);
   }
 
   updateStatus(cfg) {
@@ -870,8 +888,8 @@ export class Bot {
   }
 
   // Details zu einem Projekt aus dem Auswahlmenü des Dashboards, mit Knöpfen für Aufgaben und eine Anweisung.
-  detail(pr, cfg, t) {
-    const body = renderStatus({ ...pr.snap, recent: pr.recent, ci: this.state.ci[pr.rid] || null }, cfg);
+  detail(pr, cfg, t, lang) {
+    const body = renderStatus({ ...pr.snap, recent: pr.recent, ci: this.state.ci[pr.rid] || null }, cfg, { lang });
     const btns = [...act(2, t('Aufgaben', 'Tasks'), cid('tasks', pr.rid, '')), ...act(1, t('Anweisung an Claude', 'Instruction for Claude'), cid('ins', pr.rid, (pr.snap.active && pr.snap.active.id) || ''))];
     return { ...body, components: btns.length ? [{ type: 1, components: btns }] : [] };
   }
@@ -904,6 +922,7 @@ export class Bot {
   // im Board, Verlauf mit [Discord]). Fehler kommen als Text für den Nutzer zurück.
   async act(i, cfg, t) {
     const { runActionWithUndo } = await import('./api.mjs');
+    const lang = normLang(i.locale || i.guild_locale) || 'en';
     const ok = (title, description = '') => ({ embeds: [{ color: COLOR.done, title: cut(title, 256), ...(description ? { description: trimTo(description, 4000) } : {}) }] });
     const create = async (pr, title, prio) => {
       const priority = String(prio || '').toUpperCase();
@@ -921,7 +940,7 @@ export class Bot {
       const { sub, opts } = subOf(i);
       if (sub === 'status' && !opts.project) return this.overview(cfg, t);
       const pr = this.pick(cfg, t, { name: opts.project || '' });
-      if (sub === 'status') return renderStatus({ ...pr.snap, recent: pr.recent, ci: this.state.ci[pr.rid] || null }, cfg);
+      if (sub === 'status') return renderStatus({ ...pr.snap, recent: pr.recent, ci: this.state.ci[pr.rid] || null }, cfg, { lang });
       if (sub === 'tasks') return this.taskList(pr, cfg, t);
       if (sub === 'new') return create(pr, opts.title, opts.priority);
       if (sub === 'instruct') return instruct(pr, (opts.task || '').toUpperCase(), opts.text);
@@ -930,7 +949,7 @@ export class Bot {
     const p = parseCid(i.data && i.data.custom_id);
     if (!p) throw new Error(t('Unbekannter Knopf.', 'Unknown button.'));
     if (i.type === 3 && p.act === 'queue') return this.queueView(cfg, t);
-    if (i.type === 3 && p.act === 'proj') return this.detail(this.pick(cfg, t, { rid: String((i.data.values || [])[0] || '') || '-' }), cfg, t);
+    if (i.type === 3 && p.act === 'proj') return this.detail(this.pick(cfg, t, { rid: String((i.data.values || [])[0] || '') || '-' }), cfg, t, lang);
     // Knöpfe des Dashboards tragen kein Projekt: das aus dem Dialog, sonst das einzige oder das, in dem Claude gerade ist.
     const pr = this.pick(cfg, t, p.rid ? { rid: p.rid } : { name: i.type === 5 ? modalValues(i.data).project || '' : '', active: true });
     if (i.type === 3 && p.act === 'tasks') return this.taskList(pr, cfg, t);
@@ -968,9 +987,12 @@ export class Bot {
       if ((i.type === 2 && subOf(i).sub === 'help') || (p && p.act === 'help')) return await io.reply(helpMessage({ locale: i.locale, shared: this.shared }));
       await io.defer();
       let data;
+      // Meldungen der Board-API (api.mjs, tr aus i18n) in der Sprache des Clients, danach wieder die globale.
+      // ponytail: eine Sprache je Prozess; zwei gleichzeitige Antworten in verschiedenen Sprachen können sich mischen.
+      setLanguage(normLang(i.locale || i.guild_locale) || 'en');
       try { data = await this.act(i, cfg, t); } catch (e) {
         data = { embeds: [{ color: COLOR.red, title: t('Ging nicht', 'That did not work'), description: cut(e.message, 1500) }] };
-      }
+      } finally { setLanguage(null); }
       await io.edit(data);
     } catch (e) { this.log(`Antwort auf Befehl oder Knopf: ${e.message}`); }
   }

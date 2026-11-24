@@ -1,268 +1,268 @@
-# Kanban-Board
+# Kanban board
 
-Das Board zeigt alle Aufgaben als Spalten nach Status. In der Live-Ansicht kann der Nutzer dort auch selbst arbeiten: Aufgaben anlegen, verschieben, bearbeiten, Bilder ablegen, Ideen und Meilensteine pflegen. Alle Änderungen laufen über dasselbe CLI wie im Terminal, Prüfungen und Verlauf sind also identisch.
+The board shows all tasks as columns by status. In the live view the user can work there too: create tasks, move them, edit them, drop in images, maintain ideas and milestones. All changes go through the same CLI as in the terminal, so checks and history are identical.
 
-## Zwei Varianten
+## Two variants
 
-| | Live-Ansicht | Datei |
+| | Live view | File |
 |---|---|---|
-| Befehl | `works board --serve` | `works board` |
-| Ergebnis | Lokaler Server, standardmäßig `http://127.0.0.1:4747/` | `.works/board.html` |
-| Bearbeiten | Ja | Nein, reine Ansicht mit Hinweis |
-| Aktualisierung | Laufend, auch bei manuellen Edits an task.md, ohne Neuladen der Seite | Datei wird nach jedem CLI-Befehl neu erzeugt, im Browser von Hand neu laden |
-| Läuft ohne Prozess | Nein | Ja, auch per Doppelklick und offline |
+| Command | `works board --serve` | `works board` |
+| Result | Local server, by default `http://127.0.0.1:4747/` | `.works/board.html` |
+| Editing | Yes | No, view only with a notice |
+| Updates | Continuous, also for manual edits to task.md, without reloading the page | File is regenerated after every CLI command, reload it in the browser by hand |
+| Works without a process | No | Yes, also by double-click and offline |
 
-## Live-Ansicht starten
+## Starting the live view
 
-Wenn der Nutzer das Board sehen oder selbst Aufgaben pflegen will, die Live-Ansicht starten.
+When the user wants to see the board or maintain tasks themselves, start the live view.
 
-In Claude Code so starten:
+In Claude Code, start it like this:
 
 ```
 works board --serve --detach
 ```
 
-Der Server läuft dann losgelöst im Hintergrund weiter, auch nach dem Ende der Session, und der Befehl gibt die URL aus. Diese dem Nutzer nennen. Läuft für das Projekt schon ein Server mit der aktuellen Version, startet kein zweiter, sondern es wird nur dessen URL ausgegeben. Ein Server einer älteren Version wird beendet und durch die aktuelle ersetzt.
+The server then keeps running detached in the background, even after the session ends, and the command prints the URL. Tell the user that URL. If a server with the current version is already running for the project, no second one starts; only its URL is printed. A server of an older version is stopped and replaced by the current one.
 
-Weitere Befehle:
+More commands:
 
-- `works board --status`: läuft ein Server, welche Version, ist sie aktuell?
-- `works board --restart`: Server mit der aktuellen Version neu starten, gleicher Port.
-- `works board --stop`: Server beenden.
+- `works board --status`: is a server running, which version, is it current?
+- `works board --restart`: restart the server with the current version, same port.
+- `works board --stop`: stop the server.
 
-Ohne `--detach` läuft der Server im Vordergrund, bis er mit Strg+C beendet wird. Das ist für ein eigenes Terminal gedacht. Mit `--open` öffnet sich der Standardbrowser auf dem Rechner, auf dem der Befehl läuft, aber nur, wenn das Board dort noch in keinem Tab offen ist: Offene Tabs halten eine Verbindung zum Server, die er unter `/tabs` zählt (nur lokal, Links von anderen Geräten zählen nicht). Nach einem Start oder Neustart wartet `--open` bis zu drei Sekunden, weil sich offene Tabs dann von selbst neu verbinden. Das gilt auch für ein schon laufendes Board. Gezählt werden die Tabs aller laufenden Boards: Ist das Board eines anderen Projekts offen, öffnet `--open` nichts, weil dieser Tab von selbst zum Hub wechselt. Bei Remote-SSH kein `--open`, sondern auf die Portweiterleitung des Editors hinweisen; ein anderer lokaler Port ist dabei kein Problem.
+Without `--detach` the server runs in the foreground until it is stopped with Ctrl+C. That is meant for a separate terminal. With `--open` the default browser opens on the machine running the command, but only if the board isn't open in any tab there yet: open tabs keep a connection to the server, which it counts under `/tabs` (local only, links from other devices don't count). After a start or restart, `--open` waits up to three seconds, because open tabs then reconnect on their own. This also applies to a board that is already running. The tabs of all running boards are counted: if another project's board is open, `--open` opens nothing, because that tab switches to the hub on its own. With Remote SSH, don't use `--open`; point to the editor's port forwarding instead. A different local port is not a problem there.
 
-Optionen:
+Options:
 
-- `--port 4800`: fester Port. Ohne Angabe startet das Board auf seinem zuletzt genutzten Port (`.works/server-last.json`, lokal), beim ersten Start auf 4747; ist der belegt, wird der nächste freie gesucht, auch mit `--detach`. So verbindet sich ein offener Tab nach Stopp und Neustart wieder, auch wenn das Board über den Hub startet. Neustarts behalten den Port des bisherigen Servers.
-- `--host 0.0.0.0`: im lokalen Netz erreichbar machen. Nur auf ausdrücklichen Wunsch, weil dann jeder im Netz, der die Seite öffnet, Aufgaben ändern kann.
+- `--port 4800`: fixed port. Without it the board starts on its last used port (`.works/server-last.json`, local), on the first start on 4747; if that is taken, the next free one is used, also with `--detach`. That way an open tab reconnects after a stop and restart, even if the board starts via the hub. Restarts keep the port of the previous server.
+- `--host 0.0.0.0`: make it reachable on the local network. Only when explicitly requested, because then anyone on the network who opens the page can change tasks.
 
-## Demo zum Ausprobieren
+## Demo to try it out
 
 ```
 works demo --simulate --open
 ```
 
-Legt im Temp-Ordner ein Beispielprojekt `works-demo` mit elf Aufgaben aller Typen an, mit Bildern, Ideen, zwei Meilensteinen, einer überfälligen und einer blockierten Aufgabe, und startet das Live-Board. Mit `--simulate` folgen im Abstand von `--delay` Sekunden (Standard 6) zehn Änderungen, wie Claude sie macht: Aufgabe starten, Kriterium abhaken, Frage notieren, nach Review verschieben, neue Aufgabe, Priorität anheben, abschließen, Übergabe schreiben, verwerfen. Im Board lässt sich danach alles selbst ausprobieren.
+Creates a sample project `works-demo` in the temp folder with eleven tasks of all types, with images, ideas, two milestones, one overdue and one blocked task, and starts the live board. With `--simulate`, ten changes follow at intervals of `--delay` seconds (default 6), the way Claude makes them: start a task, tick a criterion, note a question, move to review, new task, raise priority, complete, write a handoff, drop. Afterwards everything can be tried out in the board.
 
-Ein erneuter Aufruf setzt die Demo zurück. `works demo --remove` beendet den Server und löscht den Ordner. Ein Ordner mit echtem `.works` wird nie angefasst; die Demo erkennt ihre eigenen Ordner an `.works/.demo`.
+Running it again resets the demo. `works demo --remove` stops the server and deletes the folder. A folder with a real `.works` is never touched; the demo recognizes its own folders by `.works/.demo`.
 
-## Aufbau der Oberfläche
+## Layout of the interface
 
-- Kopfzeile: Projekt, Verbindungsstatus, Ansicht (Board, Sprint, Warteschlange, Zeitleiste, Abhängigkeiten, Tabelle, Live, Tasten `1` bis `7`), Werkzeuge, Suche (Taste `/`), Nächste Aufgabe, Ideen, Aktivität, Teilen, Farbschema (System, Hell, Dunkel) und Neue Aufgabe (Taste `N`).
-- Flussleiste: Verteilung aller Aufgaben auf die Status. Ein Klick springt zur Spalte.
-- Hinweise darunter: offene P1, blockierte, überfällige, Aufgaben mit offenen Fragen, unvollständig erfasste, offene Aufgaben mit gleichen Dateien (Konflikt-Radar: in Arbeit, im Review oder in der Warteschlange, Dateien aus Commits mit der ID, Änderungen in files.jsonl und der task.md, dieselbe Erkennung wie `works parallel plan`; Etikett "Gleiche Dateien wie W-0015" mit den Dateien im Tooltip, in der Live-Ansicht "W-0012 und W-0015 ändern board.js") und stille (in Arbeit, aber seit `handoff_stale_days` Tagen keine Antwort, keine Dateiänderung, kein abgehakter Schritt und keine Änderung an der task.md). Ein Klick filtert. Stille Karten tragen ein Etikett wie "Seit 4 Tagen still, keine Übergabe", in der Live-Ansicht stehen sie unter "Wartet auf dich".
-- Filter: Priorität, Typ, Tag, Meilenstein, Archiv und Verworfene. Im Meilenstein-Filter lassen sich auch Meilensteine anlegen; ist einer gewählt, erscheint "Meilenstein bearbeiten".
-- Fortschritt: Anteil erledigter Aufgaben in Prozent, Balken für erledigt, in Arbeit und Review sowie noch offen, erfüllte Akzeptanzkriterien, Bilanz der letzten 7 Tage, eine Prognose aus dem Tempo der letzten 4 Wochen und ein Verlaufsdiagramm über 8 Wochen (angelegte gegen erledigte Aufgaben). Die Anzeige folgt den Filtern: Ist ein Meilenstein gewählt, zeigt sie dessen Fortschritt samt Zieldatum. Verworfene Aufgaben zählen nicht mit, erledigte im Archiv schon.
-- Spalten mit Karten. Karten zeigen ID, Typ, Aufwand, Priorität (als farbiger Text und feine Linie oben an der Karte), Titel, letztes Bild, Fortschritt der Akzeptanzkriterien, Blockaden, Fälligkeit, offene Fragen, Meilenstein und Tags.
+- Header: project, connection status, view (Board, Sprint, Queue, Timeline, Dependencies, Table, Live, keys `1` to `7`), Tools, Search (key `/`), Next task, Ideas, Activity, Share, color scheme (System, Light, Dark) and New task (key `N`).
+- Flow bar: distribution of all tasks across the statuses. A click jumps to the column.
+- Notices below: open P1, blocked, overdue, tasks with open questions, incompletely captured ones, open tasks touching the same files (conflict radar: in progress, in review or in the queue, files from commits with the ID, changes in files.jsonl and the task.md, the same detection as `works parallel plan`; label "Same files as W-0015" with the files in the tooltip, in the live view "W-0012 and W-0015 change board.js") and quiet ones (in progress, but for `handoff_stale_days` days no reply, no file change, no ticked step and no change to the task.md). A click filters. Quiet cards carry a label like "Quiet for 4 days, no handoff", in the live view they are listed under "Waiting for you".
+- Filters: priority, type, tag, milestone, archive and dropped. The milestone filter can also create milestones; when one is selected, "Edit milestone" appears.
+- Progress: share of done tasks in percent, bars for done, in progress and review, and still open, fulfilled acceptance criteria, balance of the last 7 days, a forecast from the pace of the last 4 weeks and a history chart over 8 weeks (created versus done tasks). The display follows the filters: if a milestone is selected, it shows that milestone's progress including its target date. Dropped tasks don't count, done ones in the archive do.
+- Columns with cards. Cards show ID, type, effort, priority (as colored text and a thin line at the top of the card), title, latest image, progress of the acceptance criteria, blockers, due date, open questions, milestone and tags.
 
-## Ansichten
+## Views
 
-- **Board**: Spalten mit Karten wie oben.
-- **Sprint**: Zeitraum, Ziel, Kapazität in Punkten, Burndown und Vorschläge zum Einplanen. Siehe planning.md.
-- **Abhängigkeiten**: Graph von links nach rechts in Stufen. Der kritische Pfad (längste Kette offener Aufgaben nach Schätzung) ist orange, rechts stehen seine Dauer und die Aufgabe, die am meisten freigibt. Das + an einer Karte auf eine andere ziehen legt "blockiert" an.
-- **Warteschlange**: die Reihenfolge, in der Claude arbeiten soll. Aufgaben einreihen (Auswahlfeld, Detailpanel oder Tabelle), per Ziehen oder Pfeilen sortieren, mit × entfernen. Oben steht, was gerade läuft. Rechts die Einstellungen: nach dem Abschluss weitermachen (`auto_next`), vorher nachfragen (`ask_before`), blockierte überspringen (`skip_blocked`), dazu was Claude als Nächstes nimmt und der Aufwand in der Schlange. Erledigte und verworfene fallen automatisch heraus. Im CLI: `works queue`.
-- **Zeitleiste**: Wochen mit Kalenderwoche, gruppiert nach Meilenstein. Volle Balken laufen oder sind erledigt, gestrichelt farbig sind geplant mit Fälligkeit, gestrichelt grau sind aus dem Aufwand geschätzt (S 2, M 5, L 10, XL 15 Tage, blockierte beginnen nach ihrer Abhängigkeit). Linie für heute, gestrichelte grüne Linie für das Ziel eines Meilensteins, Überfälliges rot. Das rechte Ende eines Balkens ziehen setzt die Fälligkeit.
-- **Tabelle**: alle gefilterten Aufgaben mit sortierbaren Spalten. Priorität, Aufwand und Fälligkeit direkt in der Zeile ändern. Mehrere auswählen (Shift wählt einen Bereich), dann in der Leiste unten Priorität, Status, Meilenstein, Aufwand oder Tags setzen, einreihen, verwerfen oder archivieren. Abschließen geht bewusst nur einzeln über die Definition of Done.
-- **Live**: was Claude gerade tut und wie weit die Aufgaben des Tages sind. Nur im Live-Board, nicht in `board.html` und im Export. Aufbau im Abschnitt Live-Ansicht.
+- **Board**: columns with cards as above.
+- **Sprint**: period, goal, capacity in points, burndown and suggestions for planning in. See planning.md.
+- **Dependencies**: graph from left to right in stages. The critical path (longest chain of open tasks by estimate) is orange; on the right are its duration and the task that unblocks the most. Dragging the + on a card onto another one creates "blocked".
+- **Queue**: the order in which Claude should work. Add tasks to the queue (dropdown, detail panel or table), sort by dragging or with arrows, remove with ×. At the top is what is running right now. On the right the settings: continue after completion (`auto_next`), ask first (`ask_before`), skip blocked ones (`skip_blocked`), plus what Claude takes next and the effort in the queue. Done and dropped tasks drop out automatically. In the CLI: `works queue`.
+- **Timeline**: weeks with calendar week number, grouped by milestone. Solid bars are running or done, dashed colored ones are planned with a due date, dashed gray ones are estimated from the effort (S 2, M 5, L 10, XL 15 days, blocked ones start after their dependency). Line for today, dashed green line for a milestone's target, overdue in red. Dragging the right end of a bar sets the due date.
+- **Table**: all filtered tasks with sortable columns. Change priority, effort and due date directly in the row. Select several (Shift selects a range), then in the bar at the bottom set priority, status, milestone, effort or tags, add to the queue, drop or archive. Completing deliberately only works one at a time via the Definition of Done.
+- **Live**: what Claude is doing right now and how far the day's tasks are. Only in the live board, not in `board.html` and the export. Layout in the section Live view.
 
-## Live-Ansicht
+## Live view
 
-Oben vier Kacheln:
+Four tiles at the top:
 
-- **Claude arbeitet gerade**: Aufgabe, Schritt im Umsetzungsplan und der laufende Werkzeugaufruf mit Laufzeit, zum Beispiel "Befehl npm test, seit 1:12". Zwischen zwei Aufrufen steht "Claude denkt nach" mit dem letzten Aufruf, nach dem Ende einer Antwort "Claude wartet seit 14:03". Fragt Claude nach einer Freigabe, färbt sich die Kachel gelb und zeigt "Claude wartet auf deine Freigabe" mit Befehl und Wartezeit. Ein Klick lässt die Ansicht wieder Claude folgen.
-- **Fortschritt heute**: wie viele Aufgaben der Tagesliste fertig sind (Review oder erledigt), mit einem Segment je Aufgabe. Darunter "Verbrauch heute" mit Tokens und geschätzten Kosten des Tages, sobald der Stop Hook etwas erfasst hat.
-- **Parallel**: Agenten in eigenen Worktrees und woran sie gerade sind.
-- **Wartet auf dich**: wartende Freigaben (immer zuerst, "W-0152: Freigabe für einen Befehl"), Aufgaben im Review, Funde und Fehlschläge in Prüfungen, offene Fragen an Aufgaben in Arbeit, je Aufgabe und Art eine Zeile ("W-0152: 45 Prüfungen fehlgeschlagen"), höchstens vier Zeilen, darunter "und N weitere Punkte". Ein Klick wählt die Aufgabe.
+- **Claude is working**: task, step in the implementation plan and the running tool call with its runtime, for example "Command npm test, for 1:12". Between two calls it says "Claude is thinking" with the last call, after a reply ends "Claude waiting since 14:03". If Claude asks for an approval, the tile turns yellow and shows "Claude is waiting for your approval" with command and waiting time. A click makes the view follow Claude again.
+- **Progress today**: how many tasks of the day list are finished (review or done), with one segment per task. Below it "Usage today" with tokens and estimated cost of the day, as soon as the Stop hook has recorded something.
+- **Parallel**: agents in their own worktrees and what they are working on.
+- **Waiting for you**: pending approvals (always first, "W-0152: approval for a command"), tasks in review, findings and failures in checks, open questions on tasks in progress, one line per task and kind ("W-0152: 45 checks failed"), at most four lines, below them "and N more items". A click selects the task.
 
-Darunter links die Tagesliste: Aufgaben in Arbeit (die der Hauptsitzung zuerst, dann Agenten), im Review, in der Warteschlange und heute erledigte. In der Mitte die gewählte Aufgabe mit ihrem bisherigen Verbrauch im Kopf (Tokens und geschätzte Kosten), Phasenleiste (Gestartet, Umsetzung, Prüfungen, Review, Erledigt), Umsetzungsplan mit der Uhrzeit jedes abgehakten Schritts, Akzeptanzkriterien, "Gerade jetzt", Verlauf (diese Aufgabe oder alle; Einträge mit einer geänderten Datei klappen per Klick ihren Diff auf: uncommitteter Stand gegen den letzten Commit, bei parallelen Aufgaben aus deren Worktree, neue Dateien mit ganzem Inhalt, sonst die Änderungen der Aufgabe; nicht im Leselink) und dem Feld "Anweisung an Claude". Rechts alle Prüfungen der Tagesliste: laufende mit Laufzeit, Funde mit "Claude beheben lassen" und "Als bekannt markieren", Fehlschläge mit den letzten Zeilen der Ausgabe, noch nicht gelaufene als kurze Zeile, bestandene eingeklappt.
+Below that, on the left, the day list: tasks in progress (the main session's first, then agents), in review, in the queue and done today. In the middle the selected task with its usage so far in the header (tokens and estimated cost), phase bar (Started, Implementation, Checks, Review, Done), implementation plan with the time each step was ticked, acceptance criteria, "Right now", history (this task or all; entries with a changed file expand their diff on click: uncommitted state against the last commit, for parallel tasks from their worktree, new files with their whole content, otherwise the task's changes; not in the read link) and the field "Instruction for Claude". On the right all checks of the day list: running ones with runtime, findings with "Let Claude fix it" and "Mark as known", failures with the last lines of output, not yet run ones as a short line, passed ones collapsed.
 
-Hat eine Aufgabe mehr als 8 Prüfungen, zeigt die Spalte eine Zusammenfassung statt einer Zeile je Prüfung: Zähler (fehlgeschlagen, Fund, bestanden, läuft, offen) und einen Streifen mit einem Strich je Prüfung, darunter die gerade laufende Prüfung mit Laufzeit. Fehlschläge mit derselben ersten Zeile der Ausgabe stehen zusammen auf einer Karte ("44 Prüfungen, gleiche Meldung") mit den ersten zehn Namen, der Ausgabe der ersten und einem Knopf "Claude beheben lassen", der einen Kommentar für die ganze Gruppe schreibt. Funde stehen einzeln, bestandene als eine Zeile. "Alle N Prüfungen anzeigen" klappt die komplette Liste auf.
+If a task has more than 8 checks, the column shows a summary instead of one line per check: counters (failed, finding, passed, running, pending) and a strip with one mark per check, below it the check currently running with its runtime. Failures with the same first output line are grouped on one card ("44 checks, same message") with the first ten names, the output of the first one and a button "Let Claude fix it" that writes one comment for the whole group. Findings are listed individually, passed ones as one line. "Show all N checks" expands the complete list.
 
-**Verlauf, wackelig, Laufzeit**: `checks.json` merkt sich je Prüfung die letzten fünf Läufe mit Ergebnis und Dauer (`hist`), ein geänderter Befehl beginnt von vorn. In der Zeile einer Prüfung zeigen kleine Striche diese Läufe (neuester rechts), rechts steht nur die Dauer, weil der Zustand schon im Symbol steckt. "wackelig, 2 von 5 rot" erscheint, wenn eine Prüfung in diesen Läufen mindestens zweimal zwischen bestanden und fehlgeschlagen gewechselt hat, ohne dass sich der Code dazwischen geändert hat (gleicher Fingerabdruck). Kaputt gemacht und repariert ist also nicht wackelig. Ein Pfeil an der Dauer zeigt einen deutlich langsameren (↑) oder schnelleren (↓) Lauf: mindestens 1,5-mal so lang oder kurz wie der Median der bestandenen Läufe davor und mindestens 5 Sekunden Unterschied. Bei vielen Prüfungen stehen wackelige Namen mit "~" in der Fehlergruppe, darunter je eine Zeile "N wackelig" und "Langsamer als sonst".
+**History, flaky, runtime**: `checks.json` remembers the last five runs per check with result and duration (`hist`); a changed command starts from scratch. In a check's row, small marks show these runs (newest on the right); on the right only the duration is shown, since the state is already in the icon. "flaky, 2 of 5 red" appears when a check switched between passed and failed at least twice in these runs without the code changing in between (same fingerprint). Broken and then fixed is therefore not flaky. An arrow at the duration marks a clearly slower (↑) or faster (↓) run: at least 1.5 times as long or short as the median of the passed runs before it, and at least 5 seconds difference. With many checks, flaky names are marked with "~" in the failure group, below that one line each for "N flaky" and "Slower than usual".
 
-**Erneut prüfen**: Jede Fehlergruppe hat neben "Claude beheben lassen" den Knopf "Erneut prüfen", jede rote Zeile einen Link dafür, und ab zwei Fehlschlägen gibt es über der Liste "Alle N fehlgeschlagenen erneut prüfen". Es laufen nur diese Prüfungen (`works checks run <ID> --only ...`), bestandene Ergebnisse bleiben stehen. Jedes Ergebnis merkt sich den Codestand, auf dem es lief: Hat sich der Code seither geändert, gelten die stehengebliebenen für die Definition of Done als veraltet, und `works done` lässt sie neu laufen. Skill-Prüfungen wie code-audit bekommen keinen Knopf, die trägt Claude ein. Der Lauf ist live zu sehen; solange er läuft, gibt es keine Knöpfe. Nur im lokalen Board, nicht im Leselink. Aufgeklappte Ausgaben und Listen bleiben bei Aktualisierungen offen.
+**Re-run**: every failure group has a "Re-run" button next to "Let Claude fix it", every red row a link for it, and from two failures on there is "Re-run all N failed" above the list. Only these checks run (`works checks run <ID> --only ...`), passed results stay. Every result remembers the code state it ran on: if the code has changed since, the remaining results count as outdated for the Definition of Done, and `works done` runs them again. Skill checks like code-audit get no button, Claude enters those. The run can be watched live; while it runs there are no buttons. Only in the local board, not in the read link. Expanded output and lists stay open across updates.
 
-Die Phase "Prüfungen" hängt daran, ob gerade eine Prüfung läuft, nicht am Status. Prüfungen laufen oft erst bei der Abnahme im Review.
+The phase "Checks" depends on whether a check is running right now, not on the status. Checks often only run during the acceptance review in Review.
 
-Die Mitte folgt der Aufgabe, an der Claude arbeitet. Wer selbst eine Aufgabe wählt, behält sie, bis sie aus der Tagesliste fällt oder die Ansicht wieder Claude folgen soll (Kachel oder Pille im Kopf). Gewählte Aufgabe und Verlaufsfilter merkt sich der Browser. Mit geteiltem Leselink fehlen Anweisungsfeld, Abnahme und die Knöpfe an Funden. Bei reduzierter Bewegung stehen Punkte und Spinner still; Screenreader hören, wenn ein Schritt erledigt ist, Prüfungen fertig sind, eine Aufgabe auf Abnahme wartet oder Claude eine Freigabe braucht.
+The middle follows the task Claude is working on. If you select a task yourself, it stays until it drops out of the day list or the view should follow Claude again (tile or pill in the header). The browser remembers the selected task and the history filter. With a shared read link, the instruction field, acceptance review and the buttons on findings are missing. With reduced motion, dots and spinners stand still; screen readers announce when a step is done, checks are finished, a task is waiting for acceptance review or Claude needs an approval.
 
-Wartet Claude auf eine Freigabe, zeigen auch die Jetzt-Box der Aufgabe und ihre Zeile in der Tagesliste das. Der Reiter Live bekommt einen ruhigen gelben Punkt statt des pulsierenden, die Pille im Kopf "Wartet auf deine Freigabe (W-0152)" und der Fenstertitel ein "Freigabe" vorne, auch in den anderen Ansichten. Freigeben oder ablehnen geht nur im Claude-Fenster. "Mich im Browser benachrichtigen" in der Jetzt-Box schaltet die Browser-Benachrichtigung dafür ein (gemerkt im Browser, wie die übrigen Benachrichtigungen unter Werkzeuge). Nach einer Freigabe bleibt die Anzeige bis zum Ende des Aufrufs stehen, weil Claude Code den Moment der Freigabe nicht meldet.
+When Claude is waiting for an approval, the task's Right now box and its row in the day list show it too. The Live tab gets a calm yellow dot instead of the pulsing one, the pill in the header says "Waiting for your approval (W-0152)" and the window title gets "Approval" at the front, also in the other views. Approving or denying only works in the Claude window. "Notify me in the browser" in the Right now box turns on the browser notification for it (remembered in the browser, like the other notifications under Tools). After an approval the display stays until the call ends, because Claude Code doesn't report the moment of approval.
 
-Woher die Daten kommen: Werkzeugaufrufe aus den Hooks PreToolUse, PermissionRequest und PostToolUse (`activity.json`), Uhrzeiten abgehakter Schritte aus `steps.json` (die task.md speichert sie nicht; bei mehreren Häkchen zwischen zwei Beobachtungen bekommen sie dieselbe Uhrzeit), Prüfungsstand aus `checks.json` der Aufgabe, Verbrauch aus den usage-Einträgen in `time.jsonl` (der Stop Hook schreibt sie nach jeder Antwort, das Board liest die Datei nur neu, wenn sie sich geändert hat; Kosten nach `config.prices`, siehe planning.md). Ein Prüfungslauf, der länger als 11 Minuten "läuft", gilt als abgebrochen.
+Where the data comes from: tool calls from the PreToolUse, PermissionRequest and PostToolUse hooks (`activity.json`), times of ticked steps from `steps.json` (the task.md doesn't store them; several ticks between two observations get the same time), check state from the task's `checks.json`, usage from the usage entries in `time.jsonl` (the Stop hook writes them after every reply, the board only rereads the file when it has changed; cost according to `config.prices`, see planning.md). A check run that has been "running" for more than 11 minutes counts as aborted.
 
-Das Detailpanel hat die Reiter **Übersicht**, **Kommentare** (Gespräch mit Claude, siehe planning.md), **Zeit** (aktive Zeit von Claude, Tage je Status, Sitzungen) und **Code und Commits**. Unten gibt es "Als Vorlage speichern".
+The detail panel has the tabs **Overview**, **Comments** (conversation with Claude, see planning.md), **Time** (Claude's active time, days per status, sessions) and **Code and commits**. At the bottom there is "Save as template".
 
-Über dem Fortschritt zeigt die Zeile **Ansichten** gespeicherte Filter als Chips; "Aktuelle Filter speichern" erscheint, sobald Filter gesetzt sind. Über der Zeitleiste zeigt "Wie gut passen die Schätzungen?" Schätzung gegen tatsächliche Dauer.
+Above the progress, the **Views** row shows saved filters as chips; "Save current filters" appears as soon as filters are set. Above the timeline, "How good are the estimates?" shows estimate versus actual duration.
 
-Das Symbol mit den Reglern in der Kopfzeile öffnet die **Werkzeuge**: Wochenbericht (Zeitplan, Discord, Inhalt, Berichte ansehen), Vorlagen (anlegen, bearbeiten, nutzen), Prüfungen vor dem Abschluss, Prüfungen im Projekt (je Prüfung über alle Aufgaben: Anteil rot mit Läufen im Tooltip, Median der Laufzeit mit Pfeil bei deutlicher Abweichung, letzte Läufe und wackelig; sortierbar nach oft rot, langsam, wackelig; die ersten zehn, Rest aufklappbar) und Benachrichtigungen im Browser (Freigabe, Review, Frage oder Kommentar von Claude, neue P1, Blockade aufgelöst, Warteschlange leer, Ton und Zähler im Tab-Titel).
+The icon with the sliders in the header opens the **Tools**: weekly report (schedule, Discord, content, view reports), templates (create, edit, use), checks before completion, checks in the project (per check across all tasks: share of red with runs in the tooltip, median runtime with an arrow for clear deviations, recent runs and flaky; sortable by often red, slow, flaky; the first ten, the rest expandable) and browser notifications (approval, review, question or comment from Claude, new P1, blocker resolved, queue empty, sound and counter in the tab title).
 
-Oben unter Werkzeuge öffnet **Discord-Bot** (nur im Live-Board mit Bearbeiten) den Dialog für den Bot nach Entwurf J2: Reiter Verbindung (Stand, Einrichtung beim ersten Mal mit gemeinsamem Bot und Code oder eigenem Bot und Token, Kanalwahl live vom Bot mit „Hierher verschieben“), Projekte (Hinweise je Projekt an oder aus, beim eigenen Bot ein Kanal je Projekt; beim gemeinsamen gesperrt mit Hinweis), Ereignisse (an und @ je Ereignis, Ruhezeit, Verzögerungen, Frist zum Löschen), Befehle (Schalter „Befehle und Knöpfe erlauben“, ausgeschaltet ohne Knöpfe und ohne `/works`) und Datenschutz. Rechts steht eine Vorschau der gewählten Nachricht wie in Discord und wie sie auf dem Sperrbildschirm erscheint, schon mit den ungespeicherten Änderungen. Unten zählt der Dialog die Änderungen; Speichern wirkt ohne Neustart des Bots. Token und Schlüssel zeigt er nur maskiert. Details in integrations.md.
+At the top of Tools, **Discord bot** (only in the live board with editing) opens the dialog for the bot from design J2: tabs Connection (state, first-time setup with the shared bot and a code or an own bot and a token, channel choice live from the bot with "Move here"), Projects (notices per project on or off, with an own bot one channel per project; locked with a note for the shared bot), Events (on and @ per event, quiet hours, delays, deletion period), Commands (switch "Allow commands and buttons", when off without buttons and without `/works`) and Privacy. On the right is a preview of the selected message as in Discord and as it appears on the lock screen, already with the unsaved changes. At the bottom the dialog counts the changes; saving takes effect without restarting the bot. Token and keys are only shown masked. Details in integrations.md.
 
-Neue Aufgaben: Gibt es Vorlagen, fragt der Dialog zuerst nach einer Vorlage oder "Leer". Mit Vorlage gibt es die Felder der Vorlage, das freie Feld "Was genau soll passieren?" und die Kriterien zum An- und Abwählen.
+New tasks: if there are templates, the dialog first asks for a template or "Blank". With a template there are the template's fields, the free field "What exactly should happen?" and the criteria to select and deselect.
 
-Im Detailpanel zeigt der Reiter **Code und Commits** den Branch der Aufgabe (aus dem Feld `branch` oder der ID im Branchnamen), wie weit er dem Hauptbranch voraus ist, einen Pull Request (wenn `gh` angemeldet ist), alle Commits mit der ID in der Nachricht und die geänderten Dateien. Ein Klick auf eine Datei zeigt den Diff. Arbeitet man gerade auf dem Branch, stehen noch nicht committete Änderungen extra.
+In the detail panel, the **Code and commits** tab shows the task's branch (from the `branch` field or the ID in the branch name), how far it is ahead of the main branch, a pull request (if `gh` is logged in), all commits with the ID in the message and the changed files. A click on a file shows the diff. If you are currently on the branch, uncommitted changes are listed separately.
 
-## Teilen
+## Sharing
 
-- **Im Netzwerk, live und nur lesen**: Im Board auf Teilen, dann "Im Netzwerk freigeben", oder `works board --restart --share`. Der Server hört dann auf allen Adressen und gibt einen Link wie `http://192.168.1.20:4747/?view=SCHLÜSSEL` aus. Wer ihn öffnet, sieht Board, Zeitleiste, Tabelle, Details und Code live, kann aber nichts ändern. Ohne Schlüssel gibt es keinen Zugriff.
-- **Eigene andere Geräte**: Der Bearbeitungslink (`?key=…`, im Teilen-Dialog unter "Link mit Bearbeitungsrechten" oder `works share --owner`) erlaubt alles. Nicht weitergeben.
-- **Links erneuern**: `works share --rotate` oder im Dialog. Alte Links funktionieren danach nicht mehr. Die Schlüssel liegen in `.works/share.json` und sind von Git ausgenommen.
-- **Freigabe beenden**: `works board --restart --private` oder im Dialog.
-- **Schnappschuss**: `works export` oder im Dialog. Eine HTML-Datei mit allen Aufgaben, Details und eingebetteten Bildern, öffnet sich ohne Server und ohne Internet. Ideal für Leute außerhalb des Netzwerks.
-- Ein Hosting im Internet ist noch nicht eingebaut. Den Port nicht einfach ins Internet weiterleiten; Tunnel und Reverse Proxys werden als fremde Zugriffe behandelt und brauchen ebenfalls einen Schlüssel.
+- **On the network, live and read-only**: in the board click Share, then "Share on network", or `works board --restart --share`. The server then listens on all addresses and prints a link like `http://192.168.1.20:4747/?view=KEY`. Whoever opens it sees board, timeline, table, details and code live, but can't change anything. Without a key there is no access.
+- **Your own other devices**: the edit link (`?key=…`, in the Share dialog under "Link with edit rights" or `works share --owner`) allows everything. Don't pass it on.
+- **Renew links**: `works share --rotate` or in the dialog. Old links stop working afterwards. The keys are stored in `.works/share.json` and excluded from Git.
+- **Stop sharing**: `works board --restart --private` or in the dialog.
+- **Snapshot**: `works export` or in the dialog. A single HTML file with all tasks, details and embedded images that opens without a server and without internet. Ideal for people outside the network.
+- Hosting on the internet is not built in yet. Don't simply forward the port to the internet; tunnels and reverse proxies are treated as external access and also need a key.
 
-## Schnellsuche
+## Quick search
 
-Rechte Shift-Taste kurz drücken und loslassen, oder Strg+K (auf dem Mac Cmd+K), öffnet eine Suche wie bei GitHub.
+Briefly pressing and releasing the right Shift key, or Ctrl+K (Cmd+K on the Mac), opens a search like on GitHub.
 
-- Ohne Eingabe: offene Aufgaben nach Wichtigkeit und häufige Befehle.
-- Text: sucht in ID, Titel, Tags, Typ und Meilenstein. Enter öffnet die Aufgabe.
-- `#`: Tags, Enter filtert danach.
-- `>`: Befehle, etwa Neue Aufgabe, Ideen, Farbschema, Filter nach Priorität oder Meilenstein, Zu Spalte springen.
-- Pfeiltasten wählen, Esc schließt.
+- Without input: open tasks by importance and frequent commands.
+- Text: searches ID, title, tags, type and milestone. Enter opens the task.
+- `#`: tags, Enter filters by them.
+- `>`: commands, such as New task, Ideas, Color scheme, filter by priority or milestone, Jump to column.
+- Arrow keys select, Esc closes.
 
-Beim Tippen von Großbuchstaben mit der rechten Shift-Taste öffnet sich nichts, weil dabei eine weitere Taste gedrückt wird. In Eingabefeldern ist die Shift-Abkürzung aus; Strg+K funktioniert dort weiterhin.
+Typing capital letters with the right Shift key opens nothing, because another key is pressed at the same time. In input fields the Shift shortcut is off; Ctrl+K still works there.
 
-## Bearbeiten im Board
+## Editing in the board
 
-| Aktion | So geht es | Was dahinter passiert |
+| Action | How | What happens behind it |
 |---|---|---|
-| Aufgabe anlegen | "Neue Aufgabe" oder `N`: Typ, Titel, Priorität, Spalte, Aufwand, Risiko, Fälligkeit, Meilenstein, Tags, Abhängigkeit, Beschreibung mit allem Relevanten, Akzeptanzkriterien | `works new`, danach `section` und `item`. Ohne Beschreibung oder Kriterien wird die Aufgabe als unvollständig markiert |
-| Schnell anlegen | `+` in Backlog oder Geplant, Titel eingeben, Enter | `works new` mit Feature und P3 |
-| Verschieben | Karte in eine andere Spalte ziehen oder Status im Detailpanel wählen | Siehe Tabelle unten |
-| Felder ändern | Detailpanel: Titel, Status, Priorität, Typ, Aufwand, Risiko, Fälligkeit, Meilenstein, Tags | `works set` |
-| Inhalte | Ziel und weitere Abschnitte über "Bearbeiten", Markdown, Strg+Enter speichert | `works section` |
-| Checklisten | Akzeptanzkriterien und Umsetzungsplan abhaken, ergänzen, entfernen | `works check`, `works item` |
-| Offene Fragen | Notieren, mit optionaler Antwort als geklärt markieren | `works question` |
-| Übergabe | Lesen und bearbeiten | `works handoff` |
-| Bilder | Im Detailpanel mit Strg+V einfügen, hineinziehen oder Datei wählen, Art und Beschreibung angeben | Upload in die Inbox, dann `works asset` |
-| Abhängigkeiten | Wartet auf, Blockiert, Verwandt mit einer anderen Aufgabe | `works link`, `works unlink` |
-| Verlauf | Notiz schreiben | `works log` |
-| Archivieren | Bei erledigten und verworfenen Aufgaben | `works archive` |
-| Ideen | Notieren, als Aufgabe übernehmen (Typ und Priorität wählen), verwerfen | `works idea`, `promote`, `idea-drop` |
-| Meilensteine | Im Meilenstein-Filter anlegen, gewählten Meilenstein bearbeiten, oder über die Schnellsuche | `works milestone add`, `milestone set` |
-| Nächste Aufgabe | Vorschläge mit Begründung, direkt starten | `works next`, `works start` |
-| Entwürfe wählen | Tab Entwürfe einer Gestaltungsaufgabe: Designrichtung, Varianten als Vorschau, "Groß ansehen", "Diese nehmen" mit optionalem Grund | `works design choose` |
-| Abnehmen | In Review "Abnehmen": gewählter Entwurf oder Vorher neben dem Ergebnis, Kriterien gegenprüfen. Bei Entwurf gegen Ergebnis wählen Breite (Desktop, Tablet, Handy) und Schema (hell, dunkel) beide Seiten: Der Entwurf rendert so, daneben das Nachher-Bild mit `-light-1440`, `-dark-390` usw. im Namen; fehlt es, steht dort der Befehl zum Anlegen. "Annehmen" öffnet die Definition of Done, "Zurück an Claude" verlangt einen Text | Kommentar an Claude, abgewählte Kriterien wieder offen, Status In Arbeit |
-| Anweisung an Claude | Auf der aktiven Karte oder in der Übersicht einer Aufgabe in Arbeit | `works instruct`, Claude bekommt sie über den PostToolUse oder Stop Hook |
-| Rückgängig | Meldung nach jeder Änderung mit "Rückgängig", `Strg+Z` außerhalb von Textfeldern, Liste unter Werkzeuge, Letzte Änderungen | `works undo` |
-| Projektwissen, Aufräumen | Werkzeuge, oben | `works know`, siehe planning.md |
-| Importieren | Werkzeuge, oben, oder Schnellsuche: Datei wählen, Vorschau mit Auswahl, Spalte und Tags für alle | `works import --apply --only`, siehe import.md |
-| Parallelarbeit ansehen | Werkzeuge, Parallelarbeit: laufende Bahnen und die Einschätzung für die nächsten Aufgaben | `works parallel status`, `works parallel plan` |
-| Wiederkehrend, GitHub, Kalender, Verbrauch | Abschnitte unter Werkzeuge | `works recur`, `works github`, `kalender.ics`, `works time` |
+| Create a task | "New task" or `N`: type, title, priority, column, effort, risk, due date, milestone, tags, dependency, description with everything relevant, acceptance criteria | `works new`, then `section` and `item`. Without a description or criteria the task is marked incomplete |
+| Quick create | `+` in Backlog or Planned, enter a title, Enter | `works new` with feature and P3 |
+| Move | Drag the card into another column or choose the status in the detail panel | See table below |
+| Change fields | Detail panel: title, status, priority, type, effort, risk, due date, milestone, tags | `works set` |
+| Content | Goal and other sections via "Edit", Markdown, Ctrl+Enter saves | `works section` |
+| Checklists | Tick, add and remove acceptance criteria and implementation plan items | `works check`, `works item` |
+| Open questions | Note them, mark as resolved with an optional answer | `works question` |
+| Handoff | Read and edit | `works handoff` |
+| Images | In the detail panel paste with Ctrl+V, drag in or choose a file, give kind and description | Upload to the inbox, then `works asset` |
+| Dependencies | Waiting for, Blocks, Related to another task | `works link`, `works unlink` |
+| History | Write a note | `works log` |
+| Archive | For done and dropped tasks | `works archive` |
+| Ideas | Note them, turn them into a task (choose type and priority), drop them | `works idea`, `promote`, `idea-drop` |
+| Milestones | Create in the milestone filter, edit the selected milestone, or via the quick search | `works milestone add`, `milestone set` |
+| Next task | Suggestions with reasons, start directly | `works next`, `works start` |
+| Choose design variants | Design variants tab of a design task: design direction, variants as preview, "View large", "Pick this one" with an optional reason | `works design choose` |
+| Acceptance review | In Review "Acceptance review": chosen variant or Before next to the result, check the criteria. For variant versus result, width (Desktop, Tablet, Phone) and scheme (light, dark) apply to both sides: the variant renders that way, next to it the After image with `-light-1440`, `-dark-390` etc. in its name; if it is missing, the command to create it is shown there. "Accept" opens the Definition of Done, "Back to Claude" requires a text | Comment to Claude, deselected criteria reopened, status In progress |
+| Instruction for Claude | On the active card or in the overview of a task in progress | `works instruct`, Claude receives it via the PostToolUse or Stop hook |
+| Undo | Message after every change with "Undo", `Ctrl+Z` outside text fields, list under Tools, Recent changes | `works undo` |
+| Project knowledge, cleanup | Tools, at the top | `works know`, see planning.md |
+| Import | Tools, at the top, or quick search: choose a file, preview with selection, column and tags for all | `works import --apply --only`, see import.md |
+| View parallel work | Tools, Parallel work: running lanes and the assessment for the next tasks | `works parallel status`, `works parallel plan` |
+| Recurring, GitHub, calendar, usage | Sections under Tools | `works recur`, `works github`, `kalender.ics`, `works time` |
 
-Verschieben im Detail:
+Moving in detail:
 
-| Ziel | Verhalten |
+| Target | Behavior |
 |---|---|
-| In Arbeit | `works start`. Ist die Aufgabe blockiert, fragt das Board nach und startet nur nach Bestätigung mit `--force` |
-| Erledigt | Prüfdialog der Definition of Done: automatische Punkte mit Ergebnis, manuelle Punkte zum Abhaken. Abschließen erst, wenn alle manuellen Punkte bestätigt sind. Fehlen automatische Punkte, nur mit Begründung, die im Verlauf landet |
-| Verworfen | Nur mit Begründung |
-| Aus Erledigt oder Verworfen zurück | Nur in eine offene Spalte und mit Begründung (`works reopen`) |
-| Alle anderen | `works set status=...` |
+| In progress | `works start`. If the task is blocked, the board asks and only starts after confirmation with `--force` |
+| Done | Definition of Done dialog: automatic items with result, manual items to tick. Completing only once all manual items are confirmed. If automatic items are missing, only with a reason, which goes into the history |
+| Dropped | Only with a reason |
+| Back from Done or Dropped | Only into an open column and with a reason (`works reopen`) |
+| All others | `works set status=...` |
 
-Jeder Verlaufseintrag aus dem Board endet mit `[Board]`. So ist in der task.md und in der Aktivitätsliste erkennbar, was der Nutzer selbst geändert hat.
+Every history entry from the board ends with `[Board]`. That way the task.md and the activity list show what the user changed themselves.
 
 ## Updates
 
-Nach einem Plugin-Update stellt sich alles selbst auf die neue Version um:
+After a plugin update everything switches to the new version on its own:
 
-| Stelle | Was passiert |
+| Where | What happens |
 |---|---|
-| Laufender Server | Prüft alle 30 Sekunden, ob eine neuere Version installiert ist (über `~/.claude/plugins/installed_plugins.json`, sonst die Plugin-Ordner). Ist sie bei zwei Prüfungen hintereinander gleich, startet er die neue Version auf demselben Port und beendet sich |
-| Sessionstart | Der SessionStart Hook ersetzt Server mit veralteter Version, auch solche aus works-Versionen vor dieser Funktion, und erzeugt WORKS.md und eine vorhandene board.html neu |
-| Offene Tabs | Erkennen die neue Version, merken sich Suche, Filter, geöffnete Aufgabe und Scrollposition und laden sich einmal neu. Ist gerade ein Text in Bearbeitung, wartet das Neuladen bis nach dem Speichern |
-| board.html | Wird beim Sessionstart und nach jedem schreibenden Befehl mit der neuen Version erzeugt. Ein bereits geöffneter Tab der Datei muss von Hand neu geladen werden |
+| Running server | Checks every 30 seconds whether a newer version is installed (via `~/.claude/plugins/installed_plugins.json`, otherwise the plugin folders). If it is the same in two checks in a row, it starts the new version on the same port and exits |
+| Session start | The SessionStart hook replaces servers with an outdated version, including those from works versions before this feature, and regenerates WORKS.md and an existing board.html |
+| Open tabs | Detect the new version, remember search, filters, opened task and scroll position, and reload once. If a text is being edited, the reload waits until after saving |
+| board.html | Generated with the new version at session start and after every writing command. A tab that already has the file open must be reloaded by hand |
 
-Die Version ist ein Hash über alle Skripte und Board-Dateien. Sie ändert sich also mit jedem Update, auch ohne Versionsnummer in plugin.json. Registriert wird der Server in `.works/server.json` (PID, Port, Version), Ausgaben landen in `.works/server.log`. Beide stehen in `.works/.gitignore` und werden dort bei Bedarf ergänzt.
+The version is a hash over all scripts and board files. So it changes with every update, even without a version number in plugin.json. The server is registered in `.works/server.json` (PID, port, version), output goes to `.works/server.log`. Both are listed in `.works/.gitignore` and added there if needed.
 
-Tabs, die mit einer works-Version ohne diese Funktion geöffnet wurden, kennen das automatische Neuladen noch nicht. Sie brauchen nach dem Update einmal F5.
+Tabs opened with a works version without this feature don't know the automatic reload yet. They need F5 once after the update.
 
-## Claude arbeitet gerade
+## Claude is working
 
-Solange Claude an einer Aufgabe arbeitet, zeigt der Kopf "Claude arbeitet an W-0003, seit 6 min" (Klick öffnet die Live-Ansicht, im statischen Board springt er zur Karte), der Reiter Live trägt einen pulsierenden Punkt. Die aktive Karte zeigt den aktuellen Schritt und die letzten drei, zum Beispiel "Bearbeitet src/backup.ts" oder "Befehl npm test", dazu den Knopf "Anweisung an Claude". Wartet Claude auf eine Freigabe, steht dort "Wartet auf deine Freigabe (W-0003)" und der Punkt am Reiter pulsiert nicht. Die Daten kommen aus den Hooks PreToolUse (Aufruf beginnt), PermissionRequest (Freigabe nötig) und PostToolUse (Aufruf fertig) in `.works/activity.json` (lokal). Nach zehn Minuten ohne Werkzeugaufruf verschwindet die Anzeige, eine wartende Freigabe nach 60 Minuten.
+While Claude works on a task, the header shows "Claude is working on W-0003, for 6 min" (a click opens the live view, in the static board it jumps to the card), and the Live tab carries a pulsing dot. The active card shows the current step and the last three, for example "Edited src/backup.ts" or "Command npm test", plus the button "Instruction for Claude". If Claude is waiting for an approval, it says "Waiting for your approval (W-0003)" and the dot on the tab doesn't pulse. The data comes from the hooks PreToolUse (call starts), PermissionRequest (approval needed) and PostToolUse (call finished) in `.works/activity.json` (local). After ten minutes without a tool call the display disappears, a pending approval after 60 minutes.
 
-Anweisungen landen in `.works/instructions.json` und als Kommentar an der Aufgabe. Claude bekommt sie beim nächsten Werkzeugaufruf als Kontext, spätestens am Ende der Antwort, und liest sie, wenn es sinnvoll ist. Bis dahin zeigt das Board "wartet".
+Instructions go to `.works/instructions.json` and as a comment on the task. Claude receives them as context with the next tool call, at the latest at the end of the reply, and reads them when it makes sense. Until then the board shows "waiting".
 
-## Dateien und Parallelarbeit
+## Files and parallel work
 
-Der Reiter Code und Commits zeigt unter "Auch in anderen Aufgaben" Dateien, die andere Aufgaben ebenfalls geändert haben, mit Sprung dorthin. Läuft die Aufgabe parallel, steht dort auch ihr Worktree mit Commits und offenen Dateien. Karten paralleler Aufgaben tragen "Parallel" und zeigen den aktuellen Schritt ihres Agenten.
+The Code and commits tab shows, under "Also in other tasks", files that other tasks changed as well, with a jump there. If the task runs in parallel, its worktree is shown there too, with commits and uncommitted files. Cards of parallel tasks carry "Parallel" and show the current step of their agent.
 
-## Sichern und Wiederherstellen
+## Backup and restore
 
-Unter Werkzeuge (und in der Befehlspalette) öffnet „Sichern und Wiederherstellen“ einen Dialog mit zwei Reitern:
+Under Tools (and in the command palette), "Backup and restore" opens a dialog with two tabs:
 
-- **Exportieren:** das Board als eine JSON-Datei herunterladen. Wählbar sind offene, erledigte und archivierte Aufgaben, Kommentare und Entscheidungen, Verlauf und Übergaben, Prüfergebnisse, Planung (Meilensteine, Sprints, Warteschlange, Wiederkehrendes), Projektwissen und Ideen sowie Bilder und Entwürfe. Die Größe der Datei steht dabei. Aufgaben stecken darin als ihre Dateien im Wortlaut, Export und Import ergeben also denselben Stand.
-- **Importieren:** eine solche Datei wählen. Das Board zeigt, woher sie stammt, und den Abgleich: neu, geändert, gleich, nur hier. Gleich heißt gleiche ID und gleicher Titel (oder gleicher Titel unter anderer ID).
-  - **Zusammenführen** legt die gewählten neuen Aufgaben mit freien IDs an (Verweise wie blocked_by werden mit umgestellt) und übernimmt die gewählten geänderten. Was nur hier steht, bleibt, Planung und Projektwissen bleiben unverändert.
-  - **Wiederherstellen** sichert zuerst den ganzen jetzigen Stand samt Bildern in `.works/backups/` und ersetzt dann Aufgaben, Archiv, Planung, Projektwissen und Ideen durch die Datei. Aufgaben, die nur hier standen, sind danach weg, stecken aber in der Sicherung.
+- **Export:** download the board as one JSON file. You can choose open, done and archived tasks, comments and decisions, history and handoffs, check results, planning (milestones, sprints, queue, recurring), project knowledge and ideas, and images and design variants. The file size is shown alongside. Tasks are contained as their files verbatim, so export and import produce the same state.
+- **Import:** choose such a file. The board shows where it comes from and the comparison: new, changed, same, only here. Same means same ID and same title (or same title under a different ID).
+  - **Merge** creates the selected new tasks with free IDs (references like blocked_by are updated accordingly) and takes over the selected changed ones. What exists only here stays, planning and project knowledge stay unchanged.
+  - **Restore** first backs up the entire current state including images in `.works/backups/` and then replaces tasks, archive, planning, project knowledge and ideas with the file. Tasks that existed only here are gone afterwards, but are kept in the backup.
 
-Beides lässt sich mit Rückgängig zurücknehmen; nach einem Wiederherstellen spielt Rückgängig die Sicherung aus `.works/backups/` wieder ein. Im Terminal: `works export --json` und `works import <datei.json>` (siehe cli.md).
+Both can be reverted with Undo; after a restore, Undo brings back the backup from `.works/backups/`. In the terminal: `works export --json` and `works import <file.json>` (see cli.md).
 
-## Rückgängig
+## Undo
 
-Vor jeder Änderung aus dem Board sichert works die betroffenen Dateien in `.works/.undo/` (lokal, die letzten 50). Rückgängig stellt sie wieder her, holt archivierte Ordner zurück und entfernt Aufgaben, die erst durch die Änderung entstanden sind (sie landen in `.undo/entfernt/`). Änderungen von Claude oder aus dem Terminal laufen nicht über diesen Weg; dafür gibt es Git. `works undo --list` und `works undo <key>` machen dasselbe im Terminal.
+Before every change from the board, works backs up the affected files in `.works/.undo/` (local, the last 50). Undo restores them, brings back archived folders and removes tasks that only came into existence through the change (they go to `.undo/entfernt/`). Changes by Claude or from the terminal don't go through this path; that's what Git is for. `works undo --list` and `works undo <key>` do the same in the terminal.
 
-## Kalender
+## Calendar
 
-`http://127.0.0.1:4747/kalender.ics` liefert Fälligkeiten, Meilensteine und Sprints als Kalender zum Abonnieren, mit `?recurring=1` auch kommende wiederkehrende Aufgaben. Im geteilten Modus gibt es dieselbe Adresse mit Leseschlüssel (`?key=`). Kalender im Internet wie Google Kalender erreichen den Rechner nicht; dafür `works ical --out termine.ics` und die Datei importieren.
+`http://127.0.0.1:4747/kalender.ics` provides due dates, milestones and sprints as a calendar to subscribe to, with `?recurring=1` also upcoming recurring tasks. In shared mode the same address works with the read key (`?key=`). Internet calendars like Google Calendar can't reach the machine; for those, use `works ical --out dates.ics` and import the file.
 
-## Alle Projekte
+## All projects
 
-Der Hub zeigt alle laufenden Boards der Projekte, die in `~/.works/projects.json` angemeldet sind (beim Init, beim Sitzungsstart und beim Start eines Boards). Jedes laufende Board liefert ihn unter `/hub`, `works hub` zeigt dieselbe Seite auf Port 4740.
+The hub shows all running boards of the projects registered in `~/.works/projects.json` (at init, at session start and when a board starts). Every running board serves it under `/hub`, `works hub` shows the same page on port 4740.
 
-- Kopf: Summen über die laufenden Boards (offene Aufgaben, P1, wartende Freigaben, Review, Verbrauch heute in Geld und Tokens).
-- Laufende Boards als große Karten: Live-Zeile (Claude arbeitet, wartet auf Freigabe, in Arbeit), offen, in Arbeit, Review, P1, überfällig, Fortschritt (Sprint oder gesamt), als Nächstes, Verbrauch heute, läuft seit und Port, CI aus dem GitHub-Abgleich, ob die Version aktuell ist.
-- Knöpfe: Öffnen (im selben Tab), In neuem Tab, Neu starten, Stoppen.
-- Die Seite holt ihren Inhalt alle 5 Sekunden neu. Endet ein Board, verschwindet es dabei aus der Liste.
-- Hinweise bei wartender Freigabe: Unter dem Kopf fragt eine Leiste einmal, ob der Hub benachrichtigen soll (Einschalten, Nicht jetzt). Danach steht dort nur die Glocke „Hinweise an/aus“. Wartet Claude in einem Projekt auf eine Freigabe und liegt der Hub-Tab im Hintergrund, kommt ein Browser-Hinweis mit Projekt und Befehl, je Freigabe genau einmal; ein Klick öffnet das Board. Was beim Laden schon wartet, meldet er nicht. Die Wahl steht im Browser (`works-hub-notify`).
+- Header: totals across the running boards (open tasks, P1, pending approvals, review, usage today in money and tokens).
+- Running boards as large cards: live line (Claude is working, waiting for approval, in progress), open, in progress, review, P1, overdue, progress (sprint or overall), next up, usage today, running since and port, CI from the GitHub sync, whether the version is current.
+- Buttons: Open (in the same tab), In new tab, Restart, Stop.
+- The page fetches its content again every 5 seconds. When a board ends, it disappears from the list.
+- Notifications for pending approvals: below the header, a bar asks once whether the hub should notify (Turn on, Not now). After that only the bell "Notifications on/off" is shown there. If Claude is waiting for an approval in a project and the hub tab is in the background, a browser notification with project and command appears, exactly once per approval; a click opens the board. What is already waiting when the page loads is not reported. The choice is stored in the browser (`works-hub-notify`).
 
-Automatik: Läuft nur ein Board, gibt es keinen Hub. Die Board-Seite fragt alle 5 Sekunden `/boards`. Wird aus einem laufenden Board zwei, wechselt der offene Tab zu `/hub`. Bleibt im Hub nur noch ein Board übrig, schließt er sich und der Tab zeigt dieses Board; endet das Board, das den Hub ausliefert, wechselt der Tab nach etwa 15 Sekunden ohne Antwort zum verbliebenen. Ein Board, das aus dem Hub geöffnet wurde (`?from=hub`), bleibt offen. Oben links steht dann `← Hub (N Boards)`, solange mindestens zwei laufen.
+Automatic behavior: with only one board running, there is no hub. The board page asks `/boards` every 5 seconds. When one running board becomes two, the open tab switches to `/hub`. If only one board is left in the hub, the hub closes and the tab shows that board; if the board serving the hub ends, the tab switches to the remaining one after about 15 seconds without a response. A board opened from the hub (`?from=hub`) stays open. At the top left it then shows `← Hub (N boards)` as long as at least two are running.
 
-Verwaiste Tabs: Endet ein Board und startet auf seinem Port ein anderes Projekt, verbindet sich der alte Tab zwar neu, zeigt aber nicht still das fremde Board. Jede Seite kennt ihr Projekt (`meta.rootId`, ein Hash des Pfads). Passt es nicht, erscheint oben die Leiste „<Projekt> läuft hier nicht mehr“ mit „<Projekt> starten“, „Zum Hub“ und „<anderes Projekt> ansehen“; der letzte Stand bleibt ausgegraut und gesperrt. Der Tab schließt seine Verbindung und zählt beim fremden Board nicht als offen (`--open` öffnet dort also einen eigenen Tab). Läuft das eigene Board wieder, wechselt er von selbst dorthin. `/boards` liefert dafür neben den laufenden Boards die angemeldeten Projekte mit Pfad und das Token, nur lokal.
+Orphaned tabs: if a board ends and another project starts on its port, the old tab reconnects but doesn't silently show the other board. Every page knows its project (`meta.rootId`, a hash of the path). If it doesn't match, a bar appears at the top saying "<project> is no longer running here" with "Start <project>", "To hub" and "View <other project>"; the last state stays grayed out and locked. The tab closes its connection and doesn't count as open at the other board (so `--open` opens its own tab there). When its own board runs again, it switches there on its own. For this, `/boards` returns, next to the running boards, the registered projects with path and the token, local only.
 
-`/boards`, `/hub` und die Knöpfe (`POST /api/hub` mit Token) gehen nur direkt am Rechner, nicht über geteilte Links. Die Knöpfe rufen im Projektordner `works board --serve --detach`, `--stop` oder `--restart` auf. `works hub --list` gibt die Projekte als Text aus.
+`/boards`, `/hub` and the buttons (`POST /api/hub` with token) only work directly on the machine, not via shared links. The buttons run `works board --serve --detach`, `--stop` or `--restart` in the project folder. `works hub --list` prints the projects as text.
 
-## Für Claude wichtig
+## Important for Claude
 
-- Sagt der Nutzer, das Board sehe alt aus oder verhalte sich falsch, zuerst `works board --status`, dann `works board --restart` und den Nutzer bitten, einen Tab, der noch eine sehr alte Version zeigt, einmal neu zu laden.
-- Vor jedem Edit an einer task.md die Datei neu lesen. Der Nutzer kann sie inzwischen im Board geändert haben.
-- Aufgaben mit `source: board` oder `source: discord` und `incomplete: true` hat der Nutzer schnell angelegt. Bei passender Gelegenheit Ziel und Akzeptanzkriterien mit ihm klären.
-- Offene Fragen, die der Nutzer im Board notiert, sind oft an Claude gerichtet. Beim Start einer solchen Aufgabe zuerst darauf eingehen.
-- Die Warteschlange ist ein Auftrag des Nutzers. Beim Abarbeiten immer die oberste startbare Aufgabe nehmen und die Einstellungen `auto_next` und `ask_before` beachten.
-- Beim Teilen den Leselink nennen, den Bearbeitungslink nur, wenn der Nutzer ausdrücklich danach fragt.
-- Gibt der Nutzer eine Aufgabe in der Abnahme zurück, den Kommentar wie eine Vorgabe behandeln, umsetzen und mit `works comment` antworten.
-- Eine Anweisung während der Arbeit nicht ignorieren, auch wenn sie nicht sofort passt. Spätestens nach dem aktuellen Schritt aufgreifen und kurz antworten.
-- Bilder, die über das Board kommen, haben eine Beschreibung vom Nutzer. Fehlt sie, das Bild bei Bedarf mit Read ansehen und die Beschreibung ergänzen.
+- If the user says the board looks old or behaves wrongly, first `works board --status`, then `works board --restart`, and ask the user to reload once any tab that still shows a very old version.
+- Reread a task.md before every edit to it. The user may have changed it in the board in the meantime.
+- Tasks with `source: board` or `source: discord` and `incomplete: true` were created quickly by the user. At a suitable moment, clarify goal and acceptance criteria with them.
+- Open questions the user notes in the board are often addressed to Claude. When starting such a task, address them first.
+- The queue is an assignment from the user. When working through it, always take the topmost startable task and respect the settings `auto_next` and `ask_before`.
+- When sharing, give the read link; give the edit link only if the user explicitly asks for it.
+- If the user sends a task back in the acceptance review, treat the comment as a requirement, implement it and reply with `works comment`.
+- Don't ignore an instruction during the work, even if it doesn't fit right away. Pick it up after the current step at the latest and reply briefly.
+- Images that come in via the board have a description from the user. If it is missing, look at the image with Read if needed and add the description.
 
-## Live-Aktualisierung
+## Live updates
 
-- Der Server prüft jede Sekunde task.md, decisions.md, Assets, config.json, state.json und ideas.md. Bei Änderungen erzeugt er WORKS.md und eine vorhandene board.html neu und meldet sie an alle offenen Tabs.
-- Verschobene Karten gleiten in die neue Spalte, die Zielspalte leuchtet kurz auf. Geänderte Karten tragen zehn Sekunden lang ein Etikett wie "In Arbeit → Review" oder "Priorität P3 → P2".
-- Änderungen von Claude oder aus dem Terminal erscheinen zusätzlich als Hinweis unten rechts mit dem letzten Verlaufseintrag. Eigene Änderungen im Board bestätigt eine kurze Meldung.
-- Die Aktivitätsliste sammelt alle Änderungen mit Uhrzeit und Herkunft und bleibt im Browser gespeichert.
-- Während eine Karte gezogen wird, wartet die Aktualisierung bis zum Loslassen. Ist im Detailpanel gerade ein Text in Bearbeitung, wird er nicht überschrieben; stattdessen erscheint "Neu laden".
-- Bei reduzierter Bewegung in den Systemeinstellungen entfallen die Animationen.
+- The server checks task.md, decisions.md, assets, config.json, state.json and ideas.md every second. On changes it regenerates WORKS.md and an existing board.html and reports them to all open tabs.
+- Moved cards slide into the new column, the target column lights up briefly. Changed cards carry a label like "In progress → Review" or "Priority P3 → P2" for ten seconds.
+- Changes by Claude or from the terminal also appear as a notice at the bottom right with the latest history entry. Your own changes in the board are confirmed by a short message.
+- The activity list collects all changes with time and origin and stays stored in the browser.
+- While a card is being dragged, the update waits until it is dropped. If a text is being edited in the detail panel, it isn't overwritten; instead "Reload" appears.
+- With reduced motion in the system settings, animations are off.
 
-## Sicherheit
+## Security
 
-- Der Server bindet standardmäßig nur an 127.0.0.1 und nimmt nur Anfragen mit lokalem Hostnamen an. Das verhindert DNS-Rebinding.
-- Beim Teilen (`--share`) bekommen nur lokale Anfragen ohne Proxy-Header automatisch volle Rechte. Alle anderen brauchen den Lese- oder Bearbeitungsschlüssel aus dem Link; er wird danach als HttpOnly-Cookie mitgeschickt. Lesende erhalten ein eigenes Token, mit dem der Server nur GET-Anfragen annimmt. Export und Freigabe-Einstellungen sind dem Besitzer vorbehalten. Prüfungen ausführen oder ändern und den Discord-Webhook setzen geht nur bei lokalen Anfragen, auch nicht mit dem Bearbeitungslink.
-- Jede API-Anfrage braucht ein zufälliges Token, das bei jedem Serverstart neu erzeugt und nur in die ausgelieferte Seite eingebettet wird. Fremde Webseiten können es nicht lesen und deshalb nichts ändern. Ein abweichender Origin wird zusätzlich abgelehnt.
-- Alle Eingaben werden geprüft (IDs, Werte, Längen, Bildtypen bis 20 MB) und als einzelne Argumente ohne Shell an das CLI übergeben.
-- Ausgeliefert werden nur Board, Daten und Dateien unter `tasks/`, `archive/` und `reports/` sowie WORKS.md und ideas.md. config.json, state.json, share.json, activity.json, instructions.json, github.json und `.undo/` bleiben gesperrt.
-- Git wird ohne Shell mit festen Argumenten und Zeitlimit aufgerufen, Diffs nur für Dateien, die zur Aufgabe gehören, und gekürzt auf 400 Zeilen.
-- Temporäre Dateien liegen kurz in `.works/.tmp/` und werden sofort wieder gelöscht.
-- HTML-Mockups aus `design/` laufen in einem iframe mit `sandbox="allow-scripts"` und eigener Content-Security-Policy. Sie haben keinen Zugriff auf das Board, seine Tokens oder Cookies und dürfen nicht in fremde Seiten eingebettet werden.
-- Den Discord-Bot einstellen (`/api/discord`) darf nur der Besitzer. Token, Code und Trennen gehen nur bei lokalen Anfragen, damit das Token nicht unverschlüsselt durchs Netz geht; Token, Geräteschlüssel und Codes stehen in keiner Antwort, nur maskiert.
-- GitHub-Abgleich und seine Einstellungen gehen nur bei lokalen Anfragen, weil sie über das gh CLI mit den Rechten des Nutzers handeln. Die Kalenderadresse braucht im geteilten Modus den Leseschlüssel.
-- Der Hub (`/hub` am Board, `works hub`) ist nur lokal erreichbar, prüft den Hostnamen und startet, stoppt oder startet Boards nur mit dem Token aus der eigenen Seite neu, und nur für eingetragene Projekte.
+- By default the server binds only to 127.0.0.1 and only accepts requests with a local host name. This prevents DNS rebinding.
+- When sharing (`--share`), only local requests without proxy headers automatically get full rights. All others need the read or edit key from the link; after that it is sent along as an HttpOnly cookie. Readers get their own token with which the server only accepts GET requests. Export and sharing settings are reserved for the owner. Running or changing checks and setting the Discord webhook only work for local requests, not even with the edit link.
+- Every API request needs a random token that is generated at every server start and only embedded in the delivered page. Other websites can't read it and therefore can't change anything. A different origin is rejected as well.
+- All input is validated (IDs, values, lengths, image types up to 20 MB) and passed to the CLI as individual arguments without a shell.
+- Only the board, data and files under `tasks/`, `archive/` and `reports/` as well as WORKS.md and ideas.md are served. config.json, state.json, share.json, activity.json, instructions.json, github.json and `.undo/` stay blocked.
+- Git is called without a shell with fixed arguments and a time limit, diffs only for files that belong to the task, and cut to 400 lines.
+- Temporary files sit briefly in `.works/.tmp/` and are deleted right away.
+- HTML mockups from `design/` run in an iframe with `sandbox="allow-scripts"` and their own Content Security Policy. They have no access to the board, its tokens or cookies and must not be embedded in other pages.
+- Only the owner may configure the Discord bot (`/api/discord`). Token, code and disconnecting only work for local requests, so the token never travels unencrypted over the network; token, device key and codes appear in no response, only masked.
+- The GitHub sync and its settings only work for local requests, because they act via the gh CLI with the user's rights. The calendar address needs the read key in shared mode.
+- The hub (`/hub` on the board, `works hub`) is only reachable locally, checks the host name and starts, stops or restarts boards only with the token from its own page, and only for registered projects.
 
-## Meilensteine
+## Milestones
 
-Meilensteine fassen Aufgaben zu einem Ziel zusammen, etwa einem Release oder dem Livegang. Im Board erscheinen sie als Filter; mit gewähltem Meilenstein zeigt die Fortschrittsanzeige dessen Stand. Angelegt werden sie im Board oder mit `works milestone add M1 --title "Livegang" --due 2026-11-15`, zugeordnet im Detailpanel oder mit `works set <ID> milestone=M1`. Verworfene Aufgaben zählen nicht mit.
+Milestones group tasks toward a goal, such as a release or a launch. In the board they appear as a filter; with a milestone selected, the progress display shows its state. They are created in the board or with `works milestone add M1 --title "Launch" --due 2026-11-15`, assigned in the detail panel or with `works set <ID> milestone=M1`. Dropped tasks don't count.
 
-## Darstellung
+## Appearance
 
-Die Oberfläche liegt in `scripts/board/` (template.html, board.css, board.js) und wird mit der eingebetteten Schrift Geist (SIL Open Font License, siehe `scripts/board/fonts/Geist-LICENSE.txt`) zu einer einzigen HTML-Seite zusammengesetzt. Es werden keine externen Ressourcen geladen. Mit der Umgebungsvariable `WORKS_DEV=1` liest der Server die Dateien bei jedem Aufruf neu, praktisch beim Anpassen des Designs.
+The interface lives in `scripts/board/` (template.html, board.css, board.js) and is combined with the embedded font Geist (SIL Open Font License, see `scripts/board/fonts/Geist-LICENSE.txt`) into a single HTML page. No external resources are loaded. With the environment variable `WORKS_DEV=1` the server rereads the files on every request, handy when adjusting the design.

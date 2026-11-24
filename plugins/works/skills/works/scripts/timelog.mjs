@@ -52,7 +52,7 @@ export function taskTime(root, task) {
   const history = historyOf(task);
   for (const s of sessions) {
     const day = new Date(s.start).toLocaleDateString('sv-SE');
-    const entry = history.filter((h) => h.date === day && !/^(Gestartet|Status|Übergabe)/.test(h.text)).pop();
+    const entry = history.filter((h) => h.date === day && !/^(Gestartet|Started|Status|Übergabe|Handoff)/.test(h.text)).pop();
     s.label = entry ? entry.text.replace(/ \[[^\]]+\]$/, '').slice(0, 90) : '';
   }
   const total = sessions.reduce((a, s) => a + s.ms, 0);
@@ -65,7 +65,7 @@ export function historyOf(task) {
 }
 
 export function startedOf(task) {
-  const h = historyOf(task).find((x) => x.text.startsWith('Gestartet'));
+  const h = historyOf(task).find((x) => /^(Gestartet|Started)/.test(x.text));
   return h ? h.date : '';
 }
 

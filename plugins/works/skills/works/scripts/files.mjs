@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { readText, worksDir, readJson, writeJson, exists, loadTasks, stripComments, getSection } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 const editsFile = (root) => path.join(worksDir(root), 'files.jsonl');
 const cacheFile = (root) => path.join(worksDir(root), '.filemap.json');
@@ -107,7 +108,7 @@ export function tasksForFile(root, config, file, { tasks } = {}) {
   }
   return [...hits.values()].map((h) => {
     const t = byId.get(h.id);
-    return { ...h, title: t ? t.title : '(unbekannt)', status: t ? t.status : '', decisions: t ? decisionTitles(t) : [] };
+    return { ...h, title: t ? t.title : tr('(unknown)'), status: t ? t.status : '', decisions: t ? decisionTitles(t) : [] };
   }).sort((a, b) => String(b.last).localeCompare(String(a.last)));
 }
 
@@ -146,9 +147,9 @@ export function editHint(root, config, task, file, session) {
   writeJson(hintsFile(root), h);
   const list = tasksForFile(root, config, file).filter((x) => x.id !== task && (x.decisions.length || ['in-arbeit', 'review'].includes(x.status)));
   if (!list.length) return '';
-  const line = (x) => `- ${x.id} ${x.title} (${x.status || 'unbekannt'}${x.commits ? `, ${x.commits} Commit${x.commits === 1 ? '' : 's'}` : ''})${x.decisions.length ? `. Entscheidungen: ${x.decisions.join('; ')}` : ''}`;
-  return `works: ${file} wurde auch in anderen Aufgaben geändert:\n${list.slice(0, 4).map(line).join('\n')}\n`
-    + 'Prüfe kurz, ob deine Änderung diesen Entscheidungen oder laufender Arbeit widerspricht (works show <ID>, decisions.md). Bei Widerspruch den Nutzer fragen.';
+  const line = (x) => `- ${x.id} ${x.title} (${x.status || tr('unknown')}${x.commits ? `, ${x.commits === 1 ? tr('1 commit') : tr('{n} commits', { n: x.commits })}` : ''})${x.decisions.length ? `. ${tr('Decisions: {list}', { list: x.decisions.join('; ') })}` : ''}`;
+  return `${tr('works: {file} was also changed in other tasks:', { file })}\n${list.slice(0, 4).map(line).join('\n')}\n`
+    + tr('Briefly check whether your change contradicts these decisions or ongoing work (works show <ID>, decisions.md). If it does, ask the user.');
 }
 
 // Dateien, die eine Aufgabe in ihrer Beschreibung, im Umsetzungsplan oder im Kontext nennt.

@@ -1,36 +1,36 @@
 # {{title}}
 
-## Ziel
-<!-- Was ist nach Abschluss anders? Ein bis drei Sätze, aus Sicht des Ergebnisses formuliert. -->
+## Goal
+<!-- What is different once this is done? One to three sentences, phrased from the point of view of the result. -->
 
-## Kontext und Problem
-<!-- Warum ist das nötig? Aktueller Zustand, Auslöser, Einschränkungen. -->
+## Context and problem
+<!-- Why is this needed? Current state, trigger, constraints. -->
 
-## Nutzerperspektive
-<!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
+## User perspective
+<!-- Who benefits, and how? Optional: As a <role> I want <capability> so that <benefit>. -->
 
-## Akzeptanzkriterien
-<!-- Prüfbare Aussagen. Jede Zeile muss sich mit ja oder nein beantworten lassen. -->
+## Acceptance criteria
+<!-- Testable statements. Each line must be answerable with yes or no. -->
 - [ ] 
 
-## Umsetzungsplan
-<!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
+## Implementation plan
+<!-- Concrete steps in a sensible order. Subtasks belong here, not in their own folders. -->
 - [ ] 
 
-## Betroffene Dateien
-<!-- Pfade mit kurzer Notiz, was dort passiert. -->
+## Affected files
+<!-- Paths with a short note on what happens there. -->
 
-## Designentscheidungen
-<!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
+## Design decisions
+<!-- Short version of the most important decisions. Details in decisions.md (works decisions <ID>). -->
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+<!-- Maintained via `works asset`. Every image has a description line. -->
 
-## Offene Fragen
-<!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
+## Open questions
+<!-- Questions for the user that Claude cannot settle alone. Format: - [ ] Question -->
 
-## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+## Handoff
+<!-- Overwritten at the end of every work phase with `works handoff`. -->
 
-## Verlauf
-- {{date}}: Aufgabe angelegt
+## History
+- {{date}}: Task created

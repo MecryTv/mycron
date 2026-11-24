@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { worksDir, exists, readJson, writeJson, slugify, getSection, stripComments, checkboxes, TYPES, PRIORITIES, EFFORTS } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,40}$/;
 const KEY_RE = /^[\p{L}\p{N}_]{1,30}$/u;
@@ -34,37 +35,37 @@ export function findTemplate(root, slug) {
 
 const str = (v, max, name) => {
   const s = typeof v === 'string' ? v.trim() : '';
-  if (s.length > max) throw new Error(`${name} ist zu lang.`);
+  if (s.length > max) throw new Error(tr('{name} is too long.', { name }));
   return s;
 };
 
 // Prüft und vereinheitlicht eine Vorlage. Wirft bei ungültigen Angaben.
 export function normalizeTemplate(t) {
-  const name = str(t.name, 80, 'Name');
-  if (!name) throw new Error('Name der Vorlage fehlt.');
+  const name = str(t.name, 80, tr('Name'));
+  if (!name) throw new Error(tr('Template name missing.'));
   const slug = t.slug && SLUG_RE.test(t.slug) ? t.slug : slugify(name).toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40) || 'vorlage';
   const fields = (Array.isArray(t.fields) ? t.fields : []).slice(0, 12).map((f) => {
-    const key = str(f.key, 30, 'Feld');
-    if (!KEY_RE.test(key)) throw new Error(`Ungültiger Feldname: ${key || 'leer'}. Erlaubt sind Buchstaben, Zahlen und _.`);
+    const key = str(f.key, 30, tr('Field'));
+    if (!KEY_RE.test(key)) throw new Error(tr('Invalid field name: {key}. Letters, digits and _ are allowed.', { key: key || tr('empty') }));
     const kind = f.kind === 'choice' ? 'choice' : 'text';
-    const options = kind === 'choice' ? (Array.isArray(f.options) ? f.options : String(f.options || '').split(',')).map((o) => str(String(o), 60, 'Option')).filter(Boolean).slice(0, 20) : [];
-    return { key, kind, options, required: !!f.required, hint: str(f.hint, 120, 'Hinweis') };
+    const options = kind === 'choice' ? (Array.isArray(f.options) ? f.options : String(f.options || '').split(',')).map((o) => str(String(o), 60, tr('Option'))).filter(Boolean).slice(0, 20) : [];
+    return { key, kind, options, required: !!f.required, hint: str(f.hint, 120, tr('Hint')) };
   });
   const criteria = (Array.isArray(t.criteria) ? t.criteria : []).slice(0, 30).map((c) => ({
-    text: str(typeof c === 'string' ? c : c.text, 300, 'Kriterium'),
+    text: str(typeof c === 'string' ? c : c.text, 300, tr('Criterion')),
     mode: ['always', 'default', 'optional'].includes(c.mode) ? c.mode : 'always',
   })).filter((c) => c.text);
   return {
     slug, name,
-    about: str(t.about, 200, 'Kurzbeschreibung'),
-    title: str(t.title, 160, 'Titel'),
+    about: str(t.about, 200, tr('Short description')),
+    title: str(t.title, 160, tr('Title')),
     type: TYPES.includes(t.type) ? t.type : 'feature',
     priority: PRIORITIES.includes(t.priority) ? t.priority : 'P3',
     effort: EFFORTS.includes(t.effort) ? t.effort : '',
     tags: (Array.isArray(t.tags) ? t.tags : String(t.tags || '').split(',')).map((x) => String(x).trim().replace(/^#/, '')).filter((x) => /^[\p{L}\p{N}_.+-]{1,40}$/u.test(x)).slice(0, 10),
     fields,
-    description: str(t.description, 8000, 'Grundtext'),
-    hints: str(t.hints, 2000, 'Hinweise für Claude'),
+    description: str(t.description, 8000, tr('Base text')),
+    hints: str(t.hints, 2000, tr('Hints for Claude')),
     criteria,
     uses: Number.isInteger(t.uses) ? t.uses : 0,
   };
@@ -80,7 +81,7 @@ export function saveTemplate(root, input, scope = 'project') {
 }
 
 export function deleteTemplate(root, slug) {
-  if (!SLUG_RE.test(slug)) throw new Error('Ungültige Vorlage.');
+  if (!SLUG_RE.test(slug)) throw new Error(tr('Invalid template.'));
   const dirs = templateDirs(root);
   let n = 0;
   for (const d of Object.values(dirs)) {
@@ -101,14 +102,14 @@ const fill = (text, values) => String(text || '').replace(/\{([\p{L}\p{N}_]{1,30
 // Baut aus Vorlage, Feldwerten und dem freien Text des Nutzers die Angaben für eine neue Aufgabe.
 export function applyTemplate(tpl, { values = {}, text = '', criteria = null, title = '' } = {}) {
   for (const f of tpl.fields) {
-    if (f.required && !String(values[f.key] || '').trim()) throw new Error(`Feld ${f.key} ist ein Pflichtfeld.`);
-    if (f.kind === 'choice' && values[f.key] && !f.options.includes(values[f.key])) throw new Error(`Ungültiger Wert für ${f.key}.`);
+    if (f.required && !String(values[f.key] || '').trim()) throw new Error(tr('Field {key} is required.', { key: f.key }));
+    if (f.kind === 'choice' && values[f.key] && !f.options.includes(values[f.key])) throw new Error(tr('Invalid value for {key}.', { key: f.key }));
   }
   const base = fill(tpl.description, values).trim();
   const parts = [];
   if (text.trim()) parts.push(text.trim());
-  if (base) parts.push(text.trim() ? `Aus der Vorlage „${tpl.name}“:\n\n${base}` : base);
-  if (tpl.hints) parts.push(`Hinweise für Claude: ${fill(tpl.hints, values)}`);
+  if (base) parts.push(text.trim() ? `${tr('From the template "{name}":', { name: tpl.name })}\n\n${base}` : base);
+  if (tpl.hints) parts.push(tr('Hints for Claude: {hints}', { hints: fill(tpl.hints, values) }));
   const chosen = criteria
     ? tpl.criteria.filter((c, i) => c.mode === 'always' || criteria.includes(i))
     : tpl.criteria.filter((c) => c.mode !== 'optional');

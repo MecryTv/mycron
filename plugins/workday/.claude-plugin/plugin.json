@@ -1,6 +1,6 @@
 {
   "name": "workday",
-  "description": "Feierabend und Guten Morgen für Projekte mit works: Tag sauber abschließen und am nächsten Morgen nahtlos weitermachen",
+  "description": "End of day and good morning for projects with works: wrap up the day cleanly and pick up seamlessly the next morning",
   "author": { "name": "MecryTv" },
   "repository": "https://github.com/MecryTv/mycron"
 }

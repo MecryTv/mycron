@@ -55,7 +55,7 @@ export function buildSnapshot(root, { images = true, closed = true } = {}) {
   }
   data.tasks = tasks;
   data.meta.snapshot = new Date().toISOString();
-  const html = renderBoard(data, { mode: 'snapshot', details });
+  const html = renderBoard(data, { mode: 'snapshot', details, root });
   return { html, tasks: tasks.length, imageBytes: total, skipped };
 }
 

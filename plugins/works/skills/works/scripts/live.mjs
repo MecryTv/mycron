@@ -4,11 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { worksDir, readJson, writeJson, nowStamp, loadState, getSection, checkboxes } from './lib.mjs';
 import { loadLanes } from './parallel.mjs';
+import { tr } from './i18n.mjs';
 
 const actFile = (root) => path.join(worksDir(root), 'activity.json');
 const insFile = (root) => path.join(worksDir(root), 'instructions.json');
 
-const VERB = { Edit: 'Bearbeitet', MultiEdit: 'Bearbeitet', Write: 'Schreibt', Read: 'Liest', Bash: 'Befehl', Grep: 'Sucht', Glob: 'Sucht', NotebookEdit: 'Bearbeitet', WebFetch: 'Lädt', WebSearch: 'Sucht im Web', Task: 'Agent', Agent: 'Agent', Skill: 'Skill' };
+const VERB = (name) => ({ Edit: tr('Editing'), MultiEdit: tr('Editing'), Write: tr('Writing'), Read: tr('Reading'), Bash: tr('Command'), Grep: tr('Searching'), Glob: tr('Searching'), NotebookEdit: tr('Editing'), WebFetch: tr('Loading'), WebSearch: tr('Searching the web'), Task: 'Agent', Agent: 'Agent', Skill: 'Skill' })[name];
 
 export function describeTool(root, name, input = {}) {
   const rel = (p) => { if (!p) return ''; const r = path.relative(root, String(p)); return r && !r.startsWith('..') ? r.split(path.sep).join('/') : path.basename(String(p)); };
@@ -21,7 +22,7 @@ export function describeTool(root, name, input = {}) {
   else if (input.url) what = String(input.url).slice(0, 100);
   // Aufrufe des works CLI selbst zeigen, aber ohne den langen Pfad.
   what = what.replace(/node\s+"?[^"\s]*works\.mjs"?/, 'works');
-  return { verb: VERB[name] || name, what };
+  return { verb: VERB(name) || name, what };
 }
 
 const inside = (p, dir) => { if (!p || !dir) return false; const r = path.relative(dir, path.resolve(String(p))); return r === '' || (!r.startsWith('..') && !path.isAbsolute(r)); };
@@ -103,7 +104,7 @@ export function setBusy(root, task) {
   const a = readJson(actFile(root), null) || { recent: [] };
   a.busy = true;
   a.since = new Date().toISOString();
-  a.current = { at: a.since, task: task || '', tool: '', verb: 'Denkt nach', what: '', ok: true };
+  a.current = { at: a.since, task: task || '', tool: '', verb: tr('Thinking'), what: '', ok: true };
   writeJson(actFile(root), a);
 }
 
@@ -133,8 +134,7 @@ export function takeInstructions(root, pick = () => true) {
 }
 
 export function instructionText(items) {
-  return `works: Der Nutzer hat dir über das Board ${items.length === 1 ? 'eine Anweisung' : `${items.length} Anweisungen`} geschickt:\n`
+  return `${items.length === 1 ? tr('works: The user sent you an instruction via the board:') : tr('works: The user sent you {n} instructions via the board:', { n: items.length })}\n`
     + items.map((x) => `- ${x.task ? `${x.task}: ` : ''}${x.text}`).join('\n')
-    + '\nBerücksichtige sie, sobald es sinnvoll ist: wenn sie den aktuellen Schritt betrifft sofort, sonst nach dem aktuellen Schritt. '
-    + 'Antworte kurz mit works comment <ID> "...", was du daraus machst. Passt sie nicht zur Aufgabe, frag nach.';
+    + '\n' + tr('Take them into account as soon as it makes sense: right away if they concern the current step, otherwise after it. Briefly reply with works comment <ID> "..." what you make of them. If one does not fit the task, ask.');
 }

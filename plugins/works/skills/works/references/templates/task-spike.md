@@ -1,35 +1,35 @@
 # {{title}}
 
-## Forschungsfrage
-<!-- Genau eine Frage, die am Ende beantwortet ist. -->
+## Research question
+<!-- Exactly one question that is answered at the end. -->
 
-## Zeitlimit
-<!-- Maximaler Aufwand, z. B. zwei Stunden. Danach wird mit dem Stand entschieden. -->
+## Timebox
+<!-- Maximum effort, e.g. two hours. After that, decide based on where things stand. -->
 
-## Hypothesen
-<!-- Was wird vermutet? Woran wird erkannt, ob es stimmt? -->
+## Hypotheses
+<!-- What is suspected? How will you tell whether it holds? -->
 
-## Vorgehen
+## Approach
 - [ ] 
 
-## Ergebnisse
-<!-- Fakten, Messwerte, Links zu Prototypen. Keine Meinungen ohne Beleg. -->
+## Results
+<!-- Facts, measurements, links to prototypes. No opinions without evidence. -->
 
-## Empfehlung
-<!-- Klare Empfehlung mit Begründung und Gegenargumenten. -->
+## Recommendation
+<!-- A clear recommendation with rationale and counterarguments. -->
 
-## Folgeaufgaben
-<!-- IDs der daraus angelegten Aufgaben. -->
+## Follow-up tasks
+<!-- IDs of the tasks created from this. -->
 
-## Akzeptanzkriterien
-- [ ] Forschungsfrage ist beantwortet oder das Zeitlimit ist erreicht und dokumentiert
-- [ ] Empfehlung ist mit dem Nutzer besprochen
+## Acceptance criteria
+- [ ] The research question is answered, or the timebox is reached and documented
+- [ ] The recommendation has been discussed with the user
 
 ## Assets
 
-## Offene Fragen
+## Open questions
 
-## Übergabe
+## Handoff
 
-## Verlauf
-- {{date}}: Aufgabe angelegt
+## History
+- {{date}}: Task created

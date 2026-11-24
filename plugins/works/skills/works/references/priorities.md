@@ -1,70 +1,72 @@
-# Prioritäten, Status, Aufwand und Risiko
+# Priorities, status, effort and risk
 
-## Prioritäten
+## Priorities
 
-Die Priorität beschreibt die Dringlichkeit aus Sicht des Projekts, nicht den Aufwand. Im Zweifel die niedrigere Stufe wählen und den Nutzer fragen.
+The priority describes urgency from the project's point of view, not effort. When in doubt, pick the lower level and ask the user.
 
-| Prio | Name | Kriterien | Erwartete Reaktion | Beispiele |
+| Prio | Name | Criteria | Expected response | Examples |
 |---|---|---|---|---|
-| P1 | Kritisch | Produktion ist ausgefallen oder unbenutzbar, Datenverlust droht, Sicherheitslücke, rechtliches Risiko, Release blockiert | Sofort melden, laufende Arbeit unterbrechen, wenn der Nutzer zustimmt. Bug-Branches mit P1 bekommen das Präfix `hotfix/` | Bot crasht beim Start, Token im Repo veröffentlicht, Zahlungen schlagen fehl |
-| P2 | Hoch | Wichtige Funktion fehlt oder ist für viele fehlerhaft, blockiert andere Aufgaben, harte Frist in Kürze | Als Nächstes einplanen | Verifizierung schlägt für neue Accounts fehl, Feature für feste Deadline |
-| P3 | Mittel | Normale Features, Verbesserungen, Fehler mit Umgehungslösung | Regulär nach Reihenfolge | Neues Dashboard-Widget, Refactoring eines Moduls |
-| P4 | Niedrig | Kosmetik, Komfort, Ideen mit unklarem Nutzen | Wenn Zeit ist oder im Zuge verwandter Arbeit | Hover-Animation, Wording-Anpassung |
+| P1 | Critical | Production is down or unusable, data loss is imminent, security hole, legal risk, release blocked | Report immediately, interrupt current work if the user agrees. Bug branches with P1 get the prefix `hotfix/` | Bot crashes on startup, token published in the repo, payments fail |
+| P2 | High | Important feature missing or broken for many users, blocks other tasks, hard deadline coming up | Schedule next | Verification fails for new accounts, feature for a fixed deadline |
+| P3 | Medium | Normal features, improvements, bugs with a workaround | Regular order | New dashboard widget, refactoring a module |
+| P4 | Low | Cosmetics, convenience, ideas with unclear value | When there is time or alongside related work | Hover animation, wording change |
 
-Regeln:
+Rules:
 
-- Eine P1 wird dem Nutzer sofort genannt, auch wenn gerade an etwas anderem gearbeitet wird.
-- Mehr als drei offene P1 sind ein Warnsignal. Den Nutzer darauf hinweisen und gemeinsam neu bewerten.
-- Prioritätsänderungen immer mit Begründung: `works set W-0012 priority=P1 --reason "..."`.
-- Aus Code-Markern und GitHub-Labels abgeleitete Prioritäten sind Vorschläge. Bei der Vervollständigung prüfen.
+- A P1 is reported to the user right away, even while working on something else.
+- More than three open P1s are a warning sign. Point this out to the user and reassess together.
+- Always give a reason when changing a priority: `works set W-0012 priority=P1 --reason "..."`.
+- Priorities derived from code markers and GitHub labels are suggestions. Check them when completing the task.
 
-## Status-Lebenszyklus
+## Status lifecycle
 
 ```
-backlog ──> geplant ──> in-arbeit ──> review ──> erledigt
-   │           │            │           │
-   └───────────┴────────────┴───────────┴──> verworfen
+backlog ──> planned ──> in-progress ──> review ──> done
+   │           │             │             │
+   └───────────┴─────────────┴─────────────┴──> dropped
 
-erledigt / verworfen ──(reopen mit Begründung)──> backlog / geplant / in-arbeit
+done / dropped ──(reopen with a reason)──> backlog / planned / in-progress
 ```
 
-| Status | Bedeutung | Übergang durch |
+The commands accept these English values. The task files store `backlog`, `geplant`, `in-arbeit`, `review`, `erledigt` and `verworfen`; the board and the CLI output show Backlog, Planned, In progress, Review, Done and Dropped.
+
+| Status | Meaning | Set by |
 |---|---|---|
-| backlog | Erfasst, noch nicht eingeplant | `works new` |
-| geplant | Soll als Nächstes angegangen werden, ist ausreichend beschrieben | `works set <ID> status=geplant` |
-| in-arbeit | Wird gerade umgesetzt. Möglichst nur eine Aufgabe gleichzeitig | `works start <ID>` |
-| review | Umsetzung fertig, wartet auf Prüfung durch den Nutzer oder Tests | `works set <ID> status=review` |
-| erledigt | Definition of Done erfüllt | `works done <ID> --confirm` |
-| verworfen | Wird nicht umgesetzt, Grund ist dokumentiert | `works drop <ID> --reason "..."` |
+| backlog | Captured, not scheduled yet | `works new` |
+| planned | Should be tackled next, described well enough | `works set <ID> status=planned` |
+| in-progress | Being implemented right now. Ideally only one task at a time | `works start <ID>` |
+| review | Implementation finished, waiting for review by the user or tests | `works set <ID> status=review` |
+| done | Definition of done met | `works done <ID> --confirm` |
+| dropped | Won't be implemented, the reason is documented | `works drop <ID> --reason "..."` |
 
-Blockiert ist kein eigener Status. Eine Aufgabe gilt als blockiert, solange eine Aufgabe in `blocked_by` nicht erledigt ist. `works start` verweigert dann den Start.
+Blocked is not a status of its own. A task counts as blocked as long as a task in `blocked_by` is not done. `works start` then refuses to start it.
 
-Unvollständig (`incomplete: true`) ist ebenfalls kein Status, sondern eine Markierung für schnell erfasste Aufgaben. Sie wird mit `works set <ID> incomplete=false` entfernt, sobald Ziel und Akzeptanzkriterien stehen.
+Incomplete (`incomplete: true`) is not a status either, but a marker for quickly captured tasks. Remove it with `works set <ID> incomplete=false` once goal and acceptance criteria are in place.
 
-## Aufwand
+## Effort
 
-| Wert | Richtwert |
+| Value | Guideline |
 |---|---|
-| S | Unter einer Stunde, eine Datei oder eine klar umrissene Stelle |
-| M | Halber bis ganzer Tag, mehrere Dateien |
-| L | Mehrere Tage, mehrere Module |
-| XL | Über eine Woche. Sollte in kleinere Aufgaben zerlegt werden |
+| S | Under an hour, one file or a clearly bounded spot |
+| M | Half a day to a full day, several files |
+| L | Several days, several modules |
+| XL | Over a week. Should be split into smaller tasks |
 
-Bei XL dem Nutzer vorschlagen, die Aufgabe aufzuteilen und die Teile mit `blocked_by` zu verketten.
+For XL, suggest to the user to split the task and chain the parts with `blocked_by`.
 
-## Risiko
+## Risk
 
-`niedrig`, `mittel` oder `hoch`. Hohes Risiko bedeutet: schwer rückgängig zu machen, schlecht getestete Bereiche, Datenmigrationen, Sicherheitsrelevanz. Bei hohem Risiko einen Rollback-Abschnitt ergänzen, auch wenn der Typ keinen vorsieht.
+`low`, `medium` or `high` (stored as `niedrig`, `mittel`, `hoch`). High risk means: hard to undo, poorly tested areas, data migrations, security relevance. With high risk, add a Rollback section even if the type doesn't have one.
 
-## Wie `works next` priorisiert
+## How `works next` prioritizes
 
-Startbar sind nur Aufgaben in `backlog` oder `geplant` ohne offene Blocker. Die Reihenfolge ergibt sich aus:
+Only tasks in `backlog` or `planned` without open blockers can be started. The order comes from:
 
-1. Priorität (stärkster Faktor)
-2. Überfällig oder bald fällig
-3. Status geplant vor backlog
-4. Anzahl der Aufgaben, die dadurch frei werden
-5. Kleiner Aufwand vor großem
-6. Abzug für unvollständige Aufgaben und hohes Risiko
+1. Priority (strongest factor)
+2. Overdue or due soon
+3. Status planned before backlog
+4. Number of tasks this unblocks
+5. Small effort before large
+6. Penalty for incomplete tasks and high risk
 
-Die Empfehlung ist ein Vorschlag. Dem Nutzer die Begründung nennen und die Entscheidung überlassen.
+The recommendation is a suggestion. Give the user the reasoning and leave the decision to them.

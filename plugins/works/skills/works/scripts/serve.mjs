@@ -5,9 +5,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { worksDir, run, openInBrowser } from './lib.mjs';
+import { tr, language, setLanguage } from './i18n.mjs';
 import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
-import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload, backupPreview } from './api.mjs';
+import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload, backupPreview, setLang } from './api.mjs';
 import { buildIcal } from './ical.mjs';
 import { registerProject, runningBoards, projectsBrief, hubHtml, hubAction } from './hub.mjs';
 import { syncSettings, syncState } from './ghsync.mjs';
@@ -74,7 +75,7 @@ function readBody(req, limit) {
     let size = 0;
     req.on('data', (c) => {
       size += c.length;
-      if (size > limit) { reject(new ApiError(413, 'Datei oder Anfrage ist zu groß.')); req.destroy(); return; }
+      if (size > limit) { reject(new ApiError(413, tr('File or request is too large.'))); req.destroy(); return; }
       chunks.push(c);
     });
     req.on('end', () => resolve(Buffer.concat(chunks)));
@@ -163,7 +164,7 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   async function handOver(cli, v, newHost = host) {
     handingOver = true;
     await drain(15000);
-    process.stdout.write(v ? `Neue Version ${v} gefunden, übergebe an ${cli}\n` : `Starte neu mit Host ${newHost}\n`);
+    process.stdout.write((v ? tr('New version {v} found, handing over to {cli}', { v, cli }) : tr('Restarting with host {host}', { host: newHost })) + '\n');
     clearInterval(timer); clearInterval(keepalive); clearInterval(updateTimer);
     for (const res of clients) { res.write('event: restart\ndata: 1\n\n'); res.end(); }
     clients.clear();
@@ -232,9 +233,9 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
 
   async function handleApi(req, res, url) {
     const level = apiLevel(req);
-    if (!level) return json(res, 403, { error: 'Zugriff verweigert. Board neu laden.' });
-    if (level === 'view' && req.method !== 'GET') return json(res, 403, { error: 'Dieser Link ist nur zum Ansehen.' });
-    if (stopping && req.method !== 'GET') return json(res, 503, { error: 'Das Board startet gerade neu. Bitte in ein paar Sekunden erneut versuchen.' });
+    if (!level) return json(res, 403, { error: tr('Access denied. Reload the board.') });
+    if (level === 'view' && req.method !== 'GET') return json(res, 403, { error: tr('This link is view only.') });
+    if (stopping && req.method !== 'GET') return json(res, 503, { error: tr('The board is restarting. Please try again in a few seconds.') });
     inflight++;
     try { return await handleApiInner(req, res, url, level); } finally { inflight--; }
   }
@@ -253,16 +254,16 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
       // Discord-Bot (W-0038): nur für den Besitzer. Token, Code und Trennen nur direkt am Rechner, nicht über einen
       // geteilten Link (das Token ginge sonst unverschlüsselt durchs Netz). Fehler kommen als Meldung für den Nutzer.
       if (p === '/api/discord' || p === '/api/discord/channels') {
-        if (level !== 'edit') throw new ApiError(403, 'Nur für den Besitzer des Boards.');
+        if (level !== 'edit') throw new ApiError(403, tr('Only for the owner of the board.'));
         const d = await import('./discord.mjs');
         let body = {};
-        if (req.method === 'POST') { try { body = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8')) || {}; } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, 'Ungültiges JSON.'); } }
-        if (['token', 'link', 'disconnect'].includes(body.op) && !isLocal(req)) throw new ApiError(403, 'Das geht nur direkt am Rechner, auf dem das Board läuft.');
+        if (req.method === 'POST') { try { body = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8')) || {}; } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, tr('Invalid JSON.')); } }
+        if (['token', 'link', 'disconnect'].includes(body.op) && !isLocal(req)) throw new ApiError(403, tr('This only works directly on the computer running the board.'));
         try {
           if (req.method === 'GET') return json(res, 200, p === '/api/discord' ? await d.boardState(root) : await d.channelsOf());
           if (p === '/api/discord') return json(res, 200, await d.boardAction(root, body));
         } catch (e) { throw new ApiError(400, e.message); }
-        return json(res, 405, { error: 'Nur GET.' });
+        return json(res, 405, { error: tr('Only GET.') });
       }
       if (req.method === 'GET') {
         if (p === '/api/templates') return json(res, 200, templatesList(root));
@@ -279,9 +280,9 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         if (p === '/api/reports') return json(res, 200, reportsInfo(root));
         if (p === '/api/code') return json(res, 200, await codeOf(root, String(q.get('id') || '').toUpperCase()));
         // Der Live-Diff (Verlauf der Live-Ansicht) zeigt auch Uncommittetes und ist nur für den Besitzer.
-        if (p === '/api/diff' && q.get('live') === '1' && level !== 'edit') return json(res, 403, { error: 'Nur für den Besitzer des Boards.' });
+        if (p === '/api/diff' && q.get('live') === '1' && level !== 'edit') return json(res, 403, { error: tr('Only for the owner of the board.') });
         if (p === '/api/diff') return json(res, 200, await diffOf(root, String(q.get('id') || '').toUpperCase(), q.get('file'), q.get('uncommitted') === '1', q.get('live') === '1'));
-        if (level !== 'edit' && ['/api/share', '/api/export', '/api/checks', '/api/template-draft', '/api/backup', '/api/backup-info'].includes(p)) return json(res, 403, { error: 'Nur für den Besitzer des Boards.' });
+        if (level !== 'edit' && ['/api/share', '/api/export', '/api/checks', '/api/template-draft', '/api/backup', '/api/backup-info'].includes(p)) return json(res, 403, { error: tr('Only for the owner of the board.') });
         // Sichern als JSON (W-0021): Umfang über Parameter, 1 an, 0 aus; ohne Angabe gilt der Standard von exportBoard.
         if (p === '/api/backup-info') return json(res, 200, backupInfo(root));
         if (p === '/api/backup') {
@@ -310,41 +311,52 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         if (p === '/api/dod') return json(res, 200, dodOf(root, String(q.get('id') || '').toUpperCase()));
         if (p === '/api/ideas') return json(res, 200, ideasList(root));
         if (p === '/api/next') return json(res, 200, nextList(root));
-        return json(res, 404, { error: 'Unbekannter Endpunkt.' });
+        return json(res, 404, { error: tr('Unknown endpoint.') });
       }
-      if (req.method !== 'POST') return json(res, 405, { error: 'Nur GET und POST.' });
+      if (req.method !== 'POST') return json(res, 405, { error: tr('Only GET and POST.') });
       // Knöpfe im Hub (W-0025): wirken auf Boards anderer Projekte, deshalb nur direkt am Rechner.
       if (p === '/api/hub') {
-        if (!isLocal(req)) throw new ApiError(403, 'Das geht nur direkt am Rechner, auf dem das Board läuft.');
+        if (!isLocal(req)) throw new ApiError(403, tr('This only works directly on the computer the board runs on.'));
         let body;
-        try { body = JSON.parse((await readBody(req, 8192)).toString('utf8')); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, 'Ungültiges JSON.'); }
+        try { body = JSON.parse((await readBody(req, 8192)).toString('utf8')); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, tr('Invalid JSON.')); }
         const r = hubAction(body && body.op, body && body.path);
         return json(res, r.status, r.error ? { error: r.error } : { ok: true });
       }
       if (p === '/api/action') {
-        if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: 'JSON erwartet.' });
+        if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: tr('JSON expected.') });
         let body;
-        try { body = JSON.parse((await readBody(req, MAX_JSON)).toString('utf8')); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, 'Ungültiges JSON.'); }
+        try { body = JSON.parse((await readBody(req, MAX_JSON)).toString('utf8')); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, tr('Invalid JSON.')); }
         // Befehle ausführen oder ändern und den Webhook setzen geht nur direkt am eigenen Rechner,
         // nicht über einen geteilten Bearbeitungslink.
-        if (['checksRun', 'checksSave', 'reportWebhook', 'githubSync', 'githubSettings'].includes(body && body.action) && !isLocal(req)) throw new ApiError(403, 'Das geht nur direkt am Rechner, auf dem das Board läuft.');
+        if (['checksRun', 'checksSave', 'reportWebhook', 'githubSync', 'githubSettings'].includes(body && body.action) && !isLocal(req)) throw new ApiError(403, tr('This only works directly on the computer the board runs on.'));
         const result = await runActionWithUndo(root, body);
         tick();
         return json(res, 200, { ok: true, ...result });
       }
+      // Sprache (W-0041): wie works lang. Global nur direkt am Rechner, das prüft setLang. Danach alle Tabs neu
+      // aufbauen lassen: Sie sehen die neue Sprache in meta.lang und laden sich neu.
+      if (p === '/api/lang') {
+        if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: tr('JSON expected.') });
+        let body;
+        try { body = JSON.parse((await readBody(req, 8192)).toString('utf8')); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, tr('Invalid JSON.')); }
+        const result = await setLang(root, body, { local: isLocal(req) });
+        sig = '';
+        tick();
+        return json(res, 200, result);
+      }
       if (p === '/api/share') {
         let body = {};
-        try { body = JSON.parse((await readBody(req, MAX_JSON)).toString('utf8') || '{}'); } catch { throw new ApiError(400, 'Ungültiges JSON.'); }
-        if (body.op === 'rotate') { keys = rotateKeys(root); return json(res, 200, { ok: true, message: 'Neue Links erzeugt. Die alten funktionieren nicht mehr.', ...shareInfo() }); }
+        try { body = JSON.parse((await readBody(req, MAX_JSON)).toString('utf8') || '{}'); } catch { throw new ApiError(400, tr('Invalid JSON.')); }
+        if (body.op === 'rotate') { keys = rotateKeys(root); return json(res, 200, { ok: true, message: tr('New links created. The old ones no longer work.'), ...shareInfo() }); }
         if (body.op === 'enable' || body.op === 'disable') {
           const want = body.op === 'enable' ? '0.0.0.0' : '127.0.0.1';
-          if ((want === '0.0.0.0') === shared) return json(res, 200, { ok: true, message: 'Keine Änderung.', ...shareInfo() });
+          if ((want === '0.0.0.0') === shared) return json(res, 200, { ok: true, message: tr('No change.'), ...shareInfo() });
           if (want === '0.0.0.0') shareKeys(root);
-          json(res, 200, { ok: true, restarting: true, message: body.op === 'enable' ? 'Board wird im Netzwerk freigegeben und startet neu.' : 'Freigabe beendet, das Board startet neu.' });
+          json(res, 200, { ok: true, restarting: true, message: body.op === 'enable' ? tr('The board is being shared in the network and restarts.') : tr('Sharing ended, the board restarts.') });
           setTimeout(() => handOver(OWN_CLI, '', want), 100);
           return;
         }
-        throw new ApiError(400, 'Unbekannte Aktion.');
+        throw new ApiError(400, tr('Unknown action.'));
       }
       if (p === '/api/backup-preview') {
         const data = await readBody(req, MAX_UPLOAD);
@@ -363,49 +375,51 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         tick();
         return json(res, 200, { ok: true, ...result });
       }
-      return json(res, 404, { error: 'Unbekannter Endpunkt.' });
+      return json(res, 404, { error: tr('Unknown endpoint.') });
     } catch (e) {
       if (e instanceof ApiError) return json(res, e.status, { error: e.message });
-      return json(res, 500, { error: `Interner Fehler: ${e.message}` });
+      return json(res, 500, { error: tr('Internal error: {msg}', { msg: e.message }) });
     }
   }
 
   const server = http.createServer((req, res) => {
-    if (!hostAllowed(req.headers.host)) return send(res, 421, 'text/plain; charset=utf-8', 'Unbekannter Host.');
+    // Sprache je Anfrage frisch (W-0041): works lang oder eine geänderte config.json wirkt ohne Neustart.
+    setLanguage(language(root));
+    if (!hostAllowed(req.headers.host)) return send(res, 421, 'text/plain; charset=utf-8', tr('Unknown host.'));
     let url;
-    try { url = new URL(req.url, 'http://x'); decodeURIComponent(url.pathname); } catch { return send(res, 400, 'text/plain', 'Ungültige Anfrage'); }
+    try { url = new URL(req.url, 'http://x'); decodeURIComponent(url.pathname); } catch { return send(res, 400, 'text/plain; charset=utf-8', tr('Invalid request.')); }
     const pathname = decodeURIComponent(url.pathname);
 
     if (pathname.startsWith('/api/')) { handleApi(req, res, url); return; }
-    if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'text/plain', 'Nur GET');
+    if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'text/plain; charset=utf-8', tr('Only GET'));
 
     // Kalender zum Abonnieren: lokal oder mit Schlüssel im Link, weil Kalender-Apps keine Cookies senden.
     if (pathname === '/kalender.ics') {
       const k = url.searchParams.get('key');
-      if (!accessOf(req, null) && !(k && keyLevel(k))) return send(res, 403, 'text/plain', 'Kein Zugriff');
+      if (!accessOf(req, null) && !(k && keyLevel(k))) return send(res, 403, 'text/plain; charset=utf-8', tr('No access'));
       try { return send(res, 200, 'text/calendar; charset=utf-8', buildIcal(root, { recurring: url.searchParams.get('recurring') === '1' })); } catch (e) { return send(res, 500, 'text/plain', e.message); }
     }
     // Wie viele Board-Tabs hier offen sind, damit works board --open keinen zweiten öffnet. Nur lokal, nur eine Zahl.
-    if (pathname === '/tabs') return isLocal(req) ? json(res, 200, { tabs: localTabs.size }) : send(res, 403, 'text/plain', 'Kein Zugriff');
+    if (pathname === '/tabs') return isLocal(req) ? json(res, 200, { tabs: localTabs.size }) : send(res, 403, 'text/plain; charset=utf-8', tr('No access'));
     // Hub (W-0025): laufende Boards aller Projekte und die Übersicht. Nur lokal, die Seite enthält das Token.
     // Verwaiste Tabs (W-0029) brauchen die Projekte mit Pfad und das Token für "Board starten". Nur lokal, wie /hub.
-    if (pathname === '/boards') return isLocal(req) ? json(res, 200, { boards: runningBoards().map(({ id, name, port, url: u }) => ({ id, name, port, url: u })), projects: projectsBrief(), token }) : send(res, 403, 'text/plain', 'Kein Zugriff');
+    if (pathname === '/boards') return isLocal(req) ? json(res, 200, { boards: runningBoards().map(({ id, name, port, url: u }) => ({ id, name, port, url: u })), projects: projectsBrief(), token }) : send(res, 403, 'text/plain; charset=utf-8', tr('No access'));
     if (pathname === '/hub') {
-      if (!isLocal(req)) return send(res, 403, 'text/plain', 'Kein Zugriff');
-      try { return send(res, 200, 'text/html; charset=utf-8', hubHtml({ token, self: fs.realpathSync(root), part: url.searchParams.has('part'), partUrl: '/hub?part=1', events: true })); } catch (e) { return send(res, 500, 'text/plain; charset=utf-8', `Fehler beim Erzeugen: ${e.message}`); }
+      if (!isLocal(req)) return send(res, 403, 'text/plain; charset=utf-8', tr('No access'));
+      try { return send(res, 200, 'text/html; charset=utf-8', hubHtml({ token, self: fs.realpathSync(root), part: url.searchParams.has('part'), partUrl: '/hub?part=1', events: true, root })); } catch (e) { return send(res, 500, 'text/plain; charset=utf-8', tr('Error while building: {msg}', { msg: e.message })); }
     }
     const access = accessOf(req, pathname === '/' || pathname === '/index.html' ? url : null);
     if (!access) {
-      return send(res, 403, 'text/html; charset=utf-8', '<!doctype html><meta charset="utf-8"><title>Kein Zugriff</title><body style="font:16px system-ui;padding:40px;max-width:560px;margin:auto;color:#222"><h1 style="font-size:22px">Kein Zugriff auf dieses Board</h1><p>Der Link ist ungültig oder wurde erneuert. Bitte den Besitzer des Boards um einen neuen Link.</p></body>');
+      return send(res, 403, 'text/html; charset=utf-8', `<!doctype html><meta charset="utf-8"><title>${tr('No access')}</title><body style="font:16px system-ui;padding:40px;max-width:560px;margin:auto;color:#222"><h1 style="font-size:22px">${tr('No access to this board')}</h1><p>${tr('The link is invalid or has been renewed. Please ask the owner of the board for a new link.')}</p></body>`);
     }
     if (pathname === '/' || pathname === '/index.html') {
       const headers = {};
       if (access.set) headers['Set-Cookie'] = `works_key=${access.set}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000`;
       try {
-        const html = renderBoard(withServer(boardData(root)), { live: true, token: access.level === 'edit' ? token : viewToken, mode: access.level });
+        const html = renderBoard(withServer(boardData(root)), { live: true, token: access.level === 'edit' ? token : viewToken, mode: access.level, root });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...SECURITY_HEADERS, ...headers });
         return res.end(html);
-      } catch (e) { return send(res, 500, 'text/plain; charset=utf-8', `Fehler beim Erzeugen: ${e.message}`); }
+      } catch (e) { return send(res, 500, 'text/plain; charset=utf-8', tr('Error while building: {msg}', { msg: e.message })); }
     }
     if (pathname === '/data.json') {
       try { return json(res, 200, withServer(boardData(root))); } catch (e) { return json(res, 500, { error: e.message }); }
@@ -421,11 +435,11 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     }
 
     const rel = pathname.replace(/^\/+/, '');
-    if (!PUBLIC_PREFIXES.some((p) => rel === p || rel.startsWith(p))) return send(res, 404, 'text/plain', 'Nicht gefunden');
+    if (!PUBLIC_PREFIXES.some((p) => rel === p || rel.startsWith(p))) return send(res, 404, 'text/plain; charset=utf-8', tr('Not found'));
     const abs = path.resolve(wd, rel);
-    if (!abs.startsWith(wd + path.sep)) return send(res, 403, 'text/plain', 'Verboten');
+    if (!abs.startsWith(wd + path.sep)) return send(res, 403, 'text/plain; charset=utf-8', tr('Forbidden'));
     fs.stat(abs, (err, st) => {
-      if (err || !st.isFile()) return send(res, 404, 'text/plain', 'Nicht gefunden');
+      if (err || !st.isFile()) return send(res, 404, 'text/plain; charset=utf-8', tr('Not found'));
       const ext = path.extname(abs).toLowerCase();
       // Mockups aus UI UX Pro Max dürfen im Board eingebettet werden, laufen aber in einer Sandbox ohne Zugriff auf das Board.
       const mockup = ext === '.html' && /^(tasks|archive)\/[^/]+\/design\/[^/]+\.html$/.test(rel);
@@ -449,7 +463,7 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
       // Bei einer Übergabe wartet der neue Server, bis der alte den Port freigegeben hat.
       if (e.code === 'EADDRINUSE' && takeover && Date.now() < takeoverUntil) { setTimeout(() => listen(p), 300); return; }
       if (e.code === 'EADDRINUSE' && !fixedPort && attempt < 10) { attempt++; listen(p + 1); return; }
-      process.stderr.write(`Fehler: Port ${p} ist nicht verfügbar (${e.code}). Anderen Port mit --port wählen.\n`);
+      process.stderr.write(tr('Error: {msg}', { msg: tr('Port {port} is not available ({code}). Choose another port with --port.', { port: p, code: e.code }) }) + '\n');
       process.exit(1);
     });
     server.listen(p, host, () => {
@@ -458,16 +472,16 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
       writeServer(root, { pid: process.pid, port: p, host, version: runningVersion(), cli: OWN_CLI, started: new Date().toISOString() });
       rememberPort(root, p, host);
       const url = `http://${host === '0.0.0.0' || host === '::' ? 'localhost' : host}:${p}/`;
-      process.stdout.write(`Live-Board läuft: ${url}\nBeobachte ${wd}\nBeenden mit Strg+C.\n`);
+      process.stdout.write(`${tr('Live board running: {url}', { url })}\n${tr('Watching {dir}', { dir: wd })}\n${tr('Stop with Ctrl+C.')}\n`);
       if (shared) {
         const links = shareLinks(root, p);
         if (links.length) {
-          process.stdout.write('Im Netzwerk geteilt. Link zum Ansehen:\n');
+          process.stdout.write(tr('Shared in the network. Link to view:') + '\n');
           for (const l of links) process.stdout.write(`  ${l.view}\n`);
-        } else process.stdout.write('Im Netzwerk freigegeben, aber keine Netzwerkadresse gefunden.\n');
+        } else process.stdout.write(tr('Shared in the network, but no network address found.') + '\n');
       }
       // Offene Tabs eines vorherigen Servers verbinden sich nach etwa 2 s neu (retry im Event-Stream). So lange warten.
-      if (open) setTimeout(() => process.stdout.write((localTabs.size ? 'Das Board ist schon in einem Browser-Tab offen, kein neuer Tab.' : openInBrowser(url)) + '\n'), 3000);
+      if (open) setTimeout(() => process.stdout.write((localTabs.size ? tr('The board is already open in a browser tab, no new tab.') : openInBrowser(url)) + '\n'), 3000);
     });
   };
   listen(port);

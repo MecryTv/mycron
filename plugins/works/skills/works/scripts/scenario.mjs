@@ -7,6 +7,7 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawnSync } from 'node:child_process';
 import { SKILL_DIR } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 const freePort = (p) => new Promise((resolve) => {
   const s = net.createServer().once('error', () => resolve(false)).once('listening', () => s.close(() => resolve(true)));
@@ -31,7 +32,7 @@ export function scenarioKit({ cli }) {
     },
     // Projekt mit Aufgaben: Einträge als Titel oder { title, priority, type }.
     project(name, tasks = []) {
-      if (!/^[\w .-]+$/.test(name)) throw new Error(`Ungültiger Projektname: ${name}`);
+      if (!/^[\w .-]+$/.test(name)) throw new Error(tr('Invalid project name: {name}', { name }));
       const d = path.join(dir, name);
       fs.mkdirSync(d);
       kit.works(d, ['init']);
@@ -46,14 +47,14 @@ export function scenarioKit({ cli }) {
     async board(cwd, { port } = {}) {
       let p = Number(port) || 0;
       for (let c = 49300 + Math.floor(Math.random() * 400); !p && c < 49800; c++) if (await freePort(c)) p = c;
-      if (!p) throw new Error('Kein freier Port');
+      if (!p) throw new Error(tr('No free port'));
       kit.works(cwd, ['board', '--serve', '--detach', `--port=${p}`]);
       return `http://127.0.0.1:${p}/`;
     },
     stop(cwd) { kit.works(cwd, ['board', '--stop'], { ok: false }); },
     // Hook von works auslösen, etwa permission.mjs für eine wartende Freigabe.
     hook(cwd, file, input = {}) {
-      if (!/^[\w-]+\.mjs$/.test(file)) throw new Error(`Ungültiger Hook: ${file}`);
+      if (!/^[\w-]+\.mjs$/.test(file)) throw new Error(tr('Invalid hook: {file}', { file }));
       spawnSync(process.execPath, [path.join(SKILL_DIR, 'hooks', file)], { cwd, env, input: JSON.stringify({ cwd, session_id: 'szenario', ...input }), encoding: 'utf8', windowsHide: true, timeout: 30000 });
     },
     file(name, content) { const f = path.join(dir, name); fs.writeFileSync(f, content); return f; },
@@ -72,14 +73,14 @@ export async function loadScenario(file, { cli }) {
   const { pathToFileURL } = await import('node:url');
   const mod = await import(pathToFileURL(path.resolve(file)).href);
   const sc = mod.default || mod;
-  if (typeof sc.setup !== 'function') throw new Error(`${file} exportiert kein setup(kit).`);
+  if (typeof sc.setup !== 'function') throw new Error(tr('{file} does not export setup(kit).', { file }));
   return {
     name: sc.name || path.basename(file).replace(/\.[^.]+$/, ''),
     perShot: async () => {
       const kit = scenarioKit({ cli });
       let state;
       try { state = await sc.setup(kit); } catch (e) { await kit.cleanup(); throw e; }
-      if (!state || !state.url) { await kit.cleanup(); throw new Error('setup(kit) muss { url } zurückgeben.'); }
+      if (!state || !state.url) { await kit.cleanup(); throw new Error(tr('setup(kit) must return { url }.')); }
       return { url: state.url, prepare: sc.prepare ? (page) => sc.prepare(page, kit, state) : null, done: () => kit.cleanup() };
     },
   };

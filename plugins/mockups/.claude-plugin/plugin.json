@@ -1,6 +1,6 @@
 {
   "name": "mockups",
-  "description": "Entwurf-Werkzeug: Entwurfsseiten mit den echten Styles des Projekts, Varianten und hell/dunkel umschaltbar, Screenshots in drei Breiten mit installiertem Chrome samt Prüfung auf seitliches Scrollen und Fehler, Anhängen an works-Aufgaben",
+  "description": "Mockup tool: mockup pages with the project's real styles, switchable variants and light/dark, screenshots at three widths with the installed Chrome including checks for horizontal scrolling and errors, attaching to works tasks",
   "author": { "name": "MecryTv" },
   "repository": "https://github.com/MecryTv/mycron"
 }

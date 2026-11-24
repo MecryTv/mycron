@@ -1,34 +1,36 @@
 # works
 
-works ist eine Aufgabenverwaltung für Claude Code. Alle Aufgaben eines Projekts liegen als Markdown im Ordner `.works/`, jede mit eigener Datei für Beschreibung, Akzeptanzkriterien, Verlauf, Übergabe, Bilder und Designentscheidungen. Claude legt Aufgaben an, arbeitet sie ab und hält fest, wo es weitergeht. Du verfolgst alles in einem Live-Board im Browser, legst dort selbst Aufgaben an und sagst Claude, was als Nächstes kommt.
+> English. Deutsche Fassung: [README.de.md](README.de.md)
 
-Es braucht nur Node.js 18 oder neuer, keine Datenbank, keinen Account und keine weiteren Pakete.
+works is a task manager for Claude Code. All tasks of a project live as Markdown in the `.works/` folder, each with its own file for description, acceptance criteria, history, handoff, images and design decisions. Claude creates tasks, works through them and records where to pick up next. You follow everything on a live board in the browser, create tasks there yourself and tell Claude what comes next.
 
-## Inhalt
+All it needs is Node.js 18 or newer: no database, no account and no other packages.
+
+## Contents
 
 - [Installation](#installation)
-- [Erste Schritte](#erste-schritte)
-- [So arbeitest du mit Claude](#so-arbeitest-du-mit-claude)
-- [Aufbau einer Aufgabe](#aufbau-einer-aufgabe)
-- [Das Live-Board](#das-live-board)
-- [Planen](#planen)
-- [Zusammenarbeit mit Claude](#zusammenarbeit-mit-claude)
-- [Gestaltung mit UI UX Pro Max und Brainstorming](#gestaltung-mit-ui-ux-pro-max-und-brainstorming)
-- [Projektwissen](#projektwissen)
+- [Getting started](#getting-started)
+- [How you work with Claude](#how-you-work-with-claude)
+- [Structure of a task](#structure-of-a-task)
+- [The live board](#the-live-board)
+- [Planning](#planning)
+- [Collaborating with Claude](#collaborating-with-claude)
+- [Design with UI UX Pro Max and Brainstorming](#design-with-ui-ux-pro-max-and-brainstorming)
+- [Project knowledge](#project-knowledge)
 - [GitHub](#github)
-- [Mehrere Aufgaben parallel](#mehrere-aufgaben-parallel)
+- [Several tasks in parallel](#several-tasks-in-parallel)
 - [Import](#import)
-- [Qualität vor dem Abschluss](#qualität-vor-dem-abschluss)
-- [Zeit, Kosten und Schätzungen](#zeit-kosten-und-schätzungen)
-- [Berichte](#berichte)
-- [Teilen](#teilen)
-- [Kalender und alle Projekte](#kalender-und-alle-projekte)
-- [Befehle im Terminal und ohne Claude](#befehle-im-terminal)
-- [Einstellungen](#einstellungen)
+- [Quality before closing](#quality-before-closing)
+- [Time, cost and estimates](#time-cost-and-estimates)
+- [Reports](#reports)
+- [Sharing](#sharing)
+- [Calendar and all projects](#calendar-and-all-projects)
+- [Commands in the terminal and without Claude](#commands-in-the-terminal)
+- [Settings](#settings)
 - [Hooks](#hooks)
-- [Sicherheit und Datenschutz](#sicherheit-und-datenschutz)
-- [Was ins Git gehört](#was-ins-git-gehört)
-- [Probleme lösen](#probleme-lösen)
+- [Security and privacy](#security-and-privacy)
+- [What belongs in Git](#what-belongs-in-git)
+- [Troubleshooting](#troubleshooting)
 
 ## Installation
 
@@ -39,386 +41,389 @@ In Claude Code:
 /plugin install works@mycron
 ```
 
-Danach Claude Code neu starten. Updates holst du mit `/plugin marketplace update mycron`. Laufende Boards stellen sich dabei von selbst auf die neue Version um, offene Tabs laden sich neu.
+Then restart Claude Code. You get updates with `/plugin marketplace update mycron`. Running boards switch to the new version on their own, and open tabs reload.
 
-## Erste Schritte
+**Language:** works uses English by default (CLI, hooks, docs and new tasks). `works lang` shows the configured language. `works lang de` switches to German globally (`~/.works/settings.json`), `works lang de --project` only for this project (`.works/config.json`), and `works lang --reset [--project]` removes the setting again. The environment variable `WORKS_LANG` takes precedence, then the project, then the global setting, otherwise English applies. workday, ci-watch and mockups follow the same setting.
 
-Sag Claude in deinem Projekt zum Beispiel:
+## Getting started
 
-> Richte works in diesem Projekt ein und öffne das Board.
+In your project, tell Claude something like:
 
-Claude führt `works init` aus und fragt vorher, ob `.works/` ins Git soll. Danach startet es das Live-Board und nennt dir die Adresse, normalerweise `http://127.0.0.1:4747/`.
+> Set up works in this project and open the board.
 
-Ausprobieren ohne echtes Projekt geht mit der Demo:
+Claude runs `works init` and first asks whether `.works/` should go into Git. Then it starts the live board and gives you the address, usually `http://127.0.0.1:4747/`.
 
-> Zeig mir die works Demo.
+To try it without a real project, use the demo:
 
-Die Demo legt ein Beispielprojekt im Temp-Ordner an, mit Aufgaben, Sprint, Kommentaren, Vorlage, Zeiterfassung und Prüfungen. Mit `--simulate` spielt sie zehn typische Änderungen von Claude vor, damit du siehst, wie sich das Board live bewegt.
+> Show me the works demo.
 
-## So arbeitest du mit Claude
+The demo creates a sample project in the temp folder, with tasks, a sprint, comments, a template, time tracking and checks. With `--simulate` it plays back ten typical changes by Claude so you can see the board move live.
 
-Du sprichst ganz normal. Ein paar Beispiele und was dann passiert:
+## How you work with Claude
 
-| Du sagst | Claude macht |
+You just talk normally. A few examples and what happens:
+
+| You say | Claude does |
 |---|---|
-| Notier dir, dass der Login auf dem Handy hakt. | legt schnell einen Bug an und fragt später die Details nach |
-| Mach daraus eine Aufgabe mit P2, Aufwand M. | legt die Aufgabe mit Beschreibung und Akzeptanzkriterien an |
-| Was steht an? | nennt die nächste sinnvolle Aufgabe mit Begründung |
-| Arbeite die Warteschlange ab. | startet die oberste Aufgabe deiner Warteschlange und macht danach weiter |
-| Hier ein Screenshot zu W-0012. | legt das Bild mit Beschreibung in der Aufgabe ab |
-| Plane einen Sprint bis Freitag nächster Woche. | startet einen Sprint und schlägt Aufgaben passend zur Kapazität vor |
-| Ich will das Board mit Lukas teilen. | gibt das Board im Netzwerk frei und nennt dir den Leselink |
-| Wie lange hat W-0034 gedauert? | zeigt aktive Zeit, Sitzungen und Tage je Status |
-| Was hat W-0034 gekostet? | zeigt Tokens und geschätzte Kosten der Aufgabe |
-| Bau die Turnierseite für Mobilgeräte. | arbeitet bei einer Gestaltungsaufgabe mit UI UX Pro Max und Brainstorming Entwürfe aus, hängt sie an die Aufgabe und wartet auf deine Wahl |
-| Merk dir für das Projekt: Prisma nur mit migrate deploy. | trägt das ins Projektwissen ein, das jede Sitzung liest |
-| Jeden ersten Montag im Monat Abhängigkeiten aktualisieren. | legt eine wiederkehrende Aufgabe an |
-| Arbeite den Sprint ab. | prüft, ob sich Aufgaben parallel mit Agenten erledigen lassen, und fragt nach, wenn es unsicher ist |
-| Hier ist unser Trello-Export. | zeigt eine Vorschau der Aufgaben und übernimmt sie nach deinem Okay |
+| Make a note that login is flaky on mobile. | quickly creates a bug and asks for the details later |
+| Turn that into a task with P2, effort M. | creates the task with description and acceptance criteria |
+| What's next? | names the next sensible task and why |
+| Work through the queue. | starts the top task in your queue and carries on afterwards |
+| Here's a screenshot for W-0012. | stores the image with a description in the task |
+| Plan a sprint until Friday next week. | starts a sprint and suggests tasks that fit the capacity |
+| I want to share the board with Lukas. | shares the board on the network and gives you the read-only link |
+| How long did W-0034 take? | shows active time, sessions and days per status |
+| What did W-0034 cost? | shows tokens and estimated cost of the task |
+| Build the tournament page for mobile. | for a design task, works out mockups with UI UX Pro Max and Brainstorming, attaches them to the task and waits for your choice |
+| Remember for this project: Prisma only with migrate deploy. | adds it to the project knowledge that every session reads |
+| Update dependencies every first Monday of the month. | creates a recurring task |
+| Work through the sprint. | checks whether tasks can be done in parallel with agents, and asks if unsure |
+| Here's our Trello export. | shows a preview of the tasks and takes them over after your okay |
 
-Beim Start jeder Sitzung bekommt Claude automatisch eine Kurzübersicht: offene P1, Überfälliges, Warteschlange, Sprint, neue Kommentare von dir, die Bereiche des Projektwissens, Entwürfe, die auf deine Wahl warten, und die Übergabe der aktiven Aufgabe. So macht jede neue Sitzung dort weiter, wo die letzte aufgehört hat.
+At the start of every session Claude automatically gets a short overview: open P1s, overdue items, queue, sprint, new comments from you, the areas of the project knowledge, mockups waiting for your choice, and the handoff of the active task. So every new session picks up where the last one stopped.
 
-## Aufbau einer Aufgabe
+## Structure of a task
 
 ```
 .works/
-  WORKS.md            generierte Übersicht
-  config.json         Einstellungen, Meilensteine, Warteschlange, Sprints, Ansichten, Prüfungen, wiederkehrende Aufgaben
-  wissen.md           Projektwissen, das Claude vor der Arbeit liest
-  state.json          aktive Aufgabe (lokal)
-  ideas.md            Ideen, die noch keine Aufgabe sind
-  templates/          Vorlagen
-  reports/            Berichte und Schnappschüsse
-  inbox/              Bilder, die noch zugeordnet werden
+  WORKS.md            generated overview
+  config.json         settings, milestones, queue, sprints, views, checks, recurring tasks
+  wissen.md           project knowledge Claude reads before working
+  state.json          active task (local)
+  ideas.md            ideas that are not a task yet
+  templates/          templates
+  reports/            reports and snapshots
+  inbox/              images not yet assigned
   tasks/W-0012-slug/
-    task.md           Beschreibung, Kriterien, Plan, Fragen, Übergabe, Verlauf
-    decisions.md      Designentscheidungen
-    comments.md       Gespräch zwischen dir und Claude
-    checks.json       Ergebnis der Prüfungen
-    assets/           Bilder
-    design/           Designrichtung, Entwürfe und Brainstorming
-  archive/            erledigte und verworfene Aufgaben
+    task.md           description, criteria, plan, questions, handoff, history
+    decisions.md      design decisions
+    comments.md       conversation between you and Claude
+    checks.json       results of the checks
+    assets/           images
+    design/           design direction, mockups and brainstorming
+  archive/            done and dropped tasks
 ```
 
-**Typen:** Feature, Bug, Refactoring, Spike, Chore, Design, Technische Schuld. Jeder Typ bringt passende Abschnitte mit, ein Bug etwa Reproduktion, Ursache und Lösung.
+**Types:** Feature, Bug, Refactor, Spike, Chore, Design, Tech debt. Each type brings matching sections, a bug for example Reproduction, Root cause and Solution.
 
-**Prioritäten:** P1 Kritisch, P2 Hoch, P3 Mittel, P4 Niedrig.
+**Priorities:** P1 Critical, P2 High, P3 Medium, P4 Low.
 
-**Status:** Backlog, Geplant, In Arbeit, Review, Erledigt, Verworfen.
+**Status:** Backlog, Planned, In progress, Review, Done, Dropped. The files store the values `backlog`, `geplant`, `in-arbeit`, `review`, `erledigt` and `verworfen`; the English inputs `planned`, `in-progress`, `done` and `dropped` are accepted as well (for example `works set W-0012 status=in-progress`).
 
-**Beschreibung:** der zentrale Abschnitt. Alles, was du zu einer Aufgabe wichtig findest, gehört hierhin. Claude liest ihn vor der Arbeit vollständig und behandelt ihn als Vorgabe.
+**Description:** the central section. Everything you consider important about a task belongs here. Claude reads it in full before working and treats it as a requirement.
 
-**Definition of Done:** Abschließen geht nur, wenn alle Kriterien abgehakt sind, keine Fragen offen sind und die typbezogenen Abschnitte gefüllt sind. Dazu kommen manuelle Punkte und, wenn eingerichtet, automatische Prüfungen. Wer trotzdem abschließt, muss einen Grund angeben, der im Verlauf landet.
+**Definition of Done:** A task can only be closed when all criteria are checked, no questions are open and the type-specific sections are filled in. On top of that come manual items and, if set up, automatic checks. Anyone who closes it anyway has to give a reason, which goes into the history.
 
-**Übergabe:** Am Ende jeder Arbeitsphase schreibt Claude, wo es weitergeht. Ein Stop Hook erinnert daran, wenn Dateien geändert wurden, die Aufgabe aber nicht.
+**Handoff:** At the end of each work phase Claude writes where to pick up. A Stop hook reminds it when files were changed but the task was not.
 
-## Das Live-Board
+## The live board
 
-Claude startet es mit `works board --serve --detach`, oder du sagst "Öffne das Board". Es läuft im Hintergrund und aktualisiert sich jede Sekunde. Wenn Claude eine Karte verschiebt, gleitet sie in die neue Spalte, und unten rechts erscheint, was passiert ist und warum.
+Claude starts it with `works board --serve --detach`, or you say "Open the board". It runs in the background and refreshes every second. When Claude moves a card, it slides into the new column, and the bottom right shows what happened and why.
 
-Solange Claude arbeitet, steht oben "Claude arbeitet an W-0003, seit 6 min". Ein Klick darauf öffnet die Ansicht Live: Dort siehst du die Aufgabe mit ihrem Umsetzungsplan, den gerade laufenden Befehl mit Laufzeit, parallele Agenten, was auf dich wartet, und alle Prüfungen samt Laufzeit und Funden. Die aktive Karte zeigt den aktuellen Schritt, etwa "Bearbeitet src/backup.ts" oder "Befehl npm test", und die drei davor. Über "Anweisung an Claude" schickst du mitten in der Arbeit einen Hinweis. Claude bekommt ihn beim nächsten Schritt und berücksichtigt ihn, sobald es sinnvoll ist.
+While Claude is working, the top bar says "Claude is working on W-0003, for 6 min". Clicking it opens the Live view: there you see the task with its implementation plan, the command currently running with its runtime, parallel agents, what is waiting for you, and all checks with runtime and findings. The active card shows the current step, for example "Editing src/backup.ts" or "Command npm test", and the three before it. With "Instruction for Claude" you send a hint in the middle of the work. Claude gets it at the next step and takes it into account as soon as it makes sense.
 
-Jede Änderung im Board lässt sich zurücknehmen: über "Rückgängig" in der Meldung, mit Strg+Z oder in den Werkzeugen unter Letzte Änderungen.
+Every change on the board can be undone: with "Undo" in the notification, with Ctrl+Z or in Tools under Recent changes.
 
-### Ansichten
+### Views
 
-| Ansicht | Taste | Wofür |
+| View | Key | What for |
 |---|---|---|
-| Board | 1 | Spalten nach Status, Karten per Ziehen verschieben |
-| Sprint | 2 | Zeitraum, Ziel, Kapazität, Burndown, Vorschläge zum Einplanen |
-| Warteschlange | 3 | Reihenfolge, in der Claude arbeiten soll |
-| Zeitleiste | 4 | Wochen und Meilensteine, Fälligkeit per Ziehen am Balkenende |
-| Abhängigkeiten | 5 | Graph mit kritischem Pfad und der Aufgabe mit dem größten Hebel |
-| Tabelle | 6 | Sortieren, direkt bearbeiten, mehrere Aufgaben auf einmal ändern |
-| Live | 7 | Was Claude gerade tut, welcher Schritt dran ist, wie weit die Aufgaben des Tages sind und wie die Prüfungen stehen |
+| Board | 1 | Columns by status, move cards by dragging |
+| Sprint | 2 | Period, goal, capacity, burndown, suggestions for planning in |
+| Queue | 3 | Order in which Claude should work |
+| Timeline | 4 | Weeks and milestones, due date by dragging the end of the bar |
+| Dependencies | 5 | Graph with critical path and the task with the most leverage |
+| Table | 6 | Sort, edit inline, change several tasks at once |
+| Live | 7 | What Claude is doing right now, which step is next, how far today's tasks are and how the checks stand |
 
-Über den Spalten zeigt der Fortschritt den Anteil erledigter Aufgaben, die letzten sieben Tage, eine Prognose und den Verlauf der letzten acht Wochen. Mit gewähltem Meilenstein gilt alles nur für ihn.
+Above the columns, the progress shows the share of done tasks, the last seven days, a forecast and the trend of the last eight weeks. With a milestone selected, everything applies to that milestone only.
 
-### Detailpanel
+### Detail panel
 
-Ein Klick auf eine Karte öffnet die Aufgabe mit diesen Reitern:
+Clicking a card opens the task with these tabs:
 
-- **Übersicht:** alle Felder, Beschreibung, Kriterien zum Abhaken, Fragen, Übergabe, Bilder per Einfügen oder Ziehen, Abhängigkeiten, Verlauf
-- **Entwürfe:** bei Gestaltungsaufgaben Farben, Schrift, die Varianten als Vorschau und das Brainstorming. Hier wählst du die Variante, die Claude umsetzen soll
-- **Kommentare:** das Gespräch mit Claude zu dieser Aufgabe
-- **Zeit:** aktive Zeit von Claude, Tage je Status, Sitzungen, Tokens und geschätzte Kosten
-- **Code und Commits:** Branch, Vorsprung gegenüber dem Hauptbranch, Pull Requests, Commits mit der Aufgaben-ID, geänderte Dateien mit Diff
+- **Overview:** all fields, description, criteria to check off, questions, handoff, images by pasting or dragging, dependencies, history
+- **Design variants:** for design tasks, colors, fonts, the variants as a preview and the brainstorming. Here you choose the variant Claude should build
+- **Comments:** the conversation with Claude about this task
+- **Time:** Claude's active time, days per status, sessions, tokens and estimated cost
+- **Code and commits:** branch, how far it is ahead of the main branch, pull requests, commits with the task ID, changed files with diff
 
-Aufgaben in Review haben den Knopf **Abnehmen**: Der gewählte Entwurf oder der Vorher-Screenshot steht neben dem Ergebnis, darunter die Akzeptanzkriterien zum Gegenprüfen. Annehmen führt zum Abschluss. "Zurück an Claude" braucht einen kurzen Text, was fehlt; er landet als Kommentar bei Claude, und Kriterien, die du abwählst, sind wieder offen.
+Tasks in Review have the **Accept** button: the chosen mockup or the before screenshot sits next to the result, with the acceptance criteria below for cross-checking. Accepting leads to closing the task. "Back to Claude" needs a short text about what is missing; it reaches Claude as a comment, and criteria you uncheck are open again.
 
-### Werkzeuge
+### Tools
 
-Das Symbol mit den Reglern in der Kopfzeile öffnet Wochenbericht, Vorlagen, Prüfungen, Projektwissen, Aufräumen, wiederkehrende Aufgaben, GitHub, Kalender, Verbrauch, Letzte Änderungen und Benachrichtigungen.
+The icon with the sliders in the header opens weekly report, templates, checks, project knowledge, cleanup, recurring tasks, GitHub, calendar, usage, recent changes and notifications.
 
-### Tastatur
+### Keyboard
 
-| Taste | Wirkung |
+| Key | Effect |
 |---|---|
-| rechte Shift oder Strg+K | Schnellsuche nach Aufgaben, mit `#` nach Tags, mit `>` nach Befehlen |
-| N | neue Aufgabe |
-| / | Suche |
-| 1 bis 6 | Ansicht wechseln |
-| Esc | Panel oder Dialog schließen |
-| Strg+Z | letzte Änderung im Board zurücknehmen |
+| right Shift or Ctrl+K | quick search for tasks, with `#` for tags, with `>` for commands |
+| N | new task |
+| / | search |
+| 1 to 6 | switch view |
+| Esc | close panel or dialog |
+| Ctrl+Z | undo the last change on the board |
 
-Das Farbschema folgt dem System oder lässt sich auf Hell oder Dunkel festlegen.
+The color scheme follows the system or can be fixed to light or dark.
 
-## Planen
+## Planning
 
-### Warteschlange
+### Queue
 
-Du reihst Aufgaben ein und sortierst sie per Ziehen. Claude nimmt sie in genau dieser Reihenfolge, vor allen eigenen Vorschlägen. Drei Schalter steuern den Ablauf: nach dem Abschluss weitermachen, vorher nachfragen und blockierte überspringen. Erledigte Aufgaben fallen von selbst heraus.
+You add tasks to the queue and sort them by dragging. Claude takes them in exactly this order, before any suggestions of its own. Three switches control the flow: carry on after closing a task, ask first, and skip blocked tasks. Done tasks drop out on their own.
 
 ### Sprint
 
-Ein Sprint hat Titel, Ziel, Zeitraum und eine Kapazität in Punkten. Standard sind 14 Tage und 20 Punkte, je Aufwand S 1, M 2, L 4 und XL 8 Punkte. Die Sprint-Ansicht zeigt, wie viel verplant, in Arbeit und erledigt ist, einen Burndown mit Ideallinie und Vorschläge mit dem Hinweis, ob sie noch in die Kapazität passen. Beim Abschluss öffnet sich ein Rückblick: was geschafft wurde, ob das Ziel erreicht ist, welche Aufgaben länger dauerten als geschätzt, was nachträglich dazukam und was es gekostet hat. Dazu drei kurze Fragen an dich. Claude nutzt die Antworten beim Planen des nächsten Sprints. Offene Aufgaben lassen sich gleich übernehmen.
+A sprint has a title, goal, period and a capacity in points. The default is 14 days and 20 points, with effort S 1, M 2, L 4 and XL 8 points. The Sprint view shows how much is planned, in progress and done, a burndown with an ideal line, and suggestions with a note on whether they still fit into the capacity. When the sprint closes, a retrospective opens: what was achieved, whether the goal was reached, which tasks took longer than estimated, what was added along the way and what it cost. Plus three short questions for you. Claude uses the answers when planning the next sprint. Open tasks can be carried over right away.
 
-### Vorlagen
+### Templates
 
-Für Aufgaben, die immer ähnlich aussehen, etwa ein neuer Slash-Befehl oder eine neue Dashboard-Seite. Eine Vorlage legt Typ, Priorität, Aufwand, Tags, Felder, einen Grundtext und Akzeptanzkriterien fest. Beim Anlegen füllst du die Felder aus und beschreibst im Feld "Was genau soll passieren?" mit eigenen Worten, worum es geht. Dein Text hat Vorrang vor dem Grundtext.
+For tasks that always look similar, such as a new slash command or a new dashboard page. A template sets type, priority, effort, tags, fields, a base text and acceptance criteria. When creating a task you fill in the fields and describe in your own words, in the field "What exactly should happen?", what it is about. Your text takes precedence over the base text.
 
-Eigene Vorlagen erstellst du in den Werkzeugen oder im Detailpanel einer bestehenden Aufgabe mit "Als Vorlage speichern". Sie gelten für das Projekt oder für alle deine Projekte.
+You create your own templates in Tools or in the detail panel of an existing task with "Save as template". They apply to the project or to all your projects.
 
-### Wiederkehrende Aufgaben
+### Recurring tasks
 
-Regeln wie "täglich", "jeden Montag", "jeden ersten Montag im Monat" oder "alle 3 Tage" legen Aufgaben selbst an, auch aus einer Vorlage. Platzhalter `{Datum}` und `{Monat}` im Titel werden ersetzt. Ist die vorige Aufgabe einer Regel noch offen, entsteht keine zweite. Auf Wunsch kommen neue Aufgaben direkt in die Warteschlange oder den Sprint.
+Rules such as "daily", "every Monday", "every first Monday of the month" or "every 3 days" create tasks on their own, also from a template. The placeholders `{Datum}` (date) and `{Monat}` (month) in the title are replaced. If the previous task of a rule is still open, no second one is created. If you like, new tasks go straight into the queue or the sprint.
 
-### Aufräumen
+### Cleanup
 
-Werkzeuge, Aufräumen, bewertet den Backlog von 0 bis 100 und listet, was Pflege braucht: Aufgaben, die festhängen, Entwürfe ohne deine Wahl, unvollständige Aufgaben, vermutliche Duplikate und alte, unberührte Einträge. Zu jedem Punkt gibt es die passende Aktion, etwa zusammenführen oder zur Idee machen. Schon beim Anlegen warnt works, wenn es eine ähnliche offene Aufgabe gibt, und bietet an, dein Anliegen dort als Kommentar anzuhängen.
+Cleanup in Tools rates the backlog from 0 to 100 and lists what needs attention: tasks that are stuck, mockups without your choice, incomplete tasks, likely duplicates and old, untouched entries. Each item comes with the matching action, such as merge or turn into an idea. Already when you create a task, works warns you if there is a similar open task and offers to attach your request there as a comment.
 
-### Gespeicherte Ansichten
+### Saved views
 
-Setz Filter, etwa P1 und P2 mit Tag bot, und speichere sie als "Bot dringend". Die Ansicht erscheint als Chip über dem Board, mit der Zahl passender offener Aufgaben. Claude kann sie mit `works list --view "Bot dringend"` nutzen.
+Set filters, for example P1 and P2 with tag bot, and save them as "Bot urgent". The view appears as a chip above the board, with the number of matching open tasks. Claude can use it with `works list --view "Bot urgent"`.
 
-### Meilensteine
+### Milestones
 
-Meilensteine bündeln Aufgaben zu einem Ziel mit Datum, etwa einem Release. Du legst sie im Meilenstein-Filter an. Zeitleiste und Fortschritt zeigen ihren Stand.
+Milestones group tasks towards a goal with a date, such as a release. You create them in the milestone filter. Timeline and progress show where they stand.
 
-## Zusammenarbeit mit Claude
+## Collaborating with Claude
 
-**Kommentare:** Du schreibst im Reiter Kommentare, was dir wichtig ist. Claude sieht neue Kommentare beim nächsten Sitzungsstart, setzt sie um und antwortet dort.
+**Comments:** In the Comments tab you write what matters to you. Claude sees new comments at the next session start, acts on them and replies there.
 
-**Offene Fragen:** Fragen, die vor der Arbeit geklärt sein müssen. Du beantwortest sie im Detailpanel. Solange eine offen ist, lässt sich die Aufgabe nicht abschließen.
+**Open questions:** Questions that have to be settled before the work. You answer them in the detail panel. As long as one is open, the task cannot be closed.
 
-**Benachrichtigungen:** Ist der Board-Tab im Hintergrund, meldet sich der Browser, wenn eine Aufgabe in Review kommt, Claude dir eine Frage stellt oder kommentiert, eine neue P1 auftaucht, eine Blockade aufgelöst ist oder die Warteschlange leer gelaufen ist. Dazu optional ein Ton und ein Zähler im Tab-Titel. Einstellen in den Werkzeugen.
+**Notifications:** When the board tab is in the background, the browser notifies you when a task moves to Review, Claude asks you a question or comments, a new P1 shows up, a blocker is resolved or the queue has run empty. Optionally with a sound and a counter in the tab title. Set it up in Tools.
 
-**Ideen:** Lose Gedanken landen in `ideas.md` und lassen sich später mit einem Klick zur Aufgabe machen.
+**Ideas:** Loose thoughts go into `ideas.md` and can later be turned into a task with one click.
 
-## Gestaltung mit UI UX Pro Max und Brainstorming
+## Design with UI UX Pro Max and Brainstorming
 
-Sind die Skills [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) und das Brainstorming aus [Superpowers](https://github.com/obra/superpowers) installiert, nutzt Claude sie bei Gestaltungsaufgaben von sich aus. Als Gestaltungsaufgabe gilt Typ Design oder ein Tag ui, design oder ux.
+If the skills [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) and Brainstorming from [Superpowers](https://github.com/obra/superpowers) are installed, Claude uses them for design tasks on its own. A design task is one of type Design or with a tag ui, design or ux.
 
-1. Brainstorming mit dir, das Ergebnis hängt an der Aufgabe.
-2. UI UX Pro Max liefert die Designrichtung: Farben, Schrift, Stil und Regeln.
-3. Claude baut zwei bis drei Varianten als HTML-Mockup oder Bild und hängt sie an.
-4. Du siehst alles im Reiter Entwürfe und wählst mit "Diese nehmen". Die Karte zeigt so lange "2 Entwürfe zur Wahl".
-5. Erst dann setzt Claude um. Die Wahl steht in `decisions.md`.
-6. In der Abnahme liegt der gewählte Entwurf neben dem Screenshot des Ergebnisses.
+1. Brainstorming with you; the result is attached to the task.
+2. UI UX Pro Max provides the design direction: colors, fonts, style and rules.
+3. Claude builds two to three variants as an HTML mockup or image and attaches them.
+4. You see everything in the Design variants tab and choose with "Take this one". Until then the card shows "2 mockups to choose from".
+5. Only then does Claude build it. The choice is recorded in `decisions.md`.
+6. In the acceptance review, the chosen mockup sits next to the screenshot of the result.
 
-Alles liegt im Aufgabenordner unter `design/`. Ohne die beiden Skills klärt Claude die Gestaltung wie gewohnt mit dir und zeigt trotzdem einen Entwurf.
+Everything lives in the task folder under `design/`. Without the two skills, Claude settles the design with you as usual and still shows a mockup.
 
-## Projektwissen
+## Project knowledge
 
-`.works/wissen.md` hält fest, was jede Sitzung über das Projekt wissen muss, etwa "Rollen-Änderungen laufen über rateQueue" oder "Prisma nur mit migrate deploy". Einträge sind nach Bereichen sortiert. Claude liest die passenden vor der Arbeit. Findet Claude selbst etwas Wichtiges heraus, schlägt es einen Eintrag vor; du übernimmst, bearbeitest oder lehnst ihn in den Werkzeugen unter Projektwissen ab. Die Datei gehört ins Git, damit alle denselben Stand haben.
+`.works/wissen.md` records what every session needs to know about the project, for example "Role changes go through rateQueue" or "Prisma only with migrate deploy". Entries are sorted by area. Claude reads the relevant ones before working. If Claude finds out something important itself, it suggests an entry; you accept, edit or reject it in Tools under Project knowledge. The file belongs in Git so everyone has the same state.
 
 ## GitHub
 
-Ist das Projekt ein GitHub-Repository und das [gh CLI](https://cli.github.com/) angemeldet, gleicht works automatisch ab, beim Sitzungsstart und alle zwei Minuten, solange das Board läuft:
+If the project is a GitHub repository and the [gh CLI](https://cli.github.com/) is logged in, works syncs automatically, at session start and every two minutes while the board is running:
 
-- Ein Pull Request mit der Aufgaben-ID im Titel oder Branch schiebt die Aufgabe nach Review.
-- Das Ergebnis der CI wird zur Prüfung `ci`. Rot verhindert den Abschluss.
-- Änderungswünsche im Review landen als Kommentar bei Claude, die Aufgabe geht zurück nach In Arbeit.
-- Ein Merge schließt die Aufgabe ab, wenn die Definition of Done erfüllt ist. Sonst bleibt sie in Review mit einem Hinweis, was fehlt.
-- Neue Issues werden zu Aufgaben, und eine erledigte Aufgabe schließt ihr Issue.
+- A pull request with the task ID in its title or branch moves the task to Review.
+- The CI result becomes the check `ci`. Red prevents closing.
+- Change requests in a review reach Claude as a comment, and the task goes back to In progress.
+- A merge closes the task if the Definition of Done is met. Otherwise it stays in Review with a note about what is missing.
+- New issues become tasks, and a done task closes its issue.
 
-Jeder Teil lässt sich in den Werkzeugen unter GitHub abschalten. Der erste Abgleich merkt sich nur den Stand und ändert nichts.
+Each part can be turned off in Tools under GitHub. The first sync only records the current state and changes nothing.
 
-## Mehrere Aufgaben parallel
+## Several tasks in parallel
 
-Sollen mehrere Aufgaben erledigt werden, prüft Claude zuerst mit `works parallel plan`, ob sie sich gegenseitig stören: Hängen sie voneinander ab, ändern sie dieselben Dateien oder liegen sie im selben Bereich? Ergebnis ist parallel, nacheinander oder unsicher.
+When several tasks are to be done, Claude first checks with `works parallel plan` whether they get in each other's way: do they depend on each other, do they change the same files, or are they in the same area? The result is parallel, one after another, or unsure.
 
-- **Parallel:** Claude legt für jede Aufgabe einen eigenen Git-Worktree mit Branch an, neben deinem Projekt im Ordner `<projekt>.works-lanes`, und startet je Aufgabe einen Agenten. Die Agenten tragen ihren Fortschritt in dieselben Aufgaben ein, die du im Board siehst.
-- **Nacheinander:** Claude arbeitet wie gewohnt eine Aufgabe nach der anderen, etwa weil sie dieselben Dateien ändern oder zu klein sind, um den Aufwand zu lohnen.
-- **Unsicher:** Claude nennt dir die Gründe und fragt.
+- **Parallel:** Claude creates a separate Git worktree with a branch for each task, next to your project in the folder `<project>.works-lanes`, and starts one agent per task. The agents record their progress in the same tasks you see on the board.
+- **One after another:** Claude works as usual, one task after the other, for example because they change the same files or are too small to be worth the overhead.
+- **Unsure:** Claude tells you the reasons and asks.
 
-Unvollständige Aufgaben, offene Fragen und Gestaltung ohne gewählten Entwurf gibt Claude nie an einen Agenten. Wenn ein Agent fertig ist, prüft Claude das Ergebnis, entfernt den Worktree und lässt den Branch für Review oder Pull Request stehen. Gemergt wird nur, wenn du es willst. Bis zu drei Aufgaben laufen gleichzeitig, einstellbar unter `parallel.max`.
+Claude never hands incomplete tasks, open questions or design without a chosen mockup to an agent. When an agent is done, Claude checks the result, removes the worktree and leaves the branch for review or a pull request. Merging only happens if you want it. Up to three tasks run at the same time, configurable under `parallel.max`.
 
-Im Board tragen diese Karten "Parallel" und zeigen, was ihr Agent gerade tut. Werkzeuge, Parallelarbeit zeigt laufende Bahnen und wie Claude die nächsten Aufgaben einschätzt.
+On the board these cards carry "Parallel" and show what their agent is doing right now. Parallel work in Tools shows running lanes and how Claude rates the next tasks.
 
-**Dateien und Aufgaben:** works merkt sich, welche Aufgabe welche Datei geändert hat, aus Commits mit der Aufgaben-ID und aus den Änderungen während der Arbeit. Ändert Claude eine Datei, an der schon eine andere Aufgabe mit Entscheidungen gearbeitet hat, bekommt es einen Hinweis darauf. `works file src/backup.ts` zeigt alle Aufgaben zu einer Datei, der Reiter Code und Commits die Dateien, die auch andere Aufgaben berührt haben.
+**Files and tasks:** works remembers which task changed which file, from commits with the task ID and from the changes made during the work. If Claude changes a file that another task with decisions has already worked on, it gets a hint about it. `works file src/backup.ts` shows all tasks for a file, and the Code and commits tab shows the files that other tasks have touched too.
 
 ## Import
 
-Aufgaben aus anderen Werkzeugen übernimmst du in den Werkzeugen unter Importieren oder indem du Claude die Datei gibst:
+You take over tasks from other tools in Tools under Import, or by giving Claude the file:
 
-| Woher | Datei |
+| From | File |
 |---|---|
-| Trello | JSON-Export des Boards |
-| Notion | CSV-, Markdown- oder ZIP-Export einer Datenbank |
-| Linear | CSV-Export |
-| Jira, Asana, eigene Tabellen | CSV oder TSV |
+| Trello | JSON export of the board |
+| Notion | CSV, Markdown or ZIP export of a database |
+| Linear | CSV export |
+| Jira, Asana, your own spreadsheets | CSV or TSV |
 | Excel | .xlsx |
-| Word | .docx mit Listen, Kontrollkästchen oder Tabellen |
-| Notizen | Markdown oder Text mit Listen und `- [ ]` |
+| Word | .docx with lists, checkboxes or tables |
+| Notes | Markdown or text with lists and `- [ ]` |
 
-Spalten werden über ihre Namen zugeordnet, auf Deutsch und Englisch. Status, Priorität, Aufwand und Datum werden übersetzt, Checklisten werden zu Akzeptanzkriterien. Du siehst vorher eine Vorschau und wählst aus. Duplikate und Erledigtes sind abgewählt, und ein zweiter Import derselben Datei legt nichts doppelt an. Protokolle oder Fließtext liest Claude selbst und schlägt die Aufgaben vor. Ein Import lässt sich wie jede Änderung im Board rückgängig machen.
+Columns are mapped by their names, in German and English. Status, priority, effort and date are translated, and checklists become acceptance criteria. You see a preview first and pick what to take. Duplicates and done items are deselected, and a second import of the same file does not create anything twice. Claude reads meeting notes or free text itself and suggests the tasks. An import can be undone like any change on the board.
 
-## Qualität vor dem Abschluss
+## Quality before closing
 
-In den Werkzeugen oder mit `works checks detect` schlägt works Prüfungen aus deinem Projekt vor, etwa TypeScript, Lint, Tests und Build aus der `package.json`. Gespeichert wird erst, wenn du zustimmst.
+In Tools or with `works checks detect`, works suggests checks from your project, such as TypeScript, lint, tests and build from the `package.json`. Nothing is saved until you agree.
 
-Danach laufen die Prüfungen bei jedem Abschluss automatisch, sobald es für den aktuellen Stand des Codes noch kein Ergebnis gibt. Der Abschluss-Dialog zeigt jede Prüfung mit Ergebnis und Dauer:
+After that the checks run automatically every time a task is closed, as long as there is no result yet for the current state of the code. The closing dialog shows each check with result and duration:
 
-- **grün:** bestanden
-- **rot:** fehlgeschlagen, mit den letzten Zeilen der Ausgabe, verhindert den Abschluss
-- **gelb:** ein Fund, etwa aus dem Code-Audit. Du entscheidest: "Claude beheben lassen" schreibt Claude einen Auftrag als Kommentar, "Als bekannt markieren" quittiert den Fund.
+- **green:** passed
+- **red:** failed, with the last lines of the output; prevents closing
+- **yellow:** a finding, for example from the code audit. You decide: "Let Claude fix it" writes Claude an assignment as a comment, "Mark as known" acknowledges the finding.
 
-Den Code-Audit führt Claude selbst aus und trägt das Ergebnis ein. Welche Prüfungen für welchen Typ gelten, legst du in `checks_by_type` fest, etwa nur Lint für Chores.
+Claude runs the code audit itself and records the result. Which checks apply to which type is set in `checks_by_type`, for example only lint for chores.
 
-## Zeit, Kosten und Schätzungen
+## Time, cost and estimates
 
-Zwei Hooks messen, wie lange Claude an der aktiven Aufgabe arbeitet: vom Absenden einer Anfrage bis zum Ende der Antwort. Pausen über 20 Minuten trennen Sitzungen. Der Reiter Zeit zeigt die Summe, die Sitzungen und wie viele Tage die Aufgabe in welchem Status war.
+Two hooks measure how long Claude works on the active task: from sending a request to the end of the response. Breaks over 20 minutes separate sessions. The Time tab shows the total, the sessions and how many days the task spent in which status.
 
-Dazu zählt der Stop Hook die Tokens jeder Antwort: Eingabe, Ausgabe, Cache-Schreiben und Cache-Lesen. works rechnet daraus geschätzte Kosten nach den Preisen in `config.json` unter `prices` (Standard sind die API-Preise je Million Tokens). Der Reiter Zeit zeigt Tokens und Kosten je Aufgabe und Tag, die Werkzeuge unter Verbrauch die letzten 30 Tage je Typ und die teuersten Aufgaben. Es bleibt eine Schätzung, keine Abrechnung. Mit einem Abo siehst du daran, wofür dein Kontingent draufgeht.
+On top of that, the Stop hook counts the tokens of every response: input, output, cache writes and cache reads. From these works calculates an estimated cost based on the prices in `config.json` under `prices` (the default is the API prices per million tokens). The Time tab shows tokens and cost per task and day, and Usage in Tools shows the last 30 days per type and the most expensive tasks. It remains an estimate, not a bill. With a subscription it shows you what your quota goes into.
 
-Über der Zeitleiste steht, wie gut die Schätzungen passen: geschätzte gegen tatsächliche Dauer je Aufwandsgröße. Dauern M-Aufgaben bei dir im Schnitt sieben statt fünf Tage, kannst du Zeitleiste, Graph und Sprint mit den gemessenen Werten rechnen lassen.
+Above the timeline you see how well the estimates fit: estimated versus actual duration per effort size. If your M tasks take seven instead of five days on average, you can have timeline, graph and sprint calculated with the measured values.
 
-## Berichte
+## Reports
 
-**Wochenbericht:** Zusammenfassung, Zahlen, Erledigtes, was dich braucht und der Plan für die nächste Woche, als Markdown und HTML in `.works/reports/`. Die HTML-Fassung folgt deinem Farbschema. In den Werkzeugen legst du Wochentag und Uhrzeit fest. Ist der Bericht fällig, erinnert der Hook Claude beim nächsten Sitzungsstart, die Woche zusammenzufassen. Mit einem Discord-Webhook geht der Bericht zusätzlich in einen Kanal deiner Wahl.
+**Weekly report:** summary, numbers, what got done, what needs you and the plan for the next week, as Markdown and HTML in `.works/reports/`. The HTML version follows your color scheme. In Tools you set the weekday and time. When the report is due, the hook reminds Claude at the next session start to sum up the week. With a Discord webhook the report also goes to a channel of your choice.
 
-**Bericht über einen Zeitraum:** `works report --days 14 --write`.
+**Report for a period:** `works report --days 14 --write`.
 
-**Changelog:** `works changelog --milestone M1` aus den erledigten Aufgaben.
+**Changelog:** `works changelog --milestone M1` from the done tasks.
 
-## Teilen
+## Sharing
 
-**Im selben Netzwerk:** Teilen in der Kopfzeile, dann "Im Netzwerk freigeben". Du bekommst einen Link wie `http://192.168.1.20:4747/?view=...`. Wer ihn hat, sieht das Board live, kann aber nichts ändern. Ein zweiter Link mit Bearbeitungsrechten ist für deine eigenen anderen Geräte gedacht. Links lassen sich jederzeit erneuern, dann funktionieren die alten nicht mehr.
+**On the same network:** Share in the header, then "Share on network". You get a link like `http://192.168.1.20:4747/?view=...`. Whoever has it sees the board live but cannot change anything. A second link with edit rights is meant for your own other devices. Links can be renewed at any time; the old ones then stop working.
 
-**Schnappschuss:** eine einzige HTML-Datei mit allen Aufgaben, Details und Bildern. Sie öffnet sich ohne Server und ohne Internet und eignet sich für Mail oder Chat. Im Teilen-Dialog oder mit `works export`.
+**Snapshot:** a single HTML file with all tasks, details and images. It opens without a server and without internet and works well for mail or chat. In the Share dialog or with `works export`.
 
-## Kalender und alle Projekte
+## Calendar and all projects
 
-**Kalender:** Werkzeuge, Kalender, gibt dir eine Adresse zum Abonnieren in Google Kalender, Outlook oder Apple Kalender mit Fälligkeiten, Meilensteinen und Sprints. Kalender im Internet erreichen deinen Rechner nicht; dann lädst du die Datei herunter (`works ical --out termine.ics`) und importierst sie.
+**Calendar:** Calendar in Tools gives you an address to subscribe to in Google Calendar, Outlook or Apple Calendar, with due dates, milestones and sprints. Calendars on the internet cannot reach your computer; in that case you download the file (`works ical --out termine.ics`) and import it.
 
-**Alle Projekte:** `works hub` öffnet auf `http://127.0.0.1:4740/` eine Übersicht über alle Projekte mit works: offene Aufgaben, P1 über alle Projekte, Review, Überfälliges, Sprint oder Meilenstein, woran Claude gerade arbeitet, und ein Knopf, um das Board eines Projekts zu öffnen oder zu starten.
+**All projects:** `works hub` opens an overview of all projects with works on `http://127.0.0.1:4740/`: open tasks, P1 across all projects, Review, overdue items, sprint or milestone, what Claude is working on right now, and a button to open or start a project's board.
 
-## Befehle im Terminal
+## Commands in the terminal
 
-Claude ruft die Befehle selbst auf. Du kannst works aber auch ganz ohne Claude nutzen. Einmal einrichten, zum Beispiel indem du Claude sagst "Richte den works Befehl ein", oder selbst:
-
-```
-node "<Pfad zum Skill>/scripts/works.mjs" install-cli
-```
-
-Danach gibt es in jedem Terminal und jedem Ordner den Befehl `works`:
+Claude calls the commands itself. But you can also use works entirely without Claude. Set it up once, for example by telling Claude "Set up the works command", or yourself:
 
 ```
-works init                          works im aktuellen Ordner einrichten
-works board --serve --open          Live-Board starten und im Browser öffnen
-works new --type bug --title "..."  Aufgabe anlegen
-works list                          offene Aufgaben
-works hub                           alle Projekte
-works help                          alle Befehle
+node "<path to the skill>/scripts/works.mjs" install-cli
 ```
 
-Im Board legst du Aufgaben an, bearbeitest, sortierst und importierst sie wie gewohnt. Arbeitet Claude später im Projekt, sieht es alles, was du ohne Claude angelegt hast.
+After that the `works` command is available in every terminal and every folder:
 
-Was `install-cli` macht:
+```
+works init                          set up works in the current folder
+works board --serve --open          start the live board and open it in the browser
+works new --type bug --title "..."  create a task
+works list                          open tasks
+works hub                           all projects
+works help                          all commands
+```
 
-- Ein Startscript in `~/.works/bin`, das bei jedem Aufruf die neueste installierte works-Version sucht. Nach einem Plugin-Update gilt also sofort die neue Version.
-- Linux und macOS: den Befehl in `~/.local/bin/works`. Steht der Ordner nicht im PATH, ergänzt `install-cli` eine Zeile in `.bashrc` oder `.zshrc`.
-- Windows: `works.cmd` und `works.ps1` in `%USERPROFILE%\.works\bin`. Der Ordner kommt in den PATH deines Benutzers. Danach ein neues Terminal öffnen.
+On the board you create, edit, sort and import tasks as usual. When Claude later works in the project, it sees everything you created without Claude.
 
-Mit `--no-path` bleibt der PATH unverändert, mit `--dir` wählst du einen eigenen Ordner, mit `--uninstall` entfernst du alles wieder. `works which` zeigt, welche Installation gerade verwendet wird, `works version` die Version.
+What `install-cli` does:
 
-Ohne Claude fehlen nur die Hooks: Zeit, Tokens und die Anzeige "Claude arbeitet" entstehen nur in Sitzungen mit Claude.
+- A launcher script in `~/.works/bin` that looks for the newest installed works version on every call. So after a plugin update the new version applies right away.
+- Linux and macOS: the command in `~/.local/bin/works`. If the folder is not in the PATH, `install-cli` adds a line to `.bashrc` or `.zshrc`.
+- Windows: `works.cmd` and `works.ps1` in `%USERPROFILE%\.works\bin`. The folder is added to your user PATH. Open a new terminal afterwards.
 
-| Bereich | Befehle |
+With `--no-path` the PATH stays unchanged, with `--dir` you choose your own folder, and with `--uninstall` you remove everything again. `works which` shows which installation is in use, `works version` the version.
+
+Without Claude only the hooks are missing: time, tokens and the "Claude is working" display only come from sessions with Claude.
+
+| Area | Commands |
 |---|---|
-| Einrichten | `init`, `doctor [--fix]`, `install-hooks`, `install-cli`, `demo`, `selftest`, `version` |
-| Erfassen | `new`, `idea`, `promote`, `scan`, `gh-import`, `recur`, `import` |
-| Ansehen | `list`, `show`, `next`, `status`, `views` |
-| Arbeiten | `start`, `set`, `section`, `check`, `item`, `log`, `question`, `link`, `handoff`, `asset`, `decisions`, `design`, `know`, `instruct` |
-| Abschließen | `dod`, `done`, `drop`, `reopen`, `archive` |
-| Planen | `queue`, `sprint`, `milestone`, `template`, `parallel` |
-| Gespräch | `comments`, `comment` |
-| Qualität | `checks` |
-| Auswertung | `time`, `report`, `changelog`, `commits`, `ical`, `file`, `files` |
+| Setup | `init`, `lang`, `doctor [--fix]`, `install-hooks`, `install-cli`, `demo`, `selftest`, `version` |
+| Capture | `new`, `idea`, `promote`, `scan`, `gh-import`, `recur`, `import` |
+| View | `list`, `show`, `next`, `status`, `views` |
+| Work | `start`, `set`, `section`, `check`, `item`, `log`, `question`, `link`, `handoff`, `asset`, `decisions`, `design`, `know`, `instruct` |
+| Close | `dod`, `done`, `drop`, `reopen`, `archive` |
+| Plan | `queue`, `sprint`, `milestone`, `template`, `parallel` |
+| Conversation | `comments`, `comment` |
+| Quality | `checks` |
+| Analysis | `time`, `report`, `changelog`, `commits`, `ical`, `file`, `files` |
 | GitHub | `github sync`, `github status`, `github set` |
 | Board | `board [--serve] [--detach] [--restart] [--stop] [--status] [--share] [--private]`, `share`, `export`, `undo`, `hub` |
 
-`works help` zeigt alle Befehle mit Optionen. Die vollständige Referenz steht in `skills/works/references/cli.md`.
+`works help` shows all commands with options. The full reference is in `skills/works/references/cli.md`.
 
-## Einstellungen
+## Settings
 
-Alles steht in `.works/config.json`. Die Datei muss nur enthalten, was vom Standard abweicht. Die wichtigsten Felder:
+Everything is in `.works/config.json`. The file only needs to contain what differs from the default. The most important fields:
 
-| Feld | Wofür |
+| Field | What for |
 |---|---|
-| `id_prefix` | Präfix der IDs, Standard `W` |
-| `dod` | manuelle Punkte der Definition of Done, global, je Typ und je Tag |
-| `checks`, `checks_by_type` | automatische Prüfungen |
-| `sprint_settings` | Länge, Kapazität und Punkte je Aufwand |
-| `effort_mode`, `effort_days` | feste oder gemessene Dauer je Aufwand |
-| `report` | Wochenbericht: Zeitplan, Ziele, Inhalt |
-| `time_tracking` | Zeit- und Tokenerfassung an oder aus |
-| `prices` | Preise für die Kostenschätzung |
-| `recurring` | wiederkehrende Aufgaben |
-| `github_sync` | was der GitHub-Abgleich tun darf |
-| `live_activity` | Anzeige "Claude arbeitet" und Anweisungen während der Arbeit |
-| `parallel` | Höchstzahl paralleler Aufgaben und Ordner für die Worktrees |
-| `file_tracking` | Dateien je Aufgabe merken und Hinweise beim Bearbeiten |
-| `hooks.session_start`, `hooks.stop_reminder` | Hooks pro Projekt abschalten |
+| `id_prefix` | prefix of the IDs, default `W` |
+| `language` | language for this project only (`en`, `de`), easiest with `works lang de --project` |
+| `dod` | manual Definition of Done items, global, per type and per tag |
+| `checks`, `checks_by_type` | automatic checks |
+| `sprint_settings` | length, capacity and points per effort |
+| `effort_mode`, `effort_days` | fixed or measured duration per effort |
+| `report` | weekly report: schedule, targets, content |
+| `time_tracking` | time and token tracking on or off |
+| `prices` | prices for the cost estimate |
+| `recurring` | recurring tasks |
+| `github_sync` | what the GitHub sync is allowed to do |
+| `live_activity` | "Claude is working" display and instructions during the work |
+| `parallel` | maximum number of parallel tasks and folder for the worktrees |
+| `file_tracking` | remember files per task and give hints when editing |
+| `hooks.session_start`, `hooks.stop_reminder` | turn off hooks per project |
 
-Alle Felder erklärt `skills/works/references/config.md`.
+All fields are explained in `skills/works/references/config.md`.
 
 ## Hooks
 
-Das Plugin bringt fünf Hooks mit, die automatisch aktiv sind:
+The plugin comes with five hooks that are active automatically:
 
-| Hook | Wofür |
+| Hook | What for |
 |---|---|
-| SessionStart | Kurzübersicht für Claude, Board und Server auf die neue Version bringen, fällige wiederkehrende Aufgaben anlegen, GitHub abgleichen, Erinnerung an fällige Wochenberichte |
-| UserPromptSubmit | Beginn einer Anfrage für die Zeiterfassung, Anzeige "Claude arbeitet" |
-| PostToolUse | aktueller Schritt für das Board, geänderte Dateien je Aufgabe, Hinweis auf frühere Entscheidungen, Anweisungen von dir während der Arbeit |
-| SubagentStop | Tokens und Kosten von Agenten der richtigen Aufgabe zuordnen |
-| Stop | Ende einer Anfrage, Tokens und Kosten, offene Anweisungen, Erinnerung an Verlauf und Übergabe |
+| SessionStart | short overview for Claude, bring board and server to the new version, create due recurring tasks, sync GitHub, reminder about due weekly reports |
+| UserPromptSubmit | start of a request for time tracking, "Claude is working" display |
+| PostToolUse | current step for the board, changed files per task, hint about earlier decisions, your instructions during the work |
+| SubagentStop | assign tokens and cost of agents to the right task |
+| Stop | end of a request, tokens and cost, pending instructions, reminder about history and handoff |
 
-Optional richtet `works install-hooks --git` einen pre-commit Hook ein, der die Struktur von `.works/` prüft.
+Optionally, `works install-hooks --git` sets up a pre-commit hook that checks the structure of `.works/`.
 
-## Sicherheit und Datenschutz
+## Security and privacy
 
-- Das Board läuft nur auf deinem Rechner (127.0.0.1), solange du es nicht teilst. Jede Änderung braucht ein Token, das nur die ausgelieferte Seite kennt.
-- Beim Teilen brauchen alle Zugriffe von außen einen geheimen Schlüssel aus dem Link. Lesende bekommen ein eigenes Token, mit dem der Server nur Lesezugriffe annimmt. Export und Freigabe bleiben dem Besitzer vorbehalten.
-- HTML-Dateien aus `.works/`, auch die Entwürfe, laufen im Browser in einer Sandbox ohne Zugriff auf das Board.
-- Die Anzeige "Claude arbeitet" speichert nur Werkzeug und Dateiname oder den Anfang eines Befehls, keine Inhalte und keine Ausgaben.
-- Der GitHub-Abgleich nutzt dein angemeldetes gh CLI und lässt sich nur direkt am Rechner steuern, nicht über einen geteilten Link.
-- Prüfungen führen nur Befehle aus, die in deiner `config.json` stehen. Ausführen, Ändern der Befehle und das Setzen des Discord-Webhooks gehen nur direkt am eigenen Rechner, nicht über einen geteilten Link.
-- Die Discord-Webhook-URL und die Teilen-Schlüssel liegen nur lokal und sind vom Git ausgenommen.
-- Nichts verlässt deinen Rechner, außer du schickst einen Bericht an Discord, teilst das Board oder der GitHub-Abgleich ist aktiv (dann schließt er Issues und liest PRs).
+- The board only runs on your computer (127.0.0.1) unless you share it. Every change needs a token that only the served page knows.
+- When sharing, all access from outside needs a secret key from the link. Readers get their own token with which the server only accepts read access. Export and sharing remain reserved for the owner.
+- HTML files from `.works/`, including the mockups, run in the browser in a sandbox without access to the board.
+- The "Claude is working" display only stores the tool and file name or the beginning of a command, no contents and no output.
+- The GitHub sync uses your logged-in gh CLI and can only be controlled directly at the computer, not through a shared link.
+- Checks only run commands that are in your `config.json`. Running them, changing the commands and setting the Discord webhook only work directly on your own computer, not through a shared link.
+- The Discord webhook URL and the sharing keys are stored only locally and excluded from Git.
+- Nothing leaves your computer unless you send a report to Discord, share the board or the GitHub sync is active (it then closes issues and reads PRs).
 
-## Was ins Git gehört
+## What belongs in Git
 
-`works init` legt eine `.works/.gitignore` an. Ins Repository gehören Aufgaben samt Entwürfen, Vorlagen, Berichte, `config.json`, `wissen.md`, `ideas.md` und `WORKS.md`. Lokal bleiben `state.json`, `board.html`, `server.json`, `server.log`, `share.json`, `report.local.json`, `activity.json`, `instructions.json`, `github.json`, `.usage-state.json`, `lanes.json`, `files.jsonl`, `.filemap.json`, `.undo/`, `.tmp/` und die Inbox. Ältere `.gitignore`-Dateien ergänzt works von selbst. Willst du `.works/` gar nicht im Git haben, richtet `works init --gitignore` das so ein.
+`works init` creates a `.works/.gitignore`. The repository should contain tasks including mockups, templates, reports, `config.json`, `wissen.md`, `ideas.md` and `WORKS.md`. These stay local: `state.json`, `board.html`, `server.json`, `server.log`, `share.json`, `report.local.json`, `activity.json`, `instructions.json`, `github.json`, `.usage-state.json`, `lanes.json`, `files.jsonl`, `.filemap.json`, `.undo/`, `.tmp/` and the inbox. works adds to older `.gitignore` files on its own. If you do not want `.works/` in Git at all, `works init --gitignore` sets it up that way.
 
-## Probleme lösen
+## Troubleshooting
 
-**Das Board sieht alt aus oder reagiert komisch.** Sag Claude "Starte das Board neu" oder führe `works board --restart` aus. Offene Tabs laden sich von selbst neu.
+**The board looks outdated or behaves oddly.** Tell Claude "Restart the board" or run `works board --restart`. Open tabs reload on their own.
 
-**Das Board startet nicht.** `works board --status` zeigt, ob und wo es läuft. Details stehen in `.works/server.log`. Ist der Port belegt, nimmt works den nächsten freien oder du wählst einen mit `--port`.
+**The board does not start.** `works board --status` shows whether and where it is running. Details are in `.works/server.log`. If the port is taken, works uses the next free one, or you choose one with `--port`.
 
-**Claude arbeitet gerade, und ich will das Board neu starten.** Das geht jederzeit. Der Server wartet, bis laufende Änderungen fertig sind, und offene Tabs verbinden sich danach neu.
+**Claude is working right now and I want to restart the board.** That works at any time. The server waits until running changes are finished, and open tabs reconnect afterwards.
 
-**Funktioniert noch alles?** `works selftest` legt ein Wegwerfprojekt an und prüft CLI, Hooks, Import, Parallelarbeit, Board und API. Dasselbe läuft bei jedem Push im Repo mycron als GitHub Action auf Linux, macOS und Windows mit Node 18, 20 und 22.
+**Is everything still working?** `works selftest` creates a throwaway project and checks CLI, hooks, import, parallel work, board and API. The same runs on every push in the mycron repo as a GitHub Action on Linux, macOS and Windows with Node 18, 20 and 22.
 
-**Ein paralleler Worktree hängt.** `works parallel status` zeigt alle Bahnen, `works parallel abort <ID>` räumt auf. Commits im Branch bleiben dabei erhalten.
+**A parallel worktree is stuck.** `works parallel status` shows all lanes, `works parallel abort <ID>` cleans up. Commits in the branch are kept.
 
-**Ich habe im Board etwas versehentlich geändert.** Strg+Z oder Werkzeuge, Letzte Änderungen. Im Terminal `works undo --list` und `works undo <key>`.
+**I changed something on the board by accident.** Ctrl+Z or Tools, Recent changes. In the terminal `works undo --list` and `works undo <key>`.
 
-**Der GitHub-Abgleich tut nichts.** `works github status` nennt den Grund, meist ist gh nicht installiert oder nicht angemeldet (`gh auth login`).
+**The GitHub sync does nothing.** `works github status` names the reason; usually gh is not installed or not logged in (`gh auth login`).
 
-**Die Struktur ist durcheinander.** `works doctor` findet Fehler, `works doctor --fix` behebt die meisten.
+**The structure is messed up.** `works doctor` finds errors, `works doctor --fix` fixes most of them.
 
-**Benachrichtigungen kommen nicht an.** In den Werkzeugen einschalten, dann "Testmeldung senden". Fragt der Browser nicht nach, sind Benachrichtigungen für die Seite blockiert und lassen sich in den Seiteneinstellungen erlauben.
+**Notifications do not arrive.** Turn them on in Tools, then "Send test notification". If the browser does not ask, notifications are blocked for the page and can be allowed in the site settings.

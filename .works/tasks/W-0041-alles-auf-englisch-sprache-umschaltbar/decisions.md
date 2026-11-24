@@ -20,6 +20,26 @@ Angelegt am 2026-11-24. Diese Datei hält fest, was entschieden wurde, warum, un
   - Nur global oder nur je Projekt: vom Nutzer nicht gewählt
 - Konsequenzen:
 
+### E2: Alte Spracheinträge entfernen, Projekt-Sprache mit Kennzeichen
+- Datum: 2026-11-24
+- Quelle: Gespräch
+- Kontext:
+- Entscheidung: Ältere works init schrieben language: de ungefragt in jedes Projekt. Die Migration language-1 entfernt den Eintrag einmal und setzt ein Kennzeichen; danach gilt eine Projekt-Sprache nur, wenn sie bewusst gesetzt wird (works lang --project oder von Hand). works init setzt das Kennzeichen gleich. Der Sitzungsstart sagt einmal, dass eine alte Sprache entfernt wurde.
+- Begründung: Wahl des Nutzers am 2026-11-24; Kennzeichen beim init und Hinweis nach der Code-Durchsicht
+- Verworfene Alternativen:
+  - Alte Einträge als Projekt-Sprache behalten: dann bliebe jedes alte Projekt deutsch und die globale Einstellung wirkte nicht
+- Konsequenzen:
+
+### E3: READMEs englisch mit deutscher Fassung daneben
+- Datum: 2026-11-24
+- Quelle: Gespräch
+- Kontext:
+- Entscheidung: README.md jedes Plugins ist englisch, daneben liegt README.de.md mit derselben Gliederung.
+- Begründung: Wahl des Nutzers am 2026-11-24
+- Verworfene Alternativen:
+  - Nur englische README: vom Nutzer nicht gewählt
+- Konsequenzen:
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 

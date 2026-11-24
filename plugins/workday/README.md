@@ -1,6 +1,8 @@
 # workday
 
-Zwei Skills für Projekte mit [works](../works/README.md): Den Arbeitstag sauber abschließen und am nächsten Morgen ohne Suchen weitermachen.
+> English. Deutsche Fassung: [README.de.md](README.de.md)
+
+Two skills for projects with [works](../works/README.md): wrap up the workday cleanly and carry on the next morning without searching.
 
 ## Installation
 
@@ -9,27 +11,27 @@ Zwei Skills für Projekte mit [works](../works/README.md): Den Arbeitstag sauber
 /plugin install workday@mycron
 ```
 
-Braucht das Plugin works (`/plugin install works@mycron`). Ohne `.works/` im Projekt sagen beide Skills Bescheid, statt etwas zu verändern.
+Needs the works plugin (`/plugin install works@mycron`). Without `.works/` in the project, both skills tell you so instead of changing anything.
 
-## Feierabend (Skill end-of-day)
+## End of day (skill end-of-day)
 
-Auslöser: "Feierabend", "Schluss für heute", "wir machen morgen weiter".
+Triggers: "end of day", "that's it for today", "let's continue tomorrow".
 
-- schreibt für jede Aufgabe in Arbeit eine Übergabe (was erledigt ist, was offen ist, nächster Schritt, offene Fragen, Branch)
-- speichert den Tagesbericht in `.works/reports/`
-- committet `.works`, wenn es im Git liegt, pusht aber nie und lässt Code-Änderungen unangetastet
-- nennt Zweige mit Commits, die noch nicht auf dem Remote sind, und fragt, ob gepusht werden soll
-- räumt auf, was Claude im Hintergrund gestartet hat (Test-Server, Superpowers-Begleiter), und stoppt das Live-Board
-- fasst zusammen: heute erledigt, in Arbeit, wartet auf dich, morgen zuerst, Verbrauch von heute (Tokens, Kosten)
+- writes a handoff for every task in progress (what is done, what is open, next step, open questions, branch)
+- saves the daily report in `.works/reports/`
+- commits `.works` if it is in Git, but never pushes and leaves code changes untouched
+- names branches with commits that are not on the remote yet and asks whether to push
+- cleans up what Claude started in the background (test servers, Superpowers companion) and stops the live board
+- sums up: done today, in progress, waiting for you, first thing tomorrow, today's usage (tokens, cost)
 
-## Guten Morgen (Skill good-morning)
+## Good morning (skill good-morning)
 
-Auslöser: "Guten Morgen", "weiter wie gestern", "wo waren wir stehen geblieben".
+Triggers: "good morning", "continue like yesterday", "where did we leave off".
 
-- liest Übergaben und Stand von gestern
-- prüft mit ci-watch, ob die CI des letzten Pushes grün war; rot kommt vor allem anderen
-- nennt Fälliges: überfällige und heute fällige Aufgaben, nahe Meilensteine, wiederkehrende Aufgaben
-- bietet Updates deiner Plugins an, wenn der Marketplace neuer ist
-- startet das Live-Board und öffnet es im Browser, wenn es noch in keinem Tab offen ist
-- zeigt Entwürfe, die auf deine Wahl warten, als Screenshots im Superpowers-Begleiter (braucht die Plugins mockups und superpowers)
-- nennt, womit es weitergeht, und fängt an, wenn du das schon gesagt hast ("mach weiter wie gestern")
+- reads handoffs and yesterday's state
+- checks with ci-watch whether CI for the last push was green; red comes before everything else
+- names what is due: overdue tasks and tasks due today, upcoming milestones, recurring tasks
+- offers updates for your plugins if the marketplace is newer
+- starts the live board and opens it in the browser if it is not open in a tab yet
+- shows mockups waiting for your choice as screenshots in the Superpowers companion (needs the mockups and superpowers plugins)
+- says what comes next, and starts right away if you already said so ("continue like yesterday")

@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readText, exists, loadState, saveState } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 const ENTRY_RE = /<!-- c:(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}) (Nutzer|Claude) -->\n([\s\S]*?)(?=\n<!-- c:|\s*$)/g;
 
@@ -27,9 +28,9 @@ function stamp() {
 
 export function addComment(task, author, text) {
   const clean = String(text || '').replace(/\r\n/g, '\n').replace(/<!-- c:/g, '<!-- c :').trim();
-  if (!clean) throw new Error('Kommentar ist leer.');
+  if (!clean) throw new Error(tr('Comment is empty.'));
   const file = commentsFile(task);
-  const head = exists(file) ? '' : `# Kommentare ${task.id}\n\nGespräch zwischen Nutzer und Claude. Neue Einträge mit works comment ${task.id} "...".\n`;
+  const head = exists(file) ? '' : tr('# Comments {id}\n\nConversation between user and Claude. Add entries with works comment {id} "...".\n', { id: task.id });
   const entry = { at: stamp(), author, text: clean };
   fs.appendFileSync(file, `${head}\n<!-- c:${entry.at} ${author} -->\n${clean}\n`);
   return entry;

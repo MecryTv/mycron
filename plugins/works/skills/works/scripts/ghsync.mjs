@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { worksDir, readJson, writeJson, loadTasks, loadConfig, OPEN_STATUSES } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), 'works.mjs');
 export const DEFAULT_SYNC = { enabled: true, pr_review: true, merge_done: true, ci_checks: true, review_comments: true, issues: true, labels: [], close_issues: true, interval_min: 2 };
@@ -52,9 +53,9 @@ function ciState(rollup) {
 export function syncGithub(root, { log = () => {} } = {}) {
   const config = loadConfig(root);
   const set = syncSettings(config);
-  if (!set.enabled) return { skipped: 'abgeschaltet' };
+  if (!set.enabled) return { skipped: tr('switched off') };
   const repo = gh(root, ['repo', 'view', '--json', 'nameWithOwner'], 8000);
-  if (!repo.ok) return { skipped: /not found|command not found|ENOENT/i.test(repo.err) ? 'gh ist nicht installiert' : 'kein GitHub-Repository oder gh nicht angemeldet' };
+  if (!repo.ok) return { skipped: /not found|command not found|ENOENT/i.test(repo.err) ? tr('gh is not installed') : tr('no GitHub repository or gh is not logged in') };
   const name = (() => { try { return JSON.parse(repo.out).nameWithOwner; } catch { return ''; } })();
   const prev = syncState(root);
   const first = !prev;
@@ -80,32 +81,32 @@ export function syncGithub(root, { log = () => {} } = {}) {
       const t = byId().get(id);
       if (!t) continue;
       if (set.pr_review && pr.state === 'OPEN' && old.state !== 'OPEN' && t.status === 'in-arbeit') {
-        const r = works(root, ['set', id, 'status=review', `--reason=PR #${pr.number} geöffnet`]);
-        if (r.ok) ev(`PR #${pr.number} geöffnet: ${id} nach Review`);
+        const r = works(root, ['set', id, 'status=review', `--reason=${tr('PR #{n} opened', { n: pr.number })}`]);
+        if (r.ok) ev(tr('PR #{n} opened: {id} moved to review', { n: pr.number, id }));
       }
       if (set.ci_checks && ci && ci.status !== 'pending' && ci.status !== old.ci) {
-        const r = works(root, ['checks', 'record', id, 'ci', `--status=${ci.status}`, `--note=${ci.status === 'ok' ? `GitHub CI: ${ci.count} Checks grün (PR #${pr.number})` : `GitHub CI fehlgeschlagen: ${ci.failing.join(', ') || 'siehe PR'} (PR #${pr.number})`}`]);
-        if (r.ok) ev(`CI für PR #${pr.number}: ${ci.status === 'ok' ? 'grün' : 'fehlgeschlagen'}, als Prüfung bei ${id}`);
+        const r = works(root, ['checks', 'record', id, 'ci', `--status=${ci.status}`, `--note=${ci.status === 'ok' ? tr('GitHub CI: {count} checks green (PR #{n})', { count: ci.count, n: pr.number }) : tr('GitHub CI failed: {list} (PR #{n})', { list: ci.failing.join(', ') || tr('see PR'), n: pr.number })}`]);
+        if (r.ok) ev(ci.status === 'ok' ? tr('CI for PR #{n}: green, recorded as a check on {id}', { n: pr.number, id }) : tr('CI for PR #{n}: failed, recorded as a check on {id}', { n: pr.number, id }));
       }
       if (set.review_comments && pr.reviewDecision === 'CHANGES_REQUESTED' && old.review !== 'CHANGES_REQUESTED') {
         const v = gh(root, ['pr', 'view', String(pr.number), '--json', 'reviews']);
         let body = '';
-        try { const rv = JSON.parse(v.out).reviews.filter((x) => x.state === 'CHANGES_REQUESTED').pop(); body = rv ? `${rv.author ? rv.author.login : 'Reviewer'}: ${rv.body || '(ohne Text, Kommentare im PR)'}` : ''; } catch { /* ohne Text */ }
-        const f = tmp(root, `Änderungswunsch im Review von PR #${pr.number} (${pr.url}):\n\n${body || 'Siehe Kommentare im PR.'}`);
+        try { const rv = JSON.parse(v.out).reviews.filter((x) => x.state === 'CHANGES_REQUESTED').pop(); body = rv ? `${rv.author ? rv.author.login : 'Reviewer'}: ${rv.body || tr('(no text, see comments in the PR)')}` : ''; } catch { /* ohne Text */ }
+        const f = tmp(root, tr('Change request in the review of PR #{n} ({url}):\n\n{body}', { n: pr.number, url: pr.url, body: body || tr('See comments in the PR.') }));
         works(root, ['comment', id, `--file=${f}`, '--as=Nutzer']);
         fs.rmSync(f, { force: true });
-        if (t.status === 'review') works(root, ['set', id, 'status=in-arbeit', `--reason=Änderungswunsch im Review von PR #${pr.number}`]);
-        ev(`Änderungswunsch zu PR #${pr.number} als Kommentar an ${id}`);
+        if (t.status === 'review') works(root, ['set', id, 'status=in-arbeit', `--reason=${tr('Change request in the review of PR #{n}', { n: pr.number })}`]);
+        ev(tr('Change request for PR #{n} added as a comment to {id}', { n: pr.number, id }));
       }
       if (set.merge_done && pr.state === 'MERGED' && old.state && old.state !== 'MERGED' && OPEN_STATUSES.includes(t.status)) {
         const d = works(root, ['done', id, '--confirm', '--no-checks']);
-        if (d.ok) ev(`PR #${pr.number} gemergt: ${id} abgeschlossen`);
+        if (d.ok) ev(tr('PR #{n} merged: {id} completed', { n: pr.number, id }));
         else {
-          if (t.status !== 'review') works(root, ['set', id, 'status=review', `--reason=PR #${pr.number} gemergt`]);
-          const f = tmp(root, `PR #${pr.number} ist gemergt, aber die Definition of Done ist noch nicht erfüllt. Bitte die offenen Punkte erledigen und dann works done ${id} ausführen.\n\n${(d.out || d.err).split('\n').filter((l) => /^\s*(\[ \]|✗|!|-)/.test(l)).slice(0, 10).join('\n')}`);
+          if (t.status !== 'review') works(root, ['set', id, 'status=review', `--reason=${tr('PR #{n} merged', { n: pr.number })}`]);
+          const f = tmp(root, `${tr('PR #{n} is merged, but the Definition of Done is not met yet. Please finish the open points and then run works done {id}.', { n: pr.number, id })}\n\n${(d.out || d.err).split('\n').filter((l) => /^\s*(\[ \]|✗|!|-)/.test(l)).slice(0, 10).join('\n')}`);
           works(root, ['comment', id, `--file=${f}`, '--as=Nutzer']);
           fs.rmSync(f, { force: true });
-          ev(`PR #${pr.number} gemergt: ${id} in Review, Definition of Done offen`);
+          ev(tr('PR #{n} merged: {id} in review, Definition of Done open', { n: pr.number, id }));
         }
       }
     }
@@ -125,12 +126,13 @@ export function syncGithub(root, { log = () => {} } = {}) {
       if (set.labels.length && !labels.some((l) => set.labels.includes(l))) { state.issues[key] = ''; continue; }
       const type = labels.some((l) => /bug|fehler/i.test(l)) ? 'bug' : 'feature';
       const prio = labels.some((l) => /p1|critical|kritisch/i.test(l)) ? 'P1' : labels.some((l) => /p2|high|hoch/i.test(l)) ? 'P2' : 'P3';
-      const f = tmp(root, `${(i.body || '').trim()}\n\nQuelle: GitHub Issue #${i.number} ${i.url}`.trim());
+      const f = tmp(root, `${(i.body || '').trim()}\n\n${tr('Source: GitHub issue #{n} {url}', { n: i.number, url: i.url })}`.trim());
       const r = works(root, ['new', `--type=${type}`, `--title=${String(i.title).slice(0, 150)}`, `--priority=${prio}`, `--description-file=${f}`, `--source=github:#${i.number}`, '--incomplete']);
       fs.rmSync(f, { force: true });
-      const newId = (r.out.match(/Angelegt: (\S+)/) || [])[1] || '';
+      // works new meldet "Created: ID" oder "Angelegt: ID", je nach Sprache.
+      const newId = (r.out.match(/(?:Created|Angelegt): (\S+)/) || [])[1] || '';
       state.issues[key] = newId;
-      if (newId) ev(`Issue #${i.number} als ${newId} angelegt`);
+      if (newId) ev(tr('Issue #{n} created as {id}', { n: i.number, id: newId }));
     }
   }
   if (set.close_issues && !first) {
@@ -139,8 +141,8 @@ export function syncGithub(root, { log = () => {} } = {}) {
       if (!id || state.closed.includes(num)) continue;
       const t = tasks.get(id);
       if (!t || t.status !== 'erledigt') continue;
-      const c = gh(root, ['issue', 'close', num, '--comment', `Erledigt in ${id} (works).`]);
-      if (c.ok || /already closed/i.test(c.err)) { state.closed.push(num); ev(`Issue #${num} geschlossen, ${id} ist erledigt`); }
+      const c = gh(root, ['issue', 'close', num, '--comment', tr('Done in {id} (works).', { id })]);
+      if (c.ok || /already closed/i.test(c.err)) { state.closed.push(num); ev(tr('Issue #{n} closed, {id} is done', { n: num, id })); }
     }
   }
   state.last = new Date().toISOString();

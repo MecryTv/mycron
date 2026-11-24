@@ -48,7 +48,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const home = path.join(base, 'home');
   fs.mkdirSync(proj, { recursive: true }); fs.mkdirSync(home, { recursive: true });
   // WORKS_DRY_OPEN: --open meldet nur, was es öffnen würde. Der Selbsttest öffnet nie einen Browser.
-  const env = { ...process.env, HOME: home, USERPROFILE: home, WORKS_ACTOR: '', WORKS_DRY_OPEN: '1',GIT_AUTHOR_NAME: 'works', GIT_AUTHOR_EMAIL: 'works@test', GIT_COMMITTER_NAME: 'works', GIT_COMMITTER_EMAIL: 'works@test' };
+  // WORKS_LANG=de: Die Prüfungen erwarten deutsche Ausgaben; die englische Standardausgabe prüft ein eigener Schritt (W-0041).
+  const env = { ...process.env, HOME: home, USERPROFILE: home, WORKS_ACTOR: '', WORKS_DRY_OPEN: '1', WORKS_LANG: 'de', GIT_AUTHOR_NAME: 'works', GIT_AUTHOR_EMAIL: 'works@test', GIT_COMMITTER_NAME: 'works', GIT_COMMITTER_EMAIL: 'works@test' };
+  // Direkt importierte Module (board.mjs, checks.mjs …) sprechen hier wie die Kindprozesse Deutsch, unabhängig vom
+  // Ordner und von ~/.works des Aufrufers. board.mjs bestimmt die Sprache je Aufbau neu (W-0041). Am Ende zurück.
+  const langBefore = process.env.WORKS_LANG;
+  process.env.WORKS_LANG = 'de';
   const results = [];
   const hasGit = spawnSync('git', ['--version'], { encoding: 'utf8' }).status === 0;
 
@@ -120,6 +125,214 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const list = JSON.parse(w(['list', '--json']).out);
     expect(list.length === 3, `list --json liefert ${list.length} statt 3 Aufgaben`);
     has(w(['show', 'W-0001']).out, 'Export als JSON');
+  });
+
+  // W-0041: Sprache global, je Projekt und über WORKS_LANG; Katalog vollständig und mit gleichen Platzhaltern.
+  await step('Sprache: works lang, Vorrang, Katalog', async () => {
+    const wl = (args, o = {}) => w(args, { ...o, extraEnv: { WORKS_LANG: '', ...(o.env || {}) } });
+    const settings = path.join(home, '.works', 'settings.json');
+    const cfgFile = path.join(proj, '.works', 'config.json');
+    if (!fs.existsSync(cfgFile)) w(['init']);
+    expect(!('language' in JSON.parse(fs.readFileSync(cfgFile, 'utf8'))), 'works init schreibt language in config.json');
+    has(wl(['lang']).out, 'Language: English (en), default');
+    has(wl(['lang', 'de']).out, 'Sprache: Deutsch (de), global');
+    expect(JSON.parse(fs.readFileSync(settings, 'utf8')).language === 'de', 'settings.json ohne language');
+    has(wl(['lang', 'en', '--project']).out, 'Language: English (en), for this project');
+    expect(JSON.parse(fs.readFileSync(cfgFile, 'utf8')).language === 'en', 'config.json ohne language');
+    has(wl(['lang', 'de']).out, 'takes precedence', 'Hinweis auf Vorrang des Projekts');
+    has(wl(['lang'], { env: { WORKS_LANG: 'de-DE' } }).out, 'Sprache: Deutsch (de), aus der Umgebungsvariable WORKS_LANG');
+    has(wl(['lang', '--reset', '--project']).out, 'Sprache: Deutsch (de), global');
+    expect(!('language' in JSON.parse(fs.readFileSync(cfgFile, 'utf8'))), 'language bleibt in config.json');
+    has(wl(['lang', '--reset']).out, 'Language: English (en), default');
+    expect(wl(['lang', 'xx'], { ok: false }).code !== 0, 'unbekannte Sprache wird angenommen');
+    // Alte works init schrieben "language": "de" ungefragt: einmalig entfernen, danach gilt die globale Sprache.
+    // Eine mit works lang --project gesetzte Sprache bleibt (Kennzeichen language-1 in migrations).
+    const cfgNow = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+    fs.writeFileSync(cfgFile, JSON.stringify({ ...cfgNow(), language: 'de', migrations: (cfgNow().migrations || []).filter((x) => x !== 'language-1') }, null, 2));
+    has(wl(['lang']).out, 'Language: English (en), default', 'altes language aus works init wird ignoriert');
+    expect(!('language' in cfgNow()) && cfgNow().migrations.includes('language-1'), `Migration hat language nicht entfernt: ${JSON.stringify(cfgNow())}`);
+    has(wl(['lang', 'de', '--project']).out, 'Sprache: Deutsch (de), für dieses Projekt');
+    expect(cfgNow().language === 'de' && cfgNow().migrations.filter((x) => x === 'language-1').length === 1, 'Projekt-Sprache ohne Kennzeichen');
+    wl(['list']);
+    has(wl(['lang']).out, 'Sprache: Deutsch (de), für dieses Projekt', 'bewusst gesetzte Projekt-Sprache bleibt');
+    wl(['lang', '--reset', '--project']);
+    const { placeholders } = await import(pathToFileURL(path.join(HERE, 'i18n.mjs')).href);
+    const de = JSON.parse(fs.readFileSync(path.join(HERE, 'i18n', 'de.json'), 'utf8'));
+    for (const [en, tr] of Object.entries(de)) expect(placeholders(en).join() === placeholders(tr).join(), `de.json: Platzhalter verschieden in "${en}"`);
+    // Jeder feste Text in t('...') hat eine deutsche Übersetzung.
+    const unesc = (s) => s.replace(/\\(.)/g, (a, c) => ({ n: '\n', t: '\t' })[c] || c);
+    const files = [...fs.readdirSync(HERE).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HERE, f)), ...fs.readdirSync(HOOKS).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HOOKS, f))];
+    const missing = [];
+    for (const f of files) {
+      // Zeilenenden wie JavaScript in Template-Strings: CRLF zählt als \n (Git unter Windows checkt mit CRLF aus).
+      const src = fs.readFileSync(f, 'utf8').replace(/\r\n?/g, '\n');
+      if (!/import \{[^}]*\btr?\b[^}]*\} from '[./]*(scripts\/)?i18n\.mjs'/.test(src)) continue;
+      for (const m of src.matchAll(/\btr?\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.)*)`)\s*[,)]/g)) {
+        const key = unesc(m[1] ?? m[2] ?? m[3]);
+        if (!(key in de)) missing.push(`${path.basename(f)}: ${key.slice(0, 80)}`);
+      }
+    }
+    // Board (W-0041): tr('...') in board.js (eigene Funktion im Browser, kein Import) und {{t:...}} in template.html.
+    for (const key of boardTexts()) if (!(key in de)) missing.push(`board: ${key.slice(0, 80)}`);
+    expect(!missing.length, `${missing.length} Texte ohne deutsche Übersetzung:\n${missing.slice(0, 15).join('\n')}`);
+  });
+
+  // Funde der Code-Durchsicht zu W-0041: Eine von Hand gesetzte Projekt-Sprache bleibt (nach frischem init und in alten
+  // Projekten ohne language), der Sitzungsstart sagt einmal, dass eine alte Sprache entfernt wurde, und works know add
+  // ohne --area nutzt einen vorhandenen Bereich Allgemein, statt daneben General anzulegen.
+  await step('Sprache: Migration nach init, Hinweis, Wissensbereich', () => {
+    const p = path.join(base, 'sprache-audit');
+    fs.mkdirSync(p, { recursive: true });
+    const we = (args, o = {}) => w(args, { cwd: p, extraEnv: { WORKS_LANG: '' }, ...o });
+    const cfgFile = path.join(p, '.works', 'config.json');
+    const cfg = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+    const put = (c) => fs.writeFileSync(cfgFile, JSON.stringify(c, null, 2));
+    const unflagged = () => (cfg().migrations || []).filter((x) => x !== 'language-1');
+    we(['init']);
+    put({ ...cfg(), language: 'de' });
+    has(we(['lang']).out, 'Sprache: Deutsch (de), für dieses Projekt', 'von Hand gesetzte Sprache nach works init');
+    put({ ...cfg(), language: undefined, migrations: unflagged() });
+    we(['list']);
+    put({ ...cfg(), language: 'de' });
+    has(we(['lang']).out, 'Sprache: Deutsch (de), für dieses Projekt', 'von Hand gesetzte Sprache in altem Projekt');
+    put({ ...cfg(), language: 'de', migrations: unflagged() });
+    const start = () => spawnSync(process.execPath, [path.join(HOOKS, 'session-start.mjs')], { cwd: p, env: { ...env, WORKS_LANG: '' }, encoding: 'utf8', input: '{}', timeout: 20000 }).stdout;
+    has(start(), 'works lang de', 'Sitzungsstart nach entfernter Sprache');
+    expect(!start().includes('works lang de'), 'Hinweis auf entfernte Sprache kommt mehr als einmal');
+    w(['know', 'add', '--title=Erst', '--text=eins'], { cwd: p });
+    we(['know', 'add', '--title=Zweit', '--text=zwei']);
+    const wissen = fs.readFileSync(path.join(p, '.works', 'wissen.md'), 'utf8');
+    expect(wissen.includes('## Allgemein') && !wissen.includes('## General'), `zweiter Bereich General:\n${wissen.slice(0, 400)}`);
+  });
+
+  // W-0041: Board und Hub sprechen die eingestellte Sprache. Deutsch kommt als kleiner Katalog in die Seite,
+  // works lang wirkt am laufenden Board ohne Neustart, POST /api/lang stellt um.
+  await step('Sprache: Board und Hub englisch und deutsch', async () => {
+    const p = path.join(base, 'board-sprache');
+    fs.mkdirSync(p, { recursive: true });
+    const wl = (lang, args, o = {}) => w(args, { cwd: p, extraEnv: { WORKS_LANG: lang }, ...o });
+    wl('', ['init']);
+    wl('', ['new', '--type=feature', '--title=Export', '--description=Export as JSON', '--criteria=Works']);
+    const de = JSON.parse(fs.readFileSync(path.join(HERE, 'i18n', 'de.json'), 'utf8'));
+    const page = () => fs.readFileSync(path.join(p, '.works', 'board.html'), 'utf8');
+    const bootOf = (h) => JSON.parse((h.match(/<script>window\.WORKS = ([\s\S]*?);<\/script>/) || [])[1] || 'null');
+    // Nur die Vorlage, ohne Stile, Skript und Daten.
+    const shell = (h) => h.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script>[\s\S]*?<\/script>/g, '');
+    wl('', ['board']);
+    let h = page();
+    let b = bootOf(h);
+    expect(b && b.i18n && b.i18n.lang === 'en' && b.data.meta.lang === 'en' && b.i18n.source === 'default', `Boot englisch: ${JSON.stringify(b && b.i18n).slice(0, 200)}`);
+    expect(!Object.keys(b.i18n.catalog).length && b.i18n.languages.some((l) => l.code === 'de' && l.name === 'Deutsch'), `Katalog oder Sprachen englisch: ${JSON.stringify(b.i18n).slice(0, 200)}`);
+    has(h, '<html lang="en">', 'board.html englisch'); has(h, 'Skip to the board', 'board.html englisch');
+    const german = /[äöüÄÖÜß]|\b(Aufgabe|Aufgaben|Warteschlange|Zeitleiste|Tabelle|Teilen|Suchen|Alle|oder|und|für|mit)\b/;
+    expect(!german.test(shell(h)), `Deutsch in der englischen Vorlage: ${(shell(h).match(german) || [])[0]}`);
+    wl('de', ['board']);
+    h = page();
+    b = bootOf(h);
+    expect(b.i18n.lang === 'de' && b.data.meta.lang === 'de' && b.i18n.source === 'env', `Boot deutsch: ${JSON.stringify(b.i18n).slice(0, 200)}`);
+    for (const s of ['<html lang="de">', 'Zum Board springen', 'Nächste Aufgabe', 'Aufgabe suchen, # für Tags, &gt; für Befehle']) has(h, s, 'board.html deutsch');
+    // Nur Texte des Boards im Katalog, nicht der ganze de.json; aus board.js mindestens einer, sobald es tr-Texte hat.
+    const own = boardTexts();
+    const cat = b.i18n.catalog;
+    expect(Object.keys(cat).length && Object.keys(cat).every((k) => own.includes(k) && cat[k] === de[k]), `Katalog im Board: ${Object.keys(cat).filter((k) => !own.includes(k)).slice(0, 5).join(', ')}`);
+    const fromJs = boardTexts({ template: false }).filter((k) => de[k]);
+    if (fromJs.length) expect(fromJs.every((k) => cat[k] === de[k]), `Übersetzung aus board.js fehlt im Katalog: ${fromJs.find((k) => cat[k] !== de[k])}`);
+    // Live: works lang wirkt ohne Neustart (meta.lang), POST /api/lang stellt um, nur mit Token, global nur lokal.
+    const port = await highPort();
+    wl('', ['board', '--serve', '--detach', `--port=${port}`]);
+    try {
+      const url = `http://127.0.0.1:${port}`;
+      const html = await (await fetch(url + '/')).text();
+      const token = (html.match(/"token":"([a-f0-9]{20,})"/) || [])[1];
+      expect(token && bootOf(html).i18n.lang === 'en', 'Live-Board nicht englisch oder ohne Token');
+      const meta = async () => (await (await fetch(url + '/data.json')).json()).meta;
+      const lang = (body, t = token) => fetch(url + '/api/lang', { method: 'POST', headers: { ...(t ? { 'X-Works-Token': t } : {}), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      expect((await lang({ lang: 'de', scope: 'project' }, '')).status === 403, '/api/lang ohne Token erlaubt');
+      expect((await lang({ lang: 'xx', scope: 'project' })).status === 400, '/api/lang mit unbekannter Sprache angenommen');
+      let r = await lang({ lang: 'de', scope: 'project' });
+      let j = await r.json();
+      expect(r.ok && j.ok && j.lang === 'de' && j.source === 'project', `/api/lang project: ${JSON.stringify(j)}`);
+      expect((await meta()).lang === 'de', 'meta.lang nach /api/lang nicht de');
+      has(await (await fetch(url + '/hub')).text(), 'Laufende Boards', 'Hub deutsch');
+      const note = await (await fetch(url + '/api/action', { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'log', id: 'W-0001', text: 'Notiz' }) })).json();
+      expect(note.message === 'Notiz gespeichert.', `Meldung der API nicht deutsch: ${note.message}`);
+      r = await lang({ lang: '', scope: 'project' });
+      j = await r.json();
+      expect(r.ok && j.lang === 'en' && j.source === 'default', `/api/lang zurücksetzen: ${JSON.stringify(j)}`);
+      has(await (await fetch(url + '/hub')).text(), 'Running boards', 'Hub englisch');
+      // Von außen (CLI im Terminal) geändert: das laufende Board merkt es bei der nächsten Anfrage.
+      wl('', ['lang', 'de']);
+      expect((await meta()).lang === 'de', 'works lang de wirkt nicht am laufenden Board');
+      wl('', ['lang', '--reset']);
+      r = await lang({ lang: 'de', scope: 'global' });
+      expect(r.ok && (await r.json()).source === 'global', '/api/lang global lokal nicht erlaubt');
+      r = await lang({ lang: '', scope: 'global' });
+      expect(r.ok && (await r.json()).lang === 'en', '/api/lang global zurücksetzen');
+    } finally {
+      wl('', ['board', '--stop'], { ok: false });
+    }
+  });
+
+  // W-0041: Überschriften in der Sprache der Aufgabe, deutsche Aufgaben bleiben gültig, englische Werte als Alias.
+  await step('Sprache: Aufgabenformat englisch und deutsch, Aliase', () => {
+    const p = path.join(base, 'sprache');
+    fs.mkdirSync(p, { recursive: true });
+    const en = (args, o = {}) => w(args, { cwd: p, extraEnv: { WORKS_LANG: 'en' }, ...o });
+    const de = (args, o = {}) => w(args, { cwd: p, extraEnv: { WORKS_LANG: 'de' }, ...o });
+    en(['init']);
+    en(['new', '--type=bug', '--title=Crash on start', '--description=App crashes', '--criteria=No crash', '--risk=high']);
+    de(['new', '--type=feature', '--title=Alte Aufgabe', '--description=Deutsch', '--criteria=Geht']);
+    const file = (id) => fs.readdirSync(path.join(p, '.works', 'tasks')).filter((d) => d.startsWith(id)).map((d) => path.join(p, '.works', 'tasks', d, 'task.md'))[0];
+    const read = (id) => fs.readFileSync(file(id), 'utf8');
+    let a = read('W-0001');
+    for (const h of ['## Summary', '## Acceptance criteria', '- [ ] No crash', '## Handoff', '## History', 'Task created', 'risk: hoch']) has(a, h, 'englische Aufgabe');
+    expect(!/## (Zusammenfassung|Verlauf|Akzeptanzkriterien)/.test(a), 'englische Aufgabe mit deutschen Überschriften');
+    has(read('W-0002'), '## Akzeptanzkriterien', 'deutsche Aufgabe');
+    en(['set', 'W-0001', 'status=in-progress']);
+    en(['check', 'W-0001', '3']);
+    en(['handoff', 'W-0001', '--text', 'Next: fix it']);
+    en(['question', 'W-0001', 'Which device?']);
+    en(['set', 'W-0001', 'type=feature']);
+    a = read('W-0001');
+    for (const h of ['status: in-arbeit', '- [x] No crash', '## Open questions\n', 'Which device?', '## Goal']) has(a, h, 'englische Aufgabe nach Änderungen');
+    expect(/## Handoff\n[^#]*Next: fix it/.test(a), 'Übergabe nicht im Abschnitt Handoff');
+    expect(!/## (Übergabe|Offene Fragen|Ziel|Verlauf)\n/.test(a), `englische Aufgabe bekommt deutsche Abschnitte: ${a.slice(0, 600)}`);
+    // Deutsche Aufgabe unter Englisch: bestehende Abschnitte werden gefunden, nichts doppelt.
+    en(['set', 'W-0002', 'status=planned']);
+    en(['handoff', 'W-0002', '--text', 'Weiter']);
+    en(['log', 'W-0002', 'Eintrag']);
+    const b = read('W-0002');
+    for (const h of ['status: geplant', 'Eintrag']) has(b, h, 'deutsche Aufgabe unter Englisch');
+    expect(/## Übergabe\n[^#]*Weiter/.test(b), 'Übergabe nicht im Abschnitt Übergabe');
+    expect(!/## (Handoff|History)\n/.test(b), 'deutsche Aufgabe bekommt englische Abschnitte');
+    has(en(['show', 'W-0002', '--section', 'Acceptance criteria']).out, 'Geht', 'show --section mit englischem Namen');
+    has(de(['show', 'W-0001', '--section', 'Akzeptanzkriterien']).out, 'No crash', 'show --section mit deutschem Namen');
+    en(['set', 'W-0001', 'status=done', '--force']);
+    has(read('W-0001'), 'status: erledigt');
+  });
+
+  // W-0041: Ohne Einstellung spricht das CLI Englisch; keine deutschen Reste in wichtigen Befehlen.
+  await step('Sprache: englische Standardausgabe wichtiger Befehle', () => {
+    const p = path.join(base, 'english');
+    fs.mkdirSync(p, { recursive: true });
+    const en = (args, o = {}) => w(args, { cwd: p, extraEnv: { WORKS_LANG: '' }, ...o });
+    const german = /\b(Aufgabe|Fehler|Hinweis|Nächste|Datei|angelegt|aktualisiert|gespeichert|Übergabe|keine|nicht|und|für|mit)\b/;
+    const plain = (s) => expect(!german.test(s), `Deutsch in englischer Ausgabe: ${(s.match(german) || [])[0]} in ${s.slice(0, 400)}`);
+    plain(en(['init']).out);
+    const created = en(['new', '--type=feature', '--title=Export', '--description=Export as JSON', '--criteria=Works']).out;
+    has(created, 'Created: W-0001 Export'); has(created, 'File: '); plain(created);
+    const set = en(['set', 'W-0001', 'priority=P1']).out;
+    has(set, 'W-0001 updated: '); plain(set);
+    plain(en(['start', 'W-0001']).out);
+    has(en(['handoff', 'W-0001', '--text', 'Next step']).out, 'Handoff for W-0001 saved.');
+    for (const args of [['list'], ['show', 'W-0001'], ['status'], ['next'], ['dod', 'W-0001'], ['help'], ['queue'], ['doctor']]) plain(en(args, { ok: false }).out);
+    has(en(['help']).out, 'works: task management in .works/');
+    const bad = en(['nope'], { ok: false });
+    has(bad.err, 'Error: Unknown command "nope"'); plain(bad.err);
+    const hook = spawnSync(process.execPath, [path.join(HOOKS, 'session-start.mjs')], { cwd: p, env: { ...env, WORKS_LANG: '' }, encoding: 'utf8', input: '{}', timeout: 20000 });
+    has(hook.stdout, 'Language: en', 'SessionStart nennt die Sprache'); plain(hook.stdout);
+    const hookDe = spawnSync(process.execPath, [path.join(HOOKS, 'session-start.mjs')], { cwd: p, env, encoding: 'utf8', input: '{}', timeout: 20000 });
+    has(hookDe.stdout, 'Language: de, answer in German, German docs in SKILL.de.md and references/de/', 'SessionStart mit Deutsch');
   });
 
   await step('Bearbeiten: set, item, check, link, question, log, comment', () => {
@@ -1913,6 +2126,68 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  // W-0041: Nachrichten im Kanal in der globalen Sprache, bei jedem Aufbau frisch (works lang wirkt ohne Neustart);
+  // Antworten auf Befehle in der Sprache des Clients, auch Meldungen der Board-API. Weitere Sprachen über useCatalog.
+  await step('Sprache: Discord global und je Client', async () => {
+    const botM = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
+    const uiM = await import(pathToFileURL(path.join(HERE, 'discord-ui.mjs')).href);
+    const { catalog } = await import(pathToFileURL(path.join(HERE, 'i18n.mjs')).href);
+    const cfg = botM.normalizeConfig({ quiet: { on: false } });
+    const snap = { name: 'projekt', tasks: {}, perm: { since: new Date().toISOString(), tool: 'Bash' }, perms: [], busy: true, active: { id: 'W-9', title: 'Probe' }, today: { done: 1 }, progress: { done: 1, wip: 1, total: 3 } };
+    const list = [{ rid: 'r1', snap }];
+    const perm = { type: 'perm', project: 'projekt', id: 'W-9', tool: 'Bash' };
+    const langBefore2 = process.env.WORKS_LANG;
+    try {
+      process.env.WORKS_LANG = 'en';
+      let d = botM.renderDashboard(list, cfg, { interactive: true });
+      expect(d.embeds[0].title === 'works · 1 project' && d.embeds[0].fields[0].name === 'Today' && d.components[1].components[0].label === 'Queue', `Dashboard global englisch: ${JSON.stringify(d).slice(0, 300)}`);
+      let ev = botM.renderEvent(perm, cfg, { owner: '1' });
+      expect(ev.embeds[0].title === 'Waiting for your approval' && ev.content.includes('projekt is waiting for your approval'), `Hinweis global englisch: ${JSON.stringify(ev).slice(0, 300)}`);
+      expect(botM.dashImageData(list).labels.progress === 'PROGRESS', 'Bild global englisch');
+      // Ohne Neustart: dieselben Module, andere Einstellung.
+      process.env.WORKS_LANG = 'de';
+      d = botM.renderDashboard(list, cfg, { interactive: true });
+      expect(d.embeds[0].title === 'works · 1 Projekt' && d.embeds[0].fields[0].name === 'Heute' && d.components[1].components[0].label === 'Warteschlange', `Dashboard global deutsch: ${JSON.stringify(d).slice(0, 300)}`);
+      ev = botM.renderEvent(perm, cfg, { owner: '1' });
+      expect(ev.embeds[0].title === 'Wartet auf deine Freigabe' && ev.content.includes('projekt wartet auf deine Freigabe'), `Hinweis global deutsch: ${JSON.stringify(ev).slice(0, 300)}`);
+      // Antworten bekommen die Sprache des Clients.
+      expect(botM.renderStatus(snap, cfg, { lang: 'en-US' }).embeds[0].author.name === 'projekt · Status', 'Statuspost für en-US nicht englisch');
+      // Weitere Sprache: Katalog von außen (der Dienst setzt keinen und bleibt bei Deutsch und Englisch).
+      uiM.useCatalog((l, en) => (l === 'xx' && en === 'Queue' ? 'Kø' : undefined));
+      expect(uiM.tr('xx-YY')('Warteschlange', 'Queue') === 'Kø' && uiM.tr('xx')('Hilfe', 'Help') === 'Help' && uiM.tr('de-AT')('Warteschlange', 'Queue') === 'Warteschlange', 'useCatalog wirkt nicht');
+    } finally {
+      uiM.useCatalog((l, en) => catalog(l)[en]);
+      if (langBefore2 === undefined) delete process.env.WORKS_LANG; else process.env.WORKS_LANG = langBefore2;
+    }
+    if (!hasWs) return; // Ohne Gateway kommen keine Befehle an.
+    await wa(['discord', 'start'], { extraEnv: denv, ok: false });
+    try {
+      const send = async (opts, what) => {
+        for (let n = 1; ; n++) {
+          const id = fake.interact(opts);
+          try { await dwait(() => fake.callbacks.get(id), `${what}: Eingang`, 5000); return id; } catch (e) { if (n >= 3) throw e; }
+        }
+      };
+      const ask = async (opts, what) => { const id = await send(opts, what); return dwait(() => fake.answerOf(id), what); };
+      const title = (a) => ((a.data.embeds || [])[0] || {}).title || '';
+      let a = await ask({ sub: 'status', locale: 'en-US' }, '/works status auf Englisch');
+      expect(/^works · \d+ projects?$/.test(title(a)), `Antwort für en-US: ${title(a)}`);
+      a = await ask({ sub: 'status', locale: 'de' }, '/works status auf Deutsch');
+      expect(/^works · \d+ Projekte?$/.test(title(a)), `Antwort für de: ${title(a)}`);
+      // Fehler aus der Board-API (api.mjs): Anweisung ohne Text.
+      const bad = (locale) => ({ sub: 'instruct', locale, options: [{ name: 'text', value: ' ' }, { name: 'task', value: 'W-0001' }, { name: 'project', value: 'projekt' }] });
+      a = await ask(bad('en-US'), 'Fehler auf Englisch');
+      expect(title(a) === 'That did not work' && JSON.stringify(a.data).includes('Instruction missing.'), `Fehler für en-US: ${JSON.stringify(a.data).slice(0, 300)}`);
+      a = await ask(bad('de'), 'Fehler auf Deutsch');
+      expect(title(a) === 'Ging nicht' && JSON.stringify(a.data).includes('Anweisung fehlt.'), `Fehler für de: ${JSON.stringify(a.data).slice(0, 300)}`);
+      // Der Kanal bleibt in der globalen Sprache, auch gleich nach einer englischen Antwort.
+      await ask(bad('en-US'), 'noch ein Fehler auf Englisch');
+      w(['discord', 'emit', 'ci', `--json=${JSON.stringify({ ok: false, sha: 'c0de0041aa', failed: 1, total: 2 })}`], { extraEnv: denv });
+      await dwait(() => findMsg((e) => e.title === 'CI rot für c0de004'), 'CI-Nachricht global deutsch');
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+    } finally { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); }
+  });
+
   if (browser) {
     await step('Discord: Dialog Discord-Bot im Browser mit Reitern, Vorschau, Kanalwahl und Einrichtung (W-0038)', async () => {
       const br = await launchChromium(log);
@@ -2150,7 +2425,17 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   log(`\n${results.length - failed.length} von ${results.length} Prüfungen bestanden${failed.length ? `, ${failed.length} fehlgeschlagen` : ''}.`);
   if (!keep) { try { cleanupWorktrees(proj); fs.rmSync(base, { recursive: true, force: true }); } catch { /* Windows hält Dateien manchmal kurz fest */ } }
   else log(`Testprojekt bleibt erhalten: ${proj}`);
+  if (langBefore === undefined) delete process.env.WORKS_LANG; else process.env.WORKS_LANG = langBefore;
   return { ok: !failed.length, results };
+}
+
+// Texte des Boards (W-0041): tr('...') in board.js und {{t:...}} in template.html, wie board.mjs sie in den Katalog nimmt.
+function boardTexts({ template = true } = {}) {
+  const unesc = (s) => s.replace(/\\(.)/g, (a, c) => ({ n: '\n', t: '\t' })[c] || c);
+  const js = fs.readFileSync(path.join(HERE, 'board', 'board.js'), 'utf8').replace(/\r\n?/g, '\n');
+  const keys = [...js.matchAll(/\btr\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.)*)`)\s*[,)]/g)].map((m) => unesc(m[1] ?? m[2] ?? m[3]));
+  if (template) keys.push(...[...fs.readFileSync(path.join(HERE, 'board', 'template.html'), 'utf8').matchAll(/\{\{t:(.+?)\}\}/g)].map((m) => m[1]));
+  return [...new Set(keys)];
 }
 
 function cleanupWorktrees(proj) { spawnSync('git', ['worktree', 'prune'], { cwd: proj }); }

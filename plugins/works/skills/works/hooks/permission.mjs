@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import { findRoot, loadConfig } from '../scripts/lib.mjs';
 import { recordActivity, callTarget } from '../scripts/live.mjs';
+import { language, setLanguage } from '../scripts/i18n.mjs';
 
 let input = {};
 try {
@@ -13,6 +14,7 @@ try {
 
 try {
   const root = findRoot(input.cwd || process.cwd());
+  if (root) setLanguage(language(root));
   if (root && loadConfig(root).live_activity !== false) {
     const { task, lane } = callTarget(root, input);
     recordActivity(root, task, input.tool_name || '', input.tool_input || {}, true, lane ? lane.path : '', { running: true, perm: true, agent: input.agent_id || '' });

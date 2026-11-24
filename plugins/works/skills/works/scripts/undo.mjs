@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { worksDir, readJson, writeJson, exists, loadTasks } from './lib.mjs';
 import { readBackup, restoreBackup } from './backup.mjs';
+import { tr } from './i18n.mjs';
 
 const MAX = 50;
 const dir = (root) => path.join(worksDir(root), '.undo');
@@ -65,10 +66,10 @@ export function undo(root, key) {
   const list = undoList(root);
   const i = key ? list.findIndex((x) => x.key === key) : 0;
   const e = list[i];
-  if (!e) throw new Error('Nichts zum Rückgängigmachen.');
+  if (!e) throw new Error(tr('Nothing to undo.'));
   if (e.backup) {
     const file = path.join(wd, e.backup);
-    if (!exists(file)) throw new Error(`Die Sicherung ${e.backup} fehlt, Rückgängig ist nicht möglich.`);
+    if (!exists(file)) throw new Error(tr('The backup {file} is missing, undo is not possible.', { file: e.backup }));
     restoreBackup(root, readBackup(fs.readFileSync(file, 'utf8')), { backup: false });
     list.splice(i, 1);
     writeJson(indexFile(root), list);

@@ -1,6 +1,8 @@
 'use strict';
 (() => {
   const BOOT = window.WORKS;
+  const I18N = BOOT.i18n || { lang: 'en', catalog: {} };
+  const tr = (s, v) => { const x = (I18N.catalog && I18N.catalog[s]) || s; return v ? x.replace(/\{(\w+)\}/g, (a, k) => (k in v ? String(v[k]) : a)) : x; };
   const LIVE = !!BOOT.live;
   // edit: Live mit Bearbeiten, view: Live nur lesen (geteilter Link), static: board.html, snapshot: Export
   const MODE = BOOT.mode || (LIVE ? 'edit' : 'static');
@@ -19,7 +21,7 @@
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const VIEWS = ['board', 'sprint', 'queue', 'timeline', 'graph', 'table', 'live'];
-  const VIEW_LABEL = { board: 'Board', sprint: 'Sprint', queue: 'Warteschlange', timeline: 'Zeitleiste', graph: 'Abhängigkeiten', table: 'Tabelle', live: 'Live' };
+  const VIEW_LABEL = { board: 'Board', sprint: 'Sprint', queue: tr('Queue'), timeline: tr('Timeline'), graph: tr('Dependencies'), table: tr('Table'), live: 'Live' };
   const state = { q: '', prios: new Set(PRIOS), type: '', tag: '', ms: '', closed: false, signal: '', view: 'board' };
   const PAGE_VERSION = meta.version || '';
   const PAGE_SERVER = meta.server || '';
@@ -28,7 +30,8 @@
   const isForeign = (m) => !!(m && m.rootId && ROOT_ID && m.rootId !== ROOT_ID);
   let orphan = false;
   let liveSource = null;
-  const outdated = (m) => !!m && ((m.version && PAGE_VERSION && m.version !== PAGE_VERSION) || (m.server && PAGE_SERVER && m.server !== PAGE_SERVER));
+  // Neue Version oder andere Sprache (works lang): Seite neu laden, damit Texte und Skript passen.
+  const outdated = (m) => !!m && ((m.version && PAGE_VERSION && m.version !== PAGE_VERSION) || (m.server && PAGE_SERVER && m.server !== PAGE_SERVER) || (BOOT.i18n && m.lang && m.lang !== I18N.lang));
   const UI_KEY = 'works-ui-' + meta.project;
   const changes = new Map();
   let openId = null;
@@ -46,7 +49,7 @@
   const statusVar = (s) => 'var(--s-' + (COLS.includes(s) ? s : 'backlog') + ')';
   const prioVar = (p) => 'var(--' + (PRIOS.includes(p) ? p.toLowerCase() : 'p4') + ')';
   const today = () => new Date().toLocaleDateString('sv-SE');
-  const fmtDate = (d) => { if (!d) return ''; const [y, m, dd] = String(d).split('-'); return dd + '.' + m + '.' + y; };
+  const fmtDate = (d) => { if (!d) return ''; const [y, m, dd] = String(d).split('-'); const s = I18N.lang === 'de' ? '.' : '/'; return dd + s + m + s + y; };
   const daysUntil = (d) => Math.round((new Date(d + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 86400000);
   const store = {
     get(k, f) { try { const v = localStorage.getItem(k); return v === null ? f : JSON.parse(v); } catch (e) { return f; } },
@@ -60,7 +63,7 @@
     const res = await fetch(path, opt);
     let out = {};
     try { out = await res.json(); } catch (e) { out = {}; }
-    if (!res.ok) throw new Error(out.error || 'Anfrage fehlgeschlagen (' + res.status + ').');
+    if (!res.ok) throw new Error(out.error || tr('Request failed ({status}).', { status: res.status }));
     return out;
   }
   const act = (action, payload) => api('POST', 'api/action', { action, ...payload });
@@ -77,7 +80,7 @@
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, kind === 'err' ? 9000 : 6000);
   }
   const ok = (msg) => toast('<div class="what">' + esc(msg) + '</div>');
-  const fail = (e) => toast('<div class="what">Nicht gespeichert</div><div class="why">' + esc(e.message || e) + '</div>', 'err');
+  const fail = (e) => toast('<div class="what">' + tr('Not saved') + '</div><div class="why">' + esc(e.message || e) + '</div>', 'err');
 
   async function run(fn, success) {
     try {
@@ -145,7 +148,7 @@
       if (!buf.length) { buf.push(lines[i++]); }
       out.push('<p>' + buf.map(inline).join('<br>') + '</p>');
     }
-    return out.join('') || '<p class="empty-md">Noch leer.</p>';
+    return out.join('') || '<p class="empty-md">' + tr('Nothing here yet.') + '</p>';
   }
 
   // ---------- Filter ----------
@@ -180,7 +183,7 @@
   // ---------- Kopf, Überblick, Filter ----------
 
   function renderHeader() {
-    $('#project').innerHTML = esc(meta.project) + ' <span class="dim">Aufgaben</span>';
+    $('#project').innerHTML = esc(meta.project) + ' <span class="dim">' + tr('Tasks') + '</span>';
     const pill = $('#busy');
     const a = meta.activity;
     const fresh = a && a.busy && lvFresh(a.current);
@@ -191,8 +194,8 @@
     const pulse = $('#livePulse');
     if (pulse) { pulse.hidden = pill.hidden; pulse.classList.toggle('perm', !!perm); }
     if (fresh || laneIds.length) {
-      const main = fresh ? (a.current.perm ? 'Wartet auf deine Freigabe' + (a.current.task ? ' (' + esc(a.current.task) + ')' : '') : 'Claude arbeitet' + (a.current.task ? ' an ' + esc(a.current.task) : '') + ', seit ' + lvSince(a.since || a.current.at, 'min')) : '';
-      const par = laneIds.length ? (laneIds.length === 1 ? '1 Agent parallel an ' + esc(laneIds[0]) : laneIds.length + ' Agenten parallel') : '';
+      const main = fresh ? (a.current.perm ? tr('Waiting for your approval') + (a.current.task ? ' (' + esc(a.current.task) + ')' : '') : a.current.task ? tr('Claude has been working on {task} for {since}', { task: esc(a.current.task), since: lvSince(a.since || a.current.at, 'min') }) : tr('Claude has been working for {since}', { since: lvSince(a.since || a.current.at, 'min') })) : '';
+      const par = laneIds.length ? (laneIds.length === 1 ? tr('1 agent in parallel on {task}', { task: esc(laneIds[0]) }) : tr('{n} agents in parallel', { n: laneIds.length })) : '';
       pill.innerHTML = [main, par].filter(Boolean).join(', ');
       const go = fresh && a.current.task ? a.current.task : laneIds[0];
       // Im Live-Board führt die Pille in die Live-Ansicht und lässt sie wieder Claude folgen.
@@ -217,16 +220,16 @@
     });
     const open = tasks.filter((t) => OPEN.includes(t.status));
     const sig = [
-      ['p1', 'offen mit P1', open.filter((t) => t.priority === 'P1').length, true],
-      ['blocked', 'blockiert', open.filter((t) => t.blocked).length, true],
-      ['overdue', 'überfällig', open.filter((t) => t.overdue).length, true],
-      ['questions', 'mit offenen Fragen', open.filter((t) => t.questions.length).length, false],
-      ['incomplete', 'unvollständig erfasst', open.filter((t) => t.incomplete).length, false],
-      ['conflict', 'mit gleichen Dateien', tasks.filter((t) => t.conflicts).length, 'warn'],
-      ['stale', 'seit ' + meta.staleDays + (meta.staleDays === 1 ? ' Tag' : ' Tagen') + ' still', tasks.filter((t) => t.stale).length, false],
+      ['p1', tr('open with P1'), open.filter((t) => t.priority === 'P1').length, true],
+      ['blocked', tr('blocked'), open.filter((t) => t.blocked).length, true],
+      ['overdue', tr('overdue'), open.filter((t) => t.overdue).length, true],
+      ['questions', tr('with open questions'), open.filter((t) => t.questions.length).length, false],
+      ['incomplete', tr('captured incompletely'), open.filter((t) => t.incomplete).length, false],
+      ['conflict', tr('sharing files'), tasks.filter((t) => t.conflicts).length, 'warn'],
+      ['stale', meta.staleDays === 1 ? tr('quiet for 1 day') : tr('quiet for {n} days', { n: meta.staleDays }), tasks.filter((t) => t.stale).length, false],
     ];
     $('#signals').innerHTML = sig.filter((s) => s[2] > 0).map((s) => '<button class="signal' + (s[3] === true ? ' hot' : s[3] ? ' ' + s[3] : '') + '" data-sig="' + s[0] + '" aria-pressed="' + (state.signal === s[0] || (s[0] === 'p1' && state.prios.size === 1 && state.prios.has('P1'))) + '"><b>' + s[2] + '</b> ' + esc(s[1]) + '</button>').join('')
-      || '<span class="signal calm">Keine Blockaden, nichts überfällig</span>';
+      || '<span class="signal calm">' + tr('No blockers, nothing overdue') + '</span>';
     $$('#signals .signal[data-sig]').forEach((b) => b.onclick = () => {
       const s = b.dataset.sig;
       if (s === 'p1') {
@@ -238,7 +241,7 @@
   }
 
   function renderFilters() {
-    $('#prioFilter').innerHTML = PRIOS.map((p) => '<button aria-pressed="' + state.prios.has(p) + '" data-p="' + p + '" title="' + esc(meta.prioLabel[p]) + ' ein- oder ausblenden"><span class="pdot" style="--pc:' + prioVar(p) + '"></span>' + p + '<span class="pl"> ' + esc(meta.prioLabel[p]) + '</span></button>').join('');
+    $('#prioFilter').innerHTML = PRIOS.map((p) => '<button aria-pressed="' + state.prios.has(p) + '" data-p="' + p + '" title="' + esc(tr('Show or hide {prio}', { prio: meta.prioLabel[p] })) + '"><span class="pdot" style="--pc:' + prioVar(p) + '"></span>' + p + '<span class="pl"> ' + esc(meta.prioLabel[p]) + '</span></button>').join('');
     $$('#prioFilter button').forEach((b) => b.onclick = () => {
       const p = b.dataset.p;
       if (state.prios.has(p)) { if (state.prios.size > 1) state.prios.delete(p); } else state.prios.add(p);
@@ -249,7 +252,7 @@
     ty.value = state.type;
     const tags = [...new Set(tasks.flatMap((t) => t.tags))].sort();
     const tg = $('#tagFilter');
-    tg.innerHTML = '<option value="">Alle Tags</option>' + tags.map((t) => '<option value="' + esc(t) + '">#' + esc(t) + '</option>').join('');
+    tg.innerHTML = '<option value="">' + tr('All tags') + '</option>' + tags.map((t) => '<option value="' + esc(t) + '">#' + esc(t) + '</option>').join('');
     tg.value = tags.includes(state.tag) ? state.tag : '';
     $('#showClosed').checked = state.closed;
     $('#resetFilters').hidden = !filtersActive();
@@ -290,9 +293,9 @@
     const y = (v) => H - P - (v * (H - 2 * P)) / max;
     const line = (key) => points.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p[key]).toFixed(1)).join(' ');
     const area = line('done') + ' L' + x(points.length - 1).toFixed(1) + ' ' + (H - P) + ' L' + x(0).toFixed(1) + ' ' + (H - P) + ' Z';
-    const dots = points.map((p, i) => '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.done).toFixed(1) + '" r="2.5" class="c-dot"><title>' + esc(fmtDate(p.d)) + ': ' + p.done + ' von ' + p.total + ' erledigt</title></circle>').join('');
+    const dots = points.map((p, i) => '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.done).toFixed(1) + '" r="2.5" class="c-dot"><title>' + esc(tr('{date}: {done} of {total} done', { date: fmtDate(p.d), done: p.done, total: p.total })) + '</title></circle>').join('');
     const grid = [0.5, 1].map((f) => '<line x1="' + P + '" x2="' + (W - P) + '" y1="' + y(max * f).toFixed(1) + '" y2="' + y(max * f).toFixed(1) + '" class="c-grid"/>').join('');
-    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Verlauf der letzten 8 Wochen: ' + points[points.length - 1].done + ' von ' + points[points.length - 1].total + ' erledigt">' +
+    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="' + tr('Last 8 weeks: {done} of {total} done', { done: points[points.length - 1].done, total: points[points.length - 1].total }) + '">' +
       grid + '<path d="' + area + '" class="c-area"/><path d="' + line('total') + '" class="c-total"/><path d="' + line('done') + '" class="c-done"/>' + dots + '</svg>';
   }
 
@@ -314,34 +317,35 @@
     const fourWeeks = addDays(today(), -28);
     const rate = list.filter((t) => t.status === 'erledigt' && (t.completed || '') > fourWeeks).length / 4;
     const open = total - done;
-    const eta = !open ? 'Alles erledigt' : rate > 0 ? 'Bei diesem Tempo noch etwa ' + Math.max(1, Math.ceil(open / rate)) + (Math.ceil(open / rate) === 1 ? ' Woche' : ' Wochen') : 'Tempo noch nicht messbar';
+    const weeks = rate > 0 ? Math.max(1, Math.ceil(open / rate)) : 0;
+    const eta = !open ? tr('All done') : rate > 0 ? (weeks === 1 ? tr('At this pace about 1 more week') : tr('At this pace about {n} more weeks', { n: weeks })) : tr('Pace not measurable yet');
     const ms = state.ms ? meta.milestones.find((m) => m.id === state.ms) : null;
-    const scope = ms ? 'Meilenstein ' + ms.id + ' ' + ms.title : filtersActive() ? 'Gefilterte Aufgaben' : 'Gesamtes Projekt';
+    const scope = ms ? tr('Milestone {id} {title}', { id: ms.id, title: ms.title }) : filtersActive() ? tr('Filtered tasks') : tr('Whole project');
     const late = ms && ms.due && ms.due < today() && open > 0;
     const points = burnup(list);
     box.innerHTML =
       '<div class="pg-main">' +
-        '<div class="pg-head"><span class="pg-pct num">' + pct + '<small>%</small></span><span class="pg-title"><strong>Fortschritt</strong><span>' + esc(scope) + (ms && ms.due ? ', Ziel ' + esc(fmtDate(ms.due)) : '') + '</span></span></div>' +
-        '<div class="pg-bar" role="img" aria-label="' + done + ' von ' + total + ' Aufgaben erledigt, ' + working + ' in Arbeit oder Review">' +
-          (done ? '<span class="pg-done" style="flex-grow:' + done + '" title="Erledigt: ' + done + '"></span>' : '') +
-          (working ? '<span class="pg-work" style="flex-grow:' + working + '" title="In Arbeit oder Review: ' + working + '"></span>' : '') +
-          (waiting ? '<span class="pg-wait" style="flex-grow:' + waiting + '" title="Noch offen: ' + waiting + '"></span>' : '') +
+        '<div class="pg-head"><span class="pg-pct num">' + pct + '<small>%</small></span><span class="pg-title"><strong>' + tr('Progress') + '</strong><span>' + esc(scope) + (ms && ms.due ? esc(tr(', target {date}', { date: fmtDate(ms.due) })) : '') + '</span></span></div>' +
+        '<div class="pg-bar" role="img" aria-label="' + tr('{done} of {total} tasks done, {working} in progress or review', { done, total, working }) + '">' +
+          (done ? '<span class="pg-done" style="flex-grow:' + done + '" title="' + tr('Done: {n}', { n: done }) + '"></span>' : '') +
+          (working ? '<span class="pg-work" style="flex-grow:' + working + '" title="' + tr('In progress or review: {n}', { n: working }) + '"></span>' : '') +
+          (waiting ? '<span class="pg-wait" style="flex-grow:' + waiting + '" title="' + tr('Still open: {n}', { n: waiting }) + '"></span>' : '') +
         '</div>' +
-        '<div class="pg-legend"><span class="pg-k"><i class="pg-done"></i>Erledigt <b class="num">' + done + '</b></span><span class="pg-k"><i class="pg-work"></i>In Arbeit und Review <b class="num">' + working + '</b></span><span class="pg-k"><i class="pg-wait"></i>Noch offen <b class="num">' + waiting + '</b></span></div>' +
+        '<div class="pg-legend"><span class="pg-k"><i class="pg-done"></i>' + tr('Done') + ' <b class="num">' + done + '</b></span><span class="pg-k"><i class="pg-work"></i>' + tr('In progress and review') + ' <b class="num">' + working + '</b></span><span class="pg-k"><i class="pg-wait"></i>' + tr('Still open') + ' <b class="num">' + waiting + '</b></span></div>' +
       '</div>' +
       '<dl class="pg-stats">' +
-        '<div><dt>Erledigt</dt><dd class="num">' + done + ' von ' + total + '</dd></div>' +
-        '<div><dt>Kriterien erfüllt</dt><dd class="num">' + (crit[1] ? crit[0] + ' von ' + crit[1] : 'keine') + '</dd></div>' +
-        '<div><dt>Letzte 7 Tage</dt><dd class="num">' + doneWeek + ' erledigt, ' + newWeek + ' neu</dd></div>' +
-        '<div><dt>Prognose</dt><dd class="' + (late ? 'late' : '') + '">' + esc(late ? 'Zieldatum überschritten, ' + eta : eta) + '</dd></div>' +
+        '<div><dt>' + tr('Done') + '</dt><dd class="num">' + tr('{a} of {b}', { a: done, b: total }) + '</dd></div>' +
+        '<div><dt>' + tr('Criteria met') + '</dt><dd class="num">' + (crit[1] ? tr('{a} of {b}', { a: crit[0], b: crit[1] }) : tr('none')) + '</dd></div>' +
+        '<div><dt>' + tr('Last 7 days') + '</dt><dd class="num">' + tr('{done} done, {new} new', { done: doneWeek, new: newWeek }) + '</dd></div>' +
+        '<div><dt>' + tr('Forecast') + '</dt><dd class="' + (late ? 'late' : '') + '">' + esc(late ? tr('Target date passed, {eta}', { eta }) : eta) + '</dd></div>' +
       '</dl>' +
-      '<figure class="pg-chart"><figcaption><span>Letzte 8 Wochen</span><span class="lg"><i class="lg-done"></i>erledigt <i class="lg-total"></i>angelegt</span></figcaption>' + chartSvg(points) +
-        '<div class="c-axis"><span>' + esc(fmtDate(points[0].d)) + '</span><span>heute</span></div></figure>';
+      '<figure class="pg-chart"><figcaption><span>' + tr('Last 8 weeks') + '</span><span class="lg"><i class="lg-done"></i>' + tr('done') + ' <i class="lg-total"></i>' + tr('created') + '</span></figcaption>' + chartSvg(points) +
+        '<div class="c-axis"><span>' + esc(fmtDate(points[0].d)) + '</span><span>' + tr('today') + '</span></div></figure>';
   }
 
   function renderMsFilter() {
     const sel2 = $('#msFilter');
-    const opts = '<option value="">Alle Meilensteine</option>' + meta.milestones.map((m) => '<option value="' + esc(m.id) + '">' + esc(m.id + ' ' + m.title) + ' (' + m.done + '/' + m.total + ')</option>').join('') + (EDIT ? '<option value="__new">Meilenstein anlegen …</option>' : '');
+    const opts = '<option value="">' + tr('All milestones') + '</option>' + meta.milestones.map((m) => '<option value="' + esc(m.id) + '">' + esc(m.id + ' ' + m.title) + ' (' + m.done + '/' + m.total + ')</option>').join('') + (EDIT ? '<option value="__new">' + tr('Create milestone …') + '</option>' : '');
     sel2.innerHTML = opts;
     sel2.value = meta.milestones.some((m) => m.id === state.ms) ? state.ms : '';
     sel2.hidden = !meta.milestones.length && !EDIT;
@@ -356,18 +360,18 @@
   }
   function changeLabel(c) {
     if (c.kind === 'moved') return L(c.from) + ' → ' + L(c.to);
-    if (c.kind === 'prio') return 'Priorität ' + c.from + ' → ' + c.to;
-    if (c.kind === 'added') return 'Neu';
-    if (c.kind === 'archived') return 'Archiviert';
-    if (c.kind === 'removed') return 'Entfernt';
-    return 'Aktualisiert';
+    if (c.kind === 'prio') return tr('Priority {from} → {to}', { from: c.from, to: c.to });
+    if (c.kind === 'added') return tr('New');
+    if (c.kind === 'archived') return tr('Archived');
+    if (c.kind === 'removed') return tr('Removed');
+    return tr('Updated');
   }
   // Symbole für Etiketten an Karten (Stillstand, gleiche Dateien).
   const cfSvg = (p) => '<svg viewBox="0 0 16 16" aria-hidden="true">' + p + '</svg>';
   const CF_IC = { still: cfSvg('<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/>'), conflict: cfSvg('<path d="M8 2.5l6 10.5H2z"/><path d="M8 7v2.5M8 11.4v.1"/>') };
   const cfConflict = (t) => {
     const c = t.conflicts[0];
-    return '<span class="cflag conflict" title="' + esc(t.conflicts.map((x) => x.id + ': ' + x.files.join(', ')).join('\n')) + '">' + CF_IC.conflict + 'Gleiche Dateien wie ' + esc(c.id) + (t.conflicts.length > 1 ? ' und ' + (t.conflicts.length - 1) + ' weitere' : '') + '</span>';
+    return '<span class="cflag conflict" title="' + esc(t.conflicts.map((x) => x.id + ': ' + x.files.join(', ')).join('\n')) + '">' + CF_IC.conflict + tr('Same files as {id}', { id: esc(c.id) }) + (t.conflicts.length > 1 ? tr(' and {n} more', { n: t.conflicts.length - 1 }) : '') + '</span>';
   };
 
   function changeColor(c) {
@@ -382,30 +386,30 @@
     const meta2 = [];
     if (t.crit[1]) {
       const pct = Math.round((t.crit[0] / t.crit[1]) * 100);
-      meta2.push('<span class="prog" title="Akzeptanzkriterien"><span class="bar"><span style="width:' + pct + '%"></span></span>' + t.crit[0] + '/' + t.crit[1] + '</span>');
+      meta2.push('<span class="prog" title="' + tr('Acceptance criteria') + '"><span class="bar"><span style="width:' + pct + '%"></span></span>' + t.crit[0] + '/' + t.crit[1] + '</span>');
     }
-    if (t.blocked) meta2.push('<span class="warn" title="Wartet auf ' + esc(t.blockers.join(', ')) + '">Blockiert durch ' + esc(t.blockers.join(', ')) + '</span>');
+    if (t.blocked) meta2.push('<span class="warn" title="' + esc(tr('Waiting for {ids}', { ids: t.blockers.join(', ') })) + '">' + esc(tr('Blocked by {ids}', { ids: t.blockers.join(', ') })) + '</span>');
     if (t.due) {
       const d = daysUntil(t.due);
       const closed = !OPEN.includes(t.status);
-      meta2.push('<span class="' + (t.overdue ? 'warn' : d <= 3 && !closed ? 'note' : '') + '">' + (t.overdue ? 'Überfällig seit ' : 'Fällig ') + fmtDate(t.due) + '</span>');
+      meta2.push('<span class="' + (t.overdue ? 'warn' : d <= 3 && !closed ? 'note' : '') + '">' + (t.overdue ? tr('Overdue since {date}', { date: fmtDate(t.due) }) : tr('Due {date}', { date: fmtDate(t.due) })) + '</span>');
     }
-    if ((meta.lanes || []).some((l) => l.task === t.id)) meta2.push('<span class="lane-tag" title="Ein Agent arbeitet in einem eigenen Git-Worktree">Parallel</span>');
-    if (t.design && t.design.variants) meta2.push('<span class="' + (t.design.chosen ? '' : 'note') + '" title="Entwürfe aus UI UX Pro Max">' + (t.design.chosen ? 'Entwurf ' + esc(t.design.chosen) + ' gewählt' : t.design.variants + ' Entwürfe zur Wahl') + '</span>');
-    if (t.questions.length) meta2.push('<span class="note">' + t.questions.length + (t.questions.length === 1 ? ' offene Frage' : ' offene Fragen') + '</span>');
-    if (t.incomplete && OPEN.includes(t.status)) meta2.push('<span>Unvollständig</span>');
+    if ((meta.lanes || []).some((l) => l.task === t.id)) meta2.push('<span class="lane-tag" title="' + tr('An agent is working in its own Git worktree') + '">Parallel</span>');
+    if (t.design && t.design.variants) meta2.push('<span class="' + (t.design.chosen ? '' : 'note') + '" title="' + tr('Design variants from UI UX Pro Max') + '">' + (t.design.chosen ? tr('Variant {id} chosen', { id: esc(t.design.chosen) }) : tr('{n} design variants to choose from', { n: t.design.variants })) + '</span>');
+    if (t.questions.length) meta2.push('<span class="note">' + (t.questions.length === 1 ? tr('1 open question') : tr('{n} open questions', { n: t.questions.length })) + '</span>');
+    if (t.incomplete && OPEN.includes(t.status)) meta2.push('<span>' + tr('Incomplete') + '</span>');
     const tags = [];
     if (t.milestone) tags.push('<span class="tag ms-tag">' + esc(t.milestone) + '</span>');
     t.tags.slice(0, 3).forEach((x) => tags.push('<span class="tag">#' + esc(x) + '</span>'));
     if (t.tags.length > 3) tags.push('<span class="tag">+' + (t.tags.length - 3) + '</span>');
     return '<article class="card' + (ch ? ' changed' + (ch.fresh ? ' pulse' : '') : '') + (OPEN.includes(t.status) ? '' : ' closed') + '" data-id="' + esc(t.id) + '" data-prio="' + esc(t.priority) + '" tabindex="0" role="button" aria-label="' + esc(t.id + ' ' + t.title) + '"' + (EDIT ? ' draggable="true"' : '') + (ch ? ' style="--cc:' + changeColor(ch) + '"' : '') + '>' +
       (ch && ch.kind !== 'updated' ? '<span class="change">' + esc(changeLabel(ch)) + '</span>' : '') +
-      '<div class="card-top"><span class="id">' + esc(t.id) + '</span><span>' + esc(meta.typeLabel[t.type] || t.type) + '</span>' + (t.effort ? '<span class="effort" title="Aufwand">' + esc(t.effort) + '</span>' : '') + '<span class="prio">' + esc(t.priority) + '</span></div>' +
+      '<div class="card-top"><span class="id">' + esc(t.id) + '</span><span>' + esc(meta.typeLabel[t.type] || t.type) + '</span>' + (t.effort ? '<span class="effort" title="' + tr('Effort') + '">' + esc(t.effort) + '</span>' : '') + '<span class="prio">' + esc(t.priority) + '</span></div>' +
       '<div class="title">' + esc(t.title) + '</div>' +
       (t.thumb ? '<img loading="lazy" src="' + esc(t.thumb) + '" alt="' + esc(t.thumbAlt) + '">' : '') +
       liveBlock(t) +
       (t.conflicts ? cfConflict(t) : '') +
-      (t.stale ? '<span class="cflag still">' + CF_IC.still + 'Seit ' + t.stale.days + (t.stale.days === 1 ? ' Tag' : ' Tagen') + ' still' + (t.stale.handoff ? '' : ', keine Übergabe') + '</span>' : '') +
+      (t.stale ? '<span class="cflag still">' + CF_IC.still + (t.stale.days === 1 ? tr('Quiet for 1 day') : tr('Quiet for {n} days', { n: t.stale.days })) + (t.stale.handoff ? '' : tr(', no handoff')) + '</span>' : '') +
       (meta2.length ? '<div class="card-meta">' + meta2.join('') + '</div>' : '') +
       (tags.length ? '<div class="card-meta">' + tags.join('') + '</div>' : '') +
       '</article>';
@@ -425,12 +429,12 @@
       const list = sortList(c, tasks.filter((t) => t.status === c && match(t)));
       const canAdd = EDIT && (c === 'backlog' || c === 'geplant');
       let note = '';
-      if (c === 'in-arbeit' && list.length > 1) note = '<div class="col-note">Mehr als eine Aufgabe in Arbeit. Übergaben aktuell halten.</div>';
-      const empty = filtersActive() && !anyMatch ? 'Keine Treffer für die Filter' : c === 'backlog' && EDIT ? 'Leer. Mit + eine Aufgabe anlegen.' : 'Leer';
+      if (c === 'in-arbeit' && list.length > 1) note = '<div class="col-note">' + tr('More than one task in progress. Keep handoffs up to date.') + '</div>';
+      const empty = filtersActive() && !anyMatch ? tr('No matches for the filters') : c === 'backlog' && EDIT ? tr('Empty. Use + to add a task.') : tr('Empty');
       return '<section class="col' + (arrived && arrived.has(c) ? ' arrive' : '') + '" data-col="' + c + '" style="--c:' + statusVar(c) + '" aria-label="' + esc(L(c)) + '">' +
         '<div class="col-head"><span class="dot"></span><h2>' + esc(L(c)) + '</h2><span class="n">' + list.length + '</span>' +
-        (canAdd ? '<button class="add" data-quick="' + c + '" title="Aufgabe in ' + esc(L(c)) + ' anlegen" aria-label="Aufgabe in ' + esc(L(c)) + ' anlegen">+</button>' : '') + '</div>' + note +
-        (quickCol === c ? '<div class="quick"><input class="quick-in" placeholder="Titel eingeben, Enter speichert" maxlength="160" aria-label="Titel der neuen Aufgabe"><small>Wird als Feature mit P3 angelegt. Details danach im Panel ergänzen.</small></div>' : '') +
+        (canAdd ? '<button class="add" data-quick="' + c + '" title="' + esc(tr('Add task to {col}', { col: L(c) })) + '" aria-label="' + esc(tr('Add task to {col}', { col: L(c) })) + '">+</button>' : '') + '</div>' + note +
+        (quickCol === c ? '<div class="quick"><input class="quick-in" placeholder="' + tr('Type a title, Enter saves') + '" maxlength="160" aria-label="' + tr('Title of the new task') + '"><small>' + tr('Created as a feature with P3. Add details in the panel afterwards.') + '</small></div>' : '') +
         '<div class="cards">' + (list.length ? list.map(card).join('') : '<div class="empty">' + esc(empty) + '</div>') + '</div></section>';
     }).join('');
     $$('.card', board).forEach((el) => {
@@ -497,24 +501,25 @@
     if (!t || t.status === to) return;
     const from = t.status;
     if (!OPEN.includes(from)) {
-      if (!OPEN.includes(to)) { toast('<div class="what">Erst wiedereröffnen</div><div class="why">Erledigte und verworfene Aufgaben können nur in eine offene Spalte zurück.</div>', 'err'); return; }
-      const reason = await askText({ title: id + ' wiedereröffnen', lead: 'Die Aufgabe geht zurück nach ' + L(to) + '. Der Grund landet im Verlauf.', label: 'Grund', confirm: 'Wiedereröffnen', required: true });
+      if (!OPEN.includes(to)) { toast('<div class="what">' + tr('Reopen first') + '</div><div class="why">' + tr('Done and dropped tasks can only go back to an open column.') + '</div>', 'err'); return; }
+      const reason = await askText({ title: tr('Reopen {id}', { id }), lead: tr('The task goes back to {col}. The reason is recorded in the history.', { col: L(to) }), label: tr('Justification'), confirm: tr('Reopen'), required: true });
       if (reason === null) return;
-      return run(() => act('move', { id, to, reason }), id + ' wiedereröffnet');
+      return run(() => act('move', { id, to, reason }), tr('{id} reopened', { id }));
     }
     if (to === 'erledigt') return openDod(id);
     if (to === 'verworfen') {
-      const reason = await askText({ title: id + ' verwerfen', lead: 'Die Aufgabe wird nicht umgesetzt. Sie lässt sich später wiedereröffnen.', label: 'Grund', confirm: 'Verwerfen', required: true, danger: true });
+      const reason = await askText({ title: tr('Drop {id}', { id }), lead: tr('The task will not be done. You can reopen it later.'), label: tr('Justification'), confirm: tr('Drop'), required: true, danger: true });
       if (reason === null) return;
-      return run(() => act('move', { id, to, reason }), id + ' verworfen');
+      return run(() => act('move', { id, to, reason }), tr('{id} dropped', { id }));
     }
     try {
       await act('move', { id, to });
-      ok(to === 'in-arbeit' ? id + ' gestartet' : id + ' nach ' + L(to) + ' verschoben');
+      ok(to === 'in-arbeit' ? tr('{id} started', { id }) : tr('{id} moved to {col}', { id, col: L(to) }));
     } catch (e) {
-      if (to === 'in-arbeit' && /blockiert/i.test(e.message)) {
-        const yes = await confirmBox({ title: id + ' ist blockiert', lead: e.message, confirm: 'Trotzdem starten' });
-        if (yes) await run(() => act('move', { id, to, force: true }), id + ' gestartet');
+      // Die Meldung des Servers kommt in der eingestellten Sprache.
+      if (to === 'in-arbeit' && /blockiert|blocked/i.test(e.message)) {
+        const yes = await confirmBox({ title: tr('{id} is blocked', { id }), lead: e.message, confirm: tr('Start anyway') });
+        if (yes) await run(() => act('move', { id, to, force: true }), tr('{id} started', { id }));
       } else fail(e);
     }
   }
@@ -548,7 +553,7 @@
       if (first) first.focus();
     });
   }
-  const foot = (confirm, opts = {}) => '<p class="err" role="alert"></p><div class="foot">' + (opts.extra || '') + '<button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn ' + (opts.danger ? 'danger' : 'primary') + '" value="ok">' + esc(confirm) + '</button></div>';
+  const foot = (confirm, opts = {}) => '<p class="err" role="alert"></p><div class="foot">' + (opts.extra || '') + '<button class="btn" value="cancel" formnovalidate>' + tr('Cancel') + '</button><button class="btn ' + (opts.danger ? 'danger' : 'primary') + '" value="ok">' + esc(confirm) + '</button></div>';
 
   function askText({ title, lead, label, confirm, required, danger, value = '', multiline = false }) {
     const field = multiline
@@ -578,23 +583,23 @@
     let m;
     try { m = await ensureMeta(); metaInfo = null; } catch (e) { return fail(e); }
     const type = prefill.type || 'feature';
-    const html = '<h2>Neue Aufgabe</h2>' +
-      '<div class="field span4"><span>Typ</span>' + segCtl('type', m.types.map((x) => ({ id: x.id, label: x.label })), type) + '</div>' +
-      '<label class="field span4"><span>Titel</span><input class="input" name="title" required maxlength="160" placeholder="Was soll am Ende anders sein?" value="' + esc(prefill.title || '') + '" autofocus></label>' +
+    const html = '<h2>' + tr('New task') + '</h2>' +
+      '<div class="field span4"><span>' + tr('Type') + '</span>' + segCtl('type', m.types.map((x) => ({ id: x.id, label: x.label })), type) + '</div>' +
+      '<label class="field span4"><span>' + tr('Title') + '</span><input class="input" name="title" required maxlength="160" placeholder="' + tr('What should be different at the end?') + '" value="' + esc(prefill.title || '') + '" autofocus></label>' +
       '<div class="grid">' +
-      '<div class="field span4"><span>Priorität</span>' + segCtl('priority', m.priorities.map((p) => ({ id: p.id, label: p.id + ' ' + p.label, dot: prioVar(p.id) })), prefill.priority || 'P3') + '</div>' +
-      '<div class="field span2"><span>Spalte</span>' + segCtl('status', [{ id: 'backlog', label: 'Backlog' }, { id: 'geplant', label: 'Geplant' }], prefill.status || 'backlog') + '</div>' +
-      '<div class="field span2"><span>Aufwand</span>' + segCtl('effort', [{ id: '', label: 'Offen' }].concat(m.efforts.map((e) => ({ id: e, label: e }))), '') + '</div>' +
-      '<label class="field"><span>Risiko</span><select name="risk"><option value="">Offen</option>' + m.risks.map((r) => '<option>' + esc(r) + '</option>').join('') + '</select></label>' +
-      '<label class="field"><span>Fällig</span><input type="date" name="due"></label>' +
-      '<label class="field span2"><span>Meilenstein</span><select name="milestone"><option value="">Keiner</option>' + m.milestones.map((x) => '<option value="' + esc(x.id) + '"' + (state.ms === x.id ? ' selected' : '') + '>' + esc(x.id + ' ' + x.title) + '</option>').join('') + '</select></label>' +
-      '<label class="field span2"><span>Tags, mit Komma getrennt</span><input class="input" name="tags" list="tagList" placeholder="bot, dashboard"><datalist id="tagList">' + m.tags.map((x) => '<option value="' + esc(x) + '">').join('') + '</datalist></label>' +
-      '<label class="field span2"><span>Wartet auf</span><select name="blocked_by"><option value="">Nichts</option>' + m.tasks.filter((x) => !['erledigt', 'verworfen'].includes(x.status)).map((x) => '<option value="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</option>').join('') + '</select></label>' +
+      '<div class="field span4"><span>' + tr('Priority') + '</span>' + segCtl('priority', m.priorities.map((p) => ({ id: p.id, label: p.id + ' ' + p.label, dot: prioVar(p.id) })), prefill.priority || 'P3') + '</div>' +
+      '<div class="field span2"><span>' + tr('Column') + '</span>' + segCtl('status', [{ id: 'backlog', label: L('backlog') }, { id: 'geplant', label: L('geplant') }], prefill.status || 'backlog') + '</div>' +
+      '<div class="field span2"><span>' + tr('Effort') + '</span>' + segCtl('effort', [{ id: '', label: tr('Not set') }].concat(m.efforts.map((e) => ({ id: e, label: e }))), '') + '</div>' +
+      '<label class="field"><span>' + tr('Risk') + '</span><select name="risk"><option value="">' + tr('Not set') + '</option>' + m.risks.map((r) => '<option>' + esc(r) + '</option>').join('') + '</select></label>' +
+      '<label class="field"><span>' + tr('Due') + '</span><input type="date" name="due"></label>' +
+      '<label class="field span2"><span>' + tr('Milestone') + '</span><select name="milestone"><option value="">' + tr('None') + '</option>' + m.milestones.map((x) => '<option value="' + esc(x.id) + '"' + (state.ms === x.id ? ' selected' : '') + '>' + esc(x.id + ' ' + x.title) + '</option>').join('') + '</select></label>' +
+      '<label class="field span2"><span>' + tr('Tags, comma-separated') + '</span><input class="input" name="tags" list="tagList" placeholder="bot, dashboard"><datalist id="tagList">' + m.tags.map((x) => '<option value="' + esc(x) + '">').join('') + '</datalist></label>' +
+      '<label class="field span2"><span>' + tr('Waiting for') + '</span><select name="blocked_by"><option value="">' + tr('Nothing') + '</option>' + m.tasks.filter((x) => !['erledigt', 'verworfen'].includes(x.status)).map((x) => '<option value="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</option>').join('') + '</select></label>' +
       '</div>' +
-      '<label class="field"><span>Beschreibung</span><textarea class="input" name="description" rows="7" placeholder="Was soll passieren und warum? Hintergrund, Details, Links und Hinweise für Claude. Markdown möglich, Listen mit - beginnen."></textarea><span class="sublabel">Hier gehört alles Relevante zur Aufgabe hinein. Claude liest die Beschreibung beim Start als Vorgabe von dir.</span></label>' +
-      '<label class="field"><span>Akzeptanzkriterien, eins pro Zeile</span><textarea class="input" name="criteria" rows="3" placeholder="Prüfbar mit ja oder nein"></textarea></label>' +
-      '<p class="sublabel">Ohne Beschreibung oder Kriterien wird die Aufgabe als unvollständig markiert. Claude fragt dann nach.</p>' +
-      foot('Aufgabe anlegen');
+      '<label class="field"><span>' + tr('Description') + '</span><textarea class="input" name="description" rows="7" placeholder="' + tr('What should happen and why? Background, details, links and notes for Claude. Markdown works, start lists with -.') + '"></textarea><span class="sublabel">' + tr('Put everything relevant to the task here. Claude reads the description at the start as your brief.') + '</span></label>' +
+      '<label class="field"><span>' + tr('Acceptance criteria, one per line') + '</span><textarea class="input" name="criteria" rows="3" placeholder="' + tr('Answerable with yes or no') + '"></textarea></label>' +
+      '<p class="sublabel">' + tr('Without a description or criteria the task is marked incomplete. Claude will ask about it then.') + '</p>' +
+      foot(tr('Create task'));
     const r = await showDialog(html, async (fd) => {
       const payload = {
         type: fd.get('type'), title: String(fd.get('title') || '').trim(), priority: fd.get('priority'), status: fd.get('status'),
@@ -611,13 +616,13 @@
 
   async function editMilestone(mid) {
     const m = mid ? meta.milestones.find((x) => x.id === mid) : null;
-    const html = '<h2>' + (m ? 'Meilenstein ' + esc(m.id) + ' bearbeiten' : 'Meilenstein anlegen') + '</h2>' +
-      '<p class="lead">Ein Meilenstein bündelt Aufgaben zu einem Ziel, zum Beispiel einem Release. Aufgaben ordnest du im Detailpanel zu.</p>' +
-      '<label class="field"><span>Titel</span><input class="input" name="title" required maxlength="120" value="' + esc(m ? m.title : '') + '" autofocus></label>' +
-      '<div class="grid"><label class="field span2"><span>Zieldatum</span><input type="date" name="due" value="' + esc(m ? m.due || '' : '') + '"></label>' +
-      (m ? '<label class="field span2"><span>Status</span><select name="status"><option value="offen"' + (m.status !== 'erledigt' ? ' selected' : '') + '>Offen</option><option value="erledigt"' + (m.status === 'erledigt' ? ' selected' : '') + '>Erreicht</option></select></label>' : '') + '</div>' +
-      '<label class="field"><span>Beschreibung</span><input class="input" name="description" maxlength="500" value="' + esc(m ? m.description || '' : '') + '"></label>' +
-      foot(m ? 'Speichern' : 'Meilenstein anlegen');
+    const html = '<h2>' + (m ? tr('Edit milestone {id}', { id: esc(m.id) }) : tr('Create milestone')) + '</h2>' +
+      '<p class="lead">' + tr('A milestone groups tasks toward a goal, for example a release. You assign tasks in the detail panel.') + '</p>' +
+      '<label class="field"><span>' + tr('Title') + '</span><input class="input" name="title" required maxlength="120" value="' + esc(m ? m.title : '') + '" autofocus></label>' +
+      '<div class="grid"><label class="field span2"><span>' + tr('Target date') + '</span><input type="date" name="due" value="' + esc(m ? m.due || '' : '') + '"></label>' +
+      (m ? '<label class="field span2"><span>Status</span><select name="status"><option value="offen"' + (m.status !== 'erledigt' ? ' selected' : '') + '>' + tr('Open') + '</option><option value="erledigt"' + (m.status === 'erledigt' ? ' selected' : '') + '>' + tr('Reached') + '</option></select></label>' : '') + '</div>' +
+      '<label class="field"><span>' + tr('Description') + '</span><input class="input" name="description" maxlength="500" value="' + esc(m ? m.description || '' : '') + '"></label>' +
+      foot(m ? tr('Save') : tr('Create milestone'));
     const r = await showDialog(html, (fd) => {
       const f = { title: String(fd.get('title') || '').trim(), due: fd.get('due') || '', description: String(fd.get('description') || '').trim() };
       if (m) return act('milestoneSet', { mid: m.id, fields: { ...f, status: fd.get('status') } });
@@ -633,18 +638,19 @@
     try { res = await api('GET', 'api/dod?id=' + encodeURIComponent(id)); } catch (e) { return fail(e); }
     const t = tasks.find((x) => x.id === id) || { title: '' };
     const missing = res.auto.filter((a) => !a.ok);
-    const isCheck = (a) => /^(Prüfung |Automatische Prüfungen)/.test(a.text);
+    // Punkte der Prüfungen in beiden Sprachen erkennen (englisch "Check {name}", "Automatic checks ran on the current state").
+    const isCheck = (a) => /^(Prüfung |Automatische Prüfungen|Check |Automatic checks)/.test(a.text);
     const dodItems = res.checks ? res.auto.filter((a) => !isCheck(a)) : res.auto;
-    const html = '<h2>' + esc(id) + ' abschließen</h2><p class="lead">' + esc(t.title) + '</p>' +
+    const html = '<h2>' + tr('Complete {id}', { id: esc(id) }) + '</h2><p class="lead">' + esc(t.title) + '</p>' +
       (res.checks ? checksBlock(res.checks) : '') +
-      '<div class="block"><div class="block-head"><h3>' + (res.checks ? 'Aus der Definition of Done' : 'Automatisch geprüft') + '</h3><span class="meta">' + dodItems.filter((a) => a.ok).length + ' von ' + dodItems.length + ' erfüllt</span></div>' +
-      '<ul class="dod">' + dodItems.map((a) => '<li class="' + (a.ok ? 'ok' : 'no') + '"><span class="mark" aria-hidden="true">' + (a.ok ? '✓' : '!') + '</span><span>' + esc(a.text) + (a.detail ? ' <span class="detail">' + esc(a.detail) + '</span>' : '') + '<span class="sr">' + (a.ok ? ' erfüllt' : ' fehlt') + '</span></span></li>').join('') + '</ul></div>' +
-      (res.manual.length ? '<div class="block"><div class="block-head"><h3>Selbst bestätigen</h3><span class="meta">Abhaken, was erledigt ist</span></div><ul class="dod">' + res.manual.map((m, i) => '<li><label><input type="checkbox" name="m' + i + '" class="man"><span>' + esc(m) + '</span></label></li>').join('') + '</ul></div>' : '') +
-      (missing.length ? '<div class="alert bad">' + (missing.length === 1 ? 'Es fehlt noch 1 Punkt' : 'Es fehlen noch ' + missing.length + ' Punkte') + '. Abschließen ist nur mit Begründung möglich, die im Verlauf landet.</div><label class="field"><span>Begründung für das Abschließen trotz offener Punkte</span><input class="input" name="reason" maxlength="300"></label>' : '') +
-      '<p class="err" role="alert"></p><div class="foot"><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn ' + (missing.length ? 'danger' : 'primary') + '" value="ok" id="dodGo" disabled>' + (missing.length ? 'Trotzdem abschließen' : 'Abschließen') + '</button></div>';
+      '<div class="block"><div class="block-head"><h3>' + (res.checks ? tr('From the Definition of Done') : tr('Checked automatically')) + '</h3><span class="meta">' + tr('{a} of {b} met', { a: dodItems.filter((a) => a.ok).length, b: dodItems.length }) + '</span></div>' +
+      '<ul class="dod">' + dodItems.map((a) => '<li class="' + (a.ok ? 'ok' : 'no') + '"><span class="mark" aria-hidden="true">' + (a.ok ? '✓' : '!') + '</span><span>' + esc(a.text) + (a.detail ? ' <span class="detail">' + esc(a.detail) + '</span>' : '') + '<span class="sr"> ' + (a.ok ? tr('met') : tr('missing')) + '</span></span></li>').join('') + '</ul></div>' +
+      (res.manual.length ? '<div class="block"><div class="block-head"><h3>' + tr('Confirm yourself') + '</h3><span class="meta">' + tr('Tick what is done') + '</span></div><ul class="dod">' + res.manual.map((m, i) => '<li><label><input type="checkbox" name="m' + i + '" class="man"><span>' + esc(m) + '</span></label></li>').join('') + '</ul></div>' : '') +
+      (missing.length ? '<div class="alert bad">' + (missing.length === 1 ? tr('1 item is still missing. You can only complete with a reason, which is recorded in the history.') : tr('{n} items are still missing. You can only complete with a reason, which is recorded in the history.', { n: missing.length })) + '</div><label class="field"><span>' + tr('Reason for completing despite open items') + '</span><input class="input" name="reason" maxlength="300"></label>' : '') +
+      '<p class="err" role="alert"></p><div class="foot"><button class="btn" value="cancel" formnovalidate>' + tr('Cancel') + '</button><button class="btn ' + (missing.length ? 'danger' : 'primary') + '" value="ok" id="dodGo" disabled>' + (missing.length ? tr('Complete anyway') : tr('Complete')) + '</button></div>';
     const r = await showDialog(html, (fd) => {
       const reason = String(fd.get('reason') || '').trim();
-      if (missing.length && !reason) throw new Error('Bitte eine Begründung angeben.');
+      if (missing.length && !reason) throw new Error(tr('Please give a reason.'));
       return act('move', { id, to: 'erledigt', force: missing.length > 0, reason });
     }, (f) => {
       const go = $('#dodGo', f);
@@ -657,7 +663,7 @@
       update();
       bindChecks(f, id);
     });
-    if (r) ok(id + ' erledigt');
+    if (r) ok(tr('{id} done', { id }));
   }
 
   // ---------- Detailpanel ----------
@@ -667,6 +673,12 @@
   let dirty = false;
   let staleDetail = false;
   let detailTab = 'overview';
+  // Abschnitte heißen in englischen Aufgaben wie SECTION_NAMES.en in lib.mjs; Vergleiche erkennen beide Sprachen.
+  const SEC_EN = { Beschreibung: 'Description', Übergabe: 'Handoff', Akzeptanzkriterien: 'Acceptance criteria', Umsetzungsplan: 'Implementation plan', Checkliste: 'Checklist', Vorgehen: 'Approach' };
+  const secIs = (name, key) => name === key || name === SEC_EN[key];
+  // Anzeigename eines Abschnittsschlüssels in der Sprache des Boards; andere Namen bleiben wie in der Datei.
+  const SEC_LABEL = { Beschreibung: tr('Description'), Übergabe: tr('Handoff'), Akzeptanzkriterien: tr('Acceptance criteria'), Umsetzungsplan: tr('Implementation plan'), Checkliste: tr('Checklist'), Vorgehen: tr('Approach') };
+  const secLabel = (name) => SEC_LABEL[name] || name;
 
   async function openTask(id) {
     if (!LIVE && !DETAILS) return openStatic(id);
@@ -674,7 +686,7 @@
     openId = id; dirty = false; staleDetail = false;
     closeSide();
     panel.hidden = false; scrim.hidden = false;
-    if (!detail || detail.task.id !== id) $('#panelBody').innerHTML = '<p class="md">Lädt …</p>';
+    if (!detail || detail.task.id !== id) $('#panelBody').innerHTML = '<p class="md">' + tr('Loading …') + '</p>';
     await loadDetail();
     panel.tabIndex = -1;
     panel.focus({ preventScroll: true });
@@ -685,10 +697,10 @@
     if (!t) return;
     openId = id;
     panel.hidden = false; scrim.hidden = false;
-    $('#panelBody').innerHTML = '<div class="p-head"><div class="p-bar"><span class="id">' + esc(t.id) + '</span><span>' + esc(meta.typeLabel[t.type]) + '</span><span class="st" style="--c:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span><span class="spacer"></span><button class="btn small" data-close>Schließen</button></div><h2 class="p-title" style="border:0">' + esc(t.title) + '</h2></div>' +
+    $('#panelBody').innerHTML = '<div class="p-head"><div class="p-bar"><span class="id">' + esc(t.id) + '</span><span>' + esc(meta.typeLabel[t.type]) + '</span><span class="st" style="--c:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span><span class="spacer"></span><button class="btn small" data-close>' + tr('Close') + '</button></div><h2 class="p-title" style="border:0">' + esc(t.title) + '</h2></div>' +
       (t.excerpt ? '<div class="md">' + md(t.excerpt) + '</div>' : '') +
       (t.thumb ? '<img src="' + esc(t.thumb) + '" alt="' + esc(t.thumbAlt) + '" style="max-width:100%;border-radius:8px">' : '') +
-      '<div class="alert info">Details und Bearbeiten gibt es in der Live-Ansicht.</div>' +
+      '<div class="alert info">' + tr('Details and editing are available in the live view.') + '</div>' +
       '<div class="p-foot"><span class="path">' + esc(t.file) + '</span></div>';
     $('[data-close]', panel).onclick = closePanel;
   }
@@ -698,17 +710,17 @@
     try {
       if (DETAILS) {
         detail = DETAILS[openId];
-        if (!detail) throw new Error('Für diese Aufgabe sind im Schnappschuss keine Details enthalten.');
+        if (!detail) throw new Error(tr('The snapshot contains no details for this task.'));
       } else detail = await api('GET', 'api/task?id=' + encodeURIComponent(openId));
       renderDetail();
     } catch (e) {
-      $('#panelBody').innerHTML = '<div class="alert bad">' + esc(e.message) + '</div><button class="btn" data-close>Schließen</button>';
+      $('#panelBody').innerHTML = '<div class="alert bad">' + esc(e.message) + '</div><button class="btn" data-close>' + tr('Close') + '</button>';
       $('[data-close]', panel).onclick = closePanel;
     }
   }
 
   function closePanel() {
-    if (dirty && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
+    if (dirty && !confirm(tr('Discard unsaved changes?'))) return;
     panel.hidden = true; scrim.hidden = true; openId = null; detail = null; dirty = false;
   }
   scrim.onclick = () => { closePanel(); closeSide(); };
@@ -716,7 +728,7 @@
   function sel(name, options, value, labelFn) {
     return '<select data-field="' + name + '">' + options.map((o) => {
       const v = typeof o === 'string' ? o : o.id;
-      const lab = labelFn ? labelFn(o) : typeof o === 'string' ? (o || 'Offen') : o.label;
+      const lab = labelFn ? labelFn(o) : typeof o === 'string' ? (o || tr('Not set')) : o.label;
       return '<option value="' + esc(v) + '"' + (String(value || '') === v ? ' selected' : '') + '>' + esc(lab) + '</option>';
     }).join('') + '</select>';
   }
@@ -727,20 +739,20 @@
     const mi = metaInfo || { types: Object.entries(meta.typeLabel).map(([id, label]) => ({ id, label })), efforts: ['S', 'M', 'L', 'XL'], risks: ['niedrig', 'mittel', 'hoch'], milestones: meta.milestones };
     const closed = !OPEN.includes(t.status);
     // Die Beschreibung ist der zentrale Abschnitt. Ein Ziel älterer Aufgaben erscheint nur, wenn es gefüllt ist.
-    const desc = d.sections.find((s) => s.name === 'Beschreibung');
-    const legacy = d.goalSection !== 'Beschreibung' ? d.sections.find((s) => s.name === d.goalSection && s.content) : null;
-    const others = d.sections.filter((s) => s.name !== 'Beschreibung' && s.name !== 'Übergabe' && !(legacy && s.name === legacy.name) && !(!s.content && s.name === d.goalSection));
-    const handoff = d.sections.find((s) => s.name === 'Übergabe');
+    const desc = d.sections.find((s) => secIs(s.name, 'Beschreibung'));
+    const legacy = !secIs(d.goalSection, 'Beschreibung') ? d.sections.find((s) => s.name === d.goalSection && s.content) : null;
+    const others = d.sections.filter((s) => !secIs(s.name, 'Beschreibung') && !secIs(s.name, 'Übergabe') && !(legacy && s.name === legacy.name) && !(!s.content && s.name === d.goalSection));
+    const handoff = d.sections.find((s) => secIs(s.name, 'Übergabe'));
     const h = [];
 
     const queued = (meta.queue || []).indexOf(t.id);
     h.push('<div class="p-head"><div class="p-bar"><span class="id">' + esc(t.id) + '</span><span class="st" style="--c:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span>' +
-      (d.archived ? '<span class="tag">Archiviert</span>' : '') + (queued >= 0 ? '<span class="tag q-tag">Warteschlange Platz ' + (queued + 1) + '</span>' : '') + '<span class="spacer"></span>' +
-      (OPEN.includes(t.status) && !['in-arbeit', 'review'].includes(t.status) ? '<button class="btn small ghost" data-act="queue">' + (queued >= 0 ? 'Aus Warteschlange' : 'Einreihen') + '</button>' : '') +
-      (t.status === 'review' ? '<button class="btn small primary" data-act="review">Abnehmen</button>' : OPEN.includes(t.status) ? '<button class="btn small" data-act="dod">Abschließen</button>' : '') +
-      '<button class="btn small ghost" data-close aria-label="Panel schließen">Schließen</button></div>' +
-      '<textarea class="p-title" rows="1" maxlength="160" aria-label="Titel" data-title' + (EDIT ? '' : ' readonly') + '>' + esc(t.title) + '</textarea>' +
-      '<div class="p-tabs" role="tablist">' + [['overview', 'Übersicht']].concat(d.design || /^(design)$/.test(t.type) || (t.tags || []).includes('ui') ? [['design', 'Entwürfe' + (d.design && d.design.variants.length ? ' <span class="count">' + d.design.variants.length + '</span>' : '')]] : []).concat([['comments', 'Kommentare' + ((d.comments || []).length ? ' <span class="count">' + d.comments.length + '</span>' : '')], ['time', 'Zeit']]).concat(LIVE ? [['code', 'Code und Commits']] : []).map((x) => '<button role="tab" data-tab="' + x[0] + '" aria-selected="' + (detailTab === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' +
+      (d.archived ? '<span class="tag">' + tr('Archived') + '</span>' : '') + (queued >= 0 ? '<span class="tag q-tag">' + tr('Queue position {n}', { n: queued + 1 }) + '</span>' : '') + '<span class="spacer"></span>' +
+      (OPEN.includes(t.status) && !['in-arbeit', 'review'].includes(t.status) ? '<button class="btn small ghost" data-act="queue">' + (queued >= 0 ? tr('Remove from queue') : tr('Add to queue')) + '</button>' : '') +
+      (t.status === 'review' ? '<button class="btn small primary" data-act="review">' + tr('Accept') + '</button>' : OPEN.includes(t.status) ? '<button class="btn small" data-act="dod">' + tr('Complete') + '</button>' : '') +
+      '<button class="btn small ghost" data-close aria-label="' + tr('Close panel') + '">' + tr('Close') + '</button></div>' +
+      '<textarea class="p-title" rows="1" maxlength="160" aria-label="' + tr('Title') + '" data-title' + (EDIT ? '' : ' readonly') + '>' + esc(t.title) + '</textarea>' +
+      '<div class="p-tabs" role="tablist">' + [['overview', tr('Details')]].concat(d.design || /^(design)$/.test(t.type) || (t.tags || []).includes('ui') ? [['design', tr('Design variants') + (d.design && d.design.variants.length ? ' <span class="count">' + d.design.variants.length + '</span>' : '')]] : []).concat([['comments', tr('Comments') + ((d.comments || []).length ? ' <span class="count">' + d.comments.length + '</span>' : '')], ['time', tr('Time')]]).concat(LIVE ? [['code', tr('Code and commits')]] : []).map((x) => '<button role="tab" data-tab="' + x[0] + '" aria-selected="' + (detailTab === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' +
       '</div>');
     if (detailTab === 'comments' || detailTab === 'time' || detailTab === 'design') {
       h.push(detailTab === 'comments' ? commentsHtml(d) : detailTab === 'design' ? designHtml(d) : timeHtml(d));
@@ -751,7 +763,7 @@
       return;
     }
     if (detailTab === 'code' && LIVE) {
-      h.push('<div id="codeBox" class="code-box"><p class="md">Lädt Git-Daten …</p></div>');
+      h.push('<div id="codeBox" class="code-box"><p class="md">' + tr('Loading Git data …') + '</p></div>');
       $('#panelBody').innerHTML = h.join('');
       bindHead();
       loadCode(t.id);
@@ -760,23 +772,23 @@
 
     h.push('<div class="fields">' +
       '<label class="field"><span>Status</span>' + sel('status', COLS.map((c) => ({ id: c, label: L(c) })), t.status) + '</label>' +
-      '<label class="field"><span>Priorität</span>' + sel('priority', PRIOS.map((p) => ({ id: p, label: p + ' ' + meta.prioLabel[p] })), t.priority) + '</label>' +
-      '<label class="field"><span>Typ</span>' + sel('type', mi.types, t.type) + '</label>' +
-      '<label class="field"><span>Aufwand</span>' + sel('effort', [''].concat(mi.efforts), t.effort) + '</label>' +
-      '<label class="field"><span>Risiko</span>' + sel('risk', [''].concat(mi.risks), t.risk) + '</label>' +
-      '<label class="field"><span>Fällig</span><input type="date" data-field="due" value="' + esc(t.due || '') + '"></label>' +
-      '<label class="field wide"><span>Meilenstein</span>' + sel('milestone', [{ id: '', label: 'Keiner' }].concat(meta.milestones.map((m) => ({ id: m.id, label: m.id + ' ' + m.title }))), t.milestone) + '</label>' +
-      '<label class="field wide" style="grid-column:1/-1"><span>Tags, mit Komma getrennt</span><input class="input" data-field="tags" value="' + esc((t.tags || []).join(', ')) + '"></label>' +
+      '<label class="field"><span>' + tr('Priority') + '</span>' + sel('priority', PRIOS.map((p) => ({ id: p, label: p + ' ' + meta.prioLabel[p] })), t.priority) + '</label>' +
+      '<label class="field"><span>' + tr('Type') + '</span>' + sel('type', mi.types, t.type) + '</label>' +
+      '<label class="field"><span>' + tr('Effort') + '</span>' + sel('effort', [''].concat(mi.efforts), t.effort) + '</label>' +
+      '<label class="field"><span>' + tr('Risk') + '</span>' + sel('risk', [''].concat(mi.risks), t.risk) + '</label>' +
+      '<label class="field"><span>' + tr('Due') + '</span><input type="date" data-field="due" value="' + esc(t.due || '') + '"></label>' +
+      '<label class="field wide"><span>' + tr('Milestone') + '</span>' + sel('milestone', [{ id: '', label: tr('None') }].concat(meta.milestones.map((m) => ({ id: m.id, label: m.id + ' ' + m.title }))), t.milestone) + '</label>' +
+      '<label class="field wide" style="grid-column:1/-1"><span>' + tr('Tags, comma-separated') + '</span><input class="input" data-field="tags" value="' + esc((t.tags || []).join(', ')) + '"></label>' +
       '</div>');
 
     const alerts = [];
-    if (d.blocked) alerts.push('<div class="alert bad">Wartet auf ' + d.openBlockers.map((x) => '<a href="#" data-goto="' + esc(x) + '">' + esc(x) + '</a>').join(', ') + '. Starten geht erst, wenn diese erledigt sind.</div>');
-    if (t.incomplete && !closed) alerts.push('<div class="alert info"><span>Schnell erfasst, Details fehlen noch. Ergänze Beschreibung und Akzeptanzkriterien, dann <button class="btn link" data-act="complete">als vollständig markieren</button>.</span></div>');
-    if (staleDetail) alerts.push('<div class="alert info">Die Aufgabe wurde inzwischen geändert. <button class="btn link" data-act="reload">Neu laden</button></div>');
+    if (d.blocked) alerts.push('<div class="alert bad">' + tr('Waiting for {ids}. You can start once these are done.', { ids: d.openBlockers.map((x) => '<a href="#" data-goto="' + esc(x) + '">' + esc(x) + '</a>').join(', ') }) + '</div>');
+    if (t.incomplete && !closed) alerts.push('<div class="alert info"><span>' + tr('Captured quickly, details are still missing. Add a description and acceptance criteria, then {button}.', { button: '<button class="btn link" data-act="complete">' + tr('mark as complete') + '</button>' }) + '</span></div>');
+    if (staleDetail) alerts.push('<div class="alert info">' + tr('The task has changed in the meantime.') + ' <button class="btn link" data-act="reload">' + tr('Reload') + '</button></div>');
     h.push(alerts.join(''));
     if (t.status === 'in-arbeit' && EDIT) h.push(instructBox(t.id));
 
-    const descBlock = sectionBlock('Beschreibung', desc ? desc.content : '', true, 'Alles Relevante zur Aufgabe, Claude liest das als Vorgabe');
+    const descBlock = sectionBlock('Beschreibung', desc ? desc.content : '', true, tr('Everything relevant to the task; Claude reads it as your brief'));
     // Ältere Aufgaben ohne Beschreibung: das gefüllte Ziel zuerst, darunter die leere Beschreibung zum Ergänzen.
     if (legacy && !(desc && desc.content)) h.push(sectionBlock(legacy.name, legacy.content, true), descBlock);
     else { h.push(descBlock); if (legacy) h.push(sectionBlock(legacy.name, legacy.content, true)); }
@@ -784,46 +796,46 @@
     for (const c of d.checklists) {
       if (!EDIT && !c.items.length) continue;
       const done = c.items.filter((i) => i.done).length;
-      h.push('<div class="block" data-list="' + esc(c.name) + '"><div class="block-head"><h3>' + esc(c.name) + '</h3><span class="meta">' + done + ' von ' + c.items.length + '</span></div>' +
-        (c.items.length ? '<ul class="checklist">' + c.items.map((i) => '<li class="' + (i.done ? 'done' : '') + '"><input type="checkbox" data-check="' + i.n + '"' + (i.done ? ' checked' : '') + ' aria-label="' + esc(i.text) + '"><span class="txt">' + inline(i.text) + '</span><button class="rm" data-rm="' + i.n + '" title="Punkt entfernen" aria-label="Punkt entfernen">×</button></li>').join('') + '</ul>' : '') +
-        '<div class="add-row"><input class="input" data-additem placeholder="' + (c.name === 'Akzeptanzkriterien' ? 'Kriterium ergänzen' : 'Schritt ergänzen') + '" maxlength="500"><button class="btn small" data-additem-btn>Hinzufügen</button></div></div>');
+      h.push('<div class="block" data-list="' + esc(c.name) + '"><div class="block-head"><h3>' + esc(secLabel(c.name)) + '</h3><span class="meta">' + tr('{a} of {b}', { a: done, b: c.items.length }) + '</span></div>' +
+        (c.items.length ? '<ul class="checklist">' + c.items.map((i) => '<li class="' + (i.done ? 'done' : '') + '"><input type="checkbox" data-check="' + i.n + '"' + (i.done ? ' checked' : '') + ' aria-label="' + esc(i.text) + '"><span class="txt">' + inline(i.text) + '</span><button class="rm" data-rm="' + i.n + '" title="' + tr('Remove item') + '" aria-label="' + tr('Remove item') + '">×</button></li>').join('') + '</ul>' : '') +
+        '<div class="add-row"><input class="input" data-additem placeholder="' + (secIs(c.name, 'Akzeptanzkriterien') ? tr('Add criterion') : tr('Add step')) + '" maxlength="500"><button class="btn small" data-additem-btn>' + tr('Add') + '</button></div></div>');
     }
 
     const openQ = d.questions.filter((q) => !q.done);
-    h.push('<div class="block"><div class="block-head"><h3>Offene Fragen</h3><span class="meta">' + (openQ.length ? openQ.length + ' offen' : 'keine offen') + '</span></div>' +
+    h.push('<div class="block"><div class="block-head"><h3>' + tr('Open questions') + '</h3><span class="meta">' + (openQ.length ? tr('{n} open', { n: openQ.length }) : tr('none open')) + '</span></div>' +
       d.questions.map((q) => '<div class="qa' + (q.done ? ' done' : '') + '"><div class="q">' + inline(q.text) + '</div>' +
-        (q.done ? '' : '<div class="add-row"><input class="input" data-answer="' + q.n + '" placeholder="Antwort, optional" maxlength="1000"><button class="btn small" data-resolve="' + q.n + '">Geklärt</button></div>') + '</div>').join('') +
-      '<div class="add-row"><input class="input" data-question placeholder="Frage an Claude oder an dich selbst notieren" maxlength="500"><button class="btn small" data-question-btn>Notieren</button></div></div>');
+        (q.done ? '' : '<div class="add-row"><input class="input" data-answer="' + q.n + '" placeholder="' + tr('Answer, optional') + '" maxlength="1000"><button class="btn small" data-resolve="' + q.n + '">' + tr('Resolved') + '</button></div>') + '</div>').join('') +
+      '<div class="add-row"><input class="input" data-question placeholder="' + tr('Note a question for Claude or yourself') + '" maxlength="500"><button class="btn small" data-question-btn>' + tr('Jot down') + '</button></div></div>');
 
-    h.push(sectionBlock('Übergabe', handoff ? handoff.content : '', d.editable.includes('Übergabe'), 'Wo es weitergeht. Claude schreibt sie am Ende jeder Arbeitsphase.'));
+    h.push(sectionBlock('Übergabe', handoff ? handoff.content : '', d.editable.some((n) => secIs(n, 'Übergabe')), tr('Where work continues. Claude writes it at the end of each work phase.')));
 
-    h.push('<div class="block"><div class="block-head"><h3>Bilder und Dateien</h3><span class="meta">' + d.assets.length + '</span></div>' +
+    h.push('<div class="block"><div class="block-head"><h3>' + tr('Images and files') + '</h3><span class="meta">' + d.assets.length + '</span></div>' +
       (d.assets.length ? '<div class="gallery">' + d.assets.map((a) => '<figure class="shot" style="margin:0">' + (a.image ? '<a href="' + esc(a.src) + '" target="_blank" rel="noopener"><img loading="lazy" src="' + esc(a.src) + '" alt="' + esc(a.alt) + '"></a>' : '<a href="' + esc(a.src) + '" target="_blank" rel="noopener">' + esc(a.alt || a.src) + '</a>') +
         '<figcaption>' + (a.kind ? '<span class="kind">' + esc(a.kind) + '</span>' : '') + esc(a.desc || a.alt) + '</figcaption></figure>').join('') + '</div>' : '') +
-      '<div class="drop" id="dropzone"><span><strong>Bild einfügen</strong> mit Strg+V, hierher ziehen oder <button class="btn link" id="pickFile">Datei wählen</button>. Erlaubt sind PNG, JPEG, GIF, WebP und AVIF.</span><input type="file" id="fileIn" accept="image/png,image/jpeg,image/gif,image/webp,image/avif" hidden>' +
-      '<div id="upForm" hidden><img class="preview" id="upPrev" alt="Vorschau"><div class="row" style="margin-top:8px"><select id="upKind" class="input"><option value="">Art wählen</option>' + ['ist', 'vorher', 'nachher', 'referenz', 'mockup', 'skizze', 'fehler', 'diagramm'].map((k) => '<option>' + k + '</option>').join('') + '</select><input class="input" id="upName" placeholder="Kurzer Name, optional" maxlength="60"></div>' +
-      '<textarea class="input" id="upDesc" rows="2" style="margin-top:8px" placeholder="Was ist zu sehen? Diese Beschreibung liest Claude statt des Bildes." maxlength="1000"></textarea><div class="row" style="margin-top:8px;justify-content:flex-end;display:flex;gap:8px"><button class="btn small" id="upCancel">Verwerfen</button><button class="btn small primary" id="upSave">Bild speichern</button></div></div></div></div>');
+      '<div class="drop" id="dropzone"><span>' + tr('{paste} with Ctrl+V, drag it here or {pick}. PNG, JPEG, GIF, WebP and AVIF are allowed.', { paste: '<strong>' + tr('Paste an image') + '</strong>', pick: '<button class="btn link" id="pickFile">' + tr('choose a file') + '</button>' }) + '</span><input type="file" id="fileIn" accept="image/png,image/jpeg,image/gif,image/webp,image/avif" hidden>' +
+      '<div id="upForm" hidden><img class="preview" id="upPrev" alt="' + tr('Preview') + '"><div class="row" style="margin-top:8px"><select id="upKind" class="input"><option value="">' + tr('Choose a kind') + '</option>' + ['ist', 'vorher', 'nachher', 'referenz', 'mockup', 'skizze', 'fehler', 'diagramm'].map((k) => '<option>' + k + '</option>').join('') + '</select><input class="input" id="upName" placeholder="' + tr('Short name, optional') + '" maxlength="60"></div>' +
+      '<textarea class="input" id="upDesc" rows="2" style="margin-top:8px" placeholder="' + tr('What does it show? Claude reads this description instead of the image.') + '" maxlength="1000"></textarea><div class="row" style="margin-top:8px;justify-content:flex-end;display:flex;gap:8px"><button class="btn small" id="upCancel">' + tr('Discard') + '</button><button class="btn small primary" id="upSave">' + tr('Save image') + '</button></div></div></div></div>');
 
-    const relRow = (k, list, rel) => list.map((r) => '<div class="rel-item"><span class="k">' + k + '</span><button class="go" data-goto="' + esc(r.id) + '">' + esc(r.id + ' ' + r.title) + '</button><span class="st" style="--c:' + statusVar(r.status) + '">' + esc(L(r.status)) + '</span><button class="btn small ghost" data-unlink="' + esc(rel) + '" data-target="' + esc(r.id) + '" aria-label="Verknüpfung entfernen">×</button></div>').join('');
+    const relRow = (k, list, rel) => list.map((r) => '<div class="rel-item"><span class="k">' + k + '</span><button class="go" data-goto="' + esc(r.id) + '">' + esc(r.id + ' ' + r.title) + '</button><span class="st" style="--c:' + statusVar(r.status) + '">' + esc(L(r.status)) + '</span><button class="btn small ghost" data-unlink="' + esc(rel) + '" data-target="' + esc(r.id) + '" aria-label="' + tr('Remove link') + '">×</button></div>').join('');
     const others2 = tasks.filter((x) => x.id !== t.id && !x.archived);
-    h.push('<div class="block"><div class="block-head"><h3>Abhängigkeiten</h3></div><div class="rel">' +
-      relRow('Wartet auf', d.blockedBy, 'blocked-by') + relRow('Blockiert', d.blocks, 'blocks') + relRow('Verwandt', d.related, 'related') +
-      '<div class="add-row"><select class="input" id="relKind" style="flex:0 0 140px"><option value="blocked-by">Wartet auf</option><option value="blocks">Blockiert</option><option value="related">Verwandt mit</option></select><select class="input" id="relTarget"><option value="">Aufgabe wählen</option>' + others2.map((x) => '<option value="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</option>').join('') + '</select><button class="btn small" id="relAdd">Verknüpfen</button></div></div></div>');
+    h.push('<div class="block"><div class="block-head"><h3>' + tr('Dependencies') + '</h3></div><div class="rel">' +
+      relRow(tr('Waiting for'), d.blockedBy, 'blocked-by') + relRow(tr('Blocks'), d.blocks, 'blocks') + relRow(tr('Related'), d.related, 'related') +
+      '<div class="add-row"><select class="input" id="relKind" style="flex:0 0 140px"><option value="blocked-by">' + tr('Waiting for') + '</option><option value="blocks">' + tr('Blocks') + '</option><option value="related">' + tr('Related to') + '</option></select><select class="input" id="relTarget"><option value="">' + tr('Choose a task') + '</option>' + others2.map((x) => '<option value="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</option>').join('') + '</select><button class="btn small" id="relAdd">' + tr('Link') + '</button></div></div></div>');
 
     for (const s of others) {
       if (!s.content && !d.editable.includes(s.name)) continue;
-      h.push('<details class="sec"' + (s.content ? ' open' : '') + '><summary>' + esc(s.name) + (s.content ? '' : ' <span class="meta">leer</span>') + '</summary><div class="body">' + sectionInner(s.name, s.content, d.editable.includes(s.name)) + '</div></details>');
+      h.push('<details class="sec"' + (s.content ? ' open' : '') + '><summary>' + esc(s.name) + (s.content ? '' : ' <span class="meta">' + tr('empty') + '</span>') + '</summary><div class="body">' + sectionInner(s.name, s.content, d.editable.includes(s.name)) + '</div></details>');
     }
-    if (d.decisions) h.push('<details class="sec"><summary>Designentscheidungen <span class="meta">decisions.md</span></summary><div class="body"><div class="md">' + md(d.decisions.replace(/^# .*\n?/, '')) + '</div></div></details>');
+    if (d.decisions) h.push('<details class="sec"><summary>' + tr('Design decisions') + ' <span class="meta">decisions.md</span></summary><div class="body"><div class="md">' + md(d.decisions.replace(/^# .*\n?/, '')) + '</div></div></details>');
 
-    h.push('<details class="sec" open><summary>Verlauf <span class="meta">' + d.history.length + ' Einträge</span></summary><div class="body">' +
-      '<div class="add-row"><input class="input" data-note placeholder="Notiz in den Verlauf schreiben" maxlength="2000"><button class="btn small" data-note-btn>Speichern</button></div>' +
+    h.push('<details class="sec" open><summary>' + tr('History') + ' <span class="meta">' + tr('{n} entries', { n: d.history.length }) + '</span></summary><div class="body">' +
+      '<div class="add-row"><input class="input" data-note placeholder="' + tr('Write a note to the history') + '" maxlength="2000"><button class="btn small" data-note-btn>' + tr('Save') + '</button></div>' +
       '<ol class="timeline">' + d.history.slice(0, 60).map((e) => '<li><time datetime="' + esc(e.date) + '">' + esc(fmtDate(e.date)) + '</time><span>' + inline(e.text) + (e.actor ? '<span class="by">' + esc(e.actor) + '</span>' : '') + '</span></li>').join('') + '</ol></div></details>');
 
-    h.push('<div class="p-foot"><span class="path" title="Datei">.works/' + esc(d.file) + '</span>' +
-      (EDIT ? '<button class="btn small ghost" data-act="template">Als Vorlage speichern</button>' : '') +
-      (closed && !d.archived ? '<button class="btn small" data-act="archive">Archivieren</button>' : '') +
-      (!closed ? '<button class="btn small danger" data-act="drop">Verwerfen</button>' : '<button class="btn small" data-act="reopen">Wiedereröffnen</button>') + '</div>');
+    h.push('<div class="p-foot"><span class="path" title="' + tr('File') + '">.works/' + esc(d.file) + '</span>' +
+      (EDIT ? '<button class="btn small ghost" data-act="template">' + tr('Save as template') + '</button>' : '') +
+      (closed && !d.archived ? '<button class="btn small" data-act="archive">' + tr('Archive') + '</button>' : '') +
+      (!closed ? '<button class="btn small danger" data-act="drop">' + tr('Drop') + '</button>' : '<button class="btn small" data-act="reopen">' + tr('Reopen') + '</button>') + '</div>');
 
     $('#panelBody').innerHTML = h.join('');
     bindDetail();
@@ -833,7 +845,7 @@
         const v = el.tagName === 'SELECT' ? (el.options[el.selectedIndex] || {}).text : el.type === 'date' ? fmtDate(el.value) : el.value;
         const span = document.createElement('span');
         span.className = 'ro-val';
-        span.textContent = v && v !== 'Offen' && v !== 'Keiner' ? v : '–';
+        span.textContent = v && v !== tr('Not set') && v !== tr('None') ? v : '–';
         el.replaceWith(span);
       });
       $$('#panelBody input, #panelBody select, #panelBody textarea:not([data-title])').forEach((el) => { el.disabled = true; });
@@ -852,11 +864,11 @@
   }
 
   function sectionBlock(name, content, editable, hint) {
-    return '<div class="block"><div class="block-head"><h3>' + esc(name) + '</h3>' + (hint ? '<span class="meta">' + esc(hint) + '</span>' : '') + '</div>' + sectionInner(name, content, editable) + '</div>';
+    return '<div class="block"><div class="block-head"><h3>' + esc(secLabel(name)) + '</h3>' + (hint ? '<span class="meta">' + esc(hint) + '</span>' : '') + '</div>' + sectionInner(name, content, editable) + '</div>';
   }
   function sectionInner(name, content, editable) {
     return '<div class="sec-view" data-sec="' + esc(name) + '"><div class="md">' + md(content) + '</div>' +
-      (editable ? '<div><button class="btn small" data-edit="' + esc(name) + '">Bearbeiten</button></div>' : '') + '</div>';
+      (editable ? '<div><button class="btn small" data-edit="' + esc(name) + '">' + tr('Edit') + '</button></div>' : '') + '</div>';
   }
 
   function bindDetail() {
@@ -875,7 +887,7 @@
       const v = title.value.trim();
       dirty = false;
       if (!v || v === t.title) { title.value = t.title; fit(); return; }
-      await run(() => act('set', { id, fields: { title: v } }), 'Titel gespeichert');
+      await run(() => act('set', { id, fields: { title: v } }), tr('Title saved'));
     };
 
     $$('[data-field]', root).forEach((el) => {
@@ -884,7 +896,7 @@
         if (f === 'status') { const to = el.value; el.value = t.status; return requestMove(id, to); }
         let v = el.value;
         if (f === 'tags') v = v.split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean);
-        await run(() => act('set', { id, fields: { [f]: v } }), 'Gespeichert');
+        await run(() => act('set', { id, fields: { [f]: v } }), tr('Saved'));
       };
     });
 
@@ -893,22 +905,22 @@
       if (a === 'drop') return requestMove(id, 'verworfen');
       if (a === 'reopen') return requestMove(id, 'backlog');
       if (a === 'reload') { staleDetail = false; return loadDetail(); }
-      if (a === 'archive') return run(() => act('archive', { id }), id + ' archiviert');
+      if (a === 'archive') return run(() => act('archive', { id }), tr('{id} archived', { id }));
       if (a === 'template') return editTemplate(null, id);
-      if (a === 'complete') return run(() => act('set', { id, fields: { incomplete: false } }), 'Als vollständig markiert');
+      if (a === 'complete') return run(() => act('set', { id, fields: { incomplete: false } }), tr('Marked as complete'));
     }; });
 
     $$('[data-edit]', root).forEach((b) => b.onclick = () => {
       const name = b.dataset.edit;
       const box = b.closest('.sec-view');
-      const cur = (detail.sections.find((s) => s.name === name) || {}).content || '';
-      box.innerHTML = '<textarea class="input" rows="' + Math.min(18, Math.max(4, cur.split('\n').length + 1)) + '" data-secedit>' + esc(cur) + '</textarea><div class="add-row" style="justify-content:flex-end"><span class="sublabel" style="margin-right:auto">Markdown, Listen mit - beginnen</span><button class="btn small" data-seccancel>Abbrechen</button><button class="btn small primary" data-secsave>Speichern</button></div>';
+      const cur = (detail.sections.find((s) => secIs(s.name, name)) || {}).content || '';
+      box.innerHTML = '<textarea class="input" rows="' + Math.min(18, Math.max(4, cur.split('\n').length + 1)) + '" data-secedit>' + esc(cur) + '</textarea><div class="add-row" style="justify-content:flex-end"><span class="sublabel" style="margin-right:auto">' + tr('Markdown, start lists with -') + '</span><button class="btn small" data-seccancel>' + tr('Cancel') + '</button><button class="btn small primary" data-secsave>' + tr('Save') + '</button></div>';
       const ta = $('[data-secedit]', box);
       ta.focus(); dirty = true;
       ta.onkeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') $('[data-secsave]', box).click(); };
       $('[data-seccancel]', box).onclick = () => { dirty = false; renderDetail(); };
       $('[data-secsave]', box).onclick = async () => {
-        const r = await run(() => act('section', { id, name, text: ta.value, after: name === 'Beschreibung' ? detail.typeGoal : undefined }), name + ' gespeichert');
+        const r = await run(() => act('section', { id, name, text: ta.value, after: name === 'Beschreibung' ? detail.typeGoal : undefined }), tr('{name} saved', { name: secLabel(name) }));
         if (r) dirty = false;
       };
     });
@@ -916,9 +928,9 @@
     $$('[data-list]', root).forEach((blk) => {
       const section = blk.dataset.list;
       $$('[data-check]', blk).forEach((c) => c.onchange = () => run(() => act('check', { id, section, n: +c.dataset.check, done: c.checked })));
-      $$('[data-rm]', blk).forEach((b) => b.onclick = () => run(() => act('itemRemove', { id, section, n: +b.dataset.rm }), 'Punkt entfernt'));
+      $$('[data-rm]', blk).forEach((b) => b.onclick = () => run(() => act('itemRemove', { id, section, n: +b.dataset.rm }), tr('Item removed')));
       const inp = $('[data-additem]', blk);
-      const add = () => { const v = inp.value.trim(); if (!v) return; inp.disabled = true; run(() => act('item', { id, section, text: v }), 'Punkt ergänzt').finally(() => { inp.disabled = false; }); };
+      const add = () => { const v = inp.value.trim(); if (!v) return; inp.disabled = true; run(() => act('item', { id, section, text: v }), tr('Item added')).finally(() => { inp.disabled = false; }); };
       inp.onkeydown = (e) => { if (e.key === 'Enter') add(); };
       $('[data-additem-btn]', blk).onclick = add;
     });
@@ -926,24 +938,24 @@
     $$('[data-resolve]', root).forEach((b) => b.onclick = () => {
       const n = +b.dataset.resolve;
       const answer = ($('[data-answer="' + n + '"]', root) || {}).value || '';
-      run(() => act('resolve', { id, n, answer: answer.trim() }), 'Frage geklärt');
+      run(() => act('resolve', { id, n, answer: answer.trim() }), tr('Question resolved'));
     });
     const q = $('[data-question]', root);
-    const addQ = () => { const v = q.value.trim(); if (v) run(() => act('question', { id, text: v }), 'Frage notiert'); };
+    const addQ = () => { const v = q.value.trim(); if (v) run(() => act('question', { id, text: v }), tr('Question noted')); };
     q.onkeydown = (e) => { if (e.key === 'Enter') addQ(); };
     $('[data-question-btn]', root).onclick = addQ;
 
     const note = $('[data-note]', root);
-    const addN = () => { const v = note.value.trim(); if (v) run(() => act('log', { id, text: v }), 'Notiz gespeichert'); };
+    const addN = () => { const v = note.value.trim(); if (v) run(() => act('log', { id, text: v }), tr('Note saved')); };
     note.onkeydown = (e) => { if (e.key === 'Enter') addN(); };
     $('[data-note-btn]', root).onclick = addN;
 
     $('#relAdd', root).onclick = () => {
       const target = $('#relTarget', root).value;
       if (!target) return;
-      run(() => act('link', { id, rel: $('#relKind', root).value, target }), 'Verknüpft');
+      run(() => act('link', { id, rel: $('#relKind', root).value, target }), tr('Linked'));
     };
-    $$('[data-unlink]', root).forEach((b) => b.onclick = () => run(() => act('link', { id, rel: b.dataset.unlink, target: b.dataset.target, remove: true }), 'Verknüpfung entfernt'));
+    $$('[data-unlink]', root).forEach((b) => b.onclick = () => run(() => act('link', { id, rel: b.dataset.unlink, target: b.dataset.target, remove: true }), tr('Link removed')));
 
     bindUpload(root, id);
   }
@@ -956,8 +968,8 @@
     const fileIn = $('#fileIn', root);
     const formEl = $('#upForm', root);
     const show = (file) => {
-      if (!/^image\/(png|jpeg|gif|webp|avif)$/.test(file.type)) { fail(new Error('Nur PNG, JPEG, GIF, WebP oder AVIF.')); return; }
-      if (file.size > 20 * 1024 * 1024) { fail(new Error('Das Bild ist größer als 20 MB.')); return; }
+      if (!/^image\/(png|jpeg|gif|webp|avif)$/.test(file.type)) { fail(new Error(tr('Only PNG, JPEG, GIF, WebP or AVIF.'))); return; }
+      if (file.size > 20 * 1024 * 1024) { fail(new Error(tr('The image is larger than 20 MB.'))); return; }
       pendingFile = file; dirty = true;
       formEl.hidden = false;
       const url = URL.createObjectURL(file);
@@ -976,7 +988,7 @@
       if (!pendingFile) return;
       const qs = new URLSearchParams({ id, kind: $('#upKind', root).value, desc: $('#upDesc', root).value.trim(), name: $('#upName', root).value.trim() });
       const btn = e.currentTarget; btn.disabled = true;
-      const r = await run(() => api('POST', 'api/asset?' + qs.toString(), undefined, { body: pendingFile, type: pendingFile.type }), 'Bild gespeichert');
+      const r = await run(() => api('POST', 'api/asset?' + qs.toString(), undefined, { body: pendingFile, type: pendingFile.type }), tr('Image saved'));
       btn.disabled = false;
       if (r) { pendingFile = null; dirty = false; }
     };
@@ -1005,19 +1017,19 @@
 
   async function renderSide() {
     const body = $('#sideBody');
-    const head = (title) => '<div class="side-head"><h2>' + esc(title) + '</h2><span class="spacer"></span><button class="btn small ghost" data-sclose>Schließen</button></div>';
+    const head = (title) => '<div class="side-head"><h2>' + esc(title) + '</h2><span class="spacer"></span><button class="btn small ghost" data-sclose>' + tr('Close') + '</button></div>';
     if (side === 'ideas') {
       let ideas = [];
       try { ideas = ideasCache = await api('GET', 'api/ideas'); } catch (e) { return fail(e); }
       const open = ideas.filter((i) => !i.closed);
       const closed = ideas.filter((i) => i.closed);
-      body.innerHTML = head('Ideen') +
-        '<p class="md">Lose Gedanken, die noch keine Aufgabe sind. Übernommene Ideen werden zur Aufgabe im Backlog.</p>' +
-        '<div class="add-row"><input class="input" id="ideaIn" placeholder="Idee notieren" maxlength="500"><button class="btn small primary" id="ideaAdd">Notieren</button></div>' +
-        '<input class="input" id="ideaTags" placeholder="Tags, optional, mit Komma getrennt">' +
-        (open.length ? open.map((i) => '<div class="idea"><div>' + inline(i.text) + '</div><div class="meta">' + esc(i.id) + ', ' + esc(fmtDate(i.date)) + (i.tags.length ? ', ' + i.tags.map((x) => '#' + esc(x)).join(' ') : '') + '</div><div class="row"><select class="input" data-ity="' + esc(i.id) + '" style="flex:1">' + Object.entries(meta.typeLabel).map(([k, v]) => '<option value="' + k + '">' + esc(v) + '</option>').join('') + '</select><select class="input" data-ipr="' + esc(i.id) + '" style="flex:0 0 110px">' + PRIOS.map((p) => '<option' + (p === 'P3' ? ' selected' : '') + '>' + p + '</option>').join('') + '</select><button class="btn small" data-promote="' + esc(i.id) + '">Als Aufgabe übernehmen</button><button class="btn small ghost danger" data-idrop="' + esc(i.id) + '">Verwerfen</button></div></div>').join('') : '<p class="md empty-md">Noch keine offenen Ideen.</p>') +
-        (closed.length ? '<details class="sec"><summary>Erledigte Ideen <span class="meta">' + closed.length + '</span></summary><div class="body">' + closed.map((i) => '<div class="idea closed"><div>' + inline(i.text) + '</div><div class="meta">' + esc(i.id) + ', ' + esc(i.note || 'abgeschlossen') + '</div></div>').join('') + '</div></details>' : '');
-      const add = () => { const v = $('#ideaIn').value.trim(); if (!v) return; run(() => act('idea', { text: v, tags: $('#ideaTags').value }), 'Idee notiert').then((r) => { if (r) renderSide(); }); };
+      body.innerHTML = head(tr('Ideas')) +
+        '<p class="md">' + tr('Loose thoughts that are not a task yet. Promoted ideas become a task in the backlog.') + '</p>' +
+        '<div class="add-row"><input class="input" id="ideaIn" placeholder="' + tr('Note an idea') + '" maxlength="500"><button class="btn small primary" id="ideaAdd">' + tr('Jot down') + '</button></div>' +
+        '<input class="input" id="ideaTags" placeholder="' + tr('Tags, optional, comma-separated') + '">' +
+        (open.length ? open.map((i) => '<div class="idea"><div>' + inline(i.text) + '</div><div class="meta">' + esc(i.id) + ', ' + esc(fmtDate(i.date)) + (i.tags.length ? ', ' + i.tags.map((x) => '#' + esc(x)).join(' ') : '') + '</div><div class="row"><select class="input" data-ity="' + esc(i.id) + '" style="flex:1">' + Object.entries(meta.typeLabel).map(([k, v]) => '<option value="' + k + '">' + esc(v) + '</option>').join('') + '</select><select class="input" data-ipr="' + esc(i.id) + '" style="flex:0 0 110px">' + PRIOS.map((p) => '<option' + (p === 'P3' ? ' selected' : '') + '>' + p + '</option>').join('') + '</select><button class="btn small" data-promote="' + esc(i.id) + '">' + tr('Turn into a task') + '</button><button class="btn small ghost danger" data-idrop="' + esc(i.id) + '">' + tr('Drop') + '</button></div></div>').join('') : '<p class="md empty-md">' + tr('No open ideas yet.') + '</p>') +
+        (closed.length ? '<details class="sec"><summary>' + tr('Closed ideas') + ' <span class="meta">' + closed.length + '</span></summary><div class="body">' + closed.map((i) => '<div class="idea closed"><div>' + inline(i.text) + '</div><div class="meta">' + esc(i.id) + ', ' + esc(i.note || tr('closed')) + '</div></div>').join('') + '</div></details>' : '');
+      const add = () => { const v = $('#ideaIn').value.trim(); if (!v) return; run(() => act('idea', { text: v, tags: $('#ideaTags').value }), tr('Idea noted')).then((r) => { if (r) renderSide(); }); };
       $('#ideaIn').onkeydown = (e) => { if (e.key === 'Enter') add(); };
       $('#ideaAdd').onclick = add;
       $$('[data-promote]', body).forEach((b) => b.onclick = async () => {
@@ -1026,18 +1038,18 @@
         if (r) { renderSide(); if (r.id) pendingOpen = r.id; }
       });
       $$('[data-idrop]', body).forEach((b) => b.onclick = async () => {
-        const reason = await askText({ title: 'Idee verwerfen', label: 'Grund, optional', confirm: 'Verwerfen', danger: true });
+        const reason = await askText({ title: tr('Drop idea'), label: tr('Reason, optional'), confirm: tr('Drop'), danger: true });
         if (reason === null) return;
-        const r = await run(() => act('ideaDrop', { iid: b.dataset.idrop, reason }), 'Idee verworfen');
+        const r = await run(() => act('ideaDrop', { iid: b.dataset.idrop, reason }), tr('Idea dropped'));
         if (r) renderSide();
       });
     } else if (side === 'next') {
       let n;
       try { n = await api('GET', 'api/next'); } catch (e) { return fail(e); }
-      body.innerHTML = head('Nächste Aufgabe') +
-        '<p class="md">Vorschlag nach Priorität, Fristen, Abhängigkeiten und Aufwand. Blockierte Aufgaben sind ausgenommen.</p>' +
-        (n.active.length ? '<div class="block"><div class="block-head"><h3>Läuft gerade</h3></div>' + n.active.map((t) => '<div class="cand"><div class="row"><span class="st" style="--c:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span><span class="tag">' + esc(t.priority) + '</span></div><button class="btn link" style="justify-content:flex-start;text-align:left" data-goto="' + esc(t.id) + '">' + esc(t.id + ' ' + t.title) + '</button></div>').join('') + '</div>' : '') +
-        '<div class="block"><div class="block-head"><h3>Vorschläge</h3></div>' + (n.candidates.length ? n.candidates.map((c, i) => '<div class="cand"><div class="t">' + (i === 0 ? 'Empfohlen: ' : '') + esc(c.id + ' ' + c.title) + '</div><div class="why">' + esc(c.reasons.join(', ')) + '</div><div class="row"><button class="btn small primary" data-start="' + esc(c.id) + '">Starten</button><button class="btn small" data-goto="' + esc(c.id) + '">Ansehen</button></div></div>').join('') : '<p class="md empty-md">Nichts Startbares im Backlog.</p>') + '</div>';
+      body.innerHTML = head(tr('Next task')) +
+        '<p class="md">' + tr('Suggestion based on priority, due dates, dependencies and effort. Blocked tasks are left out.') + '</p>' +
+        (n.active.length ? '<div class="block"><div class="block-head"><h3>' + tr('Running now') + '</h3></div>' + n.active.map((t) => '<div class="cand"><div class="row"><span class="st" style="--c:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span><span class="tag">' + esc(t.priority) + '</span></div><button class="btn link" style="justify-content:flex-start;text-align:left" data-goto="' + esc(t.id) + '">' + esc(t.id + ' ' + t.title) + '</button></div>').join('') + '</div>' : '') +
+        '<div class="block"><div class="block-head"><h3>' + tr('Suggestions') + '</h3></div>' + (n.candidates.length ? n.candidates.map((c, i) => '<div class="cand"><div class="t">' + esc(i === 0 ? tr('Recommended: {task}', { task: c.id + ' ' + c.title }) : c.id + ' ' + c.title) + '</div><div class="why">' + esc(c.reasons.join(', ')) + '</div><div class="row"><button class="btn small primary" data-start="' + esc(c.id) + '">' + tr('Start') + '</button><button class="btn small" data-goto="' + esc(c.id) + '">' + tr('View') + '</button></div></div>').join('') : '<p class="md empty-md">' + tr('Nothing startable in the backlog.') + '</p>') + '</div>';
       $$('[data-start]', body).forEach((b) => b.onclick = async () => { await requestMove(b.dataset.start, 'in-arbeit'); renderSide(); });
       $$('[data-goto]', body).forEach((b) => b.onclick = () => { closeSide(); openTask(b.dataset.goto); });
     } else if (side === 'knowledge') {
@@ -1048,9 +1060,9 @@
       return renderTools(body, head);
     } else if (side === 'activity') {
       unseen = 0; renderCounts();
-      body.innerHTML = head('Aktivität') +
-        '<p class="md">Änderungen seit dem Öffnen des Boards, egal ob von Claude, aus dem Terminal oder hier im Board.</p>' +
-        (activity.length ? '<ol class="feed">' + activity.map((a) => '<li data-id="' + esc(a.id) + '" style="--cc:' + changeColor(a) + '"><span class="time">' + esc(a.date) + ' ' + esc(a.time) + (a.actor ? ', ' + esc(a.actor) : '') + '</span><span><strong>' + esc(a.id) + '</strong> ' + esc(a.title) + '</span><span class="flowline">' + flowHtml(a) + '</span>' + (a.why ? '<span class="why">' + esc(a.why) + '</span>' : '') + '</li>').join('') + '</ol><button class="btn small" id="actClear">Liste leeren</button>' : '<p class="md empty-md">Noch keine Änderungen.</p>');
+      body.innerHTML = head(tr('Activity')) +
+        '<p class="md">' + tr('Changes since the board was opened, whether from Claude, the terminal or here in the board.') + '</p>' +
+        (activity.length ? '<ol class="feed">' + activity.map((a) => '<li data-id="' + esc(a.id) + '" style="--cc:' + changeColor(a) + '"><span class="time">' + esc(a.date) + ' ' + esc(a.time) + (a.actor ? ', ' + esc(a.actor) : '') + '</span><span><strong>' + esc(a.id) + '</strong> ' + esc(a.title) + '</span><span class="flowline">' + flowHtml(a) + '</span>' + (a.why ? '<span class="why">' + esc(a.why) + '</span>' : '') + '</li>').join('') + '</ol><button class="btn small" id="actClear">' + tr('Clear list') + '</button>' : '<p class="md empty-md">' + tr('No changes yet.') + '</p>');
       $$('.feed li', body).forEach((li) => li.onclick = () => { closeSide(); focusCard(li.dataset.id); });
       const c = $('#actClear', body);
       if (c) c.onclick = () => { activity = []; store.set(actKey, activity); renderSide(); };
@@ -1060,7 +1072,7 @@
 
   function flowHtml(c) {
     if (c.kind === 'moved') return '<span class="st" style="--c:' + statusVar(c.from) + '">' + esc(L(c.from)) + '</span> → <span class="st" style="--c:' + statusVar(c.to) + '">' + esc(L(c.to)) + '</span>';
-    if (c.kind === 'added') return 'Neu in <span class="st" style="--c:' + statusVar(c.to) + '">' + esc(L(c.to)) + '</span>';
+    if (c.kind === 'added') return tr('New in {col}', { col: '<span class="st" style="--c:' + statusVar(c.to) + '">' + esc(L(c.to)) + '</span>' });
     return esc(changeLabel(c));
   }
 
@@ -1089,7 +1101,7 @@
     const out = [];
     for (const t of next) {
       const o = before.get(t.id);
-      const base = { id: t.id, title: t.title, why: (t.lastLog || '').replace(/ \[[^\]]+\]$/, ''), actor: /\[Board\]$/.test(t.lastLog || '') ? 'Board' : 'Claude oder Terminal' };
+      const base = { id: t.id, title: t.title, why: (t.lastLog || '').replace(/ \[[^\]]+\]$/, ''), actor: /\[Board\]$/.test(t.lastLog || '') ? 'Board' : tr('Claude or terminal') };
       if (!o) out.push({ ...base, kind: 'added', to: t.status });
       else if (o.status !== t.status) out.push({ ...base, kind: 'moved', from: o.status, to: t.status });
       else if (!o.archived && t.archived) out.push({ ...base, kind: 'archived' });
@@ -1121,14 +1133,14 @@
   let reloadPending = false;
   // Neue works-Version auf dem Server: Ansicht merken und Seite neu laden, damit Design und Skript aktuell sind.
   function reloadForUpdate() {
-    if (dirty) { setLive(true, 'Neue Version verfügbar, wird nach dem Speichern geladen'); updateWaiting = true; return; }
+    if (dirty) { setLive(true, tr('New version available, loads after saving')); updateWaiting = true; return; }
     try {
       sessionStorage.setItem(UI_KEY, JSON.stringify({
         q: state.q, prios: [...state.prios], type: state.type, tag: state.tag, ms: state.ms, closed: state.closed, signal: state.signal, view: state.view,
         openId, side, scrollX: $('#board').scrollLeft, scrollY: window.scrollY,
       }));
     } catch (e) { /* privat */ }
-    setLive(true, 'Neue Version wird geladen');
+    setLive(true, tr('Loading the new version'));
     location.reload();
   }
   let updateWaiting = false;
@@ -1140,14 +1152,14 @@
     if (orphan) return;
     orphan = true;
     if (liveSource) liveSource.close();
-    setLive(false, 'Anderes Projekt auf diesem Port');
+    setLive(false, tr('Another project on this port'));
     const bar = $('#orphanBar');
-    const at = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const at = new Date().toLocaleTimeString(I18N.lang === 'de' ? 'de-DE' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
     const own = esc(meta.project);
     bar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/><path d="M3 3l18 18"/></svg>' +
-      '<p><b>' + own + ' läuft hier nicht mehr.</b> Auf Port ' + esc(location.port) + ' läuft jetzt ' + esc(m.project) + '.<small>Unten der letzte Stand von ' + at + ', nur zum Ansehen.</small></p>' +
-      '<span class="orphan-acts">' + (EDIT ? '<button type="button" class="btn small primary" id="orphanStart">' + own + ' starten</button><a class="btn small" href="/hub">Zum Hub</a>' : '') +
-      '<a class="btn small ghost" href="/">' + esc(m.project) + ' ansehen</a></span>';
+      '<p><b>' + tr('{project} is no longer running here.', { project: own }) + '</b> ' + tr('Port {port} now runs {other}.', { port: esc(location.port), other: esc(m.project) }) + '<small>' + tr('Below is the last state from {time}, view only.', { time: at }) + '</small></p>' +
+      '<span class="orphan-acts">' + (EDIT ? '<button type="button" class="btn small primary" id="orphanStart">' + tr('Start {project}', { project: own }) + '</button><a class="btn small" href="/hub">' + tr('Go to the hub') + '</a>' : '') +
+      '<a class="btn small ghost" href="/">' + tr('View {project}', { project: esc(m.project) }) + '</a></span>';
     bar.hidden = false;
     document.body.classList.add('orphan');
     for (const el of document.body.children) if (el !== bar && !/^(DIALOG|SCRIPT)$/.test(el.tagName)) el.inert = true;
@@ -1163,9 +1175,9 @@
     $('#orphanStart').onclick = async (e) => {
       const b = e.currentTarget;
       const p = info && (info.projects || []).find((x) => x.id === ROOT_ID);
-      if (!p) { b.disabled = true; b.textContent = 'Im Projekt mit works board --serve starten'; return; }
+      if (!p) { b.disabled = true; b.textContent = tr('Start it in the project with works board --serve'); return; }
       b.disabled = true;
-      b.textContent = meta.project + ' startet …';
+      b.textContent = tr('{project} is starting …', { project: meta.project });
       try { await fetch('/api/hub', { method: 'POST', headers: { 'X-Works-Token': info.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'start', path: p.path }) }); } catch (err) { /* look() meldet sich, sobald es läuft */ }
     };
   }
@@ -1181,8 +1193,8 @@
       if (outdated(next.meta)) return reloadForUpdate();
       const found = diff(tasks, next.tasks);
       const now = new Date();
-      const time = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const date = now.toLocaleDateString('de-DE');
+      const time = now.toLocaleTimeString(I18N.lang === 'de' ? 'de-DE' : 'en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const date = now.toLocaleDateString(I18N.lang === 'de' ? 'de-DE' : 'en-GB');
       const arrived = new Set(); const moved = new Set();
       notifyChanges(tasks, next, found);
       for (const c of found) {
@@ -1208,9 +1220,9 @@
       }
       if (pendingOpen && tasks.some((t) => t.id === pendingOpen)) { const id = pendingOpen; pendingOpen = null; openTask(id); }
       if (side === 'ideas' || side === 'next') renderSide();
-      setLive(true, 'Live, Stand ' + time);
+      setLive(true, tr('Live, as of {time}', { time }));
     } catch (e) {
-      setLive(false, 'Aktualisierung fehlgeschlagen');
+      setLive(false, tr('Update failed'));
     }
   }
 
@@ -1244,7 +1256,7 @@
 
   async function toggleQueue(id) {
     const inQ = (meta.queue || []).includes(id);
-    await run(() => act(inQ ? 'queueRemove' : 'queueAdd', { id }), inQ ? id + ' aus der Warteschlange genommen' : id + ' eingereiht');
+    await run(() => act(inQ ? 'queueRemove' : 'queueAdd', { id }), inQ ? tr('{id} removed from the queue', { id }) : tr('{id} added to the queue', { id }));
   }
 
   // ---------- Warteschlange ----------
@@ -1263,47 +1275,48 @@
     const next = q.find(startable);
     const skipped = next ? q.slice(0, q.indexOf(next)).filter((t) => t.blocked) : [];
     const effort = {};
-    q.forEach((t) => { const e = t.effort || 'ohne Schätzung'; effort[e] = (effort[e] || 0) + 1; });
-    const effortText = ['XL', 'L', 'M', 'S', 'ohne Schätzung'].filter((e) => effort[e]).map((e) => effort[e] + ' ' + e).join(', ') || 'leer';
+    const noEst = tr('without estimate');
+    q.forEach((t) => { const e = t.effort || noEst; effort[e] = (effort[e] || 0) + 1; });
+    const effortText = ['XL', 'L', 'M', 'S', noEst].filter((e) => effort[e]).map((e) => effort[e] + ' ' + e).join(', ') || tr('empty');
     const candidates = tasks.filter((t) => ['backlog', 'geplant'].includes(t.status) && !t.archived && !ids.includes(t.id))
       .sort((a, b) => PRIOS.indexOf(a.priority) - PRIOS.indexOf(b.priority) || a.id.localeCompare(b.id, 'de', { numeric: true }));
 
     const item = (t, i) => {
       const bits = [meta.typeLabel[t.type] || t.type];
-      if (t.effort) bits.push('Aufwand ' + t.effort);
-      if (t.milestone) bits.push('Meilenstein ' + t.milestone);
-      if (t.due) bits.push('fällig ' + fmtDate(t.due));
+      if (t.effort) bits.push(tr('Effort {effort}', { effort: t.effort }));
+      if (t.milestone) bits.push(tr('Milestone {id}', { id: t.milestone }));
+      if (t.due) bits.push(tr('due {date}', { date: fmtDate(t.due) }));
       let hint = '';
-      if (t.blocked) hint = '<span class="q-hint bad">wartet auf ' + esc(t.blockers.join(', ')) + '</span>';
-      else if (unlocks(t)) hint = '<span class="q-hint good">gibt ' + unlocks(t) + ' frei</span>';
+      if (t.blocked) hint = '<span class="q-hint bad">' + esc(tr('waiting for {ids}', { ids: t.blockers.join(', ') })) + '</span>';
+      else if (unlocks(t)) hint = '<span class="q-hint good">' + tr('unblocks {n}', { n: unlocks(t) }) + '</span>';
       else if (t.status === 'in-arbeit' || t.status === 'review') hint = '<span class="q-hint" style="color:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span>';
-      else if (t.status === 'geplant') hint = '<span class="q-hint">geplant</span>';
+      else if (t.status === 'geplant') hint = '<span class="q-hint">' + tr('planned') + '</span>';
       return '<li class="q-item' + (t === next ? ' is-next' : '') + (t.blocked ? ' is-blocked' : '') + '" data-id="' + esc(t.id) + '"' + (EDIT ? ' draggable="true"' : '') + '>' +
         (EDIT ? '<span class="grip" aria-hidden="true">⋮⋮</span>' : '') +
         '<span class="q-pos num">' + (i + 1) + '</span>' +
         '<div class="q-t"><button class="q-title" data-open="' + esc(t.id) + '"><span class="id num">' + esc(t.id) + '</span> ' + esc(t.title) + '</button><span class="q-meta">' + esc(bits.join(', ')) + '</span></div>' +
         hint + '<span class="q-prio" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span>' +
-        (EDIT ? '<span class="q-ctl"><button class="btn small ghost icon" data-up="' + i + '" aria-label="Nach oben"' + (i === 0 ? ' disabled' : '') + '>↑</button><button class="btn small ghost icon" data-down="' + i + '" aria-label="Nach unten"' + (i === q.length - 1 ? ' disabled' : '') + '>↓</button><button class="btn small ghost icon" data-unq="' + esc(t.id) + '" aria-label="Aus der Warteschlange nehmen" title="Aus der Warteschlange nehmen">×</button></span>' : '') +
+        (EDIT ? '<span class="q-ctl"><button class="btn small ghost icon" data-up="' + i + '" aria-label="' + tr('Move up') + '"' + (i === 0 ? ' disabled' : '') + '>↑</button><button class="btn small ghost icon" data-down="' + i + '" aria-label="' + tr('Move down') + '"' + (i === q.length - 1 ? ' disabled' : '') + '>↓</button><button class="btn small ghost icon" data-unq="' + esc(t.id) + '" aria-label="' + tr('Remove from the queue') + '" title="' + tr('Remove from the queue') + '">×</button></span>' : '') +
         '</li>';
     };
     const toggle = (key, label, sub, on, disabled) => '<label class="switch' + (disabled ? ' off' : '') + '"><span><b>' + esc(label) + '</b><small>' + esc(sub) + '</small></span><input type="checkbox" data-qset="' + key + '"' + (on ? ' checked' : '') + (disabled || !EDIT ? ' disabled' : '') + '><i aria-hidden="true"></i></label>';
 
     box.innerHTML = '<div class="q-wrap">' +
       '<section class="q-main">' +
-        '<div class="q-head"><h2>Warteschlange für Claude</h2><p>Claude arbeitet diese Aufgaben in genau dieser Reihenfolge ab, vor allen anderen Vorschlägen.' + (EDIT ? ' Zum Umsortieren ziehen oder die Pfeile nutzen.' : '') + '</p></div>' +
-        running.map((t) => '<button class="q-running" data-open="' + esc(t.id) + '" style="--c:' + statusVar(t.status) + '"><span class="q-run-ic" aria-hidden="true">▶</span><span class="q-t"><small>' + (t.status === 'review' ? 'Im Review' : 'Läuft gerade') + '</small><strong>' + esc(t.id + ' ' + t.title) + '</strong></span>' + (t.crit[1] ? '<span class="q-meta num">' + t.crit[0] + ' von ' + t.crit[1] + ' Kriterien</span>' : '') + '</button>').join('') +
+        '<div class="q-head"><h2>' + tr('Queue for Claude') + '</h2><p>' + tr('Claude works through these tasks in exactly this order, before any other suggestions.') + (EDIT ? ' ' + tr('Drag to reorder or use the arrows.') : '') + '</p></div>' +
+        running.map((t) => '<button class="q-running" data-open="' + esc(t.id) + '" style="--c:' + statusVar(t.status) + '"><span class="q-run-ic" aria-hidden="true">▶</span><span class="q-t"><small>' + (t.status === 'review' ? tr('In review') : tr('Running now')) + '</small><strong>' + esc(t.id + ' ' + t.title) + '</strong></span>' + (t.crit[1] ? '<span class="q-meta num">' + tr('{a} of {b} criteria', { a: t.crit[0], b: t.crit[1] }) + '</span>' : '') + '</button>').join('') +
         (q.length ? '<ol class="q-list" id="qList">' + q.map(item).join('') + '</ol>'
-          : '<div class="q-empty"><strong>Die Warteschlange ist leer.</strong><span>' + (EDIT ? 'Unten Aufgaben einreihen, im Detailpanel auf Einreihen klicken oder in der Tabelle mehrere auswählen.' : 'Der Besitzer des Boards hat noch nichts eingereiht.') + ' Ohne Warteschlange wählt Claude selbst nach Priorität, Fristen und Abhängigkeiten.</span></div>') +
-        (EDIT ? '<div class="q-add"><select class="input" id="qAddSel" aria-label="Aufgabe zum Einreihen"><option value="">Aufgabe einreihen …</option>' + candidates.map((t) => '<option value="' + esc(t.id) + '">' + esc(t.priority + '  ' + t.id + '  ' + t.title) + '</option>').join('') + '</select><button class="btn" id="qAddBtn">Einreihen</button>' + (q.length ? '<button class="btn ghost" id="qClear">Leeren</button>' : '') + '</div>' : '') +
+          : '<div class="q-empty"><strong>' + tr('The queue is empty.') + '</strong><span>' + (EDIT ? tr('Queue tasks below, click Add to queue in the detail panel or select several in the table.') : tr('The owner of the board has not queued anything yet.')) + ' ' + tr('Without a queue, Claude picks by itself based on priority, due dates and dependencies.') + '</span></div>') +
+        (EDIT ? '<div class="q-add"><select class="input" id="qAddSel" aria-label="' + tr('Task to queue') + '"><option value="">' + tr('Queue a task …') + '</option>' + candidates.map((t) => '<option value="' + esc(t.id) + '">' + esc(t.priority + '  ' + t.id + '  ' + t.title) + '</option>').join('') + '</select><button class="btn" id="qAddBtn">' + tr('Add to queue') + '</button>' + (q.length ? '<button class="btn ghost" id="qClear">' + tr('Clear') + '</button>' : '') + '</div>' : '') +
       '</section>' +
       '<aside class="q-side">' +
-        '<h3>Ablauf</h3>' +
-        toggle('auto_next', 'Nach dem Abschluss weitermachen', 'Claude startet danach die nächste Aufgabe der Schlange.', !!s.auto_next) +
-        toggle('ask_before', 'Vor jedem Start nachfragen', 'Claude fragt kurz, bevor es die nächste beginnt.', s.ask_before !== false, !s.auto_next) +
-        toggle('skip_blocked', 'Blockierte überspringen', 'Wartende Aufgaben bleiben stehen, bis ihre Abhängigkeit erledigt ist.', s.skip_blocked !== false) +
-        '<div class="q-card"><small>Als Nächstes für Claude</small>' + (next ? '<button class="q-title" data-open="' + esc(next.id) + '"><strong>' + esc(next.id + ' ' + next.title) + '</strong></button>' + (skipped.length ? '<span>' + esc(skipped.map((x) => x.id).join(', ')) + (skipped.length === 1 ? ' wird' : ' werden') + ' übersprungen, bis die Abhängigkeit erledigt ist.</span>' : '') : '<span>' + (q.length ? 'Nichts startbar. Alle Einträge warten auf andere Aufgaben.' : 'Claude wählt selbst mit works next.') + '</span>') + '</div>' +
-        '<div class="q-card row"><span>Aufwand in der Schlange</span><strong class="num">' + esc(effortText) + '</strong></div>' +
-        '<div class="q-card"><small>So nutzt du sie</small><span>Sag Claude zum Beispiel <q>Arbeite die Warteschlange ab</q>. Claude sieht die Reihenfolge beim Sitzungsstart und in <code>works next</code>. Fertige Aufgaben fallen automatisch heraus.</span></div>' +
+        '<h3>' + tr('Workflow') + '</h3>' +
+        toggle('auto_next', tr('Continue after completing'), tr('Claude then starts the next task in the queue.'), !!s.auto_next) +
+        toggle('ask_before', tr('Ask before each start'), tr('Claude checks with you briefly before starting the next one.'), s.ask_before !== false, !s.auto_next) +
+        toggle('skip_blocked', tr('Skip blocked tasks'), tr('Waiting tasks stay put until their dependency is done.'), s.skip_blocked !== false) +
+        '<div class="q-card"><small>' + tr('Next for Claude') + '</small>' + (next ? '<button class="q-title" data-open="' + esc(next.id) + '"><strong>' + esc(next.id + ' ' + next.title) + '</strong></button>' + (skipped.length ? '<span>' + esc(skipped.length === 1 ? tr('{ids} is skipped until the dependency is done.', { ids: skipped[0].id }) : tr('{ids} are skipped until the dependency is done.', { ids: skipped.map((x) => x.id).join(', ') })) + '</span>' : '') : '<span>' + (q.length ? tr('Nothing startable. All entries are waiting for other tasks.') : tr('Claude picks by itself with works next.')) + '</span>') + '</div>' +
+        '<div class="q-card row"><span>' + tr('Effort in the queue') + '</span><strong class="num">' + esc(effortText) + '</strong></div>' +
+        '<div class="q-card"><small>' + tr('How to use it') + '</small><span>' + tr('Tell Claude, for example, <q>Work through the queue</q>. Claude sees the order at session start and in <code>works next</code>. Finished tasks drop out automatically.') + '</span></div>' +
       '</aside></div>';
 
     $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
@@ -1313,17 +1326,17 @@
       renderQueue(); renderViews();
       run(() => act('queueOrder', { ids: order }), msg);
     };
-    $$('[data-up]', box).forEach((b) => b.onclick = () => { const i = +b.dataset.up; const o = ids.slice(); [o[i - 1], o[i]] = [o[i], o[i - 1]]; save(o, 'Reihenfolge gespeichert'); });
-    $$('[data-down]', box).forEach((b) => b.onclick = () => { const i = +b.dataset.down; const o = ids.slice(); [o[i + 1], o[i]] = [o[i], o[i + 1]]; save(o, 'Reihenfolge gespeichert'); });
-    $$('[data-unq]', box).forEach((b) => b.onclick = () => save(ids.filter((x) => x !== b.dataset.unq), b.dataset.unq + ' aus der Warteschlange genommen'));
+    $$('[data-up]', box).forEach((b) => b.onclick = () => { const i = +b.dataset.up; const o = ids.slice(); [o[i - 1], o[i]] = [o[i], o[i - 1]]; save(o, tr('Order saved')); });
+    $$('[data-down]', box).forEach((b) => b.onclick = () => { const i = +b.dataset.down; const o = ids.slice(); [o[i + 1], o[i]] = [o[i], o[i + 1]]; save(o, tr('Order saved')); });
+    $$('[data-unq]', box).forEach((b) => b.onclick = () => save(ids.filter((x) => x !== b.dataset.unq), tr('{id} removed from the queue', { id: b.dataset.unq })));
     const addBtn = $('#qAddBtn', box);
-    if (addBtn) addBtn.onclick = () => { const v = $('#qAddSel', box).value; if (v) save(ids.concat(v), v + ' eingereiht'); };
+    if (addBtn) addBtn.onclick = () => { const v = $('#qAddSel', box).value; if (v) save(ids.concat(v), tr('{id} added to the queue', { id: v })); };
     const clr = $('#qClear', box);
-    if (clr) clr.onclick = async () => { if (await confirmBox({ title: 'Warteschlange leeren', lead: 'Alle ' + ids.length + ' Einträge werden entfernt. Die Aufgaben selbst bleiben unverändert.', confirm: 'Leeren', danger: true })) save([], 'Warteschlange geleert'); };
+    if (clr) clr.onclick = async () => { if (await confirmBox({ title: tr('Clear queue'), lead: tr('All {n} entries will be removed. The tasks themselves stay unchanged.', { n: ids.length }), confirm: tr('Clear'), danger: true })) save([], tr('Queue cleared')); };
     $$('[data-qset]', box).forEach((c) => c.onchange = () => {
       meta.queueSettings = { ...s, [c.dataset.qset]: c.checked };
       renderQueue();
-      run(() => act('queueSettings', { [c.dataset.qset]: c.checked }), 'Einstellung gespeichert');
+      run(() => act('queueSettings', { [c.dataset.qset]: c.checked }), tr('Setting saved'));
     });
     const list = $('#qList', box);
     if (!list) return;
@@ -1345,7 +1358,7 @@
         const o = ids.filter((x) => x !== qDrag);
         o.splice(o.indexOf(li.dataset.id) + (after ? 1 : 0), 0, qDrag);
         qDrag = null;
-        save(o, 'Reihenfolge gespeichert');
+        save(o, tr('Order saved'));
       };
     });
   }
@@ -1424,7 +1437,7 @@
     const weekHead = Array.from({ length: weeks }, (_, i) => {
       const ws = addDays(start, i * 7);
       const cur = ws === weekStart(now);
-      return '<div class="tl-wk' + (cur ? ' cur' : '') + '"><b>KW ' + isoWeek(ws) + '</b><span>' + esc(fmtDate(ws).slice(0, 6)) + '</span></div>';
+      return '<div class="tl-wk' + (cur ? ' cur' : '') + '"><b>' + tr('Wk {n}', { n: isoWeek(ws) }) + '</b><span>' + esc(fmtDate(ws).slice(0, 6)) + '</span></div>';
     }).join('');
 
     const bar = (t) => {
@@ -1432,34 +1445,34 @@
       const l = frac(sp.start);
       const r = frac(addDays(sp.end, 1));
       const days = dayDiff(sp.start, sp.end) + 1;
-      const label = days <= 3 ? (sp.kind === 'est' ? t.effort || '' : '') : sp.kind === 'done' ? 'Erledigt' : sp.kind === 'late' ? 'Überfällig' : sp.kind === 'est' ? 'geschätzt' + (t.effort ? ', ' + t.effort : '') : t.status === 'in-arbeit' || t.status === 'review' ? L(t.status) + (t.crit[1] ? ', ' + t.crit[0] + ' von ' + t.crit[1] : '') : L(t.status);
-      const tip = t.id + ' ' + t.title + '\n' + fmtDate(sp.start) + ' bis ' + fmtDate(sp.end) + (sp.kind === 'est' ? ' (geschätzt aus Aufwand ' + (t.effort || 'M') + ')' : '') + (t.blocked ? '\nWartet auf ' + t.blockers.join(', ') : '');
+      const label = days <= 3 ? (sp.kind === 'est' ? t.effort || '' : '') : sp.kind === 'done' ? tr('Done') : sp.kind === 'late' ? tr('Overdue') : sp.kind === 'est' ? tr('estimated') + (t.effort ? ', ' + t.effort : '') : t.status === 'in-arbeit' || t.status === 'review' ? L(t.status) + (t.crit[1] ? ', ' + tr('{a} of {b}', { a: t.crit[0], b: t.crit[1] }) : '') : L(t.status);
+      const tip = t.id + ' ' + t.title + '\n' + tr('{from} to {to}', { from: fmtDate(sp.start), to: fmtDate(sp.end) }) + (sp.kind === 'est' ? ' ' + tr('(estimated from effort {effort})', { effort: t.effort || 'M' }) : '') + (t.blocked ? '\n' + tr('Waiting for {ids}', { ids: t.blockers.join(', ') }) : '');
       const canDrag = EDIT && OPEN.includes(t.status);
       return '<div class="tl-bar k-' + sp.kind + '" data-bar="' + esc(t.id) + '" style="left:' + pct(l) + ';width:max(' + pct(r - l) + ',6px);--c:' + statusVar(t.status) + '" title="' + esc(tip) + '"><span>' + esc(label) + '</span>' +
-        (canDrag ? '<i class="tl-handle" data-due="' + esc(t.id) + '" title="Ziehen ändert die Fälligkeit"></i>' : '') + '</div>' +
-        (t.blocked ? '<span class="tl-wait" style="left:calc(' + pct(r) + ' + 8px)">wartet auf ' + esc(t.blockers.join(', ')) + '</span>' : '');
+        (canDrag ? '<i class="tl-handle" data-due="' + esc(t.id) + '" title="' + tr('Drag to change the due date') + '"></i>' : '') + '</div>' +
+        (t.blocked ? '<span class="tl-wait" style="left:calc(' + pct(r) + ' + 8px)">' + esc(tr('waiting for {ids}', { ids: t.blockers.join(', ') })) + '</span>' : '');
     };
 
     const group = (g) => {
       const items = g.items.slice().sort((a, b) => order[spans.get(a.id).kind] - order[spans.get(b.id).kind] || spans.get(a.id).start.localeCompare(spans.get(b.id).start));
       const m = g.m;
       const done = m ? m.done : 0;
-      const line = m && m.due && m.due >= start && m.due <= last ? '<div class="tl-ms" style="left:calc(var(--lab) + (100% - var(--lab)) * ' + frac(addDays(m.due, 1)).toFixed(4) + ')" title="Ziel ' + esc(m.id) + ': ' + esc(fmtDate(m.due)) + '"></div>' : '';
+      const line = m && m.due && m.due >= start && m.due <= last ? '<div class="tl-ms" style="left:calc(var(--lab) + (100% - var(--lab)) * ' + frac(addDays(m.due, 1)).toFixed(4) + ')" title="' + esc(tr('Target {id}: {date}', { id: m.id, date: fmtDate(m.due) })) + '"></div>' : '';
       return '<div class="tl-group">' + line +
-        '<div class="tl-ghead"><strong>' + esc(m ? m.id + ' ' + m.title : 'Ohne Meilenstein') + '</strong><span>' + (m ? (m.due ? 'Ziel ' + esc(fmtDate(m.due)) + ', ' : '') + done + ' von ' + m.total + ' erledigt' : items.length + (items.length === 1 ? ' Aufgabe' : ' Aufgaben')) + '</span></div>' +
+        '<div class="tl-ghead"><strong>' + esc(m ? m.id + ' ' + m.title : tr('No milestone')) + '</strong><span>' + (m ? (m.due ? esc(tr('Target {date}', { date: fmtDate(m.due) })) + ', ' : '') + tr('{done} of {total} done', { done, total: m.total }) : (items.length === 1 ? tr('1 task') : tr('{n} tasks', { n: items.length }))) + '</span></div>' +
         items.map((t) => '<div class="tl-row' + (t.status === 'erledigt' ? ' is-done' : '') + '"><button class="tl-label" data-open="' + esc(t.id) + '"><span class="pdot" style="--pc:' + prioVar(t.priority) + '"></span><span class="id num">' + esc(t.id) + '</span><span class="tt">' + esc(t.title) + '</span></button><div class="tl-track">' + bar(t) + '</div></div>').join('') +
         '</div>';
     };
 
     box.innerHTML = (LIVE ? '<div id="estBox"></div>' : '') + '<div class="tl-scroll"><div class="tl" style="--weeks:' + weeks + ';min-width:calc(var(--lab) + ' + weeks + ' * 84px)">' +
-      '<div class="tl-headrow"><div class="tl-corner">Aufgabe</div><div class="tl-weeks">' + weekHead + '</div></div>' +
+      '<div class="tl-headrow"><div class="tl-corner">' + tr('Task') + '</div><div class="tl-weeks">' + weekHead + '</div></div>' +
       '<div class="tl-body"><div class="tl-grid" aria-hidden="true">' + Array.from({ length: weeks }, (_, i) => '<i' + (addDays(start, i * 7) === weekStart(now) ? ' class="cur"' : '') + '></i>').join('') + '</div>' +
-      '<div class="tl-today" style="left:calc(var(--lab) + (100% - var(--lab)) * ' + frac(now).toFixed(4) + ')" title="Heute"></div>' +
-      (groups.length ? groups.map(group).join('') : '<div class="tl-empty">Keine Aufgaben für diese Filter.</div>') +
+      '<div class="tl-today" style="left:calc(var(--lab) + (100% - var(--lab)) * ' + frac(now).toFixed(4) + ')" title="' + tr('Today') + '" data-today="' + esc(tr('today')) + '"></div>' +
+      (groups.length ? groups.map(group).join('') : '<div class="tl-empty">' + tr('No tasks for these filters.') + '</div>') +
       '</div></div></div>' +
-      '<div class="tl-legend"><span><i class="lg-today"></i>heute</span><span><i class="lg-ms"></i>Ziel eines Meilensteins</span><span><i class="lg-run"></i>läuft oder erledigt</span><span><i class="lg-plan"></i>geplant mit Fälligkeit</span><span><i class="lg-est"></i>geschätzt aus dem Aufwand</span>' +
-      (EDIT ? '<span>Rechtes Ende eines Balkens ziehen ändert die Fälligkeit.</span>' : '') +
-      (hiddenOld ? '<span>' + hiddenOld + ' ältere erledigte ausgeblendet</span>' : '') + '</div>';
+      '<div class="tl-legend"><span><i class="lg-today"></i>' + tr('today') + '</span><span><i class="lg-ms"></i>' + tr('Milestone target') + '</span><span><i class="lg-run"></i>' + tr('running or done') + '</span><span><i class="lg-plan"></i>' + tr('planned with due date') + '</span><span><i class="lg-est"></i>' + tr('estimated from effort') + '</span>' +
+      (EDIT ? '<span>' + tr('Drag the right end of a bar to change the due date.') + '</span>' : '') +
+      (hiddenOld ? '<span>' + tr('{n} older done tasks hidden', { n: hiddenOld }) + '</span>' : '') + '</div>';
 
     $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
     loadEstimates();
@@ -1482,7 +1495,7 @@
           const due = maxIso(addDays(start, day), sp.start);
           tlDrag.due = due;
           barEl.style.width = Math.max(6, ((dayDiff(start, due) + 1) / total) * track.width - (left - track.left)) + 'px';
-          barEl.firstChild.textContent = 'Fällig ' + fmtDate(due);
+          barEl.firstChild.textContent = tr('Due {date}', { date: fmtDate(due) });
         };
         h.onpointerup = async () => {
           h.onpointermove = null; h.onpointerup = null;
@@ -1491,7 +1504,7 @@
           setTimeout(() => { tlDrag = null; }, 0);
           barEl.classList.remove('resizing');
           if (!due || (t && t.due === due)) { renderTimeline(); return; }
-          await run(() => act('set', { id, fields: { due } }), id + ' fällig am ' + fmtDate(due));
+          await run(() => act('set', { id, fields: { due } }), tr('{id} due on {date}', { id, date: fmtDate(due) }));
           if (reloadPending) { reloadPending = false; reload(); }
         };
       };
@@ -1505,16 +1518,16 @@
   const tableSort = store.get('works-table-sort', { key: 'priority', dir: 1 });
   const TABLE_COLS = [
     { key: 'id', label: 'ID' },
-    { key: 'title', label: 'Titel' },
+    { key: 'title', label: tr('Title') },
     { key: 'status', label: 'Status' },
     { key: 'priority', label: 'Prio' },
-    { key: 'type', label: 'Typ' },
-    { key: 'effort', label: 'Aufwand' },
-    { key: 'due', label: 'Fällig' },
-    { key: 'milestone', label: 'Meilenstein' },
+    { key: 'type', label: tr('Type') },
+    { key: 'effort', label: tr('Effort') },
+    { key: 'due', label: tr('Due') },
+    { key: 'milestone', label: tr('Milestone') },
     { key: 'tags', label: 'Tags' },
-    { key: 'crit', label: 'Kriterien' },
-    { key: 'updated', label: 'Geändert' },
+    { key: 'crit', label: tr('Criteria') },
+    { key: 'updated', label: tr('Last changed') },
   ];
   function sortValue(t, k) {
     if (k === 'priority') return PRIOS.indexOf(t.priority);
@@ -1541,16 +1554,16 @@
     const ids = rows.map((t) => t.id);
     for (const id of [...selected]) if (!ids.includes(id)) selected.delete(id);
     const all = rows.length && rows.every((t) => selected.has(t.id));
-    const optList = (vals, cur, labelFn) => vals.map((v) => '<option value="' + esc(v) + '"' + (v === (cur || '') ? ' selected' : '') + '>' + esc(labelFn ? labelFn(v) : v || 'offen') + '</option>').join('');
+    const optList = (vals, cur, labelFn) => vals.map((v) => '<option value="' + esc(v) + '"' + (v === (cur || '') ? ' selected' : '') + '>' + esc(labelFn ? labelFn(v) : v || tr('not set')) + '</option>').join('');
     const cell = (t, k) => {
       const open = OPEN.includes(t.status);
       if (k === 'id') return '<td class="c-id num">' + esc(t.id) + '</td>';
-      if (k === 'title') return '<td class="c-title"><button class="tt" data-open="' + esc(t.id) + '">' + esc(t.title) + '</button>' + (t.blocked ? '<span class="warn">blockiert</span>' : '') + ((meta.queue || []).includes(t.id) ? '<span class="q-tag tag">Schlange ' + ((meta.queue || []).indexOf(t.id) + 1) + '</span>' : '') + '</td>';
+      if (k === 'title') return '<td class="c-title"><button class="tt" data-open="' + esc(t.id) + '">' + esc(t.title) + '</button>' + (t.blocked ? '<span class="warn">' + tr('blocked') + '</span>' : '') + ((meta.queue || []).includes(t.id) ? '<span class="q-tag tag">' + tr('Queue {n}', { n: (meta.queue || []).indexOf(t.id) + 1 }) + '</span>' : '') + '</td>';
       if (k === 'status') return '<td><span class="st" style="--c:' + statusVar(t.status) + '">' + esc(L(t.status)) + '</span></td>';
-      if (k === 'priority') return '<td>' + (EDIT && open ? '<select class="cell" data-cell="priority" data-id="' + esc(t.id) + '" style="color:' + prioVar(t.priority) + '" aria-label="Priorität">' + optList(PRIOS, t.priority) + '</select>' : '<span style="color:' + prioVar(t.priority) + ';font-weight:650">' + esc(t.priority) + '</span>') + '</td>';
+      if (k === 'priority') return '<td>' + (EDIT && open ? '<select class="cell" data-cell="priority" data-id="' + esc(t.id) + '" style="color:' + prioVar(t.priority) + '" aria-label="' + tr('Priority') + '">' + optList(PRIOS, t.priority) + '</select>' : '<span style="color:' + prioVar(t.priority) + ';font-weight:650">' + esc(t.priority) + '</span>') + '</td>';
       if (k === 'type') return '<td>' + esc(meta.typeLabel[t.type] || t.type) + '</td>';
-      if (k === 'effort') return '<td>' + (EDIT && open ? '<select class="cell" data-cell="effort" data-id="' + esc(t.id) + '" aria-label="Aufwand">' + optList(['', 'S', 'M', 'L', 'XL'], t.effort) + '</select>' : esc(t.effort || '')) + '</td>';
-      if (k === 'due') return '<td class="' + (t.overdue ? 'late' : '') + '">' + (EDIT && open ? '<input type="date" class="cell" data-cell="due" data-id="' + esc(t.id) + '" value="' + esc(t.due) + '" aria-label="Fälligkeit">' : esc(fmtDate(t.due))) + '</td>';
+      if (k === 'effort') return '<td>' + (EDIT && open ? '<select class="cell" data-cell="effort" data-id="' + esc(t.id) + '" aria-label="' + tr('Effort') + '">' + optList(['', 'S', 'M', 'L', 'XL'], t.effort) + '</select>' : esc(t.effort || '')) + '</td>';
+      if (k === 'due') return '<td class="' + (t.overdue ? 'late' : '') + '">' + (EDIT && open ? '<input type="date" class="cell" data-cell="due" data-id="' + esc(t.id) + '" value="' + esc(t.due) + '" aria-label="' + tr('Due date') + '">' : esc(fmtDate(t.due))) + '</td>';
       if (k === 'milestone') return '<td>' + esc(t.milestone) + '</td>';
       if (k === 'tags') return '<td class="c-tags">' + t.tags.map((x) => '<span class="tag">#' + esc(x) + '</span>').join('') + '</td>';
       if (k === 'crit') return '<td class="num">' + (t.crit[1] ? t.crit[0] + '/' + t.crit[1] : '') + '</td>';
@@ -1558,13 +1571,13 @@
       return '<td></td>';
     };
     box.innerHTML = '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-      (EDIT ? '<th class="c-sel"><input type="checkbox" id="selAll" aria-label="Alle auswählen"' + (all ? ' checked' : '') + '></th>' : '') +
+      (EDIT ? '<th class="c-sel"><input type="checkbox" id="selAll" aria-label="' + tr('Select all') + '"' + (all ? ' checked' : '') + '></th>' : '') +
       TABLE_COLS.map((c) => '<th><button data-sort="' + c.key + '" aria-sort="' + (tableSort.key === c.key ? (tableSort.dir > 0 ? 'ascending' : 'descending') : 'none') + '">' + esc(c.label) + (tableSort.key === c.key ? '<span aria-hidden="true">' + (tableSort.dir > 0 ? ' ↑' : ' ↓') + '</span>' : '') + '</button></th>').join('') +
       '</tr></thead><tbody>' +
-      (rows.length ? rows.map((t) => '<tr data-id="' + esc(t.id) + '" class="' + (selected.has(t.id) ? 'sel' : '') + (OPEN.includes(t.status) ? '' : ' closed') + '">' + (EDIT ? '<td class="c-sel"><input type="checkbox" data-sel="' + esc(t.id) + '"' + (selected.has(t.id) ? ' checked' : '') + ' aria-label="' + esc(t.id) + ' auswählen"></td>' : '') + TABLE_COLS.map((c) => cell(t, c.key)).join('') + '</tr>').join('')
-        : '<tr><td colspan="12" class="tbl-empty">Keine Aufgaben für diese Filter.</td></tr>') +
+      (rows.length ? rows.map((t) => '<tr data-id="' + esc(t.id) + '" class="' + (selected.has(t.id) ? 'sel' : '') + (OPEN.includes(t.status) ? '' : ' closed') + '">' + (EDIT ? '<td class="c-sel"><input type="checkbox" data-sel="' + esc(t.id) + '"' + (selected.has(t.id) ? ' checked' : '') + ' aria-label="' + esc(tr('Select {id}', { id: t.id })) + '"></td>' : '') + TABLE_COLS.map((c) => cell(t, c.key)).join('') + '</tr>').join('')
+        : '<tr><td colspan="12" class="tbl-empty">' + tr('No tasks for these filters.') + '</td></tr>') +
       '</tbody></table></div>' +
-      '<p class="tbl-foot">' + rows.length + (rows.length === 1 ? ' Aufgabe' : ' Aufgaben') + (EDIT ? '. Mit Shift klicken wählt einen Bereich. Prio, Aufwand und Fälligkeit lassen sich direkt ändern.' : '') + '</p>';
+      '<p class="tbl-foot">' + (rows.length === 1 ? tr('1 task') : tr('{n} tasks', { n: rows.length })) + (EDIT ? '. ' + tr('Shift-click selects a range. Priority, effort and due date can be changed directly.') : '') + '</p>';
 
     $$('[data-sort]', box).forEach((b) => b.onclick = () => {
       const k = b.dataset.sort;
@@ -1573,7 +1586,7 @@
       renderTable();
     });
     $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
-    $$('tbody tr[data-id]', box).forEach((tr) => tr.ondblclick = (e) => { if (!e.target.closest('input,select,button')) openTask(tr.dataset.id); });
+    $$('tbody tr[data-id]', box).forEach((row) => row.ondblclick = (e) => { if (!e.target.closest('input,select,button')) openTask(row.dataset.id); });
     if (EDIT) {
       $('#selAll', box).onchange = (e) => { rows.forEach((t) => (e.target.checked ? selected.add(t.id) : selected.delete(t.id))); renderTable(); };
       $$('[data-sel]', box).forEach((c) => c.onclick = (e) => {
@@ -1585,7 +1598,7 @@
         lastPick = id;
         renderTable();
       });
-      $$('[data-cell]', box).forEach((el) => el.onchange = () => run(() => act('set', { id: el.dataset.id, fields: { [el.dataset.cell]: el.value } }), el.dataset.id + ' gespeichert'));
+      $$('[data-cell]', box).forEach((el) => el.onchange = () => run(() => act('set', { id: el.dataset.id, fields: { [el.dataset.cell]: el.value } }), tr('{id} saved', { id: el.dataset.id })));
     }
     renderBulk();
   }
@@ -1597,15 +1610,15 @@
     const ids = [...selected];
     const n = ids.length;
     const sel = (op, label, opts) => '<select class="input" data-bulk="' + op + '" aria-label="' + esc(label) + '"><option value="">' + esc(label) + '</option>' + opts.map((o) => '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>').join('') + '</select>';
-    bar.innerHTML = '<strong class="num">' + n + ' ausgewählt</strong>' +
-      sel('priority', 'Priorität', PRIOS.map((p) => [p, p + ' ' + meta.prioLabel[p]])) +
+    bar.innerHTML = '<strong class="num">' + tr('{n} selected', { n }) + '</strong>' +
+      sel('priority', tr('Priority'), PRIOS.map((p) => [p, p + ' ' + meta.prioLabel[p]])) +
       sel('status', 'Status', ['backlog', 'geplant', 'in-arbeit', 'review'].map((s) => [s, L(s)])) +
-      sel('milestone', 'Meilenstein', [['__none', 'Keiner']].concat(meta.milestones.map((m) => [m.id, m.id + ' ' + m.title]))) +
-      sel('effort', 'Aufwand', ['S', 'M', 'L', 'XL'].map((e) => [e, e])) +
+      sel('milestone', tr('Milestone'), [['__none', tr('None')]].concat(meta.milestones.map((m) => [m.id, m.id + ' ' + m.title]))) +
+      sel('effort', tr('Effort'), ['S', 'M', 'L', 'XL'].map((e) => [e, e])) +
       '<button class="btn small" data-bop="tagAdd">Tag +</button><button class="btn small" data-bop="tagRemove">Tag −</button>' +
-      '<button class="btn small" data-bop="queueAdd">Einreihen</button>' +
-      '<button class="btn small danger" data-bop="drop">Verwerfen</button><button class="btn small" data-bop="archive">Archivieren</button>' +
-      '<button class="btn small ghost" data-bop="clear">Auswahl aufheben</button>';
+      '<button class="btn small" data-bop="queueAdd">' + tr('Add to queue') + '</button>' +
+      '<button class="btn small danger" data-bop="drop">' + tr('Discard') + '</button><button class="btn small" data-bop="archive">' + tr('Archive') + '</button>' +
+      '<button class="btn small ghost" data-bop="clear">' + tr('Clear selection') + '</button>';
     const go = async (op, value, reason) => {
       const r = await run(() => act('bulk', { ids, op, value, reason }), (x) => x.message);
       if (r && !(r.errors || []).length) selected.clear();
@@ -1619,12 +1632,12 @@
       const op = b.dataset.bop;
       if (op === 'clear') { selected.clear(); renderTable(); return; }
       if (op === 'tagAdd' || op === 'tagRemove') {
-        const tag = await askText({ title: op === 'tagAdd' ? 'Tag hinzufügen' : 'Tag entfernen', lead: n + (n === 1 ? ' Aufgabe' : ' Aufgaben'), label: 'Tag ohne #', confirm: op === 'tagAdd' ? 'Hinzufügen' : 'Entfernen', required: true });
+        const tag = await askText({ title: op === 'tagAdd' ? tr('Add tag') : tr('Remove tag'), lead: n === 1 ? tr('1 task') : tr('{n} tasks', { n }), label: tr('Tag without #'), confirm: op === 'tagAdd' ? tr('Add') : tr('Remove'), required: true });
         if (tag) go(op, tag.replace(/^#/, ''));
         return;
       }
       if (op === 'drop') {
-        const reason = await askText({ title: n + (n === 1 ? ' Aufgabe' : ' Aufgaben') + ' verwerfen', lead: 'Sie werden nicht umgesetzt und lassen sich später wiedereröffnen.', label: 'Grund', confirm: 'Verwerfen', required: true, danger: true });
+        const reason = await askText({ title: n === 1 ? tr('Discard 1 task') : tr('Discard {n} tasks', { n }), lead: tr('They will not be implemented and can be reopened later.'), label: tr('Reason for discarding'), confirm: tr('Discard'), required: true, danger: true });
         if (reason) go(op, '', reason);
         return;
       }
@@ -1639,24 +1652,24 @@
     let c;
     try { c = await api('GET', 'api/code?id=' + encodeURIComponent(id)); } catch (e) { if (box) box.innerHTML = '<div class="alert bad">' + esc(e.message) + '</div>'; return; }
     if (!box || !detail || detail.task.id !== id || detailTab !== 'code') return;
-    if (!c.git) { box.innerHTML = '<div class="alert info">Dieses Projekt ist kein Git-Repository. Der Code-Bereich zeigt Branch, Commits und Änderungen, sobald Git genutzt wird.</div>'; return; }
+    if (!c.git) { box.innerHTML = '<div class="alert info">' + tr('This project is not a Git repository. The code tab shows branch, commits and changes once Git is used.') + '</div>'; return; }
     const safeUrl = (u) => (/^https?:\/\//.test(u || '') ? u : '');
-    const pr = c.pr && safeUrl(c.pr.url) ? '<a href="' + esc(c.pr.url) + '" target="_blank" rel="noopener">#' + esc(c.pr.number) + ' ' + esc({ OPEN: 'offen', MERGED: 'gemergt', CLOSED: 'geschlossen' }[c.pr.state] || c.pr.state) + '</a>' : '<span class="muted">keiner gefunden</span>';
-    const fileRow = (f, unc) => '<li><button class="file" data-file="' + esc(f.file) + '"' + (unc ? ' data-unc="1"' : '') + ' aria-expanded="false"><span class="fn">' + esc(f.file) + '</span>' + (f.untracked ? '<span class="muted">neu</span>' : f.binary ? '<span class="muted">binär</span>' : '<span class="add num">+' + f.add + '</span><span class="del num">−' + f.del + '</span>') + '</button><div class="diff" hidden></div></li>';
+    const pr = c.pr && safeUrl(c.pr.url) ? '<a href="' + esc(c.pr.url) + '" target="_blank" rel="noopener">#' + esc(c.pr.number) + ' ' + esc({ OPEN: tr('open'), MERGED: tr('merged'), CLOSED: tr('closed unmerged') }[c.pr.state] || c.pr.state) + '</a>' : '<span class="muted">' + tr('none found') + '</span>';
+    const fileRow = (f, unc) => '<li><button class="file" data-file="' + esc(f.file) + '"' + (unc ? ' data-unc="1"' : '') + ' aria-expanded="false"><span class="fn">' + esc(f.file) + '</span>' + (f.untracked ? '<span class="muted">' + tr('new') + '</span>' : f.binary ? '<span class="muted">' + tr('binary') + '</span>' : '<span class="add num">+' + f.add + '</span><span class="del num">−' + f.del + '</span>') + '</button><div class="diff" hidden></div></li>';
     box.innerHTML =
       '<div class="code-cards">' +
-        '<div><small>Branch</small><strong class="mono">' + (c.branch ? esc(c.branch) : '<span class="muted">keiner mit ' + esc(id) + ' im Namen</span>') + '</strong></div>' +
-        '<div><small>Gegenüber ' + esc(c.base || 'Hauptbranch') + '</small><strong>' + (c.ahead === null ? '<span class="muted">nicht vergleichbar</span>' : c.ahead + (c.ahead === 1 ? ' Commit' : ' Commits') + ' voraus' + (c.behind ? ', ' + c.behind + ' zurück' : '')) + '</strong></div>' +
-        '<div><small>Pull Request</small><strong>' + ((detail.prs || []).length ? detail.prs.slice(0, 3).map((p) => (/^https?:/.test(p.url || '') ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">#' + p.number + '</a>' : '#' + p.number) + ' ' + esc({ OPEN: 'offen', MERGED: 'gemergt', CLOSED: 'geschlossen' }[p.state] || p.state) + (p.ci ? ', CI ' + (p.ci === 'ok' ? 'grün' : p.ci === 'fail' ? 'rot' : 'läuft') : '')).join('<br>') : pr) + '</strong></div>' +
-      (detail.lane ? '<div><small>Parallel im Worktree</small><strong class="mono">' + esc(detail.lane.path.split(/[\\/]/).pop()) + '</strong><span class="muted">' + detail.lane.ahead + ' Commit' + (detail.lane.ahead === 1 ? '' : 's') + ', ' + (detail.lane.dirty ? detail.lane.dirty + ' Dateien offen' : 'alles committet') + (detail.lane.status === 'konflikt' ? ', Merge-Konflikt' : '') + '</span></div>' : '') +
+        '<div><small>Branch</small><strong class="mono">' + (c.branch ? esc(c.branch) : '<span class="muted">' + esc(tr('none with {id} in its name', { id })) + '</span>') + '</strong></div>' +
+        '<div><small>' + esc(tr('Compared with {base}', { base: c.base || tr('main branch') })) + '</small><strong>' + (c.ahead === null ? '<span class="muted">' + tr('not comparable') + '</span>' : (c.ahead === 1 ? tr('1 commit ahead') : tr('{n} commits ahead', { n: c.ahead })) + (c.behind ? ', ' + tr('{n} behind', { n: c.behind }) : '')) + '</strong></div>' +
+        '<div><small>Pull Request</small><strong>' + ((detail.prs || []).length ? detail.prs.slice(0, 3).map((p) => (/^https?:/.test(p.url || '') ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">#' + p.number + '</a>' : '#' + p.number) + ' ' + esc({ OPEN: tr('open'), MERGED: tr('merged'), CLOSED: tr('closed unmerged') }[p.state] || p.state) + (p.ci ? ', CI ' + (p.ci === 'ok' ? tr('green') : p.ci === 'fail' ? tr('red') : tr('running')) : '')).join('<br>') : pr) + '</strong></div>' +
+      (detail.lane ? '<div><small>' + tr('Parallel in a worktree') + '</small><strong class="mono">' + esc(detail.lane.path.split(/[\\/]/).pop()) + '</strong><span class="muted">' + (detail.lane.ahead === 1 ? tr('1 commit') : tr('{n} commits', { n: detail.lane.ahead })) + ', ' + (detail.lane.dirty ? tr('{n} files uncommitted', { n: detail.lane.dirty }) : tr('everything committed')) + (detail.lane.status === 'konflikt' ? ', ' + tr('merge conflict') : '') + '</span></div>' : '') +
       '</div>' +
       fileLinksHtml(detail.fileLinks) +
-      '<div class="block"><div class="block-head"><h3>Commits</h3><span class="meta">mit ' + esc(id) + ' in der Nachricht</span></div>' +
-        (c.commits.length ? '<ol class="commits">' + c.commits.map((k) => '<li><span class="mono hash">' + esc(k.short) + '</span><span class="subj">' + esc(k.subject) + '</span><time class="muted num" datetime="' + esc(k.date) + '">' + esc(new Date(k.date).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time></li>').join('') + '</ol>'
-          : '<p class="md empty-md">Noch keine Commits gefunden. Claude schreibt die Aufgaben-ID in jede Commit-Nachricht, zum Beispiel <code>feat(' + esc(id) + '): …</code>.</p>') + '</div>' +
-      (c.uncommitted.length ? '<div class="block"><div class="block-head"><h3>Noch nicht committet</h3><span class="meta">auf ' + esc(c.branch) + '</span></div><ul class="files">' + c.uncommitted.map((f) => fileRow(f, true)).join('') + '</ul></div>' : '') +
-      '<div class="block"><div class="block-head"><h3>Geänderte Dateien</h3><span class="meta">' + (c.source === 'branch' ? 'Branch gegenüber ' + esc(c.base) : c.source === 'commits' ? 'aus den Commits' : '') + '</span></div>' +
-        (c.files.length ? '<ul class="files">' + c.files.map((f) => fileRow(f, false)).join('') + '</ul>' : '<p class="md empty-md">Keine Änderungen gefunden.</p>') + '</div>';
+      '<div class="block"><div class="block-head"><h3>Commits</h3><span class="meta">' + esc(tr('with {id} in the message', { id })) + '</span></div>' +
+        (c.commits.length ? '<ol class="commits">' + c.commits.map((k) => '<li><span class="mono hash">' + esc(k.short) + '</span><span class="subj">' + esc(k.subject) + '</span><time class="muted num" datetime="' + esc(k.date) + '">' + esc(new Date(k.date).toLocaleString(I18N.lang === 'de' ? 'de-DE' : 'en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time></li>').join('') + '</ol>'
+          : '<p class="md empty-md">' + tr('No commits found yet. Claude puts the task ID in every commit message, for example {example}.', { example: '<code>feat(' + esc(id) + '): …</code>' }) + '</p>') + '</div>' +
+      (c.uncommitted.length ? '<div class="block"><div class="block-head"><h3>' + tr('Not committed yet') + '</h3><span class="meta">' + esc(tr('on {branch}', { branch: c.branch })) + '</span></div><ul class="files">' + c.uncommitted.map((f) => fileRow(f, true)).join('') + '</ul></div>' : '') +
+      '<div class="block"><div class="block-head"><h3>' + tr('Changed files') + '</h3><span class="meta">' + (c.source === 'branch' ? esc(tr('Branch compared with {base}', { base: c.base })) : c.source === 'commits' ? tr('from the commits') : '') + '</span></div>' +
+        (c.files.length ? '<ul class="files">' + c.files.map((f) => fileRow(f, false)).join('') + '</ul>' : '<p class="md empty-md">' + tr('No changes found.') + '</p>') + '</div>';
     $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
     $$('.file', box).forEach((b) => b.onclick = async () => {
       const d = b.nextElementSibling;
@@ -1664,11 +1677,11 @@
       b.setAttribute('aria-expanded', String(!open));
       d.hidden = open;
       if (open || d.dataset.loaded) return;
-      d.innerHTML = '<p class="muted">Lädt …</p>';
+      d.innerHTML = '<p class="muted">' + tr('Loading …') + '</p>';
       try {
         const r = await api('GET', 'api/diff?id=' + encodeURIComponent(id) + '&file=' + encodeURIComponent(b.dataset.file) + (b.dataset.unc ? '&uncommitted=1' : ''));
         d.dataset.loaded = '1';
-        d.innerHTML = diffHtml(r.diff) + (r.truncated ? '<p class="muted diff-more">Gekürzt. Vollständig mit git diff im Terminal.</p>' : '');
+        d.innerHTML = diffHtml(r.diff) + (r.truncated ? '<p class="muted diff-more">' + tr('Truncated. Run git diff in the terminal for the full diff.') + '</p>' : '');
       } catch (e) { d.innerHTML = '<p class="err">' + esc(e.message) + '</p>'; }
     });
   }
@@ -1678,7 +1691,7 @@
     if (!fl || !fl.files || !fl.files.length) return '';
     const shared = fl.files.filter((f) => fl.others[f.file]);
     if (!shared.length) return '';
-    return '<div class="block"><div class="block-head"><h3>Auch in anderen Aufgaben</h3><span class="meta">dieselben Dateien, Entscheidungen dort beachten</span></div><ul class="flinks">' +
+    return '<div class="block"><div class="block-head"><h3>' + tr('Also in other tasks') + '</h3><span class="meta">' + tr('same files, mind the decisions there') + '</span></div><ul class="flinks">' +
       shared.slice(0, 12).map((f) => '<li><span class="mono">' + esc(f.file) + '</span><span>' + fl.others[f.file].map((x) => '<button class="btn link" data-open="' + esc(x) + '">' + esc(x) + '</button>').join(' ') + '</span></li>').join('') + '</ul></div>';
   }
 
@@ -1691,7 +1704,7 @@
       const cls = l.startsWith('@@') ? 'dh' : l.startsWith('+') ? 'da' : l.startsWith('-') ? 'dd' : '';
       out.push('<div class="dl ' + cls + '">' + (esc(l) || ' ') + '</div>');
     }
-    return '<div class="diff-body mono">' + (out.join('') || '<div class="dl">Keine Textänderung.</div>') + '</div>';
+    return '<div class="diff-body mono">' + (out.join('') || '<div class="dl">' + tr('No text change.') + '</div>') + '</div>';
   }
 
   // ---------- Teilen und Export ----------
@@ -1699,64 +1712,66 @@
   async function openShare() {
     let info;
     try { info = await api('GET', 'api/share'); } catch (e) { return fail(e); }
-    const copyRow = (label, url, warn) => '<div class="share-link' + (warn ? ' warn' : '') + '"><span>' + esc(label) + '</span><input class="input mono" readonly value="' + esc(url) + '"><button type="button" class="btn small" data-copy="' + esc(url) + '">Kopieren</button></div>';
+    const copyRow = (label, url, warn) => '<div class="share-link' + (warn ? ' warn' : '') + '"><span>' + esc(label) + '</span><input class="input mono" readonly value="' + esc(url) + '"><button type="button" class="btn small" data-copy="' + esc(url) + '">' + tr('Copy') + '</button></div>';
     const lan = info.shared
       ? (info.links.length
-        ? info.links.map((l) => copyRow('Ansehen über ' + l.address, l.view)).join('') +
-          '<details class="sec"><summary>Link mit Bearbeitungsrechten <span class="meta">nur für dich auf anderen Geräten</span></summary><div class="body">' + info.links.map((l) => copyRow(l.address, l.edit, true)).join('') + '<p class="sublabel">Wer diesen Link hat, kann alles ändern. Nicht weitergeben.</p></div></details>' +
-          '<div class="row-btns"><button type="button" class="btn small" data-share="rotate">Links erneuern</button><button type="button" class="btn small danger" data-share="disable">Freigabe beenden</button></div>'
-        : '<div class="alert bad">Freigegeben, aber keine Netzwerkadresse gefunden. Ist der Rechner mit einem Netzwerk verbunden?</div><div class="row-btns"><button type="button" class="btn small danger" data-share="disable">Freigabe beenden</button></div>')
-      : '<p class="lead">Das Board läuft gerade nur auf diesem Rechner. Nach der Freigabe sehen andere im selben Netzwerk (WLAN, Büro, VPN) das Board live mit einem Link. Ändern können sie nichts.</p><div class="row-btns"><button type="button" class="btn primary small" data-share="enable">Im Netzwerk freigeben</button></div><p class="sublabel">Der Server startet dafür kurz neu und hört dann auf allen Netzwerkadressen. Die Links enthalten einen geheimen Schlüssel, ohne ihn gibt es keinen Zugriff.</p>';
-    const html = '<h2>Board teilen</h2>' +
-      '<div class="block"><div class="block-head"><h3>Live im Netzwerk</h3><span class="meta">' + (info.shared ? 'freigegeben' : 'nur dieser Rechner') + '</span></div>' + lan + '</div>' +
-      '<div class="block"><div class="block-head"><h3>Schnappschuss</h3><span class="meta">eine HTML-Datei</span></div>' +
-        '<p class="lead">Für Mail oder Chat: alle Aufgaben mit Details und Bildern in einer Datei. Öffnet sich ohne Server und ohne Internet, zeigt den Stand von jetzt.</p>' +
-        '<label class="toggle"><input type="checkbox" name="images" checked> Bilder einbetten</label>' +
-        '<label class="toggle"><input type="checkbox" name="closed" checked> Erledigte, Verworfene und Archiv mitnehmen</label>' +
-        '<div class="row-btns"><button type="button" class="btn small primary" id="snapGo">Schnappschuss herunterladen</button></div></div>' +
-      '<div class="block"><div class="block-head"><h3>Im Internet</h3></div><p class="lead">Für Leute außerhalb deines Netzwerks den Schnappschuss schicken. Ein eigener Server mit Login ist als nächster Schritt möglich.</p></div>' +
-      '<div class="foot"><button class="btn" value="cancel" formnovalidate>Schließen</button></div>';
+        ? info.links.map((l) => copyRow(tr('View via {address}', { address: l.address }), l.view)).join('') +
+          '<details class="sec"><summary>' + tr('Link with edit rights') + ' <span class="meta">' + tr('only for you on other devices') + '</span></summary><div class="body">' + info.links.map((l) => copyRow(l.address, l.edit, true)).join('') + '<p class="sublabel">' + tr('Anyone with this link can change everything. Do not share it.') + '</p></div></details>' +
+          '<div class="row-btns"><button type="button" class="btn small" data-share="rotate">' + tr('Renew links') + '</button><button type="button" class="btn small danger" data-share="disable">' + tr('Stop sharing') + '</button></div>'
+        : '<div class="alert bad">' + tr('Shared, but no network address found. Is this computer connected to a network?') + '</div><div class="row-btns"><button type="button" class="btn small danger" data-share="disable">' + tr('Stop sharing') + '</button></div>')
+      : '<p class="lead">' + tr('The board currently runs only on this computer. Once shared, others on the same network (Wi-Fi, office, VPN) can watch it live via a link. They cannot change anything.') + '</p><div class="row-btns"><button type="button" class="btn primary small" data-share="enable">' + tr('Share on the network') + '</button></div><p class="sublabel">' + tr('The server restarts briefly and then listens on all network addresses. The links contain a secret key; without it there is no access.') + '</p>';
+    const html = '<h2>' + tr('Share board') + '</h2>' +
+      '<div class="block"><div class="block-head"><h3>' + tr('Live on the network') + '</h3><span class="meta">' + (info.shared ? tr('shared') : tr('this computer only')) + '</span></div>' + lan + '</div>' +
+      '<div class="block"><div class="block-head"><h3>' + tr('Snapshot') + '</h3><span class="meta">' + tr('one HTML file') + '</span></div>' +
+        '<p class="lead">' + tr('For mail or chat: all tasks with details and images in one file. Opens without a server or internet and shows the current state.') + '</p>' +
+        '<label class="toggle"><input type="checkbox" name="images" checked> ' + tr('Embed images') + '</label>' +
+        '<label class="toggle"><input type="checkbox" name="closed" checked> ' + tr('Include done, discarded and archived tasks') + '</label>' +
+        '<div class="row-btns"><button type="button" class="btn small primary" id="snapGo">' + tr('Download snapshot') + '</button></div></div>' +
+      '<div class="block"><div class="block-head"><h3>' + tr('On the internet') + '</h3></div><p class="lead">' + tr('For people outside your network, send the snapshot. A dedicated server with login is possible as a next step.') + '</p></div>' +
+      '<div class="foot"><button class="btn" value="cancel" formnovalidate>' + tr('Close') + '</button></div>';
     showDialog(html, () => null, (f) => {
       $$('[data-copy]', f).forEach((b) => b.onclick = async () => {
         const inp = b.previousElementSibling;
         try { await navigator.clipboard.writeText(b.dataset.copy); } catch (e) { inp.select(); document.execCommand('copy'); }
-        b.textContent = 'Kopiert';
-        setTimeout(() => { b.textContent = 'Kopieren'; }, 1500);
+        b.textContent = tr('Copied');
+        setTimeout(() => { b.textContent = tr('Copy'); }, 1500);
       });
       $$('[data-share]', f).forEach((b) => b.onclick = async () => {
         const op = b.dataset.share;
-        if (op === 'rotate' && !confirm('Neue Links erzeugen? Die bisherigen Links funktionieren dann nicht mehr.')) return;
+        if (op === 'rotate' && !confirm(tr('Create new links? The current links will stop working.'))) return;
         b.disabled = true;
         try {
           const r = await api('POST', 'api/share', { op });
           ok(r.message);
-          if (r.restarting) { dlg.close(); setLive(true, 'Board startet neu'); return; }
+          if (r.restarting) { dlg.close(); setLive(true, tr('Board is restarting')); return; }
           dlg.close(); openShare();
         } catch (e) { fail(e); b.disabled = false; }
       });
       $('#snapGo', f).onclick = async (e) => {
         const b = e.currentTarget;
-        b.disabled = true; b.textContent = 'Wird erstellt …';
+        b.disabled = true; b.textContent = tr('Creating …');
         try {
           const qs = 'images=' + (f.images.checked ? '1' : '0') + '&closed=' + (f.closed.checked ? '1' : '0');
           const res = await fetch('api/export?' + qs, { headers: { 'X-Works-Token': TOKEN } });
-          if (!res.ok) throw new Error('Export fehlgeschlagen (' + res.status + ').');
+          if (!res.ok) throw new Error(tr('Export failed ({status}).', { status: res.status }));
           const blob = await res.blob();
           const name = ((res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'works-board.html';
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob); a.download = name;
           document.body.appendChild(a); a.click(); a.remove();
           setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-          ok('Schnappschuss gespeichert: ' + name + ' (' + (blob.size / 1024 / 1024).toFixed(1) + ' MB)');
+          ok(tr('Snapshot saved: {name} ({size} MB)', { name, size: (blob.size / 1024 / 1024).toFixed(1) }));
         } catch (ex) { fail(ex); }
-        b.disabled = false; b.textContent = 'Schnappschuss herunterladen';
+        b.disabled = false; b.textContent = tr('Download snapshot');
       };
     });
   }
 
   // ---------- Sichern und Wiederherstellen (W-0021) ----------
 
-  const bkSize = (b) => (b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB' : (b / 1048576).toFixed(1).replace('.', ',') + ' MB');
+  // Dezimalkomma nur auf Deutsch (auch für fmtTok, fmtMoney und den Burndown).
+  const deComma = (s) => (I18N.lang === 'de' ? s.replace('.', ',') : s);
+  const bkSize = (b) => (b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB' : deComma((b / 1048576).toFixed(1)) + ' MB');
   const BK_KEYS = ['closed', 'archive', 'comments', 'history', 'checks', 'planning', 'knowledge', 'images', 'designs'];
 
   async function openBackup(tab) {
@@ -1765,28 +1780,28 @@
     const tg = (name, label, on, hint) => '<label class="toggle"><input type="checkbox" name="' + name + '"' + (on ? ' checked' : '') + '> ' + esc(label) + (hint ? '<span class="bk-hint">' + esc(hint) + '</span>' : '') + '</label>';
     const imp = tab === 'import';
     let pre = null;
-    const html = '<h2>Sichern und Wiederherstellen</h2>' +
-      '<div class="bk-tabs" role="tablist" aria-label="Richtung"><button type="button" role="tab" data-bk="export" aria-selected="' + !imp + '">Exportieren</button><button type="button" role="tab" data-bk="import" aria-selected="' + imp + '">Importieren</button></div>' +
+    const html = '<h2>' + tr('Back up and restore') + '</h2>' +
+      '<div class="bk-tabs" role="tablist" aria-label="' + tr('Direction') + '"><button type="button" role="tab" data-bk="export" aria-selected="' + !imp + '">' + tr('Export') + '</button><button type="button" role="tab" data-bk="import" aria-selected="' + imp + '">' + tr('Import') + '</button></div>' +
       '<div class="bk-pane" data-pane="export"' + (imp ? ' hidden' : '') + '>' +
-        '<p class="lead" style="margin:0">Das Board als eine JSON-Datei, zum Sichern oder um es in ein anderes Projekt zu übernehmen.</p>' +
+        '<p class="lead" style="margin:0">' + tr('The board as one JSON file, for backup or to move it into another project.') + '</p>' +
         '<div class="bk-scope">' +
-          '<fieldset><legend>Aufgaben</legend><label class="toggle"><input type="checkbox" checked disabled> Offene<span class="bk-hint">' + info.open + '</span></label>' + tg('closed', 'Erledigte und Verworfene', true, String(info.closed)) + tg('archive', 'Archiv', false, String(info.archived)) + '</fieldset>' +
-          '<fieldset><legend>Je Aufgabe</legend>' + tg('comments', 'Kommentare und Entscheidungen', true) + tg('history', 'Verlauf und Übergaben', true) + tg('checks', 'Prüfergebnisse', false) + '</fieldset>' +
-          '<fieldset><legend>Planung</legend>' + tg('planning', 'Meilensteine, Sprints, Warteschlange, Wiederkehrendes', true) + tg('knowledge', 'Projektwissen und Ideen', true) + '</fieldset>' +
-          '<fieldset><legend>Dateien</legend>' + tg('images', 'Bilder', false, info.images.n + ' · ' + bkSize(info.images.bytes)) + tg('designs', 'Entwürfe', false, info.designs.n + ' · ' + bkSize(info.designs.bytes)) + '</fieldset>' +
+          '<fieldset><legend>' + tr('Tasks') + '</legend><label class="toggle"><input type="checkbox" checked disabled> ' + tr('Unfinished') + '<span class="bk-hint">' + info.open + '</span></label>' + tg('closed', tr('Done and discarded'), true, String(info.closed)) + tg('archive', tr('Archived tasks'), false, String(info.archived)) + '</fieldset>' +
+          '<fieldset><legend>' + tr('Per task') + '</legend>' + tg('comments', tr('Comments and decisions'), true) + tg('history', tr('History and handoffs'), true) + tg('checks', tr('Check results'), false) + '</fieldset>' +
+          '<fieldset><legend>' + tr('Planning') + '</legend>' + tg('planning', tr('Milestones, sprints, queue, recurring tasks'), true) + tg('knowledge', tr('Project knowledge and ideas'), true) + '</fieldset>' +
+          '<fieldset><legend>' + tr('Files') + '</legend>' + tg('images', tr('Images'), false, info.images.n + ' · ' + bkSize(info.images.bytes)) + tg('designs', tr('Design variants'), false, info.designs.n + ' · ' + bkSize(info.designs.bytes)) + '</fieldset>' +
         '</div>' +
         '<div class="bk-sum"><b>' + esc(info.file) + '</b><span class="bk-hint" id="bkSize"></span></div>' +
-        '<p class="sublabel">Auch ohne Board: <span class="mono">works export --json</span></p>' +
-        '<div class="foot"><button class="btn" value="cancel" formnovalidate>Schließen</button><button type="button" class="btn primary" id="bkGo">JSON herunterladen</button></div>' +
+        '<p class="sublabel">' + tr('Also without the board:') + ' <span class="mono">works export --json</span></p>' +
+        '<div class="foot"><button class="btn" value="cancel" formnovalidate>' + tr('Close') + '</button><button type="button" class="btn primary" id="bkGo">' + tr('Download JSON') + '</button></div>' +
       '</div>' +
       '<div class="bk-pane" data-pane="import"' + (imp ? '' : ' hidden') + '>' +
-        '<label class="imp-drop" id="bkDrop"><input type="file" id="bkFile" accept=".json,application/json" hidden><strong id="bkName">Sicherung wählen oder hierher ziehen</strong><span class="sublabel">works-Sicherung als JSON, bis 20 MB</span></label>' +
+        '<label class="imp-drop" id="bkDrop"><input type="file" id="bkFile" accept=".json,application/json" hidden><strong id="bkName">' + tr('Choose a backup or drop it here') + '</strong><span class="sublabel">' + tr('works backup as JSON, up to 20 MB') + '</span></label>' +
         '<div class="bk-pane" id="bkPre"></div>' +
         '<p class="err" role="alert"></p>' +
-        '<div class="foot"><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn primary" value="next" id="bkNext" disabled>Weiter zum Vergleich</button></div>' +
+        '<div class="foot"><button class="btn" value="cancel" formnovalidate>' + tr('Cancel') + '</button><button class="btn primary" value="next" id="bkNext" disabled>' + tr('Continue to comparison') + '</button></div>' +
       '</div>';
     const next = await showDialog(html, (fd) => {
-      if (!pre) throw new Error('Bitte zuerst eine Sicherung wählen.');
+      if (!pre) throw new Error(tr('Please choose a backup first.'));
       return { r: pre, mode: fd.get('bkmode') === 'restore' ? 'restore' : 'merge' };
     }, (f) => {
       $$('[data-bk]', f).forEach((b) => b.onclick = () => {
@@ -1795,24 +1810,24 @@
       });
       const size = () => {
         const est = info.base + (f.elements.images.checked ? info.images.bytes * 1.34 : 0) + (f.elements.designs.checked ? info.designs.bytes * 1.34 : 0);
-        $('#bkSize', f).textContent = 'etwa ' + bkSize(est) + ' · ' + (info.open + (f.elements.closed.checked ? info.closed : 0) + (f.elements.archive.checked ? info.archived : 0)) + ' Aufgaben';
+        $('#bkSize', f).textContent = tr('about {size}', { size: bkSize(est) }) + ' · ' + tr('{n} tasks', { n: info.open + (f.elements.closed.checked ? info.closed : 0) + (f.elements.archive.checked ? info.archived : 0) });
       };
       BK_KEYS.forEach((k) => { f.elements[k].onchange = size; });
       size();
       $('#bkGo', f).onclick = async (e) => {
         const b = e.currentTarget; const label = b.textContent;
-        b.disabled = true; b.textContent = 'Wird erstellt …';
+        b.disabled = true; b.textContent = tr('Creating …');
         try {
           const qs = BK_KEYS.map((k) => k + '=' + (f.elements[k].checked ? '1' : '0')).join('&');
           const res = await fetch('api/backup?' + qs, { headers: { 'X-Works-Token': TOKEN } });
-          if (!res.ok) throw new Error('Export fehlgeschlagen (' + res.status + ').');
+          if (!res.ok) throw new Error(tr('Export failed ({status}).', { status: res.status }));
           const blob = await res.blob();
           const name = ((res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'works-board.json';
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob); a.download = name;
           document.body.appendChild(a); a.click(); a.remove();
           setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-          ok('Sicherung gespeichert: ' + name + ' (' + bkSize(blob.size) + ')');
+          ok(tr('Backup saved: {name} ({size})', { name, size: bkSize(blob.size) }));
         } catch (ex) { fail(ex); }
         b.disabled = false; b.textContent = label;
       };
@@ -1824,13 +1839,13 @@
         try {
           const r = await api('POST', 'api/backup-preview?name=' + encodeURIComponent(file.name), undefined, { body: file, type: 'application/json' });
           const c = r.counts;
-          const when = r.exported ? new Date(r.exported).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '';
+          const when = r.exported ? new Date(r.exported).toLocaleString(I18N.lang === 'de' ? 'de-DE' : 'en-GB', { dateStyle: 'short', timeStyle: 'short' }) : '';
           $('#bkPre', f).innerHTML = '<div class="bk-file"><span class="ic" aria-hidden="true">JSON</span><strong>' + esc(r.name) + '</strong><span class="bk-hint">' +
-            esc([r.project ? 'Projekt ' + r.project : '', when ? 'exportiert ' + when : '', r.tasks + (r.tasks === 1 ? ' Aufgabe' : ' Aufgaben'), r.milestones ? r.milestones + ' Meilensteine' : '', r.knowledge ? r.knowledge + ' Wissenseinträge' : ''].filter(Boolean).join(' · ')) + '</span></div>' +
-            '<div class="bk-counts"><span class="bk-chip" style="--c:var(--ok)"><i></i>' + c.neu + ' neu</span><span class="bk-chip" style="--c:var(--warn)"><i></i>' + c.geaendert + ' geändert</span><span class="bk-chip"><i></i>' + c.gleich + ' gleich</span><span class="bk-chip" style="--c:var(--accent)"><i></i>' + c.nurHier + ' nur hier</span></div>' +
-            '<fieldset class="bk-mode"><legend class="sublabel">Art des Imports</legend>' +
-              '<label><input type="radio" name="bkmode" value="merge" checked><b>Zusammenführen</b><span>Neue Aufgaben anlegen, Geänderte zur Auswahl zeigen, Gleiches überspringen. Was nur hier steht, bleibt.</span></label>' +
-              '<label><input type="radio" name="bkmode" value="restore"><b>Wiederherstellen</b><span>Ersetzt Aufgaben, Planung und Projektwissen durch die Datei. Der jetzige Stand wird vorher als JSON in .works/backups gesichert.</span></label>' +
+            esc([r.project ? tr('Project {name}', { name: r.project }) : '', when ? tr('exported {when}', { when }) : '', r.tasks === 1 ? tr('1 task') : tr('{n} tasks', { n: r.tasks }), r.milestones ? tr('{n} milestones', { n: r.milestones }) : '', r.knowledge ? tr('{n} knowledge entries', { n: r.knowledge }) : ''].filter(Boolean).join(' · ')) + '</span></div>' +
+            '<div class="bk-counts"><span class="bk-chip" style="--c:var(--ok)"><i></i>' + tr('{n} new', { n: c.neu }) + '</span><span class="bk-chip" style="--c:var(--warn)"><i></i>' + tr('{n} changed', { n: c.geaendert }) + '</span><span class="bk-chip"><i></i>' + tr('{n} unchanged', { n: c.gleich }) + '</span><span class="bk-chip" style="--c:var(--accent)"><i></i>' + tr('{n} only here', { n: c.nurHier }) + '</span></div>' +
+            '<fieldset class="bk-mode"><legend class="sublabel">' + tr('Import mode') + '</legend>' +
+              '<label><input type="radio" name="bkmode" value="merge" checked><b>' + tr('Merge') + '</b><span>' + tr('Create new tasks, offer changed ones for selection, skip identical ones. Whatever exists only here stays.') + '</span></label>' +
+              '<label><input type="radio" name="bkmode" value="restore"><b>' + tr('Restore') + '</b><span>' + tr('Replaces tasks, planning and project knowledge with the file. The current state is first saved as JSON in .works/backups.') + '</span></label>' +
             '</fieldset>';
           pre = r; $('#bkNext', f).disabled = false;
         } catch (ex) { err.textContent = ex.message; }
@@ -1845,27 +1860,27 @@
 
   async function backupCompareDialog(r, mode) {
     const lbl = (field, v) => (field === 'status' ? L(v) : v) || '–';
-    const chg = (c) => (c.from !== undefined ? esc(c.label) + ' <del>' + esc(lbl(c.field, c.from)) + '</del> → <ins>' + esc(lbl(c.field, c.to)) + '</ins>' : esc(c.label) + ' geändert');
-    const item = (i) => '<label><input type="checkbox" class="bkc" data-n="' + i.n + '" checked><span class="t"><span class="id">' + esc(i.kind === 'neu' ? 'neu' : i.localId) + '</span>' + esc(i.title) + '</span>' +
+    const chg = (c) => (c.from !== undefined ? esc(c.label) + ' <del>' + esc(lbl(c.field, c.from)) + '</del> → <ins>' + esc(lbl(c.field, c.to)) + '</ins>' : esc(tr('{label} changed', { label: c.label })));
+    const item = (i) => '<label><input type="checkbox" class="bkc" data-n="' + i.n + '" checked><span class="t"><span class="id">' + esc(i.kind === 'neu' ? tr('new') : i.localId) + '</span>' + esc(i.title) + '</span>' +
       '<span class="d">' + (i.kind === 'neu' ? esc([i.priority, L(i.status)].filter(Boolean).join(' · ')) : i.changes.map(chg).join(' · ')) + '</span></label>';
     const neu = r.items.filter((i) => i.kind === 'neu'); const ge = r.items.filter((i) => i.kind === 'geaendert');
     const restore = mode === 'restore';
     const body = restore
-      ? '<p class="lead">Wiederherstellen ersetzt den Stand durch ' + r.tasks + (r.tasks === 1 ? ' Aufgabe' : ' Aufgaben') + ' aus der Datei, dazu Planung und Projektwissen. Vorher wird der jetzige Stand gesichert.</p>' +
-        (r.onlyHere.length ? '<div class="bk-diff"><h4>Steht nur hier und verschwindet · ' + r.onlyHere.length + '</h4>' + r.onlyHere.map((t) => '<div class="t"><span class="id">' + esc(t.id) + '</span>' + esc(t.title) + '</div>').join('') + '</div><p class="sublabel">Diese Aufgaben stecken danach nur noch in der Sicherung unter .works/backups.</p>' : '')
+      ? '<p class="lead">' + (r.tasks === 1 ? tr('Restore replaces the current state with 1 task from the file, plus planning and project knowledge. The current state is backed up first.') : tr('Restore replaces the current state with {n} tasks from the file, plus planning and project knowledge. The current state is backed up first.', { n: r.tasks })) + '</p>' +
+        (r.onlyHere.length ? '<div class="bk-diff"><h4>' + tr('Only here and will disappear') + ' · ' + r.onlyHere.length + '</h4>' + r.onlyHere.map((t) => '<div class="t"><span class="id">' + esc(t.id) + '</span>' + esc(t.title) + '</div>').join('') + '</div><p class="sublabel">' + tr('Afterwards these tasks exist only in the backup under .works/backups.') + '</p>' : '')
       : (neu.length || ge.length
-        ? '<p class="lead">Zusammenführen: Gleiches ist ausgeblendet, was nur hier steht, bleibt.</p><div class="bk-diff">' +
-          (neu.length ? '<h4>Neu · ' + neu.length + '</h4>' + neu.map(item).join('') : '') + (ge.length ? '<h4>Geändert · ' + ge.length + '</h4>' + ge.map(item).join('') : '') + '</div>'
-        : '<div class="q-empty">Nichts zu übernehmen: Alles in der Datei steht schon genauso im Board.</div>');
-    const html = '<h2>Vergleich mit dem Board</h2>' + body + '<p class="sublabel">Unter Rückgängig lässt sich der Import als Ganzes zurücknehmen.</p>' +
-      '<p class="err" role="alert"></p><div class="foot"><button type="button" class="btn" id="bkBack" style="margin-right:auto">Zurück</button><button class="btn" value="cancel" formnovalidate>Abbrechen</button>' +
-      '<button class="btn ' + (restore ? 'danger' : 'primary') + '" value="ok" id="bkApply"' + (!restore && !neu.length && !ge.length ? ' disabled' : '') + '>' + (restore ? 'Wiederherstellen' : (neu.length + ge.length) + ' übernehmen') + '</button></div>';
+        ? '<p class="lead">' + tr('Merge: identical items are hidden, whatever exists only here stays.') + '</p><div class="bk-diff">' +
+          (neu.length ? '<h4>' + tr('New') + ' · ' + neu.length + '</h4>' + neu.map(item).join('') : '') + (ge.length ? '<h4>' + tr('Changed') + ' · ' + ge.length + '</h4>' + ge.map(item).join('') : '') + '</div>'
+        : '<div class="q-empty">' + tr('Nothing to import: everything in the file is already in the board as is.') + '</div>');
+    const html = '<h2>' + tr('Comparison with the board') + '</h2>' + body + '<p class="sublabel">' + tr('Undo can revert the whole import.') + '</p>' +
+      '<p class="err" role="alert"></p><div class="foot"><button type="button" class="btn" id="bkBack" style="margin-right:auto">' + tr('Back') + '</button><button class="btn" value="cancel" formnovalidate>' + tr('Cancel') + '</button>' +
+      '<button class="btn ' + (restore ? 'danger' : 'primary') + '" value="ok" id="bkApply"' + (!restore && !neu.length && !ge.length ? ' disabled' : '') + '>' + (restore ? tr('Restore') : tr('Import {n}', { n: neu.length + ge.length })) + '</button></div>';
     const res = await showDialog(html, () => {
       const only = $$('.bkc', form).filter((c) => c.checked).map((c) => +c.dataset.n);
-      if (!restore && !only.length) throw new Error('Nichts gewählt.');
+      if (!restore && !only.length) throw new Error(tr('Nothing selected.'));
       return act('backupApply', { token: r.token, mode, only });
     }, (f) => {
-      const count = () => { if (!restore) { const n = $$('.bkc', f).filter((c) => c.checked).length; $('#bkApply', f).textContent = n ? n + ' übernehmen' : 'Nichts gewählt'; $('#bkApply', f).disabled = !n; } };
+      const count = () => { if (!restore) { const n = $$('.bkc', f).filter((c) => c.checked).length; $('#bkApply', f).textContent = n ? tr('Import {n}', { n }) : tr('Nothing selected'); $('#bkApply', f).disabled = !n; } };
       $$('.bkc', f).forEach((c) => { c.onchange = count; });
       $('#bkBack', f).onclick = () => { $('button[value="cancel"]', f).click(); setTimeout(() => openBackup('import'), 50); };
     });
@@ -1880,29 +1895,29 @@
       const r = c.results[x.name] || { status: 'missing' };
       const st = c.stale ? 'missing' : r.status;
       const [cls, ch] = icon[st] || icon.missing;
-      const label = { ok: 'bestanden', ack: 'bekannt', fail: 'fehlgeschlagen', warn: 'Fund', manual: 'trägt Claude ein', missing: 'noch nicht gelaufen' }[st];
+      const label = { ok: tr('passed'), ack: tr('known'), fail: tr('failed'), warn: tr('finding'), manual: tr('Claude fills it in'), missing: tr('not run yet') }[st];
       let extra = '';
-      if (!c.stale && st === 'warn') extra = '<div class="ck-note">' + md(r.note || '') + (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-cfix="' + esc(x.name) + '">Claude beheben lassen</button><button type="button" class="btn small" data-cack="' + esc(x.name) + '">Als bekannt markieren</button></div>' : '') + '</div>';
-      else if (!c.stale && st === 'fail' && r.output) extra = '<details class="ck-out"><summary>Ausgabe</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>';
+      if (!c.stale && st === 'warn') extra = '<div class="ck-note">' + md(r.note || '') + (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-cfix="' + esc(x.name) + '">' + tr('Let Claude fix it') + '</button><button type="button" class="btn small" data-cack="' + esc(x.name) + '">' + tr('Mark as known') + '</button></div>' : '') + '</div>';
+      else if (!c.stale && st === 'fail' && r.output) extra = '<details class="ck-out"><summary>' + tr('Output') + '</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>';
       else if (!c.stale && (st === 'manual' || st === 'ack') && r.note) extra = '<div class="ck-note muted">' + esc(r.note.split('\n').slice(-1)[0]) + '</div>';
       return '<li class="ck ' + cls + '"><div class="ck-row"><span class="ck-ic" aria-hidden="true">' + ch + '</span><span class="ck-name">' + esc(x.name) + '</span><span class="mono muted ck-cmd">' + esc(x.cmd) + '</span><span class="muted num ck-ms">' + (r.ms && !c.stale ? Math.round(r.ms / 1000) + ' s' : esc(label)) + '</span></div>' + extra + '</li>';
     }).join('');
-    return '<div class="block"><div class="block-head"><h3>Automatische Prüfungen</h3><span class="meta">' + (c.stale ? 'für den aktuellen Stand noch nicht gelaufen' : 'zuletzt ' + esc(new Date(c.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }))) + '</span><span class="spacer"></span>' +
-      (EDIT ? '<button type="button" class="btn small" data-crun>' + (c.stale ? 'Jetzt prüfen' : 'Erneut prüfen') + '</button>' : '') + '</div><ul class="checks">' + rows + '</ul></div>';
+    return '<div class="block"><div class="block-head"><h3>' + tr('Automatic checks') + '</h3><span class="meta">' + (c.stale ? tr('not run yet for the current state') : esc(tr('last run {when}', { when: new Date(c.at).toLocaleString(I18N.lang === 'de' ? 'de-DE' : 'en-GB', { dateStyle: 'short', timeStyle: 'short' }) }))) + '</span><span class="spacer"></span>' +
+      (EDIT ? '<button type="button" class="btn small" data-crun>' + (c.stale ? tr('Check now') : tr('Check again')) + '</button>' : '') + '</div><ul class="checks">' + rows + '</ul></div>';
   }
 
   function bindChecks(f, id) {
     const reopen = () => { const c = $('button[value="cancel"]', f); if (c) c.click(); setTimeout(() => openDod(id), 50); };
     $$('[data-crun]', f).forEach((b) => b.onclick = async () => {
-      b.disabled = true; b.textContent = 'Prüfungen laufen …';
+      b.disabled = true; b.textContent = tr('Checks running …');
       $$('.ck', f).forEach((li) => li.classList.add('running'));
-      const r = await run(() => act('checksRun', { id }), 'Prüfungen gelaufen');
-      if (r) reopen(); else { b.disabled = false; b.textContent = 'Erneut prüfen'; }
+      const r = await run(() => act('checksRun', { id }), tr('Checks done'));
+      if (r) reopen(); else { b.disabled = false; b.textContent = tr('Check again'); }
     });
-    $$('[data-cack]', f).forEach((b) => b.onclick = async () => { if (await run(() => act('checksAck', { id, name: b.dataset.cack }), 'Als bekannt markiert')) reopen(); });
+    $$('[data-cack]', f).forEach((b) => b.onclick = async () => { if (await run(() => act('checksAck', { id, name: b.dataset.cack }), tr('Marked as known'))) reopen(); });
     $$('[data-cfix]', f).forEach((b) => b.onclick = async () => {
       const note = (b.closest('.ck').querySelector('.ck-note') || {}).innerText || '';
-      const r = await run(() => act('comment', { id, text: 'Bitte den Fund aus der Prüfung ' + b.dataset.cfix + ' beheben und die Prüfung danach neu eintragen:\n\n' + note.replace(/Claude beheben lassen|Als bekannt markieren/g, '').trim() }), 'Auftrag an Claude als Kommentar gespeichert');
+      const r = await run(() => act('comment', { id, text: tr('Please fix the finding from the check {name} and record the check again afterwards:', { name: b.dataset.cfix }) + '\n\n' + [tr('Let Claude fix it'), tr('Mark as known')].reduce((s, x) => s.split(x).join(''), note).trim() }), tr('Request to Claude saved as a comment'));
       if (r) b.disabled = true;
     });
   }
@@ -1916,14 +1931,14 @@
     if (list.length) store.set(seenKey, list[list.length - 1].at);
     const item = (c) => {
       const me = c.author === 'Nutzer';
-      const when = new Date(c.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-      return '<li class="cm' + (me ? ' me' : ' cl') + '"><span class="cm-av" aria-hidden="true">' + (me ? 'Du' : 'C') + '</span><div class="cm-b"><div class="cm-meta"><strong>' + (me ? 'Du' : 'Claude') + '</strong> ' + esc(when) + (!me && c.at > seen && seen ? ' <span class="tag q-tag">neu</span>' : '') + '</div><div class="cm-text md">' + md(c.text) + '</div></div></li>';
+      const when = new Date(c.at).toLocaleString(I18N.lang === 'de' ? 'de-DE' : 'en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      return '<li class="cm' + (me ? ' me' : ' cl') + '"><span class="cm-av" aria-hidden="true">' + (me ? tr('You') : 'C') + '</span><div class="cm-b"><div class="cm-meta"><strong>' + (me ? tr('You') : 'Claude') + '</strong> ' + esc(when) + (!me && c.at > seen && seen ? ' <span class="tag q-tag">' + tr('new') + '</span>' : '') + '</div><div class="cm-text md">' + md(c.text) + '</div></div></li>';
     };
     const lastMine = list.length && list[list.length - 1].author === 'Nutzer';
     return '<div class="comments">' +
-      (list.length ? '<ol class="cm-list">' + list.map(item).join('') + '</ol>' : '<div class="q-empty"><strong>Noch keine Kommentare.</strong><span>Schreib Claude hier, was bei dieser Aufgabe wichtig ist. Claude liest neue Kommentare beim Start der Sitzung und antwortet hier.</span></div>') +
-      (lastMine ? '<p class="sublabel">Claude hat deinen letzten Kommentar noch nicht beantwortet.</p>' : '') +
-      (EDIT ? '<div class="cm-compose"><label class="field"><span>Nachricht an Claude</span><textarea class="input" id="cmIn" rows="4" maxlength="10000" placeholder="Hinweis, Wunsch oder Antwort. Markdown möglich."></textarea></label><div class="add-row" style="justify-content:flex-end;align-items:center"><span class="sublabel" style="margin-right:auto">Strg+Enter sendet</span><button class="btn primary small" id="cmSend">Senden</button></div></div>' : '') +
+      (list.length ? '<ol class="cm-list">' + list.map(item).join('') + '</ol>' : '<div class="q-empty"><strong>' + tr('No comments yet.') + '</strong><span>' + tr('Tell Claude here what matters for this task. Claude reads new comments when a session starts and replies here.') + '</span></div>') +
+      (lastMine ? '<p class="sublabel">' + tr('Claude has not answered your last comment yet.') + '</p>' : '') +
+      (EDIT ? '<div class="cm-compose"><label class="field"><span>' + tr('Message to Claude') + '</span><textarea class="input" id="cmIn" rows="4" maxlength="10000" placeholder="' + tr('Note, request or answer. Markdown works.') + '"></textarea></label><div class="add-row" style="justify-content:flex-end;align-items:center"><span class="sublabel" style="margin-right:auto">' + tr('Ctrl+Enter sends') + '</span><button class="btn primary small" id="cmSend">' + tr('Send') + '</button></div></div>' : '') +
       '</div>';
   }
 
@@ -1955,15 +1970,15 @@
     const sd = Object.entries(tm.statusDays || {}).filter(([, v]) => v > 0);
     const total = sd.reduce((a, [, v]) => a + v, 0) || 1;
     return '<div class="time-box">' +
-      '<div class="code-cards"><div><small>Claude aktiv</small><strong>' + (tm.totalMs ? fmtMs(tm.totalMs) : '–') + '</strong><span class="muted">' + tm.sessions.length + (tm.sessions.length === 1 ? ' Sitzung' : ' Sitzungen') + '</span></div>' +
-      '<div><small>Seit dem Start</small><strong>' + (since === null ? 'nicht gestartet' : since + (since === 1 ? ' Tag' : ' Tage')) + '</strong><span class="muted">' + (est ? 'geschätzt ' + est + ' Tage bei ' + esc(t.effort) : 'ohne Schätzung') + '</span></div>' +
-      '<div><small>Tokens</small><strong>' + (d.usage && d.usage.tokens ? fmtTok(d.usage.tokens) : '–') + '</strong><span class="muted">' + (d.usage && d.usage.tokens ? 'davon ' + fmtTok(d.usage.cr + d.usage.cw) + ' Cache' : 'noch nichts erfasst') + '</span></div>' +
-      '<div><small>Geschätzte Kosten</small><strong>' + (d.usage && d.usage.tokens ? fmtMoney(d.usage.cost, d.usage.currency) : '–') + '</strong><span class="muted">nach den Preisen in config.json</span></div></div>' +
-      (d.usage && d.usage.days && d.usage.days.length ? '<div class="block"><div class="block-head"><h3>Verbrauch je Tag</h3></div><div class="est-grid">' + d.usage.days.slice(0, 10).map((x) => { const max = Math.max(...d.usage.days.map((y) => y.cost)) || 1; return '<span class="muted num">' + esc(fmtDate(x.day).slice(0, 6)) + '</span><div class="est-track"><span class="est-bar" style="width:' + (x.cost / max * 100).toFixed(1) + '%"></span></div><span class="num">' + fmtTok(x.in + x.out + x.cw + x.cr) + ', ' + fmtMoney(x.cost, d.usage.currency) + '</span>'; }).join('') + '</div></div>' : '') +
-      (sd.length ? '<div class="block"><div class="block-head"><h3>Tage je Status</h3></div><div class="pg-bar">' + sd.map(([k, v]) => '<span style="flex-grow:' + v + ';background:' + statusVar(k) + '" title="' + esc(L(k)) + ': ' + v + ' Tage"></span>').join('') + '</div><div class="pg-legend">' + sd.map(([k, v]) => '<span class="pg-k"><i style="background:' + statusVar(k) + '"></i>' + esc(L(k)) + ' <b class="num">' + v + '</b></span>').join('') + '</div></div>' : '') +
-      '<div class="block"><div class="block-head"><h3>Sitzungen</h3><span class="meta">Pausen über 20 Minuten trennen</span></div>' +
-      (tm.sessions.length ? '<ol class="commits">' + tm.sessions.map((s) => '<li><time class="muted num">' + esc(new Date(s.start).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time><span class="subj">' + esc(s.label || s.turns + (s.turns === 1 ? ' Anfrage' : ' Anfragen')) + '</span><span class="num">' + fmtMs(s.ms) + '</span></li>').join('') + '</ol>'
-        : '<p class="md empty-md">Noch keine erfasste Zeit. Die Hooks messen, wie lange Claude an der aktiven Aufgabe arbeitet, sobald sie mit works start begonnen wurde.</p>') + '</div></div>';
+      '<div class="code-cards"><div><small>' + tr('Claude active') + '</small><strong>' + (tm.totalMs ? fmtMs(tm.totalMs) : '–') + '</strong><span class="muted">' + (tm.sessions.length === 1 ? tr('1 session') : tr('{n} sessions', { n: tm.sessions.length })) + '</span></div>' +
+      '<div><small>' + tr('Since start') + '</small><strong>' + (since === null ? tr('not started') : since === 1 ? tr('1 day') : tr('{n} days', { n: since })) + '</strong><span class="muted">' + (est ? esc(tr('estimated {n} days at {effort}', { n: est, effort: t.effort })) : tr('no estimate')) + '</span></div>' +
+      '<div><small>Tokens</small><strong>' + (d.usage && d.usage.tokens ? fmtTok(d.usage.tokens) : '–') + '</strong><span class="muted">' + (d.usage && d.usage.tokens ? tr('incl. {n} cache', { n: fmtTok(d.usage.cr + d.usage.cw) }) : tr('nothing recorded yet')) + '</span></div>' +
+      '<div><small>' + tr('Estimated cost') + '</small><strong>' + (d.usage && d.usage.tokens ? fmtMoney(d.usage.cost, d.usage.currency) : '–') + '</strong><span class="muted">' + tr('based on the prices in config.json') + '</span></div></div>' +
+      (d.usage && d.usage.days && d.usage.days.length ? '<div class="block"><div class="block-head"><h3>' + tr('Usage per day') + '</h3></div><div class="est-grid">' + d.usage.days.slice(0, 10).map((x) => { const max = Math.max(...d.usage.days.map((y) => y.cost)) || 1; return '<span class="muted num">' + esc(fmtDate(x.day).slice(0, 6)) + '</span><div class="est-track"><span class="est-bar" style="width:' + (x.cost / max * 100).toFixed(1) + '%"></span></div><span class="num">' + fmtTok(x.in + x.out + x.cw + x.cr) + ', ' + fmtMoney(x.cost, d.usage.currency) + '</span>'; }).join('') + '</div></div>' : '') +
+      (sd.length ? '<div class="block"><div class="block-head"><h3>' + tr('Days per status') + '</h3></div><div class="pg-bar">' + sd.map(([k, v]) => '<span style="flex-grow:' + v + ';background:' + statusVar(k) + '" title="' + esc(L(k)) + ': ' + tr('{n} days', { n: v }) + '"></span>').join('') + '</div><div class="pg-legend">' + sd.map(([k, v]) => '<span class="pg-k"><i style="background:' + statusVar(k) + '"></i>' + esc(L(k)) + ' <b class="num">' + v + '</b></span>').join('') + '</div></div>' : '') +
+      '<div class="block"><div class="block-head"><h3>' + tr('Sessions') + '</h3><span class="meta">' + tr('breaks over 20 minutes split sessions') + '</span></div>' +
+      (tm.sessions.length ? '<ol class="commits">' + tm.sessions.map((s) => '<li><time class="muted num">' + esc(new Date(s.start).toLocaleString(I18N.lang === 'de' ? 'de-DE' : 'en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time><span class="subj">' + esc(s.label || (s.turns === 1 ? tr('1 prompt') : tr('{n} prompts', { n: s.turns }))) + '</span><span class="num">' + fmtMs(s.ms) + '</span></li>').join('') + '</ol>'
+        : '<p class="md empty-md">' + tr('No time recorded yet. The hooks measure how long Claude works on the active task once it was started with works start.') + '</p>') + '</div></div>';
   }
 
   async function loadEstimates() {
@@ -1973,14 +1988,14 @@
     try { e = await api('GET', 'api/estimates'); } catch (err) { return; }
     const max = Math.max(1, ...e.sizes.map((s) => Math.max(s.estimate, s.avg || 0)));
     const open = store.get('works-est-open', false);
-    box.innerHTML = '<details class="est"' + (open ? ' open' : '') + '><summary>Wie gut passen die Schätzungen? <span class="meta">Zeitleiste rechnet mit ' + (e.mode === 'measured' ? 'gemessenen' : 'festen') + ' Werten</span></summary><div class="est-body">' +
-      '<div class="est-grid">' + e.sizes.map((s) => '<strong>' + s.effort + '</strong><div class="est-track"><span class="est-bar' + (s.avg !== null && s.avg > s.estimate * 1.2 ? ' over' : '') + '" style="width:' + ((s.avg || 0) / max * 100).toFixed(1) + '%"></span><span class="est-mark" style="left:' + (s.estimate / max * 100).toFixed(1) + '%" title="Schätzung ' + s.estimate + ' Tage"></span></div><span class="' + (s.avg === null ? 'muted' : '') + '">' + (s.avg === null ? 'noch keine Daten' : s.avg + ' statt ' + s.estimate + ' Tage, ' + s.n + 'x') + '</span>').join('') + '</div>' +
-      '<p class="sublabel">Strich: Schätzung. Balken: tatsächliche Dauer im Mittel, vom Start bis zum Abschluss. Gemessene Werte zählen ab drei erledigten Aufgaben je Größe.</p>' +
-      (e.worst.length ? '<p class="sublabel">Am längsten über der Schätzung: ' + e.worst.map((w) => esc(w.id) + ' (' + esc(w.effort) + ', ' + w.days + ' Tage)').join(', ') + '</p>' : '') +
-      (EDIT ? '<div class="row-btns">' + (e.mode === 'measured' ? '<button class="btn small" data-emode="fixed">Feste Werte nutzen</button>' : '<button class="btn small primary" data-emode="measured">Gemessene Werte nutzen</button>') + '</div>' : '') +
+    box.innerHTML = '<details class="est"' + (open ? ' open' : '') + '><summary>' + tr('How good are the estimates?') + ' <span class="meta">' + (e.mode === 'measured' ? tr('Timeline uses measured values') : tr('Timeline uses fixed values')) + '</span></summary><div class="est-body">' +
+      '<div class="est-grid">' + e.sizes.map((s) => '<strong>' + s.effort + '</strong><div class="est-track"><span class="est-bar' + (s.avg !== null && s.avg > s.estimate * 1.2 ? ' over' : '') + '" style="width:' + ((s.avg || 0) / max * 100).toFixed(1) + '%"></span><span class="est-mark" style="left:' + (s.estimate / max * 100).toFixed(1) + '%" title="' + tr('Estimate {n} days', { n: s.estimate }) + '"></span></div><span class="' + (s.avg === null ? 'muted' : '') + '">' + (s.avg === null ? tr('no data yet') : tr('{avg} instead of {est} days, {n}x', { avg: s.avg, est: s.estimate, n: s.n })) + '</span>').join('') + '</div>' +
+      '<p class="sublabel">' + tr('Line: estimate. Bar: average actual duration from start to completion. Measured values count from three done tasks per size.') + '</p>' +
+      (e.worst.length ? '<p class="sublabel">' + tr('Furthest over the estimate: {list}', { list: e.worst.map((w) => esc(w.id) + ' (' + esc(w.effort) + ', ' + tr('{n} days', { n: w.days }) + ')').join(', ') }) + '</p>' : '') +
+      (EDIT ? '<div class="row-btns">' + (e.mode === 'measured' ? '<button class="btn small" data-emode="fixed">' + tr('Use fixed values') + '</button>' : '<button class="btn small primary" data-emode="measured">' + tr('Use measured values') + '</button>') + '</div>' : '') +
       '</div></details>';
     $('details', box).ontoggle = (ev) => store.set('works-est-open', ev.target.open);
-    $$('[data-emode]', box).forEach((b) => b.onclick = () => run(() => act('effortMode', { mode: b.dataset.emode }), 'Gespeichert'));
+    $$('[data-emode]', box).forEach((b) => b.onclick = () => run(() => act('effortMode', { mode: b.dataset.emode }), tr('Saved')));
   }
 
   // ---------- Sprint ----------
@@ -1994,12 +2009,12 @@
     const last = meta.lastSprint;
     if (!sp) {
       const carry = last && last.carry ? last.carry.filter((x) => byId.has(x)) : [];
-      box.innerHTML = '<div class="q-wrap"><section class="q-main"><div class="q-head"><h2>Kein Sprint aktiv</h2><p>Ein Sprint bündelt Aufgaben für einen festen Zeitraum mit einem Ziel. Die Kapazität in Punkten zeigt, ob der Plan realistisch ist. Punkte: ' + Object.entries(set.points).map(([k, v]) => k + ' ' + v).join(', ') + ', ohne Schätzung zählt eine Aufgabe wie M.</p></div>' +
-        (EDIT ? '<form class="sp-form" id="spStart"><div class="grid"><label class="field span2"><span>Titel</span><input class="input" name="title" required maxlength="120" value="Sprint ' + ((parseInt(String(last ? last.id : 'S0').slice(1), 10) || 0) + 1) + '"></label><label class="field span2"><span>Ziel</span><input class="input" name="goal" maxlength="300" placeholder="Was soll am Ende stehen?"></label>' +
-          '<label class="field"><span>Start</span><input type="date" class="input" name="start" value="' + today() + '"></label><label class="field"><span>Länge in Tagen</span><input type="number" class="input" name="days" min="1" max="60" value="' + set.length_days + '"></label><label class="field"><span>Kapazität in Punkten</span><input type="number" class="input" name="capacity" min="1" max="1000" value="' + set.capacity + '"></label></div>' +
-          (carry.length ? '<label class="toggle"><input type="checkbox" name="carry" checked> ' + carry.length + ' offene Aufgabe' + (carry.length === 1 ? '' : 'n') + ' aus ' + esc(last.id) + ' übernehmen</label>' : '') +
-          '<div class="row-btns"><button class="btn primary">Sprint starten</button></div></form>' : '<p class="md empty-md">Der Besitzer des Boards hat gerade keinen Sprint geplant.</p>') +
-        '</section>' + (last ? '<aside class="q-side"><div class="q-card"><small>' + esc(last.id + ' ' + last.title) + ' im Rückblick</small><span>' + (last.result ? last.result.done + ' von ' + last.result.planned + ' Punkten geschafft' : 'abgeschlossen') + (carry.length ? ', ' + carry.length + ' offen geblieben' : '') + '</span></div></aside>' : '') + '</div>';
+      box.innerHTML = '<div class="q-wrap"><section class="q-main"><div class="q-head"><h2>' + tr('No active sprint') + '</h2><p>' + tr('A sprint groups tasks for a fixed period with a goal. The capacity in points shows whether the plan is realistic. Points: {points}, a task without an estimate counts as M.', { points: Object.entries(set.points).map(([k, v]) => k + ' ' + v).join(', ') }) + '</p></div>' +
+        (EDIT ? '<form class="sp-form" id="spStart"><div class="grid"><label class="field span2"><span>' + tr('Title') + '</span><input class="input" name="title" required maxlength="120" value="Sprint ' + ((parseInt(String(last ? last.id : 'S0').slice(1), 10) || 0) + 1) + '"></label><label class="field span2"><span>' + tr('Goal') + '</span><input class="input" name="goal" maxlength="300" placeholder="' + tr('What should exist at the end?') + '"></label>' +
+          '<label class="field"><span>Start</span><input type="date" class="input" name="start" value="' + today() + '"></label><label class="field"><span>' + tr('Length in days') + '</span><input type="number" class="input" name="days" min="1" max="60" value="' + set.length_days + '"></label><label class="field"><span>' + tr('Capacity in points') + '</span><input type="number" class="input" name="capacity" min="1" max="1000" value="' + set.capacity + '"></label></div>' +
+          (carry.length ? '<label class="toggle"><input type="checkbox" name="carry" checked> ' + esc(carry.length === 1 ? tr('Carry over 1 open task from {id}', { id: last.id }) : tr('Carry over {n} open tasks from {id}', { n: carry.length, id: last.id })) + '</label>' : '') +
+          '<div class="row-btns"><button class="btn primary">' + tr('Start sprint') + '</button></div></form>' : '<p class="md empty-md">' + tr('The board owner has no sprint planned right now.') + '</p>') +
+        '</section>' + (last ? '<aside class="q-side"><div class="q-card"><small>' + esc(tr('{name} in retrospect', { name: last.id + ' ' + last.title })) + '</small><span>' + (last.result ? tr('{done} of {planned} points achieved', { done: last.result.done, planned: last.result.planned }) : tr('completed')) + (carry.length ? ', ' + tr('{n} left open', { n: carry.length }) : '') + '</span></div></aside>' : '') + '</div>';
       const f = $('#spStart', box);
       if (f) f.onsubmit = (e) => { e.preventDefault(); const fd = new FormData(f); run(() => act('sprintStart', { title: fd.get('title'), goal: fd.get('goal'), start: fd.get('start'), days: fd.get('days'), capacity: fd.get('capacity'), carry: fd.get('carry') === 'on' }), (x) => x.message); };
       return;
@@ -2008,7 +2023,7 @@
     const list = (sp.tasks || []).map((x) => byId.get(x)).filter(Boolean);
     const free = st.capacity - st.planned;
     const cap = Math.max(st.capacity, st.planned, 1);
-    const seg = (n, cls, label) => (n > 0 ? '<span class="' + cls + '" style="flex-grow:' + n + '" title="' + label + ': ' + n + ' Punkte"></span>' : '');
+    const seg = (n, cls, label) => (n > 0 ? '<span class="' + cls + '" style="flex-grow:' + n + '" title="' + label + ': ' + tr('{n} points', { n }) + '"></span>' : '');
     const W = 300; const H = 110; const P = 6;
     const x = (i) => P + (i * (W - 2 * P)) / Math.max(1, st.days - 1);
     const y = (v) => H - P - (v * (H - 2 * P)) / Math.max(1, st.planned);
@@ -2018,30 +2033,30 @@
     const cand = tasks.filter((t) => ['backlog', 'geplant'].includes(t.status) && !t.archived && !(sp.tasks || []).includes(t.id))
       .sort((a, b) => PRIOS.indexOf(a.priority) - PRIOS.indexOf(b.priority) || (b.status === 'geplant') - (a.status === 'geplant')).slice(0, 12);
     const row = (t) => '<li class="sp-item' + (t.status === 'erledigt' ? ' done' : '') + '" data-id="' + esc(t.id) + '"><span class="st" style="--c:' + statusVar(t.status) + '" title="' + esc(L(t.status)) + '"></span><button class="q-title" data-open="' + esc(t.id) + '"><span class="id num">' + esc(t.id) + '</span> ' + esc(t.title) + '</button>' +
-      (t.crit[1] && t.status !== 'erledigt' ? '<span class="muted num">' + t.crit[0] + ' von ' + t.crit[1] + '</span>' : '') + '<span class="muted num">' + esc(t.effort || 'ohne') + ', ' + pts(t) + ' P</span>' + (EDIT && t.status !== 'erledigt' ? '<button class="btn small ghost icon" data-sprm="' + esc(t.id) + '" aria-label="Aus dem Sprint nehmen" title="Aus dem Sprint nehmen">×</button>' : '') + '</li>';
+      (t.crit[1] && t.status !== 'erledigt' ? '<span class="muted num">' + tr('{a} of {b}', { a: t.crit[0], b: t.crit[1] }) + '</span>' : '') + '<span class="muted num">' + esc(t.effort || tr('no effort')) + ', ' + tr('{n} pts', { n: pts(t) }) + '</span>' + (EDIT && t.status !== 'erledigt' ? '<button class="btn small ghost icon" data-sprm="' + esc(t.id) + '" aria-label="' + tr('Remove from sprint') + '" title="' + tr('Remove from sprint') + '">×</button>' : '') + '</li>';
     box.innerHTML = '<div class="sp">' +
-      '<div class="sp-top"><section class="sp-card sp-main"><div class="sp-head"><h2>' + esc(sp.title) + '</h2><span class="muted">' + esc(fmtDate(sp.start)) + ' bis ' + esc(fmtDate(sp.end)) + ', Tag ' + st.dayIndex + ' von ' + st.days + '</span>' + (EDIT ? '<span class="spacer"></span><button class="btn small ghost" id="spEdit">Bearbeiten</button><button class="btn small" id="spClose">Sprint abschließen</button>' : '') + '</div>' +
-        (sp.goal ? '<p class="sp-goal">Ziel: ' + esc(sp.goal) + '</p>' : '') +
-        '<div class="sp-cap"><span>Kapazität</span><strong class="num">' + st.planned + ' von ' + st.capacity + ' Punkten verplant</strong></div>' +
-        '<div class="pg-bar sp-bar">' + seg(st.done, 'pg-done', 'Erledigt') + seg(st.working, 'pg-work', 'In Arbeit') + seg(st.open, 'sp-open', 'Offen') + seg(Math.max(0, cap - st.planned), 'pg-wait', 'Frei') + '</div>' +
-        '<div class="pg-legend"><span class="pg-k"><i class="pg-done"></i>erledigt <b class="num">' + st.done + '</b></span><span class="pg-k"><i class="pg-work"></i>in Arbeit <b class="num">' + st.working + '</b></span><span class="pg-k"><i class="sp-open"></i>offen <b class="num">' + st.open + '</b></span>' + (free < 0 ? '<span class="late">' + (-free) + ' Punkte überplant</span>' : '<span class="muted">' + free + ' frei</span>') + (st.unestimated ? '<span class="muted">' + st.unestimated + ' ohne Schätzung zählen als M</span>' : '') + '</div></section>' +
-        '<section class="sp-card sp-burn"><div class="sp-cap"><strong>Burndown</strong><span class="' + (ahead ? 'good' : 'late') + '">' + (ahead ? 'im Plan' : 'hinter dem Plan') + '</span></div>' +
-        '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Offene Punkte: ' + (lastP ? lastP.remaining : st.planned) + ', ideal wären ' + st.idealNow.toFixed(1) + '"><path d="M' + x(0) + ' ' + y(st.planned) + ' L' + x(st.days - 1) + ' ' + y(0) + '" class="c-ideal"/>' + (actual ? '<path d="' + actual + '" class="c-done"/>' : '') + '' + '</svg>' +
-        '<div class="c-axis"><span>' + (lastP ? lastP.remaining : st.planned) + ' Punkte offen</span><span>ideal wären ' + st.idealNow.toFixed(1).replace('.', ',') + '</span></div></section></div>' +
-      '<div class="q-wrap"><section class="q-main"><h3 class="sp-h">Im Sprint <span class="muted">' + list.length + '</span></h3>' +
+      '<div class="sp-top"><section class="sp-card sp-main"><div class="sp-head"><h2>' + esc(sp.title) + '</h2><span class="muted">' + esc(tr('{from} to {to}', { from: fmtDate(sp.start), to: fmtDate(sp.end) })) + ', ' + tr('day {n} of {total}', { n: st.dayIndex, total: st.days }) + '</span>' + (EDIT ? '<span class="spacer"></span><button class="btn small ghost" id="spEdit">' + tr('Edit') + '</button><button class="btn small" id="spClose">' + tr('Close sprint') + '</button>' : '') + '</div>' +
+        (sp.goal ? '<p class="sp-goal">' + esc(tr('Goal: {goal}', { goal: sp.goal })) + '</p>' : '') +
+        '<div class="sp-cap"><span>' + tr('Capacity') + '</span><strong class="num">' + tr('{planned} of {capacity} points planned', { planned: st.planned, capacity: st.capacity }) + '</strong></div>' +
+        '<div class="pg-bar sp-bar">' + seg(st.done, 'pg-done', tr('Done')) + seg(st.working, 'pg-work', tr('In progress')) + seg(st.open, 'sp-open', tr('Still to do')) + seg(Math.max(0, cap - st.planned), 'pg-wait', tr('Free')) + '</div>' +
+        '<div class="pg-legend"><span class="pg-k"><i class="pg-done"></i>' + tr('done') + ' <b class="num">' + st.done + '</b></span><span class="pg-k"><i class="pg-work"></i>' + tr('in progress') + ' <b class="num">' + st.working + '</b></span><span class="pg-k"><i class="sp-open"></i>' + tr('open') + ' <b class="num">' + st.open + '</b></span>' + (free < 0 ? '<span class="late">' + tr('{n} points overbooked', { n: -free }) + '</span>' : '<span class="muted">' + tr('{n} free', { n: free }) + '</span>') + (st.unestimated ? '<span class="muted">' + tr('{n} without estimate count as M', { n: st.unestimated }) + '</span>' : '') + '</div></section>' +
+        '<section class="sp-card sp-burn"><div class="sp-cap"><strong>Burndown</strong><span class="' + (ahead ? 'good' : 'late') + '">' + (ahead ? tr('on track') : tr('behind plan')) + '</span></div>' +
+        '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="' + tr('Open points: {n}, ideal would be {ideal}', { n: lastP ? lastP.remaining : st.planned, ideal: st.idealNow.toFixed(1) }) + '"><path d="M' + x(0) + ' ' + y(st.planned) + ' L' + x(st.days - 1) + ' ' + y(0) + '" class="c-ideal"/>' + (actual ? '<path d="' + actual + '" class="c-done"/>' : '') + '' + '</svg>' +
+        '<div class="c-axis"><span>' + tr('{n} points open', { n: lastP ? lastP.remaining : st.planned }) + '</span><span>' + tr('ideal would be {ideal}', { ideal: deComma(st.idealNow.toFixed(1)) }) + '</span></div></section></div>' +
+      '<div class="q-wrap"><section class="q-main"><h3 class="sp-h">' + tr('In sprint') + ' <span class="muted">' + list.length + '</span></h3>' +
         (list.length ? '<ol class="sp-list" id="spList">' + list.map(row).join('') + '</ol>' : '') +
-        (EDIT ? '<div class="sp-drop" id="spDrop">Aufgaben von rechts hierher ziehen oder mit + einplanen.' + (free > 0 ? ' Noch ' + free + ' Punkte frei.' : '') + '</div>' : '') + '</section>' +
-      '<aside class="q-side"><h3 class="sp-h">Vorschläge</h3>' + (cand.length ? cand.map((t) => {
+        (EDIT ? '<div class="sp-drop" id="spDrop">' + tr('Drag tasks here from the right or plan them with +.') + (free > 0 ? ' ' + tr('{n} points still free.', { n: free }) : '') + '</div>' : '') + '</section>' +
+      '<aside class="q-side"><h3 class="sp-h">' + tr('Suggestions') + '</h3>' + (cand.length ? cand.map((t) => {
         const p = pts(t);
-        const fit = p === free ? ['good', 'passt genau'] : p < free ? ['', 'passt'] : ['late', 'passt nicht mehr'];
-        return '<div class="sp-cand' + (fit[0] === 'good' ? ' best' : '') + '" data-id="' + esc(t.id) + '"' + (EDIT ? ' draggable="true"' : '') + '><button class="q-title" data-open="' + esc(t.id) + '">' + esc(t.id + ' ' + t.title) + '</button><span class="q-meta"><span style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span>, ' + esc(t.effort || 'ohne Schätzung') + ', ' + p + ' P, <span class="' + fit[0] + '">' + fit[1] + '</span></span>' + (EDIT ? '<button class="btn small ghost icon sp-add" data-spadd="' + esc(t.id) + '" aria-label="' + esc(t.id) + ' einplanen" title="Einplanen">+</button>' : '') + '</div>';
-      }).join('') : '<p class="md empty-md">Keine offenen Aufgaben außerhalb des Sprints.</p>') +
-        (last && last.result ? '<div class="q-card"><small>' + esc(last.id) + ' im Rückblick</small><span>' + last.result.done + ' von ' + last.result.planned + ' Punkten geschafft</span></div>' : '') +
+        const fit = p === free ? ['good', tr('fits exactly')] : p < free ? ['', tr('fits')] : ['late', tr('no longer fits')];
+        return '<div class="sp-cand' + (fit[0] === 'good' ? ' best' : '') + '" data-id="' + esc(t.id) + '"' + (EDIT ? ' draggable="true"' : '') + '><button class="q-title" data-open="' + esc(t.id) + '">' + esc(t.id + ' ' + t.title) + '</button><span class="q-meta"><span style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span>, ' + esc(t.effort || tr('no estimate')) + ', ' + tr('{n} pts', { n: p }) + ', <span class="' + fit[0] + '">' + fit[1] + '</span></span>' + (EDIT ? '<button class="btn small ghost icon sp-add" data-spadd="' + esc(t.id) + '" aria-label="' + esc(tr('Add {id} to sprint', { id: t.id })) + '" title="' + tr('Add to sprint') + '">+</button>' : '') + '</div>';
+      }).join('') : '<p class="md empty-md">' + tr('No open tasks outside the sprint.') + '</p>') +
+        (last && last.result ? '<div class="q-card"><small>' + esc(tr('{name} in retrospect', { name: last.id })) + '</small><span>' + tr('{done} of {planned} points achieved', { done: last.result.done, planned: last.result.planned }) + '</span></div>' : '') +
       '</aside></div></div>';
     $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
     if (!EDIT) return;
-    $$('[data-spadd]', box).forEach((b) => b.onclick = () => run(() => act('sprintAdd', { id: b.dataset.spadd }), b.dataset.spadd + ' eingeplant'));
-    $$('[data-sprm]', box).forEach((b) => b.onclick = () => run(() => act('sprintRemove', { id: b.dataset.sprm }), b.dataset.sprm + ' aus dem Sprint genommen'));
+    $$('[data-spadd]', box).forEach((b) => b.onclick = () => run(() => act('sprintAdd', { id: b.dataset.spadd }), tr('{id} added to sprint', { id: b.dataset.spadd })));
+    $$('[data-sprm]', box).forEach((b) => b.onclick = () => run(() => act('sprintRemove', { id: b.dataset.sprm }), tr('{id} removed from sprint', { id: b.dataset.sprm })));
     $$('.sp-cand[draggable]', box).forEach((c) => {
       c.ondragstart = (e) => { qDrag = c.dataset.id; e.dataTransfer.setData('text/plain', c.dataset.id); c.classList.add('dragging'); };
       c.ondragend = () => { qDrag = null; c.classList.remove('dragging'); if (reloadPending) { reloadPending = false; reload(); } };
@@ -2051,13 +2066,13 @@
     target.forEach((el) => {
       el.ondragover = (e) => { if (qDrag) { e.preventDefault(); drop.classList.add('over'); } };
       el.ondragleave = () => drop.classList.remove('over');
-      el.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); const idd = e.dataTransfer.getData('text/plain'); qDrag = null; if (idd) run(() => act('sprintAdd', { id: idd }), idd + ' eingeplant'); };
+      el.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); const idd = e.dataTransfer.getData('text/plain'); qDrag = null; if (idd) run(() => act('sprintAdd', { id: idd }), tr('{id} added to sprint', { id: idd })); };
     });
     $('#spClose', box).onclick = () => openRetro(sp, st, list);
     $('#spEdit', box).onclick = async () => {
-      const r = await showDialog('<h2>' + esc(sp.id) + ' bearbeiten</h2><label class="field"><span>Titel</span><input class="input" name="title" required maxlength="120" value="' + esc(sp.title) + '"></label><label class="field"><span>Ziel</span><input class="input" name="goal" maxlength="300" value="' + esc(sp.goal || '') + '"></label><div class="grid"><label class="field span2"><span>Ende</span><input type="date" name="end" value="' + esc(sp.end) + '"></label><label class="field span2"><span>Kapazität</span><input type="number" class="input" name="capacity" min="1" max="1000" value="' + st.capacity + '"></label></div>' + foot('Speichern'),
+      const r = await showDialog('<h2>' + esc(tr('Edit {id}', { id: sp.id })) + '</h2><label class="field"><span>' + tr('Title') + '</span><input class="input" name="title" required maxlength="120" value="' + esc(sp.title) + '"></label><label class="field"><span>' + tr('Goal') + '</span><input class="input" name="goal" maxlength="300" value="' + esc(sp.goal || '') + '"></label><div class="grid"><label class="field span2"><span>' + tr('End') + '</span><input type="date" name="end" value="' + esc(sp.end) + '"></label><label class="field span2"><span>' + tr('Capacity') + '</span><input type="number" class="input" name="capacity" min="1" max="1000" value="' + st.capacity + '"></label></div>' + foot(tr('Save')),
         (fd) => act('sprintSet', { fields: { title: fd.get('title'), goal: fd.get('goal'), end: fd.get('end'), capacity: fd.get('capacity') } }));
-      if (r) ok('Sprint gespeichert');
+      if (r) ok(tr('Sprint saved'));
     };
   }
 
@@ -2120,25 +2135,25 @@
     }));
     const node = (t) => {
       const p = pos.get(t.id);
-      const label = t.status === 'erledigt' ? 'erledigt' : t.blocked ? 'blockiert' : L(t.status);
+      const label = t.status === 'erledigt' ? tr('done') : t.blocked ? tr('blocked') : L(t.status);
       return '<div class="gr-node' + (critSet.has(t.id) ? ' crit' : '') + (t.status === 'erledigt' ? ' done' : '') + (t.blocked ? ' blocked' : '') + '" data-node="' + esc(t.id) + '" style="left:' + p.x + 'px;top:' + p.y + 'px;width:' + NW + 'px;height:' + NH + 'px">' +
         '<button class="gr-open" data-open="' + esc(t.id) + '"><span class="gr-meta"><span class="st" style="--c:' + (t.blocked ? 'var(--danger)' : statusVar(t.status)) + '"></span>' + esc(t.id) + ' ' + esc(label) + (t.effort ? ', ' + esc(t.effort) : '') + '</span><span class="gr-t">' + esc(t.title) + '</span></button>' +
-        (EDIT && open(t) ? '<button class="gr-link" data-link="' + esc(t.id) + '" title="Zu einer anderen Karte ziehen: diese Aufgabe blockiert jene" aria-label="Abhängigkeit von ' + esc(t.id) + ' ziehen">+</button>' : '') + '</div>';
+        (EDIT && open(t) ? '<button class="gr-link" data-link="' + esc(t.id) + '" title="' + tr('Drag onto another card: this task blocks that one') + '" aria-label="' + esc(tr('Drag dependency from {id}', { id: t.id })) + '">+</button>' : '') + '</div>';
     };
     const loose = pool.length - nodes.length;
     const days = endNode ? dist.get(endNode.id) : 0;
     box.innerHTML = '<div class="q-wrap"><section class="q-main">' +
-      '<div class="gr-bar"><label class="toggle"><input type="checkbox" id="grDone"' + (showDone ? ' checked' : '') + '> Erledigte zeigen</label><span class="muted">' + nodes.length + ' Aufgaben mit Abhängigkeiten' + (loose ? ', ' + loose + ' ohne' : '') + '</span></div>' +
+      '<div class="gr-bar"><label class="toggle"><input type="checkbox" id="grDone"' + (showDone ? ' checked' : '') + '> ' + tr('Show done') + '</label><span class="muted">' + tr('{n} tasks with dependencies', { n: nodes.length }) + (loose ? ', ' + tr('{n} without', { n: loose }) : '') + '</span></div>' +
       (nodes.length ? '<div class="gr-scroll"><div class="gr-canvas" style="width:' + W + 'px;height:' + H + 'px"><svg class="gr-svg" width="' + W + '" height="' + H + '" aria-hidden="true"><defs><marker id="gra" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" class="gr-ah"/></marker><marker id="grh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" class="gr-ah hot"/></marker></defs>' + edges.join('') + '<path id="grTmp" class="gr-edge tmp" d=""/></svg>' + nodes.map(node).join('') + '</div></div>'
-        : '<div class="q-empty"><strong>Noch keine Abhängigkeiten.</strong><span>Verknüpfe Aufgaben im Detailpanel unter Abhängigkeiten oder mit works link A blocked-by B. Dann zeigt diese Ansicht, was worauf wartet.</span></div>') +
+        : '<div class="q-empty"><strong>' + tr('No dependencies yet.') + '</strong><span>' + tr('Link tasks in the detail panel under Dependencies or with works link A blocked-by B. This view then shows what waits for what.') + '</span></div>') +
       '</section><aside class="q-side">' +
-      (critSet.size ? '<div class="q-card crit"><small>Kritischer Pfad</small><strong>' + crit.map(esc).join(', ') + '</strong><span>Zusammen etwa ' + days + ' Tage nach der Schätzung. Verzögert sich eine davon, verschiebt sich das Ende.</span></div>' : '') +
-      (lever ? '<div class="q-card"><small>Größter Hebel</small><button class="q-title" data-open="' + esc(lever.t.id) + '"><strong>' + esc(lever.t.id + ' ' + lever.t.title) + '</strong></button><span>Erledigt, gibt sie ' + lever.n + (lever.n === 1 ? ' Aufgabe' : ' Aufgaben') + ' frei.</span>' + (EDIT && !(meta.queue || []).includes(lever.t.id) && lever.t.status !== 'in-arbeit' ? '<button class="btn small" data-qfront="' + esc(lever.t.id) + '">In der Warteschlange nach vorn</button>' : '') + '</div>' : '') +
-      '<div class="q-card gr-legend"><span><i class="lg-hot"></i>kritischer Pfad</span><span><i class="lg-edge"></i>blockiert durch</span>' + (EDIT ? '<span class="muted">Das + an einer Karte auf eine andere ziehen legt eine Abhängigkeit an.</span>' : '') + '</div>' +
+      (critSet.size ? '<div class="q-card crit"><small>' + tr('Critical path') + '</small><strong>' + crit.map(esc).join(', ') + '</strong><span>' + tr('About {n} days in total by the estimate. If one of them slips, the end moves.', { n: days }) + '</span></div>' : '') +
+      (lever ? '<div class="q-card"><small>' + tr('Biggest lever') + '</small><button class="q-title" data-open="' + esc(lever.t.id) + '"><strong>' + esc(lever.t.id + ' ' + lever.t.title) + '</strong></button><span>' + (lever.n === 1 ? tr('Once done, it unblocks 1 task.') : tr('Once done, it unblocks {n} tasks.', { n: lever.n })) + '</span>' + (EDIT && !(meta.queue || []).includes(lever.t.id) && lever.t.status !== 'in-arbeit' ? '<button class="btn small" data-qfront="' + esc(lever.t.id) + '">' + tr('Move to front of queue') + '</button>' : '') + '</div>' : '') +
+      '<div class="q-card gr-legend"><span><i class="lg-hot"></i>' + tr('critical path') + '</span><span><i class="lg-edge"></i>' + tr('blocked by') + '</span>' + (EDIT ? '<span class="muted">' + tr('Drag the + on a card onto another to create a dependency.') + '</span>' : '') + '</div>' +
       '</aside></div>';
     $('#grDone', box).onchange = (e) => { store.set('works-graph-done', e.target.checked); renderGraph(); };
     $$('[data-open]', box).forEach((b) => b.onclick = () => openTask(b.dataset.open));
-    $$('[data-qfront]', box).forEach((b) => b.onclick = () => run(() => act('queueAdd', { id: b.dataset.qfront, pos: 1 }), b.dataset.qfront + ' steht vorn in der Warteschlange'));
+    $$('[data-qfront]', box).forEach((b) => b.onclick = () => run(() => act('queueAdd', { id: b.dataset.qfront, pos: 1 }), tr('{id} is now first in the queue', { id: b.dataset.qfront })));
     if (!EDIT) return;
     const canvas = $('.gr-canvas', box);
     const tmp = $('#grTmp', box);
@@ -2155,7 +2170,7 @@
         $$('.gr-node', canvas).forEach((n) => n.classList.remove('target'));
         const el = document.elementFromPoint(ev.clientX, ev.clientY);
         const dst = el && el.closest('.gr-node');
-        if (dst && dst.dataset.node !== src) run(() => act('link', { id: src, rel: 'blocks', target: dst.dataset.node }), src + ' blockiert jetzt ' + dst.dataset.node);
+        if (dst && dst.dataset.node !== src) run(() => act('link', { id: src, rel: 'blocks', target: dst.dataset.node }), tr('{a} now blocks {b}', { a: src, b: dst.dataset.node }));
         if (reloadPending) { reloadPending = false; reload(); }
       };
     });
@@ -2177,17 +2192,17 @@
     const cur = currentFilter();
     if (!views.length && !(EDIT && filtersActive())) { box.hidden = true; return; }
     box.hidden = false;
-    box.innerHTML = '<span class="sv-label">Ansichten</span>' +
-      '<button class="sv-chip" data-svall aria-pressed="' + (!filtersActive()) + '">Alles</button>' +
+    box.innerHTML = '<span class="sv-label">' + tr('Views') + '</span>' +
+      '<button class="sv-chip" data-svall aria-pressed="' + (!filtersActive()) + '">' + tr('Everything') + '</button>' +
       views.map((v, i) => {
         const n = withFilter(v.filter || {}, () => tasks.filter((t) => match(t) && OPEN.includes(t.status)).length);
         const on = sameFilter(v.filter || {}, cur) && (v.view || 'board') === state.view;
-        return '<span class="sv-wrap"><button class="sv-chip" data-sv="' + i + '" aria-pressed="' + on + '" title="' + esc(describeFilter(v)) + '">' + esc(v.name) + ' <span class="sv-n num">' + n + '</span></button>' + (EDIT ? '<button class="sv-x" data-svdel="' + i + '" aria-label="Ansicht ' + esc(v.name) + ' löschen" title="Löschen">×</button>' : '') + '</span>';
+        return '<span class="sv-wrap"><button class="sv-chip" data-sv="' + i + '" aria-pressed="' + on + '" title="' + esc(describeFilter(v)) + '">' + esc(v.name) + ' <span class="sv-n num">' + n + '</span></button>' + (EDIT ? '<button class="sv-x" data-svdel="' + i + '" aria-label="' + esc(tr('Delete view {name}', { name: v.name })) + '" title="' + tr('Delete') + '">×</button>' : '') + '</span>';
       }).join('') +
-      (EDIT && filtersActive() && !views.some((v) => sameFilter(v.filter || {}, cur)) ? '<button class="sv-chip add" id="svSave">Aktuelle Filter speichern</button>' : '');
+      (EDIT && filtersActive() && !views.some((v) => sameFilter(v.filter || {}, cur)) ? '<button class="sv-chip add" id="svSave">' + tr('Save current filters') + '</button>' : '');
     $('[data-svall]', box).onclick = () => resetFilters();
     $$('[data-sv]', box).forEach((b) => b.onclick = () => applySavedView(views[+b.dataset.sv]));
-    $$('[data-svdel]', box).forEach((b) => b.onclick = async () => { const v = views[+b.dataset.svdel]; if (await confirmBox({ title: 'Ansicht löschen', lead: 'Die Ansicht „' + v.name + '“ wird entfernt. Die Aufgaben bleiben unverändert.', confirm: 'Löschen', danger: true })) run(() => act('viewDelete', { name: v.name }), 'Ansicht gelöscht'); });
+    $$('[data-svdel]', box).forEach((b) => b.onclick = async () => { const v = views[+b.dataset.svdel]; if (await confirmBox({ title: tr('Delete view'), lead: tr('The view “{name}” will be removed. The tasks stay unchanged.', { name: v.name }), confirm: tr('Delete'), danger: true })) run(() => act('viewDelete', { name: v.name }), tr('View deleted')); });
     const sv = $('#svSave', box);
     if (sv) sv.onclick = saveViewDialog;
   }
@@ -2195,15 +2210,15 @@
   function describeFilter(v) {
     const f = v.filter || {};
     const p = [];
-    if (f.prios && f.prios.length && f.prios.length < 4) p.push(f.prios.join(' und '));
+    if (f.prios && f.prios.length && f.prios.length < 4) p.push(f.prios.join(' ' + tr('and') + ' '));
     if (f.type) p.push(meta.typeLabel[f.type] || f.type);
     if (f.tag) p.push('#' + f.tag);
-    if (f.ms) p.push('Meilenstein ' + f.ms);
-    if (f.signal) p.push({ blocked: 'nur blockierte', unblocked: 'ohne blockierte', overdue: 'überfällig', questions: 'mit offenen Fragen', incomplete: 'unvollständig', stale: 'still', conflict: 'mit gleichen Dateien' }[f.signal] || f.signal);
-    if (f.q) p.push('Suche „' + f.q + '“');
-    if (v.view && v.view !== 'board') p.push('Ansicht ' + (VIEW_LABEL[v.view] || v.view));
-    if (v.sort) p.push('sortiert nach ' + v.sort.key);
-    return p.join(', ') || 'alle Aufgaben';
+    if (f.ms) p.push(tr('Milestone {id}', { id: f.ms }));
+    if (f.signal) p.push({ blocked: tr('only blocked'), unblocked: tr('without blocked'), overdue: tr('overdue'), questions: tr('with open questions'), incomplete: tr('incomplete'), stale: tr('quiet'), conflict: tr('with shared files') }[f.signal] || f.signal);
+    if (f.q) p.push(tr('Search “{q}”', { q: f.q }));
+    if (v.view && v.view !== 'board') p.push(tr('View {name}', { name: VIEW_LABEL[v.view] || v.view }));
+    if (v.sort) p.push(tr('sorted by {key}', { key: v.sort.key }));
+    return p.join(', ') || tr('all tasks');
   }
 
   function applySavedView(v) {
@@ -2217,11 +2232,11 @@
   async function saveViewDialog() {
     const f = currentFilter();
     const defKey = 'works-default-view-' + meta.project;
-    const r = await showDialog('<h2>Ansicht speichern</h2><label class="field"><span>Name</span><input class="input" name="name" required maxlength="40" placeholder="Zum Beispiel Bot dringend" autofocus></label>' +
-      '<div class="field"><span>Wird gespeichert</span><p class="lead" style="margin:0">' + esc(describeFilter({ filter: f, view: state.view, sort: state.view === 'table' ? tableSort : null })) + '</p></div>' +
-      (!f.signal ? '<label class="toggle"><input type="checkbox" name="unblocked"> Blockierte ausblenden</label>' : '') +
-      '<label class="toggle"><input type="checkbox" name="def"> Beim Öffnen des Boards diese Ansicht zeigen (nur in diesem Browser)</label>' +
-      '<p class="sublabel">Ansichten gelten für das ganze Projekt und stehen in .works/config.json. Claude kann sie mit works list --view "Name" nutzen.</p>' + foot('Speichern'),
+    const r = await showDialog('<h2>' + tr('Save view') + '</h2><label class="field"><span>' + tr('Name') + '</span><input class="input" name="name" required maxlength="40" placeholder="' + tr('For example Bot urgent') + '" autofocus></label>' +
+      '<div class="field"><span>' + tr('Will be saved') + '</span><p class="lead" style="margin:0">' + esc(describeFilter({ filter: f, view: state.view, sort: state.view === 'table' ? tableSort : null })) + '</p></div>' +
+      (!f.signal ? '<label class="toggle"><input type="checkbox" name="unblocked"> ' + tr('Hide blocked tasks') + '</label>' : '') +
+      '<label class="toggle"><input type="checkbox" name="def"> ' + tr('Show this view when the board opens (this browser only)') + '</label>' +
+      '<p class="sublabel">' + tr('Views apply to the whole project and are stored in .works/config.json. Claude can use them with works list --view "Name".') + '</p>' + foot(tr('Save')),
     async (fd) => {
       const name = String(fd.get('name') || '').trim();
       const filter = { ...f, signal: fd.get('unblocked') === 'on' ? 'unblocked' : f.signal };
@@ -2238,7 +2253,7 @@
   const NDEF = { on: false, perm: true, review: true, question: true, p1: true, unblocked: false, queueEmpty: true, any: false, sound: true, title: true };
   let notifySet = { ...NDEF, ...store.get(NKEY, {}) };
   let hiddenCount = 0;
-  const baseTitle = () => (lvPermEntry() ? 'Freigabe · ' : '') + 'Works ' + meta.project;
+  const baseTitle = () => (lvPermEntry() ? tr('Approval') + ' · ' : '') + 'Works ' + meta.project;
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { hiddenCount = 0; document.title = baseTitle(); } });
 
   function beep() {
@@ -2258,21 +2273,21 @@
     for (const t of next.tasks) {
       const o = before.get(t.id);
       const own = /\[Board\]$/.test(t.lastLog || '');
-      if (!o) { if (s.p1 && t.priority === 'P1' && !own) ev.push({ id: t.id, title: 'Neue P1: ' + t.id, body: t.title }); continue; }
+      if (!o) { if (s.p1 && t.priority === 'P1' && !own) ev.push({ id: t.id, title: tr('New P1: {id}', { id: t.id }), body: t.title }); continue; }
       if (own && !(t.comments > o.comments && t.lastCommentBy === 'Claude')) continue;
-      if (s.review && o.status !== 'review' && t.status === 'review') ev.push({ id: t.id, title: t.id + ' wartet auf dein Review', body: t.title + (t.crit[1] ? ', ' + t.crit[0] + ' von ' + t.crit[1] + ' Kriterien erfüllt' : '') });
+      if (s.review && o.status !== 'review' && t.status === 'review') ev.push({ id: t.id, title: tr('{id} awaits your review', { id: t.id }), body: t.title + (t.crit[1] ? ', ' + tr('{a} of {b} criteria met', { a: t.crit[0], b: t.crit[1] }) : '') });
       else if (s.any && o.status !== t.status) ev.push({ id: t.id, title: t.id + ': ' + L(o.status) + ' → ' + L(t.status), body: t.title });
-      if (s.question && t.questions.length > o.questions.length) ev.push({ id: t.id, title: 'Frage zu ' + t.id, body: t.questions[t.questions.length - 1] });
-      if (s.question && t.comments > o.comments && t.lastCommentBy === 'Claude') ev.push({ id: t.id, title: 'Claude hat ' + t.id + ' kommentiert', body: t.title });
-      if (s.question && t.design && t.design.variants > ((o.design && o.design.variants) || 0)) ev.push({ id: t.id, title: 'Neue Entwürfe für ' + t.id, body: t.title });
-      if (s.p1 && o.priority !== 'P1' && t.priority === 'P1') ev.push({ id: t.id, title: t.id + ' ist jetzt P1', body: t.title });
-      if (s.unblocked && o.blocked && !t.blocked && OPEN.includes(t.status)) ev.push({ id: t.id, title: t.id + ' ist jetzt startbar', body: t.title });
+      if (s.question && t.questions.length > o.questions.length) ev.push({ id: t.id, title: tr('Question about {id}', { id: t.id }), body: t.questions[t.questions.length - 1] });
+      if (s.question && t.comments > o.comments && t.lastCommentBy === 'Claude') ev.push({ id: t.id, title: tr('Claude commented on {id}', { id: t.id }), body: t.title });
+      if (s.question && t.design && t.design.variants > ((o.design && o.design.variants) || 0)) ev.push({ id: t.id, title: tr('New design variants for {id}', { id: t.id }), body: t.title });
+      if (s.p1 && o.priority !== 'P1' && t.priority === 'P1') ev.push({ id: t.id, title: tr('{id} is now P1', { id: t.id }), body: t.title });
+      if (s.unblocked && o.blocked && !t.blocked && OPEN.includes(t.status)) ev.push({ id: t.id, title: tr('{id} can now be started', { id: t.id }), body: t.title });
     }
     // Freigabe: einmal je Rechteabfrage, erkannt an ihrer Startzeit.
     const permAt = (a) => (a && a.busy && a.current && a.current.perm ? a.current.permSince || a.current.at : '');
     const pn = permAt(next.meta.activity);
-    if (s.perm && pn && pn !== permAt(meta.activity)) { const c = next.meta.activity.current; ev.push({ id: c.task || '', title: 'Claude wartet auf deine Freigabe', body: (c.task ? c.task + ': ' : '') + c.verb + (c.what ? ' ' + c.what : '') }); }
-    if (s.queueEmpty && (meta.queue || []).length && !(next.meta.queue || []).length) ev.push({ id: '', title: 'Warteschlange leer', body: 'Claude hat alle eingereihten Aufgaben abgearbeitet.' });
+    if (s.perm && pn && pn !== permAt(meta.activity)) { const c = next.meta.activity.current; ev.push({ id: c.task || '', title: tr('Claude is waiting for your approval'), body: (c.task ? c.task + ': ' : '') + c.verb + (c.what ? ' ' + c.what : '') }); }
+    if (s.queueEmpty && (meta.queue || []).length && !(next.meta.queue || []).length) ev.push({ id: '', title: tr('Queue empty'), body: tr('Claude has worked through all queued tasks.') });
     if (!ev.length) return;
     if (document.hidden) {
       hiddenCount += ev.length;
@@ -2287,10 +2302,10 @@
   }
 
   async function testNotification() {
-    if (!('Notification' in window)) return fail(new Error('Dieser Browser unterstützt keine Benachrichtigungen.'));
+    if (!('Notification' in window)) return fail(new Error(tr('This browser does not support notifications.')));
     if (Notification.permission !== 'granted') await Notification.requestPermission();
-    if (Notification.permission !== 'granted') return fail(new Error('Benachrichtigungen sind im Browser blockiert. In den Seiteneinstellungen erlauben.'));
-    new Notification('works ' + meta.project, { body: 'So sieht eine Meldung aus. Ein Klick öffnet das Board.' });
+    if (Notification.permission !== 'granted') return fail(new Error(tr('Notifications are blocked in the browser. Allow them in the site settings.')));
+    new Notification('works ' + meta.project, { body: tr('This is what a notification looks like. A click opens the board.') });
     if (notifySet.sound) beep();
   }
 
@@ -2304,18 +2319,18 @@
     const by = { red: (a, b) => rate(b) - rate(a) || b.fails - a.fails, slow: (a, b) => (b.median || 0) - (a.median || 0), flaky: (a, b) => (b.flaky - a.flaky) || rate(b) - rate(a) };
     const rows = [...hd.checks].sort(by[hthSort]);
     const shown = hthAll ? rows : rows.slice(0, 10);
-    return '<div class="hth-tabs" role="group" aria-label="Sortierung">' + [['red', 'Oft rot'], ['slow', 'Langsam'], ['flaky', 'Wackelig']].map(([k, l]) => '<button type="button" data-hth="' + k + '" aria-pressed="' + (hthSort === k) + '">' + l + '</button>').join('') + '</div>' +
+    return '<div class="hth-tabs" role="group" aria-label="' + tr('Sort order') + '">' + [['red', tr('Often red')], ['slow', tr('Slow')], ['flaky', tr('Flaky')]].map(([k, l]) => '<button type="button" data-hth="' + k + '" aria-pressed="' + (hthSort === k) + '">' + l + '</button>').join('') + '</div>' +
       // Schmal genug für die Seitenleiste: Läufe als Tooltip an "Rot", wackelig am Namen.
-      '<div class="hth-wrap"><table class="hth"><thead><tr><th>Prüfung</th><th class="num">Rot</th><th class="num">Median</th><th class="opt">Letzte</th></tr></thead><tbody>' +
+      '<div class="hth-wrap"><table class="hth"><thead><tr><th>' + tr('Check') + '</th><th class="num">' + tr('Red') + '</th><th class="num">Median</th><th class="opt">' + tr('Recent') + '</th></tr></thead><tbody>' +
       shown.map((c) => {
         const pct = Math.round(rate(c) * 100);
         const up = c.trend && c.trend.dir === 'up';
-        return '<tr><td class="nm"><div class="nmw"><span class="nmt" title="' + esc(c.name) + '">' + esc(c.name) + '</span>' + (c.flaky ? '<span class="flk">wackelig</span>' : '') + '</div></td>' +
-          '<td class="num" title="' + c.fails + ' von ' + c.runs + (c.runs === 1 ? ' Lauf' : ' Läufen') + ' rot"><span class="bar" aria-hidden="true"><i style="width:' + pct + '%"></i></span>' + pct + ' %</td>' +
+        return '<tr><td class="nm"><div class="nmw"><span class="nmt" title="' + esc(c.name) + '">' + esc(c.name) + '</span>' + (c.flaky ? '<span class="flk">' + tr('flaky') + '</span>' : '') + '</div></td>' +
+          '<td class="num" title="' + (c.runs === 1 ? tr('{a} of 1 run red', { a: c.fails }) : tr('{a} of {b} runs red', { a: c.fails, b: c.runs })) + '"><span class="bar" aria-hidden="true"><i style="width:' + pct + '%"></i></span>' + pct + ' %</td>' +
           '<td class="num' + (up ? ' slow' : '') + '">' + (c.median == null ? '–' : lvMs(c.median)) + (c.trend ? (up ? ' ↑' : ' ↓') : '') + '</td>' +
           '<td class="opt"><span class="lv-hist" aria-hidden="true">' + c.last.map((s) => '<i class="' + (s === 'ok' ? 'ok' : 'fail') + '"></i>').join('') + '</span></td></tr>';
       }).join('') + '</tbody></table></div>' +
-      (rows.length > 10 ? '<button type="button" class="btn link" data-hth-all>' + (hthAll ? 'Weniger anzeigen' : 'Alle ' + rows.length + ' anzeigen') + '</button>' : '');
+      (rows.length > 10 ? '<button type="button" class="btn link" data-hth-all>' + (hthAll ? tr('Show less') : tr('Show all {n}', { n: rows.length })) + '</button>' : '');
   }
 
   async function renderTools(body, head) {
@@ -2325,44 +2340,44 @@
     ]);
     const theme = store.get('works-theme', 'auto');
     const dark = theme === 'dark' || (theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
-    const days = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+    const days = ['', tr('Monday'), tr('Tuesday'), tr('Wednesday'), tr('Thursday'), tr('Friday'), tr('Saturday'), tr('Sunday')];
     const sw = (key, label, on, attrs = '') => '<label class="switch small"><span><b>' + esc(label) + '</b></span><input type="checkbox" ' + attrs + (on ? ' checked' : '') + (EDIT ? '' : ' disabled') + ' data-k="' + key + '"><i aria-hidden="true"></i></label>';
     const s = rep ? rep.settings : null;
-    const h = [head('Werkzeuge')];
+    const h = [head(tr('Tools'))];
     if (rep) {
-      h.push('<details class="sec" open><summary>Wochenbericht</summary><div class="body">' +
-        '<p class="md">Zahlen und Listen aus den Aufgaben, die Zusammenfassung schreibt Claude. Ist ein Bericht fällig, erinnert der Hook beim nächsten Sitzungsstart daran.</p>' +
-        (EDIT ? '<div id="repSet">' + sw('enabled', 'Automatisch jede Woche', s.enabled) +
+      h.push('<details class="sec" open><summary>' + tr('Weekly report') + '</summary><div class="body">' +
+        '<p class="md">' + tr('Numbers and lists from the tasks; Claude writes the summary. When a report is due, the hook reminds you at the next session start.') + '</p>' +
+        (EDIT ? '<div id="repSet">' + sw('enabled', tr('Automatically every week'), s.enabled) +
           '<div class="row-btns"><select class="input" data-k="weekday" style="flex:1">' + days.slice(1).map((d, i) => '<option value="' + (i + 1) + '"' + (s.weekday === i + 1 ? ' selected' : '') + '>' + d + 's</option>').join('') + '</select><input type="time" class="input" data-k="time" value="' + esc(s.time) + '" style="flex:0 0 120px"></div>' +
-          sw('file', 'Datei in .works/reports', s.destinations.file) + sw('discord', 'An Discord senden', s.destinations.discord) +
-          '<div class="add-row"><input class="input" id="hookIn" type="url" placeholder="' + (rep.webhook ? 'Webhook hinterlegt, zum Ändern neue URL eingeben' : 'Discord-Webhook-URL') + '" autocomplete="off"><button class="btn small" id="hookSave">' + (rep.webhook ? 'Ersetzen' : 'Speichern') + '</button>' + (rep.webhook ? '<button class="btn small ghost" id="hookDel">Entfernen</button>' : '') + '</div>' +
-          '<p class="sublabel">Die URL bleibt nur auf diesem Rechner (.works/report.local.json, nicht im Git).</p>' +
-          sw('done', 'Erledigt und begonnen', s.include.done) + sw('attention', 'Was dich braucht', s.include.attention) + sw('next', 'Plan für nächste Woche', s.include.next) + sw('milestones', 'Meilensteine', s.include.milestones) + '</div>' +
-          '<label class="field"><span>Zusammenfassung, optional</span><textarea class="input" id="repSum" rows="2" placeholder="Ohne Text entsteht eine kurze Zusammenfassung aus den Zahlen."></textarea></label><div class="row-btns"><button class="btn small primary" id="repRun">Bericht für ' + esc(rep.current.replace('-', ', ')) + ' erzeugen</button></div>' : '') +
-        (rep.reports.length ? '<ul class="rep-list">' + rep.reports.map((r) => '<li><span>' + esc(r.name.replace('-', ', ')) + '</span>' + (r.html ? '<a href="' + esc(r.html) + '#theme=' + (dark ? 'dark' : 'light') + '" target="_blank" rel="noopener">Ansehen</a>' : '') + (r.md ? '<a href="' + esc(r.md) + '" target="_blank" rel="noopener">Markdown</a>' : '') + '</li>').join('') + '</ul>' : '<p class="md empty-md">Noch keine Berichte.</p>') +
+          sw('file', tr('File in .works/reports'), s.destinations.file) + sw('discord', tr('Send to Discord'), s.destinations.discord) +
+          '<div class="add-row"><input class="input" id="hookIn" type="url" placeholder="' + (rep.webhook ? tr('Webhook saved, enter a new URL to change it') : tr('Discord webhook URL')) + '" autocomplete="off"><button class="btn small" id="hookSave">' + (rep.webhook ? tr('Replace') : tr('Save')) + '</button>' + (rep.webhook ? '<button class="btn small ghost" id="hookDel">' + tr('Remove') + '</button>' : '') + '</div>' +
+          '<p class="sublabel">' + tr('The URL stays on this computer only (.works/report.local.json, not in Git).') + '</p>' +
+          sw('done', tr('Done and started'), s.include.done) + sw('attention', tr('What needs you'), s.include.attention) + sw('next', tr('Plan for next week'), s.include.next) + sw('milestones', tr('Milestones'), s.include.milestones) + '</div>' +
+          '<label class="field"><span>' + tr('Summary, optional') + '</span><textarea class="input" id="repSum" rows="2" placeholder="' + tr('Without text, a short summary is generated from the numbers.') + '"></textarea></label><div class="row-btns"><button class="btn small primary" id="repRun">' + esc(tr('Create report for {week}', { week: rep.current.replace('-', ', ') })) + '</button></div>' : '') +
+        (rep.reports.length ? '<ul class="rep-list">' + rep.reports.map((r) => '<li><span>' + esc(r.name.replace('-', ', ')) + '</span>' + (r.html ? '<a href="' + esc(r.html) + '#theme=' + (dark ? 'dark' : 'light') + '" target="_blank" rel="noopener">' + tr('View report') + '</a>' : '') + (r.md ? '<a href="' + esc(r.md) + '" target="_blank" rel="noopener">Markdown</a>' : '') + '</li>').join('') + '</ul>' : '<p class="md empty-md">' + tr('No reports yet.') + '</p>') +
         '</div></details>');
     }
     if (EDIT) {
-      h.push('<details class="sec" open><summary>Vorlagen <span class="meta">' + tpls.length + '</span></summary><div class="body">' +
-        (tpls.length ? tpls.map((t) => '<div class="tpl-row"><div class="q-t"><strong>' + esc(t.name) + '</strong><span class="q-meta">' + esc((meta.typeLabel[t.type] || t.type) + ', ' + t.fields.length + ' Felder, ' + t.criteria.length + ' Kriterien' + (t.uses ? ', ' + t.uses + 'x benutzt' : '') + (t.scope === 'user' ? ', alle Projekte' : '')) + '</span></div><button class="btn small" data-tuse="' + esc(t.slug) + '">Nutzen</button><button class="btn small ghost" data-tedit="' + esc(t.slug) + '">Bearbeiten</button></div>').join('') : '<p class="md empty-md">Noch keine Vorlagen. Erstelle eine neue oder speichere eine bestehende Aufgabe im Detailpanel als Vorlage.</p>') +
-        '<div class="row-btns"><button class="btn small primary" id="tplNew">Neue Vorlage</button></div></div></details>');
+      h.push('<details class="sec" open><summary>' + tr('Templates') + ' <span class="meta">' + tpls.length + '</span></summary><div class="body">' +
+        (tpls.length ? tpls.map((t) => '<div class="tpl-row"><div class="q-t"><strong>' + esc(t.name) + '</strong><span class="q-meta">' + esc((meta.typeLabel[t.type] || t.type) + ', ' + tr('{n} fields', { n: t.fields.length }) + ', ' + tr('{n} criteria', { n: t.criteria.length }) + (t.uses ? ', ' + tr('used {n}x', { n: t.uses }) : '') + (t.scope === 'user' ? ', ' + tr('all projects') : '')) + '</span></div><button class="btn small" data-tuse="' + esc(t.slug) + '">' + tr('Use') + '</button><button class="btn small ghost" data-tedit="' + esc(t.slug) + '">' + tr('Edit') + '</button></div>').join('') : '<p class="md empty-md">' + tr('No templates yet. Create a new one or save an existing task as a template in the detail panel.') + '</p>') +
+        '<div class="row-btns"><button class="btn small primary" id="tplNew">' + tr('New template') + '</button></div></div></details>');
     }
     if (chk) {
       const rows = Object.entries(chk.checks);
-      h.push('<details class="sec"' + (rows.length ? '' : ' open') + '><summary>Prüfungen vor dem Abschluss <span class="meta">' + rows.length + '</span></summary><div class="body">' +
-        '<p class="md">Laufen bei works done und im Abschluss-Dialog. Rot verhindert das Abschließen, ein Fund braucht deine Entscheidung. <code>skill:code-audit</code> führt Claude aus und trägt das Ergebnis ein.</p>' +
+      h.push('<details class="sec"' + (rows.length ? '' : ' open') + '><summary>' + tr('Checks before completion') + ' <span class="meta">' + rows.length + '</span></summary><div class="body">' +
+        '<p class="md">' + tr('Run on works done and in the completion dialog. Red blocks completion, a finding needs your decision. Claude runs {skill} and records the result.', { skill: '<code>skill:code-audit</code>' }) + '</p>' +
         '<div id="ckRows">' + (rows.length ? rows : Object.entries(chk.detected)).map(([k, v]) => ckRow(k, v)).join('') + '</div>' +
-        (!rows.length ? '<p class="sublabel">Vorschlag aus deinem Projekt. Erst mit Speichern aktiv.</p>' : '') +
-        '<div class="row-btns"><button class="btn small" id="ckAdd">Prüfung hinzufügen</button><button class="btn small primary" id="ckSave">Speichern</button></div></div></details>');
+        (!rows.length ? '<p class="sublabel">' + tr('Suggested from your project. Active only after saving.') + '</p>' : '') +
+        '<div class="row-btns"><button class="btn small" id="ckAdd">' + tr('Add check') + '</button><button class="btn small primary" id="ckSave">' + tr('Save') + '</button></div></div></details>');
     }
     if (health && health.checks.length) {
-      h.push('<details class="sec"><summary>Prüfungen im Projekt <span class="meta">' + health.checks.length + (health.checks.length === 1 ? ' Prüfung, ' : ' Prüfungen, ') + health.tasks + (health.tasks === 1 ? ' Aufgabe' : ' Aufgaben') + '</span></summary><div class="body" id="hthBox">' + hthHtml(health) + '</div></details>');
+      h.push('<details class="sec"><summary>' + tr('Checks in the project') + ' <span class="meta">' + (health.checks.length === 1 ? tr('1 check') : tr('{n} checks', { n: health.checks.length })) + ', ' + (health.tasks === 1 ? tr('1 task') : tr('{n} tasks', { n: health.tasks })) + '</span></summary><div class="body" id="hthBox">' + hthHtml(health) + '</div></details>');
     }
     h.push(await toolsExtra());
-    h.push('<details class="sec"><summary>Benachrichtigungen <span class="meta">' + (notifySet.on ? 'an' : 'aus') + '</span></summary><div class="body" id="ntSet">' +
-      '<p class="md">Meldet sich, wenn der Tab im Hintergrund ist. Gilt nur in diesem Browser.</p>' +
-      [['on', 'Benachrichtigungen an'], ['perm', 'Claude wartet auf deine Freigabe'], ['review', 'Aufgabe kommt in Review'], ['question', 'Frage oder Kommentar von Claude'], ['p1', 'Neue Aufgabe mit P1'], ['unblocked', 'Blockade aufgelöst'], ['queueEmpty', 'Warteschlange leer gelaufen'], ['any', 'Jede Statusänderung'], ['sound', 'Ton abspielen'], ['title', 'Zähler im Tab-Titel']].map(([k, l]) => '<label class="switch small"><span><b>' + l + '</b></span><input type="checkbox" data-n="' + k + '"' + (notifySet[k] ? ' checked' : '') + '><i aria-hidden="true"></i></label>').join('') +
-      '<div class="row-btns"><button class="btn small" id="ntTest">Testmeldung senden</button></div></div></details>');
+    h.push('<details class="sec"><summary>' + tr('Notifications') + ' <span class="meta">' + (notifySet.on ? tr('on') : tr('off')) + '</span></summary><div class="body" id="ntSet">' +
+      '<p class="md">' + tr('Notifies you while the tab is in the background. Applies to this browser only.') + '</p>' +
+      [['on', tr('Notifications enabled')], ['perm', tr('Claude is waiting for your approval')], ['review', tr('Task moves to review')], ['question', tr('Question or comment from Claude')], ['p1', tr('New task with P1')], ['unblocked', tr('Blocker resolved')], ['queueEmpty', tr('Queue ran empty')], ['any', tr('Every status change')], ['sound', tr('Play sound')], ['title', tr('Counter in the tab title')]].map(([k, l]) => '<label class="switch small"><span><b>' + l + '</b></span><input type="checkbox" data-n="' + k + '"' + (notifySet[k] ? ' checked' : '') + '><i aria-hidden="true"></i></label>').join('') +
+      '<div class="row-btns"><button class="btn small" id="ntTest">' + tr('Send test notification') + '</button></div></div></details>');
     body.innerHTML = h.join('');
     $$('[data-sclose]', body).forEach((b) => b.onclick = closeSide);
     $$('#ntSet [data-n]', body).forEach((c) => c.onchange = async () => {
@@ -2382,12 +2397,12 @@
     $$('#repSet [data-k]', body).forEach((el) => el.onchange = () => {
       const k = el.dataset.k;
       const v = el.type === 'checkbox' ? el.checked : el.value;
-      run(() => act('reportSettings', { [k]: v }), 'Gespeichert');
+      run(() => act('reportSettings', { [k]: v }), tr('Saved'));
     });
     const hs = $('#hookSave', body);
-    if (hs) hs.onclick = async () => { const url = $('#hookIn', body).value.trim(); if (url && await run(() => act('reportWebhook', { url }), 'Webhook gespeichert')) renderSide(); };
+    if (hs) hs.onclick = async () => { const url = $('#hookIn', body).value.trim(); if (url && await run(() => act('reportWebhook', { url }), tr('Webhook saved'))) renderSide(); };
     const hd = $('#hookDel', body);
-    if (hd) hd.onclick = async () => { if (await run(() => act('reportWebhook', { url: '' }), 'Webhook entfernt')) renderSide(); };
+    if (hd) hd.onclick = async () => { if (await run(() => act('reportWebhook', { url: '' }), tr('Webhook removed'))) renderSide(); };
     const rr = $('#repRun', body);
     if (rr) rr.onclick = async () => { rr.disabled = true; const r = await run(() => act('reportRun', { summary: $('#repSum', body).value }), (x) => x.message); rr.disabled = false; if (r) renderSide(); };
     $$('[data-tuse]', body).forEach((b) => b.onclick = async () => { closeSide(); const list = await api('GET', 'api/templates'); pickTemplate(list, {}, b.dataset.tuse); });
@@ -2413,7 +2428,7 @@
   const ckRow = (k, v) => {
     const cmd = v && typeof v === 'object' ? v.cmd || '' : v || '';
     const cwd = v && typeof v === 'object' ? v.cwd || '' : '';
-    return '<div class="ck-edit add-row"><input class="input mono" data-ckk value="' + esc(k) + '" placeholder="name" style="flex:0 0 110px" maxlength="30" aria-label="Name"><input class="input mono" data-ckv value="' + esc(cmd) + '" placeholder="Befehl, etwa npm test" maxlength="300" aria-label="Befehl"><input class="input mono" data-ckd value="' + esc(cwd) + '" placeholder="Ordner" style="flex:0 0 120px" maxlength="200" aria-label="Arbeitsordner, relativ zum Projekt" title="Arbeitsordner relativ zum Projekt, leer für das Projekt selbst"><button class="btn small ghost icon" data-ckrm aria-label="Entfernen">×</button></div>';
+    return '<div class="ck-edit add-row"><input class="input mono" data-ckk value="' + esc(k) + '" placeholder="name" style="flex:0 0 110px" maxlength="30" aria-label="' + tr('Name') + '"><input class="input mono" data-ckv value="' + esc(cmd) + '" placeholder="' + tr('Command, e.g. npm test') + '" maxlength="300" aria-label="' + tr('Command') + '"><input class="input mono" data-ckd value="' + esc(cwd) + '" placeholder="' + tr('Folder') + '" style="flex:0 0 120px" maxlength="200" aria-label="' + tr('Working folder, relative to the project') + '" title="' + tr('Working folder relative to the project, empty for the project itself') + '"><button class="btn small ghost icon" data-ckrm aria-label="' + tr('Remove') + '">×</button></div>';
   };
 
   // ---------- Vorlagen nutzen und bearbeiten ----------
@@ -2422,15 +2437,15 @@
     let sel = preselect && tpls.some((t) => t.slug === preselect) ? preselect : tpls[0].slug;
     let titleTouched = false;
     const fillT = (text, vals) => String(text || '').replace(/\{([\p{L}\p{N}_]{1,30})\}/gu, (a, k) => vals[k] || a);
-    const pane = (t) => '<label class="field"><span>Titel</span><input class="input" name="title" maxlength="160" value="' + esc(fillT(t.title, {}) || t.name) + '" data-ttl></label>' +
-      '<div class="tp-tags"><span class="tag">' + esc(meta.typeLabel[t.type] || t.type) + '</span>' + (t.effort ? '<span class="tag">Aufwand ' + esc(t.effort) + '</span>' : '') + t.tags.map((x) => '<span class="tag">#' + esc(x) + '</span>').join('') + '</div>' +
-      (t.fields.length ? '<div class="grid">' + t.fields.map((f) => '<label class="field span2"><span>' + esc(f.key) + (f.required ? ' *' : '') + (f.hint ? ' <span class="sublabel">' + esc(f.hint) + '</span>' : '') + '</span>' + (f.kind === 'choice' ? '<select name="f_' + esc(f.key) + '" data-fk="' + esc(f.key) + '"' + (f.required ? ' required' : '') + '><option value="">Wählen</option>' + f.options.map((o) => '<option>' + esc(o) + '</option>').join('') + '</select>' : '<input class="input" name="f_' + esc(f.key) + '" data-fk="' + esc(f.key) + '" maxlength="300"' + (f.required ? ' required' : '') + '>') + '</label>').join('') + '</div>' : '') +
-      '<label class="field"><span>Was genau soll passieren?</span><textarea class="input" name="text" rows="5" placeholder="Beschreibe in eigenen Worten, was diese Aufgabe erreichen soll. Hat Vorrang vor dem Grundtext der Vorlage."></textarea><span class="sublabel">Landet zusammen mit den Feldern in der Beschreibung. Claude liest sie als Vorgabe von dir.</span></label>' +
-      (t.criteria.length ? '<div class="field"><span>Akzeptanzkriterien aus der Vorlage</span><ul class="dod">' + t.criteria.map((c, i) => '<li><label><input type="checkbox" name="c_' + i + '"' + (c.mode !== 'optional' ? ' checked' : '') + (c.mode === 'always' ? ' disabled' : '') + '><span>' + esc(c.text) + (c.mode === 'always' ? ' <span class="sublabel">immer</span>' : '') + '</span></label></li>').join('') + '</ul></div>' : '') +
-      '<div class="grid"><div class="field span2"><span>Priorität</span>' + segCtl('priority', PRIOS.map((p) => ({ id: p, label: p, dot: prioVar(p) })), t.priority) + '</div><div class="field span2"><span>Spalte</span>' + segCtl('status', [{ id: 'backlog', label: 'Backlog' }, { id: 'geplant', label: 'Geplant' }], prefill.status || 'backlog') + '</div></div>';
-    const html = '<h2>Neue Aufgabe</h2><div class="tp"><nav class="tp-list" aria-label="Vorlagen"><button type="button" class="tp-item" data-tp="">Leer<span>ohne Vorlage</span></button>' +
-      tpls.map((t) => '<button type="button" class="tp-item" data-tp="' + esc(t.slug) + '" aria-pressed="' + (t.slug === sel) + '">' + esc(t.name) + '<span>' + esc((meta.typeLabel[t.type] || t.type) + ', ' + t.criteria.length + ' Kriterien' + (t.uses ? ', ' + t.uses + 'x' : '')) + '</span></button>').join('') +
-      '<button type="button" class="tp-item new" data-tpnew>Eigene Vorlage erstellen</button></nav><div class="tp-pane" id="tpPane"></div></div>' + foot('Aufgabe anlegen');
+    const pane = (t) => '<label class="field"><span>' + tr('Title') + '</span><input class="input" name="title" maxlength="160" value="' + esc(fillT(t.title, {}) || t.name) + '" data-ttl></label>' +
+      '<div class="tp-tags"><span class="tag">' + esc(meta.typeLabel[t.type] || t.type) + '</span>' + (t.effort ? '<span class="tag">' + esc(tr('Effort {effort}', { effort: t.effort })) + '</span>' : '') + t.tags.map((x) => '<span class="tag">#' + esc(x) + '</span>').join('') + '</div>' +
+      (t.fields.length ? '<div class="grid">' + t.fields.map((f) => '<label class="field span2"><span>' + esc(f.key) + (f.required ? ' *' : '') + (f.hint ? ' <span class="sublabel">' + esc(f.hint) + '</span>' : '') + '</span>' + (f.kind === 'choice' ? '<select name="f_' + esc(f.key) + '" data-fk="' + esc(f.key) + '"' + (f.required ? ' required' : '') + '><option value="">' + tr('Choose') + '</option>' + f.options.map((o) => '<option>' + esc(o) + '</option>').join('') + '</select>' : '<input class="input" name="f_' + esc(f.key) + '" data-fk="' + esc(f.key) + '" maxlength="300"' + (f.required ? ' required' : '') + '>') + '</label>').join('') + '</div>' : '') +
+      '<label class="field"><span>' + tr('What exactly should happen?') + '</span><textarea class="input" name="text" rows="5" placeholder="' + tr('Describe in your own words what this task should achieve. Takes precedence over the template base text.') + '"></textarea><span class="sublabel">' + tr('Goes into the description together with the fields. Claude reads it as your instruction.') + '</span></label>' +
+      (t.criteria.length ? '<div class="field"><span>' + tr('Acceptance criteria from the template') + '</span><ul class="dod">' + t.criteria.map((c, i) => '<li><label><input type="checkbox" name="c_' + i + '"' + (c.mode !== 'optional' ? ' checked' : '') + (c.mode === 'always' ? ' disabled' : '') + '><span>' + esc(c.text) + (c.mode === 'always' ? ' <span class="sublabel">' + tr('always') + '</span>' : '') + '</span></label></li>').join('') + '</ul></div>' : '') +
+      '<div class="grid"><div class="field span2"><span>' + tr('Priority') + '</span>' + segCtl('priority', PRIOS.map((p) => ({ id: p, label: p, dot: prioVar(p) })), t.priority) + '</div><div class="field span2"><span>' + tr('Column') + '</span>' + segCtl('status', [{ id: 'backlog', label: 'Backlog' }, { id: 'geplant', label: tr('Planned') }], prefill.status || 'backlog') + '</div></div>';
+    const html = '<h2>' + tr('New task') + '</h2><div class="tp"><nav class="tp-list" aria-label="' + tr('Templates') + '"><button type="button" class="tp-item" data-tp="">' + tr('Blank') + '<span>' + tr('no template') + '</span></button>' +
+      tpls.map((t) => '<button type="button" class="tp-item" data-tp="' + esc(t.slug) + '" aria-pressed="' + (t.slug === sel) + '">' + esc(t.name) + '<span>' + esc((meta.typeLabel[t.type] || t.type) + ', ' + tr('{n} criteria', { n: t.criteria.length }) + (t.uses ? ', ' + t.uses + 'x' : '')) + '</span></button>').join('') +
+      '<button type="button" class="tp-item new" data-tpnew>' + tr('Create your own template') + '</button></nav><div class="tp-pane" id="tpPane"></div></div>' + foot(tr('Create task'));
     let wantBlank = false; let wantNew = false;
     const r = await showDialog(html, async (fd) => {
       const t = tpls.find((x) => x.slug === sel);
@@ -2472,19 +2487,19 @@
       else if (fromTask) tpl = await api('GET', 'api/template-draft?id=' + encodeURIComponent(fromTask));
     } catch (e) { return fail(e); }
     tpl = tpl || { name: '', about: '', title: '', type: 'feature', priority: 'P3', effort: '', tags: [], fields: [], description: '', hints: '', criteria: [] };
-    const opt = (list, cur, lab) => list.map((v) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(lab ? lab(v) : v || 'offen') + '</option>').join('');
-    const fieldRow = (f) => '<div class="te-field"><span class="grip" aria-hidden="true">⋮⋮</span><input class="input mono" data-fkey value="' + esc(f.key || '') + '" placeholder="Name" maxlength="30" aria-label="Feldname"><select class="input" data-fkind aria-label="Art"><option value="text"' + (f.kind !== 'choice' ? ' selected' : '') + '>Text</option><option value="choice"' + (f.kind === 'choice' ? ' selected' : '') + '>Auswahl</option></select><input class="input" data-fopts value="' + esc((f.options || []).join(', ')) + '" placeholder="Optionen, mit Komma" ' + (f.kind === 'choice' ? '' : 'hidden') + ' aria-label="Optionen"><label class="toggle"><input type="checkbox" data-freq' + (f.required ? ' checked' : '') + '> Pflicht</label><button type="button" class="btn small ghost icon" data-frm aria-label="Feld entfernen">×</button></div>';
-    const critRow = (c) => '<div class="te-crit"><input class="input" data-ctext value="' + esc(c.text || '') + '" placeholder="Prüfbar mit ja oder nein, Felder als {Name}" maxlength="300" aria-label="Kriterium"><select class="input" data-cmode aria-label="Art"><option value="always"' + (c.mode === 'always' ? ' selected' : '') + '>immer</option><option value="default"' + (c.mode === 'default' ? ' selected' : '') + '>vorausgewählt</option><option value="optional"' + (c.mode === 'optional' ? ' selected' : '') + '>optional</option></select><button type="button" class="btn small ghost icon" data-crm aria-label="Kriterium entfernen">×</button></div>';
-    const html = '<h2>' + (slug ? 'Vorlage bearbeiten' : 'Eigene Vorlage erstellen') + '</h2>' +
-      '<div class="grid"><label class="field span2"><span>Name der Vorlage</span><input class="input" name="name" required maxlength="80" value="' + esc(tpl.name) + '" autofocus></label><label class="field span2"><span>Titel der Aufgabe, Felder als {Name}</span><input class="input mono" name="title" maxlength="160" value="' + esc(tpl.title) + '" placeholder="Dashboard: {Seite}"></label>' +
-      '<label class="field"><span>Typ</span><select name="type">' + opt(Object.keys(meta.typeLabel), tpl.type, (v) => meta.typeLabel[v]) + '</select></label><label class="field"><span>Priorität</span><select name="priority">' + opt(PRIOS, tpl.priority) + '</select></label><label class="field"><span>Aufwand</span><select name="effort">' + opt(['', 'S', 'M', 'L', 'XL'], tpl.effort) + '</select></label><label class="field"><span>Tags</span><input class="input" name="tags" value="' + esc(tpl.tags.join(', ')) + '"></label></div>' +
-      '<label class="field"><span>Kurzbeschreibung, optional</span><input class="input" name="about" maxlength="200" value="' + esc(tpl.about || '') + '" placeholder="Wofür ist die Vorlage gedacht?"></label>' +
-      '<div class="field"><span>Felder beim Anlegen</span><div id="teFields">' + tpl.fields.map(fieldRow).join('') + '</div><div class="row-btns"><button type="button" class="btn small" id="teFieldAdd">Feld hinzufügen</button></div></div>' +
-      '<label class="field"><span>Grundtext der Beschreibung</span><textarea class="input mono" name="description" rows="5" placeholder="Felder mit {Name} einsetzen. Beim Anlegen kommt ein freies Feld „Was genau soll passieren?“ dazu, das Vorrang hat.">' + esc(tpl.description) + '</textarea></label>' +
-      '<div class="field"><span>Akzeptanzkriterien</span><div id="teCrit">' + tpl.criteria.map(critRow).join('') + '</div><div class="row-btns"><button type="button" class="btn small" id="teCritAdd">Kriterium hinzufügen</button></div></div>' +
-      '<label class="field"><span>Hinweise für Claude, optional</span><textarea class="input" name="hints" rows="2" maxlength="2000" placeholder="Etwa: vorher das UI UX Pro Max Skill nutzen">' + esc(tpl.hints || '') + '</textarea></label>' +
-      '<div class="field"><span>Speichern für</span>' + segCtl('scope', [{ id: 'project', label: 'Dieses Projekt' }, { id: 'user', label: 'Alle meine Projekte' }], scope) + '</div>' +
-      foot('Vorlage speichern', { extra: slug ? '<button type="button" class="btn danger" id="teDel" style="margin-right:auto">Löschen</button>' : '' });
+    const opt = (list, cur, lab) => list.map((v) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(lab ? lab(v) : v || tr('not set')) + '</option>').join('');
+    const fieldRow = (f) => '<div class="te-field"><span class="grip" aria-hidden="true">⋮⋮</span><input class="input mono" data-fkey value="' + esc(f.key || '') + '" placeholder="' + tr('Name') + '" maxlength="30" aria-label="' + tr('Field name') + '"><select class="input" data-fkind aria-label="' + tr('Kind') + '"><option value="text"' + (f.kind !== 'choice' ? ' selected' : '') + '>Text</option><option value="choice"' + (f.kind === 'choice' ? ' selected' : '') + '>' + tr('Choice') + '</option></select><input class="input" data-fopts value="' + esc((f.options || []).join(', ')) + '" placeholder="' + tr('Options, comma-separated') + '" ' + (f.kind === 'choice' ? '' : 'hidden') + ' aria-label="' + tr('Options') + '"><label class="toggle"><input type="checkbox" data-freq' + (f.required ? ' checked' : '') + '> ' + tr('Required') + '</label><button type="button" class="btn small ghost icon" data-frm aria-label="' + tr('Remove field') + '">×</button></div>';
+    const critRow = (c) => '<div class="te-crit"><input class="input" data-ctext value="' + esc(c.text || '') + '" placeholder="' + tr('Checkable with yes or no, fields as {Name}') + '" maxlength="300" aria-label="' + tr('Criterion') + '"><select class="input" data-cmode aria-label="' + tr('Kind') + '"><option value="always"' + (c.mode === 'always' ? ' selected' : '') + '>' + tr('always') + '</option><option value="default"' + (c.mode === 'default' ? ' selected' : '') + '>' + tr('preselected') + '</option><option value="optional"' + (c.mode === 'optional' ? ' selected' : '') + '>optional</option></select><button type="button" class="btn small ghost icon" data-crm aria-label="' + tr('Remove criterion') + '">×</button></div>';
+    const html = '<h2>' + (slug ? tr('Edit template') : tr('Create your own template')) + '</h2>' +
+      '<div class="grid"><label class="field span2"><span>' + tr('Template name') + '</span><input class="input" name="name" required maxlength="80" value="' + esc(tpl.name) + '" autofocus></label><label class="field span2"><span>' + tr('Task title, fields as {Name}') + '</span><input class="input mono" name="title" maxlength="160" value="' + esc(tpl.title) + '" placeholder="Dashboard: {' + tr('Page') + '}"></label>' +
+      '<label class="field"><span>' + tr('Type') + '</span><select name="type">' + opt(Object.keys(meta.typeLabel), tpl.type, (v) => meta.typeLabel[v]) + '</select></label><label class="field"><span>' + tr('Priority') + '</span><select name="priority">' + opt(PRIOS, tpl.priority) + '</select></label><label class="field"><span>' + tr('Effort') + '</span><select name="effort">' + opt(['', 'S', 'M', 'L', 'XL'], tpl.effort) + '</select></label><label class="field"><span>Tags</span><input class="input" name="tags" value="' + esc(tpl.tags.join(', ')) + '"></label></div>' +
+      '<label class="field"><span>' + tr('Short description, optional') + '</span><input class="input" name="about" maxlength="200" value="' + esc(tpl.about || '') + '" placeholder="' + tr('What is the template for?') + '"></label>' +
+      '<div class="field"><span>' + tr('Fields when creating') + '</span><div id="teFields">' + tpl.fields.map(fieldRow).join('') + '</div><div class="row-btns"><button type="button" class="btn small" id="teFieldAdd">' + tr('Add field') + '</button></div></div>' +
+      '<label class="field"><span>' + tr('Base text of the description') + '</span><textarea class="input mono" name="description" rows="5" placeholder="' + tr('Insert fields with {Name}. When creating, a free field “What exactly should happen?” is added, which takes precedence.') + '">' + esc(tpl.description) + '</textarea></label>' +
+      '<div class="field"><span>' + tr('Acceptance criteria') + '</span><div id="teCrit">' + tpl.criteria.map(critRow).join('') + '</div><div class="row-btns"><button type="button" class="btn small" id="teCritAdd">' + tr('Add a criterion') + '</button></div></div>' +
+      '<label class="field"><span>' + tr('Notes for Claude, optional') + '</span><textarea class="input" name="hints" rows="2" maxlength="2000" placeholder="' + tr('For example: use the UI UX Pro Max skill first') + '">' + esc(tpl.hints || '') + '</textarea></label>' +
+      '<div class="field"><span>' + tr('Save for') + '</span>' + segCtl('scope', [{ id: 'project', label: tr('This project') }, { id: 'user', label: tr('All my projects') }], scope) + '</div>' +
+      foot(tr('Save template'), { extra: slug ? '<button type="button" class="btn danger" id="teDel" style="margin-right:auto">' + tr('Delete') + '</button>' : '' });
     const r = await showDialog(html, (fd, sub) => {
       const fields = $$('.te-field', form).map((row) => ({ key: $('[data-fkey]', row).value.trim(), kind: $('[data-fkind]', row).value, options: $('[data-fopts]', row).value.split(',').map((s) => s.trim()).filter(Boolean), required: $('[data-freq]', row).checked })).filter((f) => f.key);
       const criteria = $$('.te-crit', form).map((row) => ({ text: $('[data-ctext]', row).value.trim(), mode: $('[data-cmode]', row).value })).filter((c) => c.text);
@@ -2500,7 +2515,7 @@
       $('#teFieldAdd', f).onclick = () => { $('#teFields', f).insertAdjacentHTML('beforeend', fieldRow({ kind: 'text' })); bind(); $('#teFields .te-field:last-child [data-fkey]', f).focus(); };
       $('#teCritAdd', f).onclick = () => { $('#teCrit', f).insertAdjacentHTML('beforeend', critRow({ mode: 'always' })); bind(); $('#teCrit .te-crit:last-child [data-ctext]', f).focus(); };
       const del = $('#teDel', f);
-      if (del) del.onclick = async () => { if (!confirm('Vorlage „' + tpl.name + '“ löschen?')) return; if (await run(() => act('templateDelete', { slug }), 'Vorlage gelöscht')) { $('button[value="cancel"]', f).click(); if (side === 'tools') renderSide(); } };
+      if (del) del.onclick = async () => { if (!confirm(tr('Delete template “{name}”?', { name: tpl.name }))) return; if (await run(() => act('templateDelete', { slug }), tr('Template deleted'))) { $('button[value="cancel"]', f).click(); if (side === 'tools') renderSide(); } };
       bind();
     });
     if (r) { ok(r.message); if (side === 'tools') renderSide(); }
@@ -2508,15 +2523,15 @@
 
   // ---------- Runde 3: Hilfen ----------
 
-  const fmtTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' Mio' : n >= 1e3 ? Math.round(n / 1e3) + ' k' : String(n || 0));
-  const fmtMoney = (v, cur) => (v > 0 && v < 0.1 ? v.toFixed(3) : (v || 0).toFixed(2)).replace('.', ',') + ' ' + (!cur || cur === 'USD' ? '$' : esc(cur));
-  const timeOf = (iso) => { try { return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+  const fmtTok = (n) => (n >= 1e6 ? tr('{n} M', { n: deComma((n / 1e6).toFixed(1)) }) : n >= 1e3 ? Math.round(n / 1e3) + ' k' : String(n || 0));
+  const fmtMoney = (v, cur) => deComma(v > 0 && v < 0.1 ? v.toFixed(3) : (v || 0).toFixed(2)) + ' ' + (!cur || cur === 'USD' ? '$' : esc(cur));
+  const timeOf = (iso) => { try { return new Date(iso).toLocaleTimeString(I18N.lang === 'de' ? 'de-DE' : 'en-GB', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
 
   function undoToast(msg, key) {
     const box = $('#toasts');
     const el = document.createElement('div');
     el.className = 'toast undo';
-    el.innerHTML = '<div class="row"><div class="what">' + esc(msg) + '</div><button class="btn small" type="button">Rückgängig</button></div><span class="ut"><i></i></span>';
+    el.innerHTML = '<div class="row"><div class="what">' + esc(msg) + '</div><button class="btn small" type="button">' + tr('Undo') + '</button></div><span class="ut"><i></i></span>';
     $('button', el).onclick = async (e) => { e.stopPropagation(); el.remove(); await run(() => act('undo', { key }), (x) => x.message); };
     el.onclick = () => el.remove();
     box.prepend(el);
@@ -2535,16 +2550,16 @@
     const plan = t.plan || null;
     const recent = (a.recent || []).filter((r) => r.task === t.id).slice(1, 4);
     const pend = (meta.instructions || []).filter((x) => x.task === t.id).length;
-    return '<div class="live-box">' + (laneE ? '<span class="lb-lane">Agent im eigenen Worktree</span>' : '') + '<span class="lb-head"><i class="lb-dot" aria-hidden="true"></i>' + esc(cur.verb) + (cur.what ? ' <code>' + esc(cur.what) + '</code>' : '') + '</span>' +
-      (recent.length ? '<ol class="lb-list">' + recent.map((r) => '<li><span class="muted num">' + esc(timeOf(r.at)) + '</span> ' + esc(r.verb) + ' <span class="mono">' + esc(r.what) + '</span>' + (r.ok === false ? ' <span class="late">Fehler</span>' : '') + '</li>').join('') + '</ol>' : '') +
-      (EDIT ? '<button class="btn small" data-instr="' + esc(t.id) + '">Anweisung an Claude' + (pend ? ' (' + pend + ' wartet)' : '') + '</button>' : '') + '</div>';
+    return '<div class="live-box">' + (laneE ? '<span class="lb-lane">' + tr('Agent in its own worktree') + '</span>' : '') + '<span class="lb-head"><i class="lb-dot" aria-hidden="true"></i>' + esc(cur.verb) + (cur.what ? ' <code>' + esc(cur.what) + '</code>' : '') + '</span>' +
+      (recent.length ? '<ol class="lb-list">' + recent.map((r) => '<li><span class="muted num">' + esc(timeOf(r.at)) + '</span> ' + esc(r.verb) + ' <span class="mono">' + esc(r.what) + '</span>' + (r.ok === false ? ' <span class="late">' + tr('Error') + '</span>' : '') + '</li>').join('') + '</ol>' : '') +
+      (EDIT ? '<button class="btn small" data-instr="' + esc(t.id) + '">' + tr('Instruction to Claude') + (pend ? ' (' + tr('{n} waiting', { n: pend }) + ')' : '') + '</button>' : '') + '</div>';
   }
 
   function instructBox(id) {
     const pend = (meta.instructions || []).filter((x) => x.task === id);
-    return '<div class="block instr"><div class="block-head"><h3>Anweisung an Claude</h3><span class="meta">Claude liest sie, sobald es sinnvoll ist, meist nach dem aktuellen Schritt</span></div>' +
-      (pend.length ? '<ul class="instr-list">' + pend.map((x) => '<li><span class="muted num">' + esc(x.at.slice(11, 16)) + '</span> ' + esc(x.text) + ' <span class="tag">wartet</span></li>').join('') + '</ul>' : '') +
-      '<div class="add-row"><input class="input" data-instr-in="' + esc(id) + '" maxlength="4000" placeholder="Zum Beispiel: Bitte auch Threads in Forenkanälen mitsichern"><button class="btn small primary" data-instr-send="' + esc(id) + '">Senden</button></div></div>';
+    return '<div class="block instr"><div class="block-head"><h3>' + tr('Instruction to Claude') + '</h3><span class="meta">' + tr('Claude reads it when it makes sense, usually after the current step') + '</span></div>' +
+      (pend.length ? '<ul class="instr-list">' + pend.map((x) => '<li><span class="muted num">' + esc(x.at.slice(11, 16)) + '</span> ' + esc(x.text) + ' <span class="tag">' + tr('waiting') + '</span></li>').join('') + '</ul>' : '') +
+      '<div class="add-row"><input class="input" data-instr-in="' + esc(id) + '" maxlength="4000" placeholder="' + tr('For example: please also back up threads in forum channels') + '"><button class="btn small primary" data-instr-send="' + esc(id) + '">' + tr('Send') + '</button></div></div>';
   }
 
   async function sendInstruction(id, text) {
@@ -2556,7 +2571,7 @@
     const b = e.target.closest('[data-instr]');
     if (b) {
       e.preventDefault(); e.stopPropagation();
-      const text = await askText({ title: 'Anweisung an Claude', lead: b.dataset.instr + ': Claude liest sie, sobald es sinnvoll ist, meist nach dem aktuellen Schritt. Sie bleibt als Kommentar an der Aufgabe.', label: 'Anweisung', confirm: 'Senden', required: true, multiline: true });
+      const text = await askText({ title: tr('Instruction to Claude'), lead: b.dataset.instr + ': ' + tr('Claude reads it when it makes sense, usually after the current step. It stays on the task as a comment.'), label: tr('Instruction'), confirm: tr('Send'), required: true, multiline: true });
       if (text) sendInstruction(b.dataset.instr, text);
       return;
     }
@@ -2584,7 +2599,7 @@
   let liveFollow = !livePrefs.focus;
   let liveSnap = null;
   let liveSeen = null;
-  const LV_CK = { ok: 'bestanden', ack: 'bekannt', fail: 'fehlgeschlagen', warn: 'Fund', manual: 'trägt Claude ein', run: 'läuft', wait: 'noch nicht gelaufen' };
+  const LV_CK = { ok: tr('passed'), ack: tr('known'), fail: tr('failed'), warn: tr('finding'), manual: tr('Claude fills in'), run: tr('running'), wait: tr('not run yet') };
   const lvSvg = (p) => '<svg viewBox="0 0 16 16" aria-hidden="true">' + p + '</svg>';
   const LV_IC = {
     ok: lvSvg('<path d="M3.5 8.4l2.9 2.9 6.1-6.6"/>'),
@@ -2638,15 +2653,15 @@
     const e = Object.entries(a.lanes || {}).find(([id, x]) => lanes.has(id) && x.perm && lvFresh(x));
     return e ? e[1] : null;
   }
-  const LV_PERM = { Bash: 'einen Befehl', Edit: 'eine Änderung', MultiEdit: 'eine Änderung', NotebookEdit: 'eine Änderung', Write: 'eine neue Datei', WebFetch: 'einen Webzugriff', WebSearch: 'eine Websuche' };
+  const LV_PERM = { Bash: tr('a command'), Edit: tr('a change'), MultiEdit: tr('a change'), NotebookEdit: tr('a change'), Write: tr('a new file'), WebFetch: tr('a web request'), WebSearch: tr('a web search') };
   const lvNotifyOn = () => notifySet.on && notifySet.perm && 'Notification' in window && Notification.permission === 'granted';
   async function lvEnableNotify() {
-    if (!('Notification' in window)) return fail(new Error('Dieser Browser unterstützt keine Benachrichtigungen.'));
+    if (!('Notification' in window)) return fail(new Error(tr('This browser does not support notifications.')));
     if (Notification.permission === 'default') await Notification.requestPermission();
-    if (Notification.permission !== 'granted') return fail(new Error('Benachrichtigungen sind im Browser blockiert. In den Seiteneinstellungen erlauben.'));
+    if (Notification.permission !== 'granted') return fail(new Error(tr('Notifications are blocked in the browser. Allow them in the site settings.')));
     notifySet = { ...notifySet, on: true, perm: true };
     store.set(NKEY, notifySet);
-    toast('<div class="what">Benachrichtigung an</div><div class="why">Meldet sich, wenn Claude auf eine Freigabe wartet und der Tab im Hintergrund ist.</div>');
+    toast('<div class="what">' + tr('Notifications turned on') + '</div><div class="why">' + tr('Lets you know when Claude is waiting for an approval and the tab is in the background.') + '</div>');
     renderLive();
   }
   const lvLanes = () => new Set((meta.lanes || []).map((l) => l.task));
@@ -2689,39 +2704,39 @@
     const n = (...k) => states.filter((s) => k.includes(s)).length;
     return { total: states.length, ok: n('ok', 'ack'), warn: n('warn'), fail: n('fail'), finished: n('ok', 'ack', 'warn', 'fail'), running: t.checks.running };
   }
-  const lvFinds = (c) => (c.fail ? c.fail + ' fehlgeschlagen' : c.warn === 1 ? '1 Fund' : c.warn + ' Funde');
+  const lvFinds = (c) => (c.fail ? tr('{n} failed', { n: c.fail }) : c.warn === 1 ? tr('1 finding') : tr('{n} findings', { n: c.warn }));
 
   function lvStatus(t) {
     const ph = phaseOf(t), s = lvSteps(t), c = lvChecks(t);
     const pe = lvNowOf(t);
-    if (pe && pe.perm) return { ic: 'perm', text: 'Wartet auf deine Freigabe', w: s.total ? s.done / s.total : null };
-    if (ph === 'erledigt') return { ic: 'ok', text: 'Heute erledigt' };
-    if (ph === 'pruefung') return { ic: 'run', text: 'Prüfungen ' + c.finished + ' von ' + c.total + ', ' + c.running + ' läuft', w: c.finished / c.total, col: 'var(--accent)' };
-    if (ph === 'review') return { ic: c && (c.warn || c.fail) ? 'warn' : 'review', text: 'Wartet auf deine Abnahme' + (c && (c.warn || c.fail) ? ', ' + lvFinds(c) : ''), w: 1, col: 'var(--s-review)' };
+    if (pe && pe.perm) return { ic: 'perm', text: tr('Waiting for your approval'), w: s.total ? s.done / s.total : null };
+    if (ph === 'erledigt') return { ic: 'ok', text: tr('Done today') };
+    if (ph === 'pruefung') return { ic: 'run', text: tr('Checks {done} of {total}, {name} running', { done: c.finished, total: c.total, name: c.running }), w: c.finished / c.total, col: 'var(--accent)' };
+    if (ph === 'review') return { ic: c && (c.warn || c.fail) ? 'warn' : 'review', text: tr('Waiting for your acceptance review') + (c && (c.warn || c.fail) ? ', ' + lvFinds(c) : ''), w: 1, col: 'var(--s-review)' };
     if (ph === 'umsetzung') {
-      if (!s.total) return { ic: 'cur', text: 'In Umsetzung, kein Umsetzungsplan' };
-      if (s.cur < 0) return { ic: 'cur', text: 'Alle ' + s.total + ' Schritte erledigt', w: 1 };
-      return { ic: 'cur', text: 'Schritt ' + (s.cur + 1) + ' von ' + s.total + ': ' + s.curT, w: s.done / s.total };
+      if (!s.total) return { ic: 'cur', text: tr('In progress, no implementation plan') };
+      if (s.cur < 0) return { ic: 'cur', text: tr('All {n} steps done', { n: s.total }), w: 1 };
+      return { ic: 'cur', text: tr('Step {n} of {total}: {text}', { n: s.cur + 1, total: s.total, text: s.curT }), w: s.done / s.total };
     }
-    if (ph === 'queue') { const pos = (meta.queue || []).indexOf(t.id); return pos === 0 ? { ic: 'next', text: 'Als Nächstes in der Warteschlange' } : { ic: 'wait', text: 'Warteschlange, Platz ' + (pos + 1) }; }
+    if (ph === 'queue') { const pos = (meta.queue || []).indexOf(t.id); return pos === 0 ? { ic: 'next', text: tr('Next in the queue') } : { ic: 'wait', text: tr('Queue, position {n}', { n: pos + 1 }) }; }
     return { ic: 'wait', text: L(t.status) };
   }
 
   function lvAttention(list) {
     const out = [];
-    for (const t of list) { const e = lvNowOf(t); if (e && e.perm) out.push({ id: t.id, ic: 'perm', text: t.id + ': Freigabe für ' + (LV_PERM[e.tool] || 'ein Werkzeug') }); }
+    for (const t of list) { const e = lvNowOf(t); if (e && e.perm) out.push({ id: t.id, ic: 'perm', text: tr('{id}: approval for {what}', { id: t.id, what: LV_PERM[e.tool] || tr('a tool') }) }); }
     for (const t of list) {
-      if (t.status === 'review') out.push({ id: t.id, ic: 'review', text: t.id + ' abnehmen' });
+      if (t.status === 'review') out.push({ id: t.id, ic: 'review', text: tr('Review {id}', { id: t.id }) });
       // Je Aufgabe und Art eine Zeile, auch bei Dutzenden fehlgeschlagener Prüfungen.
       if (t.status !== 'erledigt' && t.checks) {
         const fails = t.checks.list.filter((x) => lvCheckState(t, x) === 'fail');
         const warns = t.checks.list.filter((x) => lvCheckState(t, x) === 'warn');
-        if (fails.length) out.push({ id: t.id, ic: 'fail', text: t.id + ': ' + (fails.length === 1 ? fails[0].name + ' fehlgeschlagen' : fails.length + ' Prüfungen fehlgeschlagen') });
-        if (warns.length) out.push({ id: t.id, ic: 'warn', text: t.id + ': ' + (warns.length === 1 ? 'Fund in ' + warns[0].name : warns.length + ' Funde') });
+        if (fails.length) out.push({ id: t.id, ic: 'fail', text: t.id + ': ' + (fails.length === 1 ? tr('{name} failed', { name: fails[0].name }) : tr('{n} checks failed', { n: fails.length })) });
+        if (warns.length) out.push({ id: t.id, ic: 'warn', text: t.id + ': ' + (warns.length === 1 ? tr('Finding in {name}', { name: warns[0].name }) : tr('{n} findings', { n: warns.length })) });
       }
-      if (t.status === 'in-arbeit' && t.questions.length) out.push({ id: t.id, ic: 'ask', text: t.id + ': ' + (t.questions.length === 1 ? '1 offene Frage' : t.questions.length + ' offene Fragen') });
-      for (const c of t.conflicts || []) if (t.id < c.id) out.push({ id: t.id, ic: 'warn', text: t.id + ' und ' + c.id + ' ändern ' + c.files[0].split('/').pop() + (c.files.length > 1 ? ' und ' + (c.files.length - 1) + ' weitere' : '') });
-      if (t.stale) out.push({ id: t.id, ic: 'wait', text: t.id + ' seit ' + t.stale.days + (t.stale.days === 1 ? ' Tag' : ' Tagen') + ' still' });
+      if (t.status === 'in-arbeit' && t.questions.length) out.push({ id: t.id, ic: 'ask', text: t.id + ': ' + (t.questions.length === 1 ? tr('1 open question') : tr('{n} open questions', { n: t.questions.length })) });
+      for (const c of t.conflicts || []) if (t.id < c.id) out.push({ id: t.id, ic: 'warn', text: tr('{a} and {b} change {file}', { a: t.id, b: c.id, file: c.files[0].split('/').pop() }) + (c.files.length > 1 ? tr(' and {n} more', { n: c.files.length - 1 }) : '') });
+      if (t.stale) out.push({ id: t.id, ic: 'wait', text: t.stale.days === 1 ? tr('{id} quiet for 1 day', { id: t.id }) : tr('{id} quiet for {n} days', { id: t.id, n: t.stale.days }) });
     }
     return out;
   }
@@ -2740,59 +2755,59 @@
     const ph = phaseOf(t), s = lvSteps(t), c = lvChecks(t);
     const started = ph !== 'queue' && ph !== '';
     const implDone = t.status === 'review' || t.status === 'erledigt' || (s.total > 0 && s.done === s.total);
-    const chk = !c ? ['', 'keine eingerichtet'] : ph === 'pruefung' ? ['cur', c.finished + ' von ' + c.total]
-      : c.total && c.ok === c.total ? ['done', 'alle bestanden'] : (c.warn || c.fail) ? ['warn', lvFinds(c)] : c.finished ? ['', c.finished + ' von ' + c.total] : ['', 'noch nicht gelaufen'];
+    const chk = !c ? ['', tr('none set up')] : ph === 'pruefung' ? ['cur', tr('{done} of {total}', { done: c.finished, total: c.total })]
+      : c.total && c.ok === c.total ? ['done', tr('all passed')] : (c.warn || c.fail) ? ['warn', lvFinds(c)] : c.finished ? ['', tr('{done} of {total}', { done: c.finished, total: c.total })] : ['', tr('not run yet')];
     const rows = [
-      ['Gestartet', started ? 'done' : '', started ? (t.started === meta.today ? 'heute' : fmtDate(t.started)) : 'noch nicht', 1, ''],
-      ['Umsetzung', ph === 'umsetzung' ? 'cur' : implDone ? 'done' : '', s.total ? s.done + ' von ' + s.total + ' Schritten' : '', s.total ? s.done / s.total : 0, 'var(--s-in-arbeit)'],
-      ['Prüfungen', chk[0], chk[1], c && c.total ? c.finished / c.total : 0, 'var(--accent)'],
-      ['Review', t.status === 'review' && ph !== 'pruefung' ? 'cur' : t.status === 'erledigt' ? 'done' : '', t.status === 'review' ? 'wartet auf dich' : '', 1, 'var(--s-review)'],
-      ['Erledigt', t.status === 'erledigt' ? 'done' : '', t.status === 'erledigt' ? fmtDate(t.completed) : '', 1, ''],
+      [tr('Started'), started ? 'done' : '', started ? (t.started === meta.today ? tr('today') : fmtDate(t.started)) : tr('not yet'), 1, ''],
+      [tr('Implementation'), ph === 'umsetzung' ? 'cur' : implDone ? 'done' : '', s.total ? tr('{done} of {total} steps', { done: s.done, total: s.total }) : '', s.total ? s.done / s.total : 0, 'var(--s-in-arbeit)'],
+      [tr('Checks'), chk[0], chk[1], c && c.total ? c.finished / c.total : 0, 'var(--accent)'],
+      ['Review', t.status === 'review' && ph !== 'pruefung' ? 'cur' : t.status === 'erledigt' ? 'done' : '', t.status === 'review' ? tr('waiting for you') : '', 1, 'var(--s-review)'],
+      [tr('Done'), t.status === 'erledigt' ? 'done' : '', t.status === 'erledigt' ? fmtDate(t.completed) : '', 1, ''],
     ];
-    return '<ol class="lv-phases" aria-label="Phasen der Aufgabe">' + rows.map((r) => '<li class="' + r[1] + '" style="--p:' + Math.max(6, Math.round(r[3] * 100)) + '%' + (r[4] ? ';--phc:' + r[4] : '') + '"' + (r[1] === 'cur' ? ' aria-current="step"' : '') + '><span class="ph-name">' + r[0] + '</span><span class="ph-sub">' + esc(r[2]) + '</span></li>').join('') + '</ol>';
+    return '<ol class="lv-phases" aria-label="' + tr('Task phases') + '">' + rows.map((r) => '<li class="' + r[1] + '" style="--p:' + Math.max(6, Math.round(r[3] * 100)) + '%' + (r[4] ? ';--phc:' + r[4] : '') + '"' + (r[1] === 'cur' ? ' aria-current="step"' : '') + '><span class="ph-name">' + r[0] + '</span><span class="ph-sub">' + esc(r[2]) + '</span></li>').join('') + '</ol>';
   }
 
   function lvStepsHtml(t) {
     const s = lvSteps(t);
-    if (!s.total) return '<p class="lv-empty">Kein Umsetzungsplan. Schritte stehen in der task.md unter Umsetzungsplan.</p>';
+    if (!s.total) return '<p class="lv-empty">' + tr('No implementation plan. Steps go in task.md under Implementation plan.') + '</p>';
     const fresh = liveSnap && liveSnap[t.id] && liveSnap[t.id].done < s.done;
     return '<ol class="lv-steps">' + t.plan.map((st, i) => {
       const cur = i === s.cur && phaseOf(t) === 'umsetzung';
       const cls = st.done ? 'done' : cur ? 'cur' + (fresh ? ' fresh' : '') : 'todo';
       const prevAt = i > 0 && t.plan[i - 1].at;
-      const right = st.done ? lvTime(st.at) : cur && prevAt ? 'seit ' + lvSince(prevAt, 'min') : '';
+      const right = st.done ? lvTime(st.at) : cur && prevAt ? tr('for {time}', { time: lvSince(prevAt, 'min') }) : '';
       return '<li class="' + cls + '"' + (cur ? ' aria-current="step"' : '') + '>' + lvSi(st.done ? 'ok' : cur ? 'cur' : 'wait') +
-        '<span class="s-t">' + esc(st.text) + '<span class="sr">, ' + (st.done ? 'erledigt' : cur ? 'in Arbeit' : 'offen') + '</span></span><span class="s-time">' + right + '</span></li>';
+        '<span class="s-t">' + esc(st.text) + '<span class="sr">, ' + (st.done ? tr('done') : cur ? tr('in progress') : tr('open')) + '</span></span><span class="s-time">' + right + '</span></li>';
     }).join('') + '</ol>';
   }
 
   function lvNowHtml(t) {
     const ph = phaseOf(t), s = lvSteps(t), c = lvChecks(t);
-    if (ph === 'review') return '<div class="lv-now done">' + lvSi(c && (c.warn || c.fail) ? 'warn' : 'review') + '<div class="lv-now-t"><span class="n-label">Claude ist fertig</span><span class="n-what">Wartet auf deine Abnahme' + (c && (c.warn || c.fail) ? ', ' + lvFinds(c) : '') + '</span></div>' + (EDIT ? '<button class="btn small primary" data-lv-review="' + esc(t.id) + '" data-lk="review">Abnehmen</button>' : '') + '</div>';
-    if (ph === 'erledigt') return '<div class="lv-now fin">' + lvSi('ok') + '<div class="lv-now-t"><span class="n-label">Abgeschlossen</span><span class="n-what">Heute erledigt</span></div></div>';
+    if (ph === 'review') return '<div class="lv-now done">' + lvSi(c && (c.warn || c.fail) ? 'warn' : 'review') + '<div class="lv-now-t"><span class="n-label">' + tr('Claude is done') + '</span><span class="n-what">' + tr('Waiting for your acceptance review') + (c && (c.warn || c.fail) ? ', ' + lvFinds(c) : '') + '</span></div>' + (EDIT ? '<button class="btn small primary" data-lv-review="' + esc(t.id) + '" data-lk="review">' + tr('Review task') + '</button>' : '') + '</div>';
+    if (ph === 'erledigt') return '<div class="lv-now fin">' + lvSi('ok') + '<div class="lv-now-t"><span class="n-label">' + tr('Completed') + '</span><span class="n-what">' + tr('Done today') + '</span></div></div>';
     const e = lvNowOf(t);
     const agent = lvLanes().has(t.id);
-    const where = ph === 'pruefung' ? 'Prüfung ' + Math.min(c.finished + 1, c.total) + ' von ' + c.total + ', Ergebnisse unter Prüfungen' : s.cur >= 0 ? 'Schritt ' + (s.cur + 1) + ': ' + esc(s.curT) : '';
+    const where = ph === 'pruefung' ? tr('Check {n} of {total}, results under Checks', { n: Math.min(c.finished + 1, c.total), total: c.total }) : s.cur >= 0 ? tr('Step {n}: {text}', { n: s.cur + 1, text: esc(s.curT) }) : '';
     if (e && e.perm) {
-      return '<div class="lv-now perm"><span class="n-label"><i class="lv-dot perm" aria-hidden="true"></i>' + (agent ? 'Agent wartet' : 'Wartet') + ' auf deine Freigabe</span><span class="n-what">' + lvWhat(e) + '</span><span class="n-meta">seit ' + lvSince(e.permSince || e.at) + (where ? ' · ' + where : '') + '</span>' +
-        '<span class="n-hint">Bestätige oder lehne im Claude-Fenster ab.' + (lvNotifyOn() ? '' : '<button type="button" class="btn link" data-lv-notify data-lk="notify">Mich im Browser benachrichtigen</button>') + '</span></div>';
+      return '<div class="lv-now perm"><span class="n-label"><i class="lv-dot perm" aria-hidden="true"></i>' + (agent ? tr('Agent waiting for your approval') : tr('Waiting for your approval')) + '</span><span class="n-what">' + lvWhat(e) + '</span><span class="n-meta">' + tr('for {time}', { time: lvSince(e.permSince || e.at) }) + (where ? ' · ' + where : '') + '</span>' +
+        '<span class="n-hint">' + tr('Approve or deny in the Claude window.') + (lvNotifyOn() ? '' : '<button type="button" class="btn link" data-lv-notify data-lk="notify">' + tr('Notify me in the browser') + '</button>') + '</span></div>';
     }
     if (e && e.running) {
-      return '<div class="lv-now"><span class="n-label"><i class="lv-dot" aria-hidden="true"></i>Gerade jetzt' + (agent ? ', Agent im eigenen Worktree' : '') + '</span><span class="n-what">' + lvWhat(e) + '</span><span class="n-meta">seit ' + lvSince(e.at) + (where ? ' · ' + where : '') + '</span></div>';
+      return '<div class="lv-now"><span class="n-label"><i class="lv-dot" aria-hidden="true"></i>' + tr('Right now') + (agent ? tr(', agent in its own worktree') : '') + '</span><span class="n-what">' + lvWhat(e) + '</span><span class="n-meta">' + tr('for {time}', { time: lvSince(e.at) }) + (where ? ' · ' + where : '') + '</span></div>';
     }
     const last = e && e.tool ? e : lvLastOf(t.id);
-    if (e) return '<div class="lv-now"><span class="n-label"><i class="lv-dot" aria-hidden="true"></i>' + (agent ? 'Agent denkt nach' : 'Claude denkt nach') + '</span>' + (last ? '<span class="n-what">Zuletzt: ' + lvWhat(last) + '</span><span class="n-meta">vor ' + lvSince(last.at) + (where ? ' · ' + where : '') + '</span>' : where ? '<span class="n-meta">' + where + '</span>' : '') + '</div>';
-    return '<div class="lv-now idle"><span class="n-label">Gerade nicht aktiv</span>' + (last ? '<span class="n-what">Zuletzt: ' + lvWhat(last) + '</span><span class="n-meta">um ' + lvTime(last.at) + (where ? ' · ' + where : '') + '</span>' : where ? '<span class="n-meta">' + where + '</span>' : '') + '</div>';
+    if (e) return '<div class="lv-now"><span class="n-label"><i class="lv-dot" aria-hidden="true"></i>' + (agent ? tr('Agent is thinking') : tr('Claude is thinking')) + '</span>' + (last ? '<span class="n-what">' + tr('Last: {what}', { what: lvWhat(last) }) + '</span><span class="n-meta">' + tr('{time} ago', { time: lvSince(last.at) }) + (where ? ' · ' + where : '') + '</span>' : where ? '<span class="n-meta">' + where + '</span>' : '') + '</div>';
+    return '<div class="lv-now idle"><span class="n-label">' + tr('Not active right now') + '</span>' + (last ? '<span class="n-what">' + tr('Last: {what}', { what: lvWhat(last) }) + '</span><span class="n-meta">' + tr('at {time}', { time: lvTime(last.at) }) + (where ? ' · ' + where : '') + '</span>' : where ? '<span class="n-meta">' + where + '</span>' : '') + '</div>';
   }
 
   function lvFeed(list, onlyId) {
     const items = [];
     for (const r of (meta.activity && meta.activity.recent) || []) items.push({ at: r.at, task: r.task, verb: r.verb, what: r.what, err: r.ok === false, kind: 'tool', file: LV_FILE_TOOLS.includes(r.tool) ? r.what : '' });
     for (const t of list) {
-      for (const s of t.plan || []) if (s.done && s.at) items.push({ at: s.at, task: t.id, verb: 'Schritt erledigt', what: s.text, kind: 'step' });
+      for (const s of t.plan || []) if (s.done && s.at) items.push({ at: s.at, task: t.id, verb: tr('Step done'), what: s.text, kind: 'step' });
       if (t.checks) {
         for (const [name, r] of Object.entries(t.checks.results)) {
-          if (r.at && ['ok', 'ack', 'warn', 'fail'].includes(r.status)) items.push({ at: r.at, task: t.id, verb: 'Prüfung', what: name + ' ' + LV_CK[r.status], kind: 'check', ok: r.status === 'ok' || r.status === 'ack', err: r.status === 'fail' });
+          if (r.at && ['ok', 'ack', 'warn', 'fail'].includes(r.status)) items.push({ at: r.at, task: t.id, verb: tr('Check'), what: name + ' ' + LV_CK[r.status], kind: 'check', ok: r.status === 'ok' || r.status === 'ack', err: r.status === 'fail' });
         }
       }
     }
@@ -2804,30 +2819,30 @@
   async function lvToggleDiff(b) {
     const key = b.dataset.lvDiff;
     if (lvDiffs.has(key)) { lvDiffs.delete(key); renderLive(); return; }
-    lvDiffs.set(key, '<p class="muted diff-more">Lädt …</p>');
+    lvDiffs.set(key, '<p class="muted diff-more">' + tr('Loading …') + '</p>');
     renderLive();
     let html;
     try {
       const r = await api('GET', 'api/diff?id=' + encodeURIComponent(b.dataset.task) + '&file=' + encodeURIComponent(b.dataset.file) + '&live=1');
       const add = (r.diff.match(/^\+(?!\+\+ )/gm) || []).length;
       const del = (r.diff.match(/^-(?!-- )/gm) || []).length;
-      const what = { uncommitted: 'Stand jetzt gegen den letzten Commit', new: 'Neue Datei, noch nicht im Git', task: 'Keine offene Änderung, gezeigt: Änderungen der Aufgabe', binary: 'Binärdatei, kein Text-Diff' }[r.source] || 'Keine Änderung gefunden';
-      html = '<div class="lv-fdiff-head">' + (r.diff ? '<span class="add">+' + add + '</span><span class="del">−' + del + '</span>' : '') + '<span class="muted">' + what + '</span><button type="button" class="btn link" data-lv-code="' + esc(b.dataset.task) + '">Im Detailpanel</button></div>' +
-        (r.diff ? '<div class="diff">' + diffHtml(r.diff) + (r.truncated ? '<p class="muted diff-more">Gekürzt. Vollständig im Detailpanel oder mit git diff.</p>' : '') + '</div>' : '');
+      const what = { uncommitted: tr('Current state against the last commit'), new: tr('New file, not in Git yet'), task: tr('No open change, showing: changes of the task'), binary: tr('Binary file, no text diff') }[r.source] || tr('No change found');
+      html = '<div class="lv-fdiff-head">' + (r.diff ? '<span class="add">+' + add + '</span><span class="del">−' + del + '</span>' : '') + '<span class="muted">' + what + '</span><button type="button" class="btn link" data-lv-code="' + esc(b.dataset.task) + '">' + tr('In the detail panel') + '</button></div>' +
+        (r.diff ? '<div class="diff">' + diffHtml(r.diff) + (r.truncated ? '<p class="muted diff-more">' + tr('Truncated. Full version in the detail panel or with git diff.') + '</p>' : '') + '</div>' : '');
     } catch (err) { html = '<p class="muted diff-more">' + esc(err.message || err) + '</p>'; }
     if (lvDiffs.has(key)) { lvDiffs.set(key, html); renderLive(); }
   }
   function lvFeedHtml(items, withId) {
-    if (!items.length) return '<p class="lv-empty">Noch keine Einträge.</p>';
+    if (!items.length) return '<p class="lv-empty">' + tr('No entries yet.') + '</p>';
     return '<ol class="lv-feed' + (withId ? ' with-id' : '') + '">' + items.map((x) => {
       const key = x.at + x.task + x.verb + x.what;
       const ic = x.err ? '<span class="fi err">' + LV_IC.fail + '</span>' : x.kind === 'step' || x.ok ? '<span class="fi ok">' + LV_IC.ok + '</span>' : x.kind === 'check' ? '<span class="fi chk">' + LV_IC.chk + '</span>' : '';
       // Einträge mit einer geänderten Datei klappen ihren Diff auf (W-0011), nur im lokalen Board.
       const canDiff = EDIT && x.file && x.task;
       const open = canDiff && lvDiffs.has(key);
-      const inner = ic + (canDiff ? '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>' : '') + '<span class="f-verb">' + esc(x.verb) + '</span><span class="mono">' + esc(x.what) + '</span>' + (x.err ? '<span class="f-err">Fehler</span>' : '');
+      const inner = ic + (canDiff ? '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>' : '') + '<span class="f-verb">' + esc(x.verb) + '</span><span class="mono">' + esc(x.what) + '</span>' + (x.err ? '<span class="f-err">' + tr('Error') + '</span>' : '');
       return '<li class="k-' + x.kind + (canDiff ? ' k-file' : '') + (liveSeen && !liveSeen.has(key) ? ' new' : '') + '"><span class="f-time">' + lvTime(x.at, true) + '</span>' + (withId ? '<span class="f-id">' + esc(x.task || '–') + '</span>' : '') +
-        (canDiff ? '<button type="button" class="f-what lv-fbtn" data-lv-diff="' + esc(key) + '" data-task="' + esc(x.task) + '" data-file="' + esc(x.file) + '" aria-expanded="' + open + '" title="Änderung an dieser Datei zeigen">' + inner + '</button>' : '<span class="f-what">' + inner + '</span>') +
+        (canDiff ? '<button type="button" class="f-what lv-fbtn" data-lv-diff="' + esc(key) + '" data-task="' + esc(x.task) + '" data-file="' + esc(x.file) + '" aria-expanded="' + open + '" title="' + tr('Show the change to this file') + '">' + inner + '</button>' : '<span class="f-what">' + inner + '</span>') +
         (open ? '<div class="lv-fdiff">' + lvDiffs.get(key) + '</div>' : '') + '</li>';
     }).join('') + '</ol>';
   }
@@ -2838,14 +2853,14 @@
     return '<ul class="checks">' + t.checks.list.map((x) => {
       const st = lvCheckState(t, x);
       const r = t.checks.results[x.name] || {};
-      const right = st === 'run' ? 'läuft ' + lvSince(t.checks.runningSince, 'sec') : r.ms && (st === 'ok' || st === 'fail') ? '<span class="sr">' + LV_CK[st] + ', </span>' + lvMs(r.ms) + lvTrendMark(r) : LV_CK[st] || st;
+      const right = st === 'run' ? tr('running {time}', { time: lvSince(t.checks.runningSince, 'sec') }) : r.ms && (st === 'ok' || st === 'fail') ? '<span class="sr">' + LV_CK[st] + ', </span>' + lvMs(r.ms) + lvTrendMark(r) : LV_CK[st] || st;
       let extra = '';
       if (st === 'warn') {
-        extra = '<div class="ck-note">' + md(r.note || '') + (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fix="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">Claude beheben lassen</button><button type="button" class="btn small" data-lv-ack="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">Als bekannt markieren</button></div>' : '') + '</div>';
+        extra = '<div class="ck-note">' + md(r.note || '') + (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fix="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">' + tr('Let Claude fix it') + '</button><button type="button" class="btn small" data-lv-ack="' + esc(x.name) + '" data-lv-task="' + esc(t.id) + '">' + tr('Mark as known') + '</button></div>' : '') + '</div>';
       } else if (st === 'ok' && (r.flaky || r.trend)) {
         extra = '<div class="ck-acts">' + lvFlaky(r) + lvTrendText(r) + '</div>';
       } else if (st === 'fail') {
-        const acts = lvFlaky(r) + lvRerunBtn(t, [x.name], 'Erneut prüfen', 'btn link') + (r.output ? '<details class="ck-out" data-out="' + esc(t.id + ':' + x.name) + '"><summary>Ausgabe</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>' : '');
+        const acts = lvFlaky(r) + lvRerunBtn(t, [x.name], tr('Check again'), 'btn link') + (r.output ? '<details class="ck-out" data-out="' + esc(t.id + ':' + x.name) + '"><summary>' + tr('Output') + '</summary><pre>' + esc(r.output.split('\n').slice(-40).join('\n')) + '</pre></details>' : '');
         if (acts) extra = '<div class="ck-acts">' + acts + '</div>';
       }
       return '<li class="ck ' + (cls[st] || '') + '"><div class="ck-row"><span class="ck-ic" aria-hidden="true">' + ch[st] + '</span><span class="ck-name">' + esc(x.name) + '</span><span class="mono muted ck-cmd">' + esc(x.cmd) + '</span>' + lvHist(r) + '<span class="muted num ck-ms">' + right + '</span></div>' + extra + '</li>';
@@ -2853,10 +2868,10 @@
   }
 
   // Verlauf je Prüfung: ein Strich je Lauf, neuester rechts. Erst ab zwei Läufen sinnvoll.
-  const lvHist = (r) => (r.hist && r.hist.length > 1 ? '<span class="lv-hist" title="Letzte ' + r.hist.length + ' Läufe, neuester rechts" aria-hidden="true">' + r.hist.map((h) => '<i class="' + (h.s === 'ok' ? 'ok' : 'fail') + '"></i>').join('') + '</span>' : '');
-  const lvFlaky = (r) => (r.flaky ? '<span class="lv-flaky" title="In den letzten ' + r.flaky.runs + ' Läufen mal bestanden, mal fehlgeschlagen">wackelig, ' + r.flaky.fails + ' von ' + r.flaky.runs + ' rot</span>' : '');
-  const lvTrendMark = (r) => (r.trend ? ' <span class="lv-trend ' + r.trend.dir + '" title="Sonst meist ' + lvMs(r.trend.usual) + '">' + (r.trend.dir === 'up' ? '↑' : '↓') + '</span>' : '');
-  const lvTrendText = (r) => (r.trend ? '<span>Dauerte ' + lvMs(r.trend.ms) + ', sonst meist ' + lvMs(r.trend.usual) + '.</span>' : '');
+  const lvHist = (r) => (r.hist && r.hist.length > 1 ? '<span class="lv-hist" title="' + tr('Last {n} runs, newest on the right', { n: r.hist.length }) + '" aria-hidden="true">' + r.hist.map((h) => '<i class="' + (h.s === 'ok' ? 'ok' : 'fail') + '"></i>').join('') + '</span>' : '');
+  const lvFlaky = (r) => (r.flaky ? '<span class="lv-flaky" title="' + tr('Passed and failed by turns in the last {n} runs', { n: r.flaky.runs }) + '">' + tr('flaky, {fails} of {runs} red', { fails: r.flaky.fails, runs: r.flaky.runs }) + '</span>' : '');
+  const lvTrendMark = (r) => (r.trend ? ' <span class="lv-trend ' + r.trend.dir + '" title="' + tr('Usually {time}', { time: lvMs(r.trend.usual) }) + '">' + (r.trend.dir === 'up' ? '↑' : '↓') + '</span>' : '');
+  const lvTrendText = (r) => (r.trend ? '<span>' + tr('Took {time}, usually {usual}.', { time: lvMs(r.trend.ms), usual: lvMs(r.trend.usual) }) + '</span>' : '');
 
   // Erneut prüfen: startet nur die genannten Prüfungen neu. Während eines Laufs (oder bis er beginnt) gibt es keinen Knopf.
   const lvRerunning = new Set();
@@ -2868,12 +2883,12 @@
   }
   function lvRerunAll(t, many) {
     const fails = t.checks.list.filter((x) => !x.skill && lvCheckState(t, x) === 'fail').map((x) => x.name);
-    const b = fails.length >= 2 ? lvRerunBtn(t, fails, many ? 'Alle ' + fails.length + ' fehlgeschlagenen erneut prüfen' : 'Fehlgeschlagene erneut prüfen (' + fails.length + ')') : '';
+    const b = fails.length >= 2 ? lvRerunBtn(t, fails, many ? tr('Run all {n} failed checks again', { n: fails.length }) : tr('Run failed checks again ({n})', { n: fails.length })) : '';
     return b ? '<div class="lv-ckg-acts">' + b + '</div>' : '';
   }
   async function lvRerun(id, names) {
     lvRerunning.add(id);
-    ok((names.length === 1 ? names[0] + ' läuft' : names.length + ' Prüfungen laufen') + ' erneut');
+    ok(names.length === 1 ? tr('{name} is running again', { name: names[0] }) : tr('{n} checks are running again', { n: names.length }));
     renderLive();
     try { await run(() => act('checksRun', { id, only: names }), (r) => r.message); } finally { lvRerunning.delete(id); renderLive(); }
   }
@@ -2881,7 +2896,7 @@
   // Ab dieser Anzahl Prüfungen einer Aufgabe zeigt die Spalte eine Zusammenfassung statt einer Zeile je Prüfung.
   const LV_MANY = 8;
   const lvExpanded = new Set();
-  const lvFirstLine = (out) => { const l = String(out || '').split('\n').map((s) => s.trim()).find(Boolean); return l ? l.slice(0, 240) : 'Keine Ausgabe'; };
+  const lvFirstLine = (out) => { const l = String(out || '').split('\n').map((s) => s.trim()).find(Boolean); return l ? l.slice(0, 240) : tr('No output'); };
   function lvAllList(t) {
     return '<div class="lv-alllist">' + t.checks.list.map((x) => '<div>' + lvSi(lvCheckState(t, x)) + '<span title="' + esc(x.cmd) + '">' + esc(x.name) + '</span></div>').join('') + '</div>';
   }
@@ -2889,11 +2904,11 @@
     const c = t.checks;
     const items = c.list.map((x) => ({ x, st: lvCheckState(t, x), r: c.results[x.name] || {} }));
     const of = (...st) => items.filter((i) => st.includes(i.st));
-    const parts = [[['fail'], 'fehlgeschlagen'], [['warn'], 'Fund'], [['ok', 'ack'], 'bestanden'], [['run'], 'läuft'], [['manual'], 'trägt Claude ein'], [['wait'], 'offen']];
+    const parts = [[['fail'], tr('failed')], [['warn'], tr('finding')], [['ok', 'ack'], tr('passed')], [['run'], tr('running')], [['manual'], tr('Claude fills in')], [['wait'], tr('open')]];
     let h = '<div class="lv-counts">' + parts.map(([st, l]) => { const n = of(...st).length; return n ? '<span class="c-' + st[0] + '"><b>' + n + '</b> ' + l + '</span>' : ''; }).join('') + '</div>' +
       '<div class="lv-strip" aria-hidden="true">' + items.map((i) => '<i class="' + i.st + '" title="' + esc(i.x.name + ': ' + (LV_CK[i.st] || i.st)) + '"></i>').join('') + '</div>' + lvRerunAll(t, true);
     const run = of('run')[0];
-    if (run) h += '<div class="lv-runline">' + lvSi('run') + '<b>' + esc(run.x.name) + '</b><span class="mono">' + esc(run.x.cmd) + '</span><span class="tm">läuft ' + lvSince(c.runningSince, 'sec') + '</span></div>';
+    if (run) h += '<div class="lv-runline">' + lvSi('run') + '<b>' + esc(run.x.name) + '</b><span class="mono">' + esc(run.x.cmd) + '</span><span class="tm">' + tr('running {time}', { time: lvSince(c.runningSince, 'sec') }) + '</span></div>';
     // Fehlschläge mit derselben ersten Zeile der Ausgabe gehören zusammen, meist haben sie dieselbe Ursache.
     const groups = new Map();
     for (const i of of('fail')) { const k = lvFirstLine(i.r.output); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); }
@@ -2901,22 +2916,22 @@
       const key = t.id + ':' + msg;
       const shown = lvExpanded.has(key) ? list : list.slice(0, 10);
       const names = list.map((i) => i.x.name);
-      h += '<div class="lv-errgrp"><div class="eh">' + lvSi('fail') + '<span>' + (list.length === 1 ? esc(names[0]) + ' fehlgeschlagen' : list.length + ' Prüfungen, gleiche Meldung') + '</span>' + (list.length === 1 ? lvFlaky(list[0].r) : '') + '</div><div class="lv-msg">' + esc(msg) + '</div>' +
-        (list.length > 1 ? '<div class="lv-names">' + shown.map((i) => '<span' + (i.r.flaky ? ' class="fl" title="wackelig"' : '') + '>' + esc(i.x.name) + '</span>').join('') + (list.length > shown.length ? '<button type="button" data-lv-more="' + esc(key) + '">+' + (list.length - shown.length) + ' weitere</button>' : '') + '</div>' : '') +
-        (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fixall="' + esc(t.id) + '" data-names="' + esc(names.join(', ')) + '">Claude beheben lassen</button>' + lvRerunBtn(t, names, 'Erneut prüfen') + '</div>' : '') +
-        '<details class="ck-out" data-out="' + esc(key) + '"><summary>Ausgabe von ' + esc(names[0]) + '</summary><pre>' + esc(String(list[0].r.output || '').split('\n').slice(-40).join('\n')) + '</pre></details></div>';
+      h += '<div class="lv-errgrp"><div class="eh">' + lvSi('fail') + '<span>' + (list.length === 1 ? tr('{name} failed', { name: esc(names[0]) }) : tr('{n} checks, same message', { n: list.length })) + '</span>' + (list.length === 1 ? lvFlaky(list[0].r) : '') + '</div><div class="lv-msg">' + esc(msg) + '</div>' +
+        (list.length > 1 ? '<div class="lv-names">' + shown.map((i) => '<span' + (i.r.flaky ? ' class="fl" title="' + tr('flaky') + '"' : '') + '>' + esc(i.x.name) + '</span>').join('') + (list.length > shown.length ? '<button type="button" data-lv-more="' + esc(key) + '">' + tr('+{n} more', { n: list.length - shown.length }) + '</button>' : '') + '</div>' : '') +
+        (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fixall="' + esc(t.id) + '" data-names="' + esc(names.join(', ')) + '">' + tr('Let Claude fix it') + '</button>' + lvRerunBtn(t, names, tr('Check again')) + '</div>' : '') +
+        '<details class="ck-out" data-out="' + esc(key) + '"><summary>' + tr('Output of {name}', { name: esc(names[0]) }) + '</summary><pre>' + esc(String(list[0].r.output || '').split('\n').slice(-40).join('\n')) + '</pre></details></div>';
     }
     for (const i of of('warn')) {
-      h += '<div class="lv-errgrp warn"><div class="eh">' + lvSi('warn') + '<span>Fund in ' + esc(i.x.name) + '</span></div><div class="ck-note">' + md(i.r.note || '') + '</div>' +
-        (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fix="' + esc(i.x.name) + '" data-lv-task="' + esc(t.id) + '">Claude beheben lassen</button><button type="button" class="btn small" data-lv-ack="' + esc(i.x.name) + '" data-lv-task="' + esc(t.id) + '">Als bekannt markieren</button></div>' : '') + '</div>';
+      h += '<div class="lv-errgrp warn"><div class="eh">' + lvSi('warn') + '<span>' + tr('Finding in {name}', { name: esc(i.x.name) }) + '</span></div><div class="ck-note">' + md(i.r.note || '') + '</div>' +
+        (EDIT ? '<div class="row-btns"><button type="button" class="btn small primary" data-lv-fix="' + esc(i.x.name) + '" data-lv-task="' + esc(t.id) + '">' + tr('Let Claude fix it') + '</button><button type="button" class="btn small" data-lv-ack="' + esc(i.x.name) + '" data-lv-task="' + esc(t.id) + '">' + tr('Mark as known') + '</button></div>' : '') + '</div>';
     }
     const fl = items.filter((i) => i.r.flaky);
-    if (fl.length) h += '<div class="lv-infoline">' + lvSi('warn') + '<span><b>' + fl.length + ' wackelig</b> (in den letzten Läufen mal bestanden, mal fehlgeschlagen, markiert mit ~): ' + esc(fl.map((i) => i.x.name).join(', ')) + '</span></div>';
+    if (fl.length) h += '<div class="lv-infoline">' + lvSi('warn') + '<span>' + tr('<b>{n} flaky</b> (passed and failed by turns in recent runs, marked with ~): {names}', { n: fl.length, names: esc(fl.map((i) => i.x.name).join(', ')) }) + '</span></div>';
     const slow = items.filter((i) => i.r.trend && i.r.trend.dir === 'up');
-    if (slow.length) h += '<div class="lv-infoline">' + lvSi('trend') + '<span><b>Langsamer als sonst:</b> ' + slow.map((i) => esc(i.x.name) + ' ' + lvMs(i.r.trend.ms) + ' statt meist ' + lvMs(i.r.trend.usual)).join(', ') + '</span></div>';
+    if (slow.length) h += '<div class="lv-infoline">' + lvSi('trend') + '<span><b>' + tr('Slower than usual:') + '</b> ' + slow.map((i) => tr('{name} {time} instead of usually {usual}', { name: esc(i.x.name), time: lvMs(i.r.trend.ms), usual: lvMs(i.r.trend.usual) })).join(', ') + '</span></div>';
     const ok = of('ok', 'ack');
-    if (ok.length) h += '<div class="lv-okline">' + lvSi('ok') + '<span>' + ok.length + ' bestanden' + (ok.length <= 6 ? ': ' + esc(ok.map((i) => i.x.name).join(', ')) : '') + '</span></div>';
-    return h + '<details class="lv-all" data-out="' + esc(t.id + ':alle') + '"><summary>Alle ' + items.length + ' Prüfungen anzeigen</summary>' + lvAllList(t) + '</details>';
+    if (ok.length) h += '<div class="lv-okline">' + lvSi('ok') + '<span>' + tr('{n} passed', { n: ok.length }) + (ok.length <= 6 ? ': ' + esc(ok.map((i) => i.x.name).join(', ')) : '') + '</span></div>';
+    return h + '<details class="lv-all" data-out="' + esc(t.id + ':alle') + '"><summary>' + tr('Show all {n} checks', { n: items.length }) + '</summary>' + lvAllList(t) + '</details>';
   }
 
   function lvChecksHtml(list, focusId) {
@@ -2927,19 +2942,19 @@
     const running = groups.filter((t) => t.checks.running).length;
     const fails = groups.reduce((n, t) => n + lvChecks(t).fail, 0);
     const warns = groups.reduce((n, t) => n + lvChecks(t).warn, 0);
-    let h = '<div class="lv-head"><h2>Prüfungen</h2><span class="meta">' + ([running ? running + ' läuft' : '', fails ? fails + ' fehlgeschlagen' : '', warns ? warns + (warns === 1 ? ' Fund' : ' Funde') : ''].filter(Boolean).join(', ') || (groups.length ? 'alles ruhig' : '')) + '</span></div><div class="lv-body">';
-    if (!meta.hasChecks) return h + '<p class="lv-empty">Noch keine Prüfungen eingerichtet. Unter Werkzeuge lassen sich Befehle wie Tests oder Build hinterlegen, sie laufen dann vor dem Abschluss.</p></div>';
-    if (!groups.length) return h + '<p class="lv-empty">Heute ist noch keine Aufgabe mit Prüfungen in Arbeit.</p></div>';
+    let h = '<div class="lv-head"><h2>' + tr('Checks') + '</h2><span class="meta">' + ([running ? tr('{n} running', { n: running }) : '', fails ? tr('{n} failed', { n: fails }) : '', warns ? (warns === 1 ? tr('1 finding') : tr('{n} findings', { n: warns })) : ''].filter(Boolean).join(', ') || (groups.length ? tr('all quiet') : '')) + '</span></div><div class="lv-body">';
+    if (!meta.hasChecks) return h + '<p class="lv-empty">' + tr('No checks set up yet. Under Tools you can add commands such as tests or a build; they then run before completion.') + '</p></div>';
+    if (!groups.length) return h + '<p class="lv-empty">' + tr('No task with checks is in progress today.') + '</p></div>';
     h += groups.map((t) => {
       const c = lvChecks(t);
       const agent = lvLanes().has(t.id) ? '<span class="tag lv-agent">Agent</span>' : '';
       const head = (ic, note) => '<div class="lv-ckg-head">' + lvSi(ic) + '<b>' + esc(t.id) + '</b><span class="t">' + esc(t.title) + '</span>' + agent + '</div>' + (note ? '<p class="lv-ckg-note">' + note + '</p>' : '');
-      if (!c.running && !c.finished) return '<div class="lv-ckg">' + head('wait', 'Laufen, sobald die Aufgabe abgeschlossen wird: ' + esc(t.checks.list.map((x) => x.name).join(', ')) + '.') + '</div>';
+      if (!c.running && !c.finished) return '<div class="lv-ckg">' + head('wait', tr('Run as soon as the task is completed: {names}.', { names: esc(t.checks.list.map((x) => x.name).join(', ')) })) + '</div>';
       const many = t.checks.list.length > LV_MANY;
-      if (!c.running && c.ok === c.total) return '<details class="lv-ckg"><summary class="lv-ckg-head">' + lvSi('ok') + '<b>' + esc(t.id) + '</b><span class="t">Alle ' + c.total + ' bestanden' + (t.checks.at ? ', ' + lvTime(t.checks.at) : '') + '</span>' + agent + '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>' + (many ? lvAllList(t) : lvChecksList(t)) + '</details>';
+      if (!c.running && c.ok === c.total) return '<details class="lv-ckg"><summary class="lv-ckg-head">' + lvSi('ok') + '<b>' + esc(t.id) + '</b><span class="t">' + tr('All {n} passed', { n: c.total }) + (t.checks.at ? ', ' + lvTime(t.checks.at) : '') + '</span>' + agent + '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>' + (many ? lvAllList(t) : lvChecksList(t)) + '</details>';
       const icon = c.running ? 'run' : c.fail ? 'fail' : c.warn ? 'warn' : 'ok';
       if (many) return '<div class="lv-ckg' + (t.id === focusId ? ' hl' : '') + '">' + head(icon, '') + lvCompact(t) + '</div>';
-      const note = c.running ? 'Läuft, ' + c.finished + ' von ' + c.total + ' fertig' : (c.warn || c.fail) ? lvFinds(c) + ', Entscheidung nötig' : c.finished + ' von ' + c.total + ' gelaufen';
+      const note = c.running ? tr('Running, {done} of {total} finished', { done: c.finished, total: c.total }) : (c.warn || c.fail) ? tr('{finds}, decision needed', { finds: lvFinds(c) }) : tr('{done} of {total} ran', { done: c.finished, total: c.total });
       return '<div class="lv-ckg' + (t.id === focusId ? ' hl' : '') + '">' + head(icon, note) + lvRerunAll(t, false) + lvChecksList(t) + '</div>';
     }).join('');
     return h + '</div>';
@@ -2951,45 +2966,45 @@
     const cur = busy ? a.current : null;
     const ct = cur && cur.task ? tasks.find((t) => t.id === cur.task) : null;
     const cs = ct ? lvSteps(ct) : null;
-    const stepTxt = cs && cs.total && cs.cur >= 0 ? ' <small>Schritt ' + (cs.cur + 1) + ' von ' + cs.total + '</small>' : '';
+    const stepTxt = cs && cs.total && cs.cur >= 0 ? ' <small>' + tr('Step {n} of {total}', { n: cs.cur + 1, total: cs.total }) + '</small>' : '';
     let t1;
-    if (!cur) t1 = '<h3>Claude wartet</h3><div class="big">' + (a && a.idleSince ? 'seit ' + lvTime(a.idleSince) : 'Gerade nicht aktiv') + '</div><div class="sub">Keine laufende Anfrage</div>';
-    else if (cur.perm) t1 = '<h3><i class="lv-dot perm" aria-hidden="true"></i>Claude wartet auf deine Freigabe</h3><div class="big">' + esc(cur.task || 'Ohne Aufgabe') + stepTxt + '</div><div class="sub">' + lvWhat(cur) + ', seit ' + lvSince(cur.permSince || cur.at) + '</div>';
-    else if (cur.running) t1 = '<h3><i class="lv-dot" aria-hidden="true"></i>Claude arbeitet gerade</h3><div class="big">' + esc(cur.task || 'Ohne Aufgabe') + stepTxt + '</div><div class="sub">' + lvWhat(cur) + ', seit ' + lvSince(cur.at) + '</div>';
-    else { const last = (a.recent || [])[0]; t1 = '<h3><i class="lv-dot" aria-hidden="true"></i>Claude denkt nach</h3><div class="big">' + esc(cur.task || 'Ohne Aufgabe') + stepTxt + '</div><div class="sub">' + (last ? 'Zuletzt: ' + lvWhat(last) + ', vor ' + lvSince(last.at) : 'seit ' + lvSince(cur.at)) + '</div>'; }
+    if (!cur) t1 = '<h3>' + tr('Claude is waiting') + '</h3><div class="big">' + (a && a.idleSince ? tr('since {time}', { time: lvTime(a.idleSince) }) : tr('Not active right now')) + '</div><div class="sub">' + tr('No request running') + '</div>';
+    else if (cur.perm) t1 = '<h3><i class="lv-dot perm" aria-hidden="true"></i>' + tr('Claude is waiting for your approval') + '</h3><div class="big">' + esc(cur.task || tr('No task')) + stepTxt + '</div><div class="sub">' + lvWhat(cur) + ', ' + tr('for {time}', { time: lvSince(cur.permSince || cur.at) }) + '</div>';
+    else if (cur.running) t1 = '<h3><i class="lv-dot" aria-hidden="true"></i>' + tr('Claude is working right now') + '</h3><div class="big">' + esc(cur.task || tr('No task')) + stepTxt + '</div><div class="sub">' + lvWhat(cur) + ', ' + tr('for {time}', { time: lvSince(cur.at) }) + '</div>';
+    else { const last = (a.recent || [])[0]; t1 = '<h3><i class="lv-dot" aria-hidden="true"></i>' + tr('Claude is thinking') + '</h3><div class="big">' + esc(cur.task || tr('No task')) + stepTxt + '</div><div class="sub">' + (last ? tr('Last: {what}', { what: lvWhat(last) }) + ', ' + tr('{time} ago', { time: lvSince(last.at) }) : tr('for {time}', { time: lvSince(cur.at) })) + '</div>'; }
     const by = (p) => list.filter((t) => phaseOf(t) === p).length;
     const fertig = by('review') + by('erledigt');
     const seg = list.map((t) => '<i class="' + ({ erledigt: 'done', review: 'review', umsetzung: 'cur', pruefung: 'check' }[phaseOf(t)] || '') + '" title="' + esc(t.id) + '"></i>').join('');
     const u = meta.usage;
-    const useLine = u && u.today && u.today.tokens ? '<div class="lv-usage" title="Geschätzt nach den Preisen in config.json, aktualisiert nach jeder Antwort">Verbrauch heute <b>' + fmtTok(u.today.tokens) + '</b> Tokens, ca. <b>' + fmtMoney(u.today.cost, u.currency) + '</b></div>' : '';
-    const t2 = (list.length ? '<h3>Fortschritt heute</h3><div class="big">' + fertig + ' von ' + list.length + ' <small>fertig</small></div><div class="lv-seg" aria-hidden="true">' + seg + '</div><div class="sub">' + by('erledigt') + ' erledigt · ' + by('review') + ' im Review · ' + (by('umsetzung') + by('pruefung')) + ' in Arbeit · ' + by('queue') + ' warten</div>'
-      : '<h3>Fortschritt heute</h3><div class="big">Nichts geplant</div><div class="sub">Keine Aufgabe in Arbeit, im Review oder in der Warteschlange</div>') + useLine;
+    const useLine = u && u.today && u.today.tokens ? '<div class="lv-usage" title="' + tr('Estimated from the prices in config.json, updated after every reply') + '">' + tr('Usage today <b>{tokens}</b> tokens, approx. <b>{cost}</b>', { tokens: fmtTok(u.today.tokens), cost: fmtMoney(u.today.cost, u.currency) }) + '</div>' : '';
+    const t2 = (list.length ? '<h3>' + tr('Progress today') + '</h3><div class="big">' + tr('{done} of {total}', { done: fertig, total: list.length }) + ' <small>' + tr('finished') + '</small></div><div class="lv-seg" aria-hidden="true">' + seg + '</div><div class="sub">' + tr('{done} done · {review} in review · {work} in progress · {queue} waiting', { done: by('erledigt'), review: by('review'), work: by('umsetzung') + by('pruefung'), queue: by('queue') }) + '</div>'
+      : '<h3>' + tr('Progress today') + '</h3><div class="big">' + tr('Nothing planned') + '</div><div class="sub">' + tr('No task in progress, in review or in the queue') + '</div>') + useLine;
     const lanes = list.filter((t) => lvLanes().has(t.id) && t.status === 'in-arbeit');
-    const t3 = '<h3>Parallel</h3>' + (lanes.length ? '<div class="big">' + (lanes.length === 1 ? '1 Agent' : lanes.length + ' Agenten') + '</div>' + lanes.map((t) => '<div class="sub">' + esc(t.id) + ' · ' + esc(lvStatus(t).text) + '</div>').join('') : '<div class="big">Kein Agent aktiv</div><div class="sub">Alles läuft in der Hauptsitzung</div>');
+    const t3 = '<h3>Parallel</h3>' + (lanes.length ? '<div class="big">' + (lanes.length === 1 ? tr('1 agent') : tr('{n} agents', { n: lanes.length })) + '</div>' + lanes.map((t) => '<div class="sub">' + esc(t.id) + ' · ' + esc(lvStatus(t).text) + '</div>').join('') : '<div class="big">' + tr('No agent active') + '</div><div class="sub">' + tr('Everything runs in the main session') + '</div>');
     const att = lvAttention(list);
     // Höchstens vier Zeilen, damit die Kacheln niedrig bleiben.
     const attRest = att.length - 4;
-    const t4 = '<h3>Wartet auf dich</h3>' + (att.length ? '<div class="big">' + att.length + ' <small>' + (att.length === 1 ? 'Punkt' : 'Punkte') + '</small></div><ul class="lv-attn">' + att.slice(0, 4).map((x, i) => '<li><button type="button" data-lv-focus="' + esc(x.id) + '" data-lk="att' + i + '">' + lvSi(x.ic) + '<span class="t">' + esc(x.text) + '</span></button></li>').join('') + '</ul>' +
-      (attRest > 0 ? '<span class="sub">und ' + attRest + (attRest === 1 ? ' weiterer Punkt' : ' weitere Punkte') + '</span>' : '') : '<div class="big">Nichts</div><div class="sub">Claude braucht gerade nichts von dir</div>');
-    return '<button type="button" class="lv-tile lv-tile-btn' + (cur && cur.perm ? ' perm' : '') + '" data-lv-follow data-lk="follow" title="Ansicht folgt Claude">' + t1 + '</button><article class="lv-tile">' + t2 + '</article><article class="lv-tile">' + t3 + '</article><article class="lv-tile' + (att.length ? ' attn' : '') + '">' + t4 + '</article>';
+    const t4 = '<h3>' + tr('Waiting for you') + '</h3>' + (att.length ? '<div class="big">' + att.length + ' <small>' + (att.length === 1 ? tr('item') : tr('items')) + '</small></div><ul class="lv-attn">' + att.slice(0, 4).map((x, i) => '<li><button type="button" data-lv-focus="' + esc(x.id) + '" data-lk="att' + i + '">' + lvSi(x.ic) + '<span class="t">' + esc(x.text) + '</span></button></li>').join('') + '</ul>' +
+      (attRest > 0 ? '<span class="sub">' + (attRest === 1 ? tr('and 1 more item') : tr('and {n} more items', { n: attRest })) + '</span>' : '') : '<div class="big">' + tr('Nothing') + '</div><div class="sub">' + tr('Claude needs nothing from you right now') + '</div>');
+    return '<button type="button" class="lv-tile lv-tile-btn' + (cur && cur.perm ? ' perm' : '') + '" data-lv-follow data-lk="follow" title="' + tr('View follows Claude') + '">' + t1 + '</button><article class="lv-tile">' + t2 + '</article><article class="lv-tile">' + t3 + '</article><article class="lv-tile' + (att.length ? ' attn' : '') + '">' + t4 + '</article>';
   }
 
   function lvFocusHtml(t, list) {
-    if (!t) return '<p class="lv-empty">Heute gibt es keine Aufgabe in Arbeit, im Review oder in der Warteschlange. Mit works start oder über die Warteschlange geht es los.</p>';
+    if (!t) return '<p class="lv-empty">' + tr('There is no task in progress, in review or in the queue today. Get going with works start or via the queue.') + '</p>';
     const s = lvSteps(t);
     let h = '<div class="lv-ftop"><span class="r-id">' + esc(t.id) + '</span><span class="r-prio" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span><span>' + esc(meta.typeLabel[t.type] || t.type) + '</span>' +
-      (t.branch ? '<span class="mono">' + esc(t.branch) + '</span>' : '') + (lvLanes().has(t.id) ? '<span class="tag lv-agent">Agent im eigenen Worktree</span>' : '') +
-      (t.usage && t.usage.tokens ? '<span class="lv-cost" title="Verbrauch dieser Aufgabe bisher, geschätzt nach den Preisen in config.json">' + fmtTok(t.usage.tokens) + ' Tokens, ca. ' + fmtMoney(t.usage.cost, meta.usage && meta.usage.currency) + '</span>' : '') +
+      (t.branch ? '<span class="mono">' + esc(t.branch) + '</span>' : '') + (lvLanes().has(t.id) ? '<span class="tag lv-agent">' + tr('Agent in its own worktree') + '</span>' : '') +
+      (t.usage && t.usage.tokens ? '<span class="lv-cost" title="' + tr('Usage of this task so far, estimated from the prices in config.json') + '">' + tr('{tokens} tokens, approx. {cost}', { tokens: fmtTok(t.usage.tokens), cost: fmtMoney(t.usage.cost, meta.usage && meta.usage.currency) }) + '</span>' : '') +
       '<button type="button" class="btn link" data-lv-open="' + esc(t.id) + '">Details</button></div><h2 class="lv-title">' + esc(t.title) + '</h2>' + lvPhases(t);
-    if (phaseOf(t) === 'queue') return h + '<p class="lv-empty">Noch nicht gestartet. ' + esc(lvStatus(t).text) + '.</p>';
+    if (phaseOf(t) === 'queue') return h + '<p class="lv-empty">' + tr('Not started yet. {status}.', { status: esc(lvStatus(t).text) }) + '</p>';
     const feed = lvFeed(list, livePrefs.feedAll ? '' : t.id);
-    h += '<div class="lv-cols"><div class="lv-col"><div class="lv-head"><h3>Umsetzungsplan</h3>' + (s.total ? '<span class="meta">' + s.done + ' von ' + s.total + ' erledigt</span>' : '') + '</div>' + lvStepsHtml(t) +
-      '<p class="lv-crit">' + lvSi(t.crit[1] && t.crit[0] === t.crit[1] ? 'ok' : 'wait') + 'Akzeptanzkriterien: ' + t.crit[0] + ' von ' + t.crit[1] + ' abgehakt</p></div>' +
-      '<div class="lv-col">' + lvNowHtml(t) + '<div class="lv-head"><h3>Verlauf</h3><div class="lv-segbtn" role="group" aria-label="Verlauf filtern"><button type="button" data-lv-feed="0" data-lk="feed0" aria-pressed="' + !livePrefs.feedAll + '">Diese Aufgabe</button><button type="button" data-lv-feed="1" data-lk="feed1" aria-pressed="' + livePrefs.feedAll + '">Alle</button></div></div>' + lvFeedHtml(feed, livePrefs.feedAll) + '</div></div>';
+    h += '<div class="lv-cols"><div class="lv-col"><div class="lv-head"><h3>' + tr('Implementation plan') + '</h3>' + (s.total ? '<span class="meta">' + tr('{done} of {total} done', { done: s.done, total: s.total }) + '</span>' : '') + '</div>' + lvStepsHtml(t) +
+      '<p class="lv-crit">' + lvSi(t.crit[1] && t.crit[0] === t.crit[1] ? 'ok' : 'wait') + tr('Acceptance criteria: {done} of {total} checked', { done: t.crit[0], total: t.crit[1] }) + '</p></div>' +
+      '<div class="lv-col">' + lvNowHtml(t) + '<div class="lv-head"><h3>' + tr('History') + '</h3><div class="lv-segbtn" role="group" aria-label="' + tr('Filter history') + '"><button type="button" data-lv-feed="0" data-lk="feed0" aria-pressed="' + !livePrefs.feedAll + '">' + tr('This task') + '</button><button type="button" data-lv-feed="1" data-lk="feed1" aria-pressed="' + livePrefs.feedAll + '">' + tr('All') + '</button></div></div>' + lvFeedHtml(feed, livePrefs.feedAll) + '</div></div>';
     if (EDIT && (t.status === 'in-arbeit')) {
       const pend = (meta.instructions || []).filter((x) => x.task === t.id).length;
-      h += '<div class="lv-instr"><label class="sr" for="lvInstr">Anweisung an Claude</label><input class="input" id="lvInstr" data-instr-in="' + esc(t.id) + '" maxlength="4000" placeholder="Anweisung an Claude, zum Beispiel: Bitte auch Beiträge mit Umfragen sichern"><button type="button" class="btn small primary" data-instr-send="' + esc(t.id) + '">Senden</button>' +
-        (pend ? '<span class="meta">' + (pend === 1 ? '1 Anweisung wartet' : pend + ' Anweisungen warten') + '. Claude liest sie nach dem aktuellen Schritt.</span>' : '') + '</div>';
+      h += '<div class="lv-instr"><label class="sr" for="lvInstr">' + tr('Instruction for Claude') + '</label><input class="input" id="lvInstr" data-instr-in="' + esc(t.id) + '" maxlength="4000" placeholder="' + tr('Instruction for Claude, for example: Please also back up posts with polls') + '"><button type="button" class="btn small primary" data-instr-send="' + esc(t.id) + '">' + tr('Send') + '</button>' +
+        (pend ? '<span class="meta">' + (pend === 1 ? tr('1 instruction waiting. Claude reads it after the current step.') : tr('{n} instructions waiting. Claude reads them after the current step.', { n: pend })) + '</span>' : '') + '</div>';
     }
     return h;
   }
@@ -3013,10 +3028,10 @@
       for (const t of list) {
         const o = liveSnap[t.id], n = snap[t.id];
         if (!o) continue;
-        if (n.done > o.done) { const st = t.plan[n.done - 1]; msgs.push(t.id + ': Schritt ' + n.done + ' von ' + t.plan.length + ' erledigt' + (st ? ', ' + st.text : '') + '.'); }
-        if (n.fin > o.fin) { const c = lvChecks(t); msgs.push(t.id + ': Prüfungen ' + c.finished + ' von ' + c.total + ' fertig' + (c.warn || c.fail ? ', ' + lvFinds(c) : '') + '.'); }
-        if (n.status === 'review' && o.status !== 'review') msgs.push(t.id + ' wartet auf deine Abnahme.');
-        if (n.perm && !o.perm) msgs.push(t.id + ': Claude wartet auf deine Freigabe.');
+        if (n.done > o.done) { const st = t.plan[n.done - 1]; msgs.push(tr('{id}: step {n} of {total} done', { id: t.id, n: n.done, total: t.plan.length }) + (st ? ', ' + st.text : '') + '.'); }
+        if (n.fin > o.fin) { const c = lvChecks(t); msgs.push(tr('{id}: checks {done} of {total} finished', { id: t.id, done: c.finished, total: c.total }) + (c.warn || c.fail ? ', ' + lvFinds(c) : '') + '.'); }
+        if (n.status === 'review' && o.status !== 'review') msgs.push(tr('{id} is waiting for your acceptance review.', { id: t.id }));
+        if (n.perm && !o.perm) msgs.push(tr('{id}: Claude is waiting for your approval.', { id: t.id }));
       }
     }
     if (msgs.length) { const say = $('#liveSay'); say.textContent = ''; setTimeout(() => { say.textContent = msgs.join(' '); }, 50); }
@@ -3051,13 +3066,13 @@
     const lvMini = (t) => '<li><button type="button" data-lv-focus="' + esc(t.id) + '" aria-current="' + (t.id === focusId) + '" title="' + esc(t.id + ' ' + t.title) + '">' + lvSi('ok') +
       '<span class="r-id">' + esc(t.id) + '</span><span class="t">' + esc(t.title) + '</span></button></li>';
     const runList = (rest.length ? '<ul class="lv-run">' + rest.map(lvRow).join('') + '</ul>' : '') +
-      (done.length ? '<details class="lv-fold"' + (foldOpen || done.some((t) => t.id === focusId) ? ' open' : '') + '><summary>' + lvSi('ok') + '<span><b>' + done.length + '</b> heute erledigt</span>' +
+      (done.length ? '<details class="lv-fold"' + (foldOpen || done.some((t) => t.id === focusId) ? ' open' : '') + '><summary>' + lvSi('ok') + '<span><b>' + done.length + '</b> ' + tr('done today') + '</span>' +
         '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary><ul class="lv-mini">' + done.map(lvMini).join('') + '</ul></details>' : '');
-    box.innerHTML = '<section class="lv-sum" aria-label="Überblick">' + lvTilesHtml(list) + '</section>' +
-      '<div class="lv-grid"><section class="lv-panel lv-runbox" aria-label="Aufgaben heute"><div class="lv-head"><h2>Heute</h2><span class="meta">' + list.length + (list.length === 1 ? ' Aufgabe' : ' Aufgaben') + '</span></div>' +
-      (list.length ? runList : '<p class="lv-empty">Keine Aufgaben für heute.</p>') + '</section>' +
-      '<section class="lv-panel lv-focus" aria-label="Gewählte Aufgabe">' + lvFocusHtml(ft, list) + '</section>' +
-      '<section class="lv-panel lv-checks" aria-label="Prüfungen">' + lvChecksHtml(list, focusId) + '</section></div>';
+    box.innerHTML = '<section class="lv-sum" aria-label="' + tr('Overview') + '">' + lvTilesHtml(list) + '</section>' +
+      '<div class="lv-grid"><section class="lv-panel lv-runbox" aria-label="' + tr('Tasks today') + '"><div class="lv-head"><h2>' + tr('Today') + '</h2><span class="meta">' + (list.length === 1 ? tr('1 task') : tr('{n} tasks', { n: list.length })) + '</span></div>' +
+      (list.length ? runList : '<p class="lv-empty">' + tr('No tasks for today.') + '</p>') + '</section>' +
+      '<section class="lv-panel lv-focus" aria-label="' + tr('Selected task') + '">' + lvFocusHtml(ft, list) + '</section>' +
+      '<section class="lv-panel lv-checks" aria-label="' + tr('Checks') + '">' + lvChecksHtml(list, focusId) + '</section></div>';
     $$('details.lv-ckg', box).forEach((d) => { const b = $('summary b', d); if (b && openGroups.includes(b.textContent)) d.open = true; });
     $$('details[data-out]', box).forEach((d) => { if (openOut.includes(d.dataset.out)) d.open = true; });
     const ni = $('#lvInstr', box);
@@ -3094,7 +3109,7 @@
     if (fa) {
       const id = fa.dataset.lvFixall;
       const msg = (fa.closest('.lv-errgrp').querySelector('.lv-msg') || {}).textContent || '';
-      const r = await run(() => act('comment', { id, text: 'Bitte die fehlgeschlagenen Prüfungen beheben und danach erneut prüfen (works checks run ' + id + '):\n\nPrüfungen: ' + fa.dataset.names + '\nMeldung: ' + msg }), 'Auftrag an Claude als Kommentar gespeichert');
+      const r = await run(() => act('comment', { id, text: tr('Please fix the failed checks and then run them again (works checks run {id}):\n\nChecks: {names}\nMessage: {msg}', { id, names: fa.dataset.names, msg }) }), tr('Request to Claude saved as a comment'));
       if (r) fa.disabled = true;
       return;
     }
@@ -3102,12 +3117,14 @@
     if (fx) {
       const id = fx.dataset.lvTask;
       const note = (fx.closest('.ck, .lv-errgrp').querySelector('.ck-note') || {}).innerText || '';
-      const r = await run(() => act('comment', { id, text: 'Bitte den Fund aus der Prüfung ' + fx.dataset.lvFix + ' beheben und die Prüfung danach neu eintragen:\n\n' + note.replace(/Claude beheben lassen|Als bekannt markieren/g, '').trim() }), 'Auftrag an Claude als Kommentar gespeichert');
+      // Knopftexte aus dem innerText entfernen, in der Sprache der Seite.
+      const clean = [tr('Let Claude fix it'), tr('Mark as known')].reduce((s, b) => s.split(b).join(''), note).trim();
+      const r = await run(() => act('comment', { id, text: tr('Please fix the finding from the check {name} and then record the check again:\n\n{note}', { name: fx.dataset.lvFix, note: clean }) }), tr('Request to Claude saved as a comment'));
       if (r) fx.disabled = true;
       return;
     }
     const ak = e.target.closest('[data-lv-ack]');
-    if (ak) run(() => act('checksAck', { id: ak.dataset.lvTask, name: ak.dataset.lvAck }), 'Als bekannt markiert');
+    if (ak) run(() => act('checksAck', { id: ak.dataset.lvTask, name: ak.dataset.lvAck }), tr('Marked as known'));
   });
 
   // ---------- Entwürfe ----------
@@ -3115,26 +3132,26 @@
   function designHtml(d) {
     const g = d.design;
     if (!g) {
-      return '<div class="q-empty"><strong>Noch keine Entwürfe.</strong><span>Bei Gestaltungsaufgaben nutzt Claude UI UX Pro Max und das Superpowers Brainstorming, wenn sie installiert sind, und hängt Designrichtung, Varianten und Ergebnisse hier an. Du wählst dann eine Variante, bevor Claude umsetzt.</span></div>';
+      return '<div class="q-empty"><strong>' + tr('No design variants so far.') + '</strong><span>' + tr('For design tasks Claude uses UI UX Pro Max and Superpowers brainstorming, if they are installed, and attaches the design direction, variants and results here. You then pick a variant before Claude implements it.') + '</span></div>';
     }
     const badge = (src) => (src ? '<span class="src-badge ' + (/brain|superpower/i.test(src) ? 'bs' : 'ux') + '">' + esc(/brain|superpower/i.test(src) ? 'Superpowers' : /ui-?ux/i.test(src) ? 'UI UX Pro Max' : src) + '</span>' : '');
     const h = [];
     if (g.direction) {
       const dir = g.direction;
-      h.push('<div class="block"><div class="block-head"><h3>Designrichtung</h3>' + badge(dir.source) + '<span class="meta">' + esc(dir.at || '') + '</span></div>' +
-        '<div class="dz-dir">' + (dir.colors.length ? '<div class="dz-card"><small>Farben</small><div class="sw">' + dir.colors.map((c) => '<span title="' + esc((c.name ? c.name + ' ' : '') + c.hex) + '"><i style="background:' + esc(c.hex) + '"></i>' + esc(c.name || c.hex) + '</span>').join('') + '</div></div>' : '') +
-        (dir.fonts.length ? '<div class="dz-card"><small>Schrift</small><strong>' + esc(dir.fonts[0]) + '</strong>' + (dir.fonts[1] ? '<span class="muted">' + esc(dir.fonts.slice(1).join(', ')) + ' für Fließtext</span>' : '') + '</div>' : '') + '</div>' +
-        (dir.text ? '<details class="sec"' + (dir.colors.length ? '' : ' open') + '><summary>Stil und Regeln</summary><div class="body"><div class="md">' + md(dir.text) + '</div></div></details>' : '') + '</div>');
+      h.push('<div class="block"><div class="block-head"><h3>' + tr('Design direction') + '</h3>' + badge(dir.source) + '<span class="meta">' + esc(dir.at || '') + '</span></div>' +
+        '<div class="dz-dir">' + (dir.colors.length ? '<div class="dz-card"><small>' + tr('Colors') + '</small><div class="sw">' + dir.colors.map((c) => '<span title="' + esc((c.name ? c.name + ' ' : '') + c.hex) + '"><i style="background:' + esc(c.hex) + '"></i>' + esc(c.name || c.hex) + '</span>').join('') + '</div></div>' : '') +
+        (dir.fonts.length ? '<div class="dz-card"><small>' + tr('Font') + '</small><strong>' + esc(dir.fonts[0]) + '</strong>' + (dir.fonts[1] ? '<span class="muted">' + tr('{fonts} for body text', { fonts: esc(dir.fonts.slice(1).join(', ')) }) + '</span>' : '') + '</div>' : '') + '</div>' +
+        (dir.text ? '<details class="sec"' + (dir.colors.length ? '' : ' open') + '><summary>' + tr('Style and rules') + '</summary><div class="body"><div class="md">' + md(dir.text) + '</div></div></details>' : '') + '</div>');
     }
     if (g.variants.length) {
-      h.push('<div class="block"><div class="block-head"><h3>Varianten</h3><span class="meta">' + g.variants.length + (g.chosen ? ', gewählt: ' + esc(g.chosen.name) : ', noch keine gewählt') + '</span></div><div class="dz-grid">' +
+      h.push('<div class="block"><div class="block-head"><h3>' + tr('Variants') + '</h3><span class="meta">' + g.variants.length + (g.chosen ? tr(', chosen: {name}', { name: esc(g.chosen.name) }) : tr(', none chosen yet')) + '</span></div><div class="dz-grid">' +
         g.variants.map((v) => {
           const chosen = g.chosen && g.chosen.name === v.name;
-          const prev = v.kind === 'html' ? (LIVE ? '<div class="dz-frame dz-wrap"><iframe src="' + esc(v.src) + '" sandbox="allow-scripts" loading="lazy" tabindex="-1" title="Mockup ' + esc(v.name) + '"></iframe></div>' : '<div class="dz-frame dz-none">HTML-Mockup, nur im Live-Board</div>') : v.kind === 'image' ? '<img class="dz-frame" src="' + esc(v.src) + '" alt="Mockup ' + esc(v.name + ' ' + v.title) + '" loading="lazy">' : '<div class="dz-frame dz-none">' + esc(v.file) + '</div>';
+          const prev = v.kind === 'html' ? (LIVE ? '<div class="dz-frame dz-wrap"><iframe src="' + esc(v.src) + '" sandbox="allow-scripts" loading="lazy" tabindex="-1" title="Mockup ' + esc(v.name) + '"></iframe></div>' : '<div class="dz-frame dz-none">' + tr('HTML mockup, only in the live board') + '</div>') : v.kind === 'image' ? '<img class="dz-frame" src="' + esc(v.src) + '" alt="Mockup ' + esc(v.name + ' ' + v.title) + '" loading="lazy">' : '<div class="dz-frame dz-none">' + esc(v.file) + '</div>';
           return '<figure class="dz-var' + (chosen ? ' chosen' : '') + '">' + prev + '<figcaption><strong>' + esc(v.name + ' ' + v.title) + '</strong>' + (v.note ? '<span class="muted">' + esc(v.note) + '</span>' : '') + '</figcaption><div class="row-btns">' +
-            (v.src && LIVE ? '<a class="btn small ghost" href="' + esc(v.src) + '" target="_blank" rel="noopener">Groß ansehen</a>' : '') +
-            (chosen ? '<span class="tag q-tag">Gewählt ' + esc((g.chosen.at || '').slice(0, 10)) + '</span>' : EDIT ? '<button class="btn small" data-dzpick="' + esc(v.name) + '">Diese nehmen</button>' : '') + '</div></figure>';
-        }).join('') + '</div>' + (g.chosen && g.chosen.reason ? '<p class="sublabel">Grund: ' + esc(g.chosen.reason) + '</p>' : '') + '</div>');
+            (v.src && LIVE ? '<a class="btn small ghost" href="' + esc(v.src) + '" target="_blank" rel="noopener">' + tr('View large') + '</a>' : '') +
+            (chosen ? '<span class="tag q-tag">' + tr('Chosen {date}', { date: esc((g.chosen.at || '').slice(0, 10)) }) + '</span>' : EDIT ? '<button class="btn small" data-dzpick="' + esc(v.name) + '">' + tr('Take this one') + '</button>' : '') + '</div></figure>';
+        }).join('') + '</div>' + (g.chosen && g.chosen.reason ? '<p class="sublabel">' + tr('Reason: {text}', { text: esc(g.chosen.reason) }) + '</p>' : '') + '</div>');
     }
     for (const b of g.brainstorm) {
       h.push('<div class="block"><div class="block-head"><h3>' + esc(b.title || 'Brainstorming') + '</h3>' + badge(b.source) + '<span class="meta">' + esc(b.at || '') + '</span></div><div class="md dz-bs">' + md(String(b.text || '').replace(/^#\s+[^\n]*\n+/, '')) + '</div></div>');
@@ -3145,7 +3162,7 @@
   function bindDesign(id) {
     scaleFrames();
     $$('[data-dzpick]').forEach((b) => b.onclick = async () => {
-      const reason = await askText({ title: 'Variante ' + b.dataset.dzpick + ' nehmen', lead: 'Claude setzt danach diese Variante um. Die Wahl landet in decisions.md.', label: 'Grund, optional', confirm: 'Diese nehmen' });
+      const reason = await askText({ title: tr('Take variant {name}', { name: b.dataset.dzpick }), lead: tr('Claude then implements this variant. The choice is recorded in decisions.md.'), label: tr('Reason, optional'), confirm: tr('Take this one') });
       if (reason === null) return;
       run(() => act('designChoose', { id, name: b.dataset.dzpick, reason }), (x) => x.message);
     });
@@ -3163,53 +3180,53 @@
   async function openReview(id) {
     let d;
     try { d = detail && detail.task.id === id ? detail : await api('GET', 'api/task?id=' + encodeURIComponent(id)); } catch (e) { return fail(e); }
-    const crit = (d.checklists.find((c) => c.name === 'Akzeptanzkriterien') || { items: [] }).items;
+    const crit = (d.checklists.find((c) => c.name === 'Akzeptanzkriterien' || c.name === 'Acceptance criteria') || { items: [] }).items;
     const imgs = d.assets.filter((a) => a.image);
     const byKind = (k) => imgs.filter((a) => a.kind === k).pop();
     const after = byKind('nachher') || byKind('ist') || imgs[imgs.length - 1];
     const before = byKind('vorher');
     const chosen = d.design && d.design.chosen ? d.design.variants.find((v) => v.name === d.design.chosen.name) : null;
     const modes = [];
-    if (chosen) modes.push({ id: 'mock', label: 'Entwurf ' + chosen.name + ' gegen Ergebnis', left: { label: 'Entwurf ' + chosen.name + ' aus UI UX Pro Max', v: chosen }, right: after });
-    if (before && after) modes.push({ id: 'ba', label: 'Vorher gegen Nachher', left: { label: 'Vorher', a: before }, right: after });
-    if (!modes.length && after) modes.push({ id: 'one', label: 'Ergebnis', left: null, right: after });
-    const pane = (x) => (!x ? '' : x.v ? '<figure class="rv-fig"><figcaption>' + esc(x.label) + '</figcaption>' + (x.v.kind === 'html' ? '<div class="rv-img dz-wrap"><iframe src="' + esc(x.v.src) + '" sandbox="allow-scripts" tabindex="-1" title="Entwurf"></iframe></div>' : '<img class="rv-img" src="' + esc(x.v.src) + '" alt="Entwurf">') + '</figure>'
+    if (chosen) modes.push({ id: 'mock', label: tr('Design {name} vs. result', { name: chosen.name }), left: { label: tr('Design {name} from UI UX Pro Max', { name: chosen.name }), v: chosen }, right: after });
+    if (before && after) modes.push({ id: 'ba', label: tr('Before vs. after'), left: { label: tr('Before'), a: before }, right: after });
+    if (!modes.length && after) modes.push({ id: 'one', label: tr('Result'), left: null, right: after });
+    const pane = (x) => (!x ? '' : x.v ? '<figure class="rv-fig"><figcaption>' + esc(x.label) + '</figcaption>' + (x.v.kind === 'html' ? '<div class="rv-img dz-wrap"><iframe src="' + esc(x.v.src) + '" sandbox="allow-scripts" tabindex="-1" title="' + tr('Design') + '"></iframe></div>' : '<img class="rv-img" src="' + esc(x.v.src) + '" alt="' + tr('Design') + '">') + '</figure>'
       : '<figure class="rv-fig"><figcaption>' + esc(x.label) + '</figcaption><img class="rv-img" src="' + esc(x.a.src) + '" alt="' + esc(x.a.desc || x.a.alt) + '"></figure>');
-    const compare = (m) => '<div class="rv-cmp">' + (m.left ? pane(m.left) : '') + (m.right ? pane({ label: 'Ergebnis' + (m.right.desc ? ': ' + m.right.desc : ''), a: m.right }) : '<div class="q-empty">Noch kein Screenshot vom Ergebnis. Claude legt ihn mit works asset --kind nachher ab.</div>') + '</div>';
+    const compare = (m) => '<div class="rv-cmp">' + (m.left ? pane(m.left) : '') + (m.right ? pane({ label: tr('Result') + (m.right.desc ? ': ' + m.right.desc : ''), a: m.right }) : '<div class="q-empty">' + tr('No screenshot of the result yet. Claude adds it with works asset --kind nachher.') + '</div>') + '</div>';
     // Gleicher Maßstab (W-0030): Breite und Schema wählen, der Entwurf rendert genau so (?theme=, ?frame=0 wie in der
     // mockups-Vorlage), daneben das Nachher-Bild mit derselben Breite und demselben Schema im Namen (works shot: -dark-390).
-    const SIZES = [['Desktop', 1440], ['Tablet', 768], ['Handy', 390]];
+    const SIZES = [['Desktop', 1440], ['Tablet', 768], [tr('Phone'), 390]];
     const shotOf = (a) => { const m = String(a.src).match(/(light|dark)-(\d{3,4})(?!\d)/); return m ? { theme: m[1], width: +m[2] } : null; };
     const afters = imgs.filter((a) => a.kind === 'nachher' && shotOf(a));
     const scaled = !!(chosen && afters.length);
     const start = scaled ? shotOf(afters.find((a) => shotOf(a).theme === 'light' && shotOf(a).width === 1440) || afters[0]) : null;
     let size = start ? (SIZES.some((s) => s[1] === start.width) ? start.width : 1440) : 1440;
     let theme = start ? start.theme : 'light';
-    const sizeLabel = () => SIZES.find((s) => s[1] === size)[0] + ', ' + (theme === 'dark' ? 'dunkel' : 'hell');
+    const sizeLabel = () => SIZES.find((s) => s[1] === size)[0] + ', ' + (theme === 'dark' ? tr('dark') : tr('light'));
     const mockCompare = () => {
       const match = afters.find((a) => { const s = shotOf(a); return s.width === size && s.theme === theme; });
       const left = chosen.kind === 'html'
-        ? '<figure class="rv-fig"><figcaption>Entwurf ' + esc(chosen.name) + ' · ' + esc(sizeLabel()) + '</figcaption><div class="rv-img dz-wrap rv-w' + size + '" data-fw="' + size + '"><iframe src="' + esc(chosen.src + (chosen.src.includes('?') ? '&' : '?') + 'theme=' + theme + '&frame=0') + '" sandbox="allow-scripts" tabindex="-1" title="Entwurf"></iframe></div></figure>'
-        : pane({ label: 'Entwurf ' + chosen.name, v: chosen });
-      const right = '<figure class="rv-fig"><figcaption>Ergebnis · ' + esc(sizeLabel()) + '</figcaption>' + (match
+        ? '<figure class="rv-fig"><figcaption>' + tr('Design {name}', { name: esc(chosen.name) }) + ' · ' + esc(sizeLabel()) + '</figcaption><div class="rv-img dz-wrap rv-w' + size + '" data-fw="' + size + '"><iframe src="' + esc(chosen.src + (chosen.src.includes('?') ? '&' : '?') + 'theme=' + theme + '&frame=0') + '" sandbox="allow-scripts" tabindex="-1" title="' + tr('Design') + '"></iframe></div></figure>'
+        : pane({ label: tr('Design {name}', { name: chosen.name }), v: chosen });
+      const right = '<figure class="rv-fig"><figcaption>' + tr('Result') + ' · ' + esc(sizeLabel()) + '</figcaption>' + (match
         ? '<img class="rv-img rv-w' + size + '" src="' + esc(match.src) + '" alt="' + esc(match.desc || match.alt) + '">'
-        : '<div class="rv-miss"><b>Kein Nachher-Bild für ' + esc(sizeLabel()) + '</b><span>Claude legt es an, etwa mit</span><code>works shot --url=&lt;Adresse&gt; --widths=' + size + ' --themes=' + theme + ' --asset=' + esc(id) + ' --kind=nachher</code></div>') + '</figure>';
+        : '<div class="rv-miss"><b>' + tr('No after image for {size}', { size: esc(sizeLabel()) }) + '</b><span>' + tr('Claude creates it, for example with') + '</span><code>works shot --url=&lt;' + tr('address') + '&gt; --widths=' + size + ' --themes=' + theme + ' --asset=' + esc(id) + ' --kind=nachher</code></div>') + '</figure>';
       return '<div class="rv-cmp">' + left + right + '</div>';
     };
     const render = (m) => (m.id === 'mock' && scaled ? mockCompare() : compare(m));
-    const scaleCtl = scaled ? '<div class="rv-scale" id="rvScale"><span class="rv-grp" role="group" aria-label="Breite"><span>Breite</span>' + SIZES.map((s) => '<button type="button" class="sv-chip" data-rvw="' + s[1] + '" aria-pressed="' + (s[1] === size) + '">' + s[0] + '</button>').join('') + '</span>' +
-      '<span class="rv-grp" role="group" aria-label="Farbschema"><span>Schema</span><button type="button" class="sv-chip" data-rvt="light" aria-pressed="' + (theme === 'light') + '">Hell</button><button type="button" class="sv-chip" data-rvt="dark" aria-pressed="' + (theme === 'dark') + '">Dunkel</button></span></div>' : '';
-    const html = '<h2>' + esc(id) + ' abnehmen</h2><p class="lead">' + esc(d.task.title) + '</p>' +
+    const scaleCtl = scaled ? '<div class="rv-scale" id="rvScale"><span class="rv-grp" role="group" aria-label="' + tr('Width') + '"><span>' + tr('Width') + '</span>' + SIZES.map((s) => '<button type="button" class="sv-chip" data-rvw="' + s[1] + '" aria-pressed="' + (s[1] === size) + '">' + s[0] + '</button>').join('') + '</span>' +
+      '<span class="rv-grp" role="group" aria-label="' + tr('Color scheme') + '"><span>' + tr('Scheme') + '</span><button type="button" class="sv-chip" data-rvt="light" aria-pressed="' + (theme === 'light') + '">' + tr('Light') + '</button><button type="button" class="sv-chip" data-rvt="dark" aria-pressed="' + (theme === 'dark') + '">' + tr('Dark') + '</button></span></div>' : '';
+    const html = '<h2>' + tr('Review {id}', { id: esc(id) }) + '</h2><p class="lead">' + esc(d.task.title) + '</p>' +
       (modes.length > 1 ? '<div class="row-btns" id="rvModes">' + modes.map((m, i) => '<button type="button" class="sv-chip" data-rvm="' + i + '" aria-pressed="' + (i === 0) + '">' + esc(m.label) + '</button>').join('') + '</div>' : '') +
       scaleCtl +
-      '<div id="rvCmp">' + (modes.length ? render(modes[0]) : '<div class="q-empty">Keine Bilder. Prüfe das Ergebnis direkt in der Anwendung.</div>') + '</div>' +
-      '<div class="rv-bottom"><div class="field"><span>Gegenprüfen</span><ul class="dod">' + (crit.length ? crit.map((c) => '<li><label><input type="checkbox" class="rvc" data-n="' + c.n + '"' + (c.done ? ' checked' : '') + '><span>' + esc(c.text) + (c.done ? ' <span class="sublabel">Claude: erfüllt</span>' : '') + '</span></label></li>').join('') : '<li>Keine Kriterien.</li>') + '</ul></div>' +
-      '<label class="field"><span>Was fehlt oder stört? Pflicht beim Zurückgeben</span><textarea class="input" name="text" rows="4" placeholder="Beschreibe, was nicht passt. Claude bekommt den Text als Kommentar."></textarea></label></div>' +
-      '<p class="err" role="alert"></p><div class="foot"><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn warn" value="reject">Zurück an Claude</button><button class="btn ok" value="accept">Annehmen und abschließen</button></div>';
+      '<div id="rvCmp">' + (modes.length ? render(modes[0]) : '<div class="q-empty">' + tr('No images. Check the result directly in the application.') + '</div>') + '</div>' +
+      '<div class="rv-bottom"><div class="field"><span>' + tr('Double-check') + '</span><ul class="dod">' + (crit.length ? crit.map((c) => '<li><label><input type="checkbox" class="rvc" data-n="' + c.n + '"' + (c.done ? ' checked' : '') + '><span>' + esc(c.text) + (c.done ? ' <span class="sublabel">' + tr('Claude: met') + '</span>' : '') + '</span></label></li>').join('') : '<li>' + tr('No criteria.') + '</li>') + '</ul></div>' +
+      '<label class="field"><span>' + tr('What is missing or bothers you? Required when returning') + '</span><textarea class="input" name="text" rows="4" placeholder="' + tr('Describe what is not right. Claude gets the text as a comment.') + '"></textarea></label></div>' +
+      '<p class="err" role="alert"></p><div class="foot"><button class="btn" value="cancel" formnovalidate>' + tr('Cancel') + '</button><button class="btn warn" value="reject">' + tr('Back to Claude') + '</button><button class="btn ok" value="accept">' + tr('Accept and complete') + '</button></div>';
     const r = await showDialog(html, async (fd, sub) => {
       if (sub === 'accept') return 'accept';
       const text = String(fd.get('text') || '').trim();
-      if (!text) throw new Error('Bitte kurz beschreiben, was fehlt.');
+      if (!text) throw new Error(tr('Please briefly describe what is missing.'));
       const uncheck = $$('.rvc', form).filter((c) => !c.checked && crit.find((x) => x.n === +c.dataset.n && x.done)).map((c) => +c.dataset.n);
       return act('review', { id, text, uncheck });
     }, (f) => {
@@ -3233,21 +3250,21 @@
     const props = list.filter((e) => e.status === 'vorschlag');
     const shown = list.filter((e) => e.status !== 'vorschlag' && (!q || (e.title + ' ' + e.text + ' ' + e.area).toLowerCase().includes(q)));
     const areas = [...new Set(shown.map((e) => e.area))];
-    const entry = (e) => '<article class="kn"><div class="kn-h"><strong>' + esc(e.title) + '</strong>' + (e.status === 'veraltet' ? '<span class="tag">veraltet?</span>' : '') + '</div><div class="md">' + md(e.text) + '</div><div class="kn-meta">' + esc([e.by ? 'von ' + (e.by === 'Nutzer' ? 'dir' : e.by) : '', e.source ? 'aus ' + e.source : '', e.date ? fmtDate(e.date) : ''].filter(Boolean).join(', ')) +
-      (EDIT ? '<span class="spacer"></span><button class="btn link" data-knedit="' + esc(e.id) + '">Bearbeiten</button>' + (e.status !== 'veraltet' ? '<button class="btn link" data-knflag="' + esc(e.id) + '">veraltet</button>' : '<button class="btn link" data-knok="' + esc(e.id) + '">aktuell</button>') + '<button class="btn link danger" data-knrm="' + esc(e.id) + '">Löschen</button>' : '') + '</div></article>';
-    body.innerHTML = head('Projektwissen') +
-      '<p class="md">Was Claude in diesem Projekt wissen muss. Claude liest die passenden Einträge vor der Arbeit und schlägt neue vor, wenn es etwas Wichtiges herausfindet. Liegt in .works/wissen.md.</p>' +
-      (props.length ? '<div class="block"><div class="block-head"><h3>Vorschläge von Claude</h3><span class="meta">' + props.length + '</span></div>' + props.map((e) => '<article class="kn prop"><div class="kn-h"><strong>' + esc(e.title) + '</strong><span class="muted">' + esc(e.area) + '</span></div><div class="md">' + md(e.text) + '</div><div class="kn-meta">' + esc([e.source ? 'gelernt in ' + e.source : '', e.date ? fmtDate(e.date) : ''].filter(Boolean).join(', ')) + (EDIT ? '<span class="spacer"></span><button class="btn small primary" data-knacc="' + esc(e.id) + '">Übernehmen</button><button class="btn small" data-knedit="' + esc(e.id) + '">Bearbeiten</button><button class="btn small ghost" data-knrm="' + esc(e.id) + '">Ablehnen</button>' : '') + '</div></article>').join('') + '</div>' : '') +
-      '<div class="add-row"><input class="input" id="knQ" placeholder="Im Wissen suchen" value="' + esc(q) + '">' + (EDIT ? '<button class="btn small primary" id="knAdd">Eintrag hinzufügen</button>' : '') + '</div>' +
-      (areas.length ? areas.map((a) => '<details class="sec" open><summary>' + esc(a) + ' <span class="meta">' + shown.filter((e) => e.area === a).length + '</span></summary><div class="body">' + shown.filter((e) => e.area === a).map(entry).join('') + '</div></details>').join('') : '<p class="md empty-md">' + (q ? 'Nichts gefunden.' : 'Noch kein Projektwissen.') + '</p>');
+    const entry = (e) => '<article class="kn"><div class="kn-h"><strong>' + esc(e.title) + '</strong>' + (e.status === 'veraltet' ? '<span class="tag">' + tr('outdated?') + '</span>' : '') + '</div><div class="md">' + md(e.text) + '</div><div class="kn-meta">' + esc([e.by ? (e.by === 'Nutzer' ? tr('by you') : tr('by {who}', { who: e.by })) : '', e.source ? tr('from {source}', { source: e.source }) : '', e.date ? fmtDate(e.date) : ''].filter(Boolean).join(', ')) +
+      (EDIT ? '<span class="spacer"></span><button class="btn link" data-knedit="' + esc(e.id) + '">' + tr('Edit') + '</button>' + (e.status !== 'veraltet' ? '<button class="btn link" data-knflag="' + esc(e.id) + '">' + tr('outdated') + '</button>' : '<button class="btn link" data-knok="' + esc(e.id) + '">' + tr('current') + '</button>') + '<button class="btn link danger" data-knrm="' + esc(e.id) + '">' + tr('Delete') + '</button>' : '') + '</div></article>';
+    body.innerHTML = head(tr('Project knowledge')) +
+      '<p class="md">' + tr('What Claude needs to know in this project. Claude reads the matching entries before working and suggests new ones when it finds out something important. Stored in .works/wissen.md.') + '</p>' +
+      (props.length ? '<div class="block"><div class="block-head"><h3>' + tr('Suggestions from Claude') + '</h3><span class="meta">' + props.length + '</span></div>' + props.map((e) => '<article class="kn prop"><div class="kn-h"><strong>' + esc(e.title) + '</strong><span class="muted">' + esc(e.area) + '</span></div><div class="md">' + md(e.text) + '</div><div class="kn-meta">' + esc([e.source ? tr('learned in {source}', { source: e.source }) : '', e.date ? fmtDate(e.date) : ''].filter(Boolean).join(', ')) + (EDIT ? '<span class="spacer"></span><button class="btn small primary" data-knacc="' + esc(e.id) + '">' + tr('Accept suggestion') + '</button><button class="btn small" data-knedit="' + esc(e.id) + '">' + tr('Edit') + '</button><button class="btn small ghost" data-knrm="' + esc(e.id) + '">' + tr('Reject') + '</button>' : '') + '</div></article>').join('') + '</div>' : '') +
+      '<div class="add-row"><input class="input" id="knQ" placeholder="' + tr('Search knowledge') + '" value="' + esc(q) + '">' + (EDIT ? '<button class="btn small primary" id="knAdd">' + tr('Add entry') + '</button>' : '') + '</div>' +
+      (areas.length ? areas.map((a) => '<details class="sec" open><summary>' + esc(a) + ' <span class="meta">' + shown.filter((e) => e.area === a).length + '</span></summary><div class="body">' + shown.filter((e) => e.area === a).map(entry).join('') + '</div></details>').join('') : '<p class="md empty-md">' + (q ? tr('Nothing found.') : tr('No project knowledge yet.')) + '</p>');
     $$('[data-sclose]', body).forEach((b) => b.onclick = closeSide);
     const qi = $('#knQ', body);
     qi.oninput = () => { store.set('works-know-q', qi.value); clearTimeout(qi._t); qi._t = setTimeout(() => { renderKnowledge(body, head).then(() => { const n = $('#knQ', body); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }); }, 250); };
     if (!EDIT) return;
     const areasAll = [...new Set(list.map((e) => e.area))];
     const edit = async (e) => {
-      const r = await showDialog('<h2>' + (e ? 'Eintrag bearbeiten' : 'Eintrag hinzufügen') + '</h2><div class="grid"><label class="field span2"><span>Bereich</span><input class="input" name="area" list="knAreas" maxlength="60" value="' + esc(e ? e.area : '') + '" placeholder="Zum Beispiel Discord und Bot"><datalist id="knAreas">' + areasAll.map((a) => '<option value="' + esc(a) + '">').join('') + '</datalist></label><label class="field span2"><span>Titel</span><input class="input" name="title" required maxlength="140" value="' + esc(e ? e.title : '') + '" autofocus></label></div><label class="field"><span>Text, Markdown möglich</span><textarea class="input" name="text" rows="6">' + esc(e ? e.text : '') + '</textarea></label>' + foot('Speichern'),
-        (fd) => (e ? act('knowEdit', { kid: e.id, fields: { area: String(fd.get('area') || 'Allgemein'), title: String(fd.get('title')), text: String(fd.get('text') || ''), ok: e.status === 'vorschlag' } }) : act('knowAdd', { area: String(fd.get('area') || 'Allgemein'), title: String(fd.get('title')), text: String(fd.get('text') || '') })));
+      const r = await showDialog('<h2>' + (e ? tr('Edit entry') : tr('Add entry')) + '</h2><div class="grid"><label class="field span2"><span>' + tr('Area') + '</span><input class="input" name="area" list="knAreas" maxlength="60" value="' + esc(e ? e.area : '') + '" placeholder="' + tr('For example Discord and bot') + '"><datalist id="knAreas">' + areasAll.map((a) => '<option value="' + esc(a) + '">').join('') + '</datalist></label><label class="field span2"><span>' + tr('Title') + '</span><input class="input" name="title" required maxlength="140" value="' + esc(e ? e.title : '') + '" autofocus></label></div><label class="field"><span>' + tr('Text, Markdown allowed') + '</span><textarea class="input" name="text" rows="6">' + esc(e ? e.text : '') + '</textarea></label>' + foot(tr('Save')),
+        (fd) => (e ? act('knowEdit', { kid: e.id, fields: { area: String(fd.get('area') || tr('General')), title: String(fd.get('title')), text: String(fd.get('text') || ''), ok: e.status === 'vorschlag' } }) : act('knowAdd', { area: String(fd.get('area') || tr('General')), title: String(fd.get('title')), text: String(fd.get('text') || '') })));
       if (r) { ok(r.message); renderKnowledge(body, head); }
     };
     const again = () => renderKnowledge(body, head);
@@ -3266,14 +3283,14 @@
     try { c = await api('GET', 'api/cleanup'); } catch (e) { return fail(e); }
     const row = (x, btns) => '<div class="cl-row"><span class="st" style="--c:' + statusVar(x.status) + '"></span><div class="q-t"><button class="q-title" data-open="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</button><span class="q-meta">' + esc(x.why) + '</span></div>' + (EDIT ? btns : '') + '</div>';
     const sec = (title, sub, items) => (items.length ? '<div class="block"><div class="block-head"><h3>' + esc(title) + '</h3><span class="meta">' + esc(sub) + '</span></div>' + items.join('') + '</div>' : '');
-    body.innerHTML = head('Aufräumen') +
-      '<div class="cl-score"><div><small>Zustand des Backlogs</small><strong class="num ' + (c.score >= 85 ? 'good' : c.score >= 60 ? '' : 'late') + '">' + c.score + '</strong><span class="muted">von 100</span></div><span class="md">' + (c.count ? c.count + ' Dinge brauchen Pflege. Erledigtes verschwindet aus der Liste.' : 'Alles in Ordnung.') + '</span></div>' +
-      sec('Hängt fest', 'lange ohne Bewegung', c.stuck.map((x) => row(x, x.review ? '<button class="btn small primary" data-clreview="' + esc(x.id) + '">Jetzt abnehmen</button>' : '<button class="btn small" data-clhand="' + esc(x.id) + '">Übergabe anfordern</button><button class="btn small ghost" data-clback="' + esc(x.id) + '">Zurück ins Backlog</button>'))) +
-      sec('Entwürfe ohne Wahl', 'Claude wartet mit dem Umsetzen', c.design.map((x) => row(x, '<button class="btn small primary" data-cldesign="' + esc(x.id) + '">Entwürfe ansehen</button>'))) +
-      sec('Unvollständig', 'Claude kann so nicht sauber starten', c.incomplete.map((x) => row(x, '<button class="btn small" data-open="' + esc(x.id) + '">Ergänzen</button>')).concat(c.noEffort.length ? ['<div class="cl-row"><span class="st"></span><div class="q-t"><strong>' + c.noEffort.length + ' Aufgaben ohne Aufwand</strong><span class="q-meta">' + esc(c.noEffort.slice(0, 8).join(', ')) + ' zählen in Sprint und Zeitleiste als M</span></div>' + (EDIT ? '<button class="btn small" data-cltable>In der Tabelle schätzen</button>' : '') + '</div>'] : [])) +
-      sec('Vermutlich doppelt', 'ähnliche Titel, Tags und Beschreibung', c.dups.map((p) => '<div class="cl-row"><span class="st"></span><div class="q-t"><span><button class="q-title" data-open="' + esc(p.a.id) + '">' + esc(p.a.id + ' ' + p.a.title) + '</button> und <button class="q-title" data-open="' + esc(p.b.id) + '">' + esc(p.b.id + ' ' + p.b.title) + '</button></span><span class="q-meta">' + p.score + ' Prozent Übereinstimmung</span></div>' + (EDIT ? '<button class="btn small primary" data-clmerge="' + esc(p.a.id) + '|' + esc(p.b.id) + '">Zusammenführen</button><button class="btn small ghost" data-cldis="' + esc(p.a.id) + '|' + esc(p.b.id) + '">Kein Duplikat</button>' : '') + '</div>')) +
-      sec('Alt und unberührt', 'über 60 Tage im Backlog', c.old.map((x) => row(x, '<button class="btn small" data-clidea="' + esc(x.id) + '">Zu Idee machen</button>'))) +
-      (c.old.length > 1 && EDIT ? '<div class="row-btns"><button class="btn small" data-clideaall>Alle ' + c.old.length + ' zu Ideen machen</button></div>' : '');
+    body.innerHTML = head(tr('Clean up')) +
+      '<div class="cl-score"><div><small>' + tr('Backlog health') + '</small><strong class="num ' + (c.score >= 85 ? 'good' : c.score >= 60 ? '' : 'late') + '">' + c.score + '</strong><span class="muted">' + tr('of 100') + '</span></div><span class="md">' + (c.count ? tr('{n} things need attention. Done items disappear from the list.', { n: c.count }) : tr('All good.')) + '</span></div>' +
+      sec(tr('Stuck'), tr('no movement for a long time'), c.stuck.map((x) => row(x, x.review ? '<button class="btn small primary" data-clreview="' + esc(x.id) + '">' + tr('Review now') + '</button>' : '<button class="btn small" data-clhand="' + esc(x.id) + '">' + tr('Request handoff') + '</button><button class="btn small ghost" data-clback="' + esc(x.id) + '">' + tr('Back to backlog') + '</button>'))) +
+      sec(tr('Design variants without a choice'), tr('Claude is holding off on implementing'), c.design.map((x) => row(x, '<button class="btn small primary" data-cldesign="' + esc(x.id) + '">' + tr('View design variants') + '</button>'))) +
+      sec(tr('Incomplete'), tr('Claude cannot start cleanly like this'), c.incomplete.map((x) => row(x, '<button class="btn small" data-open="' + esc(x.id) + '">' + tr('Fill in') + '</button>')).concat(c.noEffort.length ? ['<div class="cl-row"><span class="st"></span><div class="q-t"><strong>' + tr('{n} tasks without effort', { n: c.noEffort.length }) + '</strong><span class="q-meta">' + tr('{ids} count as M in sprint and timeline', { ids: esc(c.noEffort.slice(0, 8).join(', ')) }) + '</span></div>' + (EDIT ? '<button class="btn small" data-cltable>' + tr('Estimate in the table') + '</button>' : '') + '</div>'] : [])) +
+      sec(tr('Probably duplicates'), tr('similar titles, tags and description'), c.dups.map((p) => '<div class="cl-row"><span class="st"></span><div class="q-t"><span><button class="q-title" data-open="' + esc(p.a.id) + '">' + esc(p.a.id + ' ' + p.a.title) + '</button> ' + tr('and') + ' <button class="q-title" data-open="' + esc(p.b.id) + '">' + esc(p.b.id + ' ' + p.b.title) + '</button></span><span class="q-meta">' + tr('{n} percent match', { n: p.score }) + '</span></div>' + (EDIT ? '<button class="btn small primary" data-clmerge="' + esc(p.a.id) + '|' + esc(p.b.id) + '">' + tr('Merge') + '</button><button class="btn small ghost" data-cldis="' + esc(p.a.id) + '|' + esc(p.b.id) + '">' + tr('Not a duplicate') + '</button>' : '') + '</div>')) +
+      sec(tr('Old and untouched'), tr('over 60 days in the backlog'), c.old.map((x) => row(x, '<button class="btn small" data-clidea="' + esc(x.id) + '">' + tr('Turn into idea') + '</button>'))) +
+      (c.old.length > 1 && EDIT ? '<div class="row-btns"><button class="btn small" data-clideaall>' + tr('Turn all {n} into ideas', { n: c.old.length }) + '</button></div>' : '');
     $$('[data-sclose]', body).forEach((b) => b.onclick = closeSide);
     $$('[data-open]', body).forEach((b) => b.onclick = () => { closeSide(); openTask(b.dataset.open); });
     const again = () => renderCleanup(body, head);
@@ -3281,16 +3298,16 @@
     $$('[data-clreview]', body).forEach((b) => b.onclick = () => { closeSide(); openReview(b.dataset.clreview); });
     $$('[data-cldesign]', body).forEach((b) => b.onclick = () => { closeSide(); detailTab = 'design'; openTask(b.dataset.cldesign).then(() => { detailTab = 'design'; renderDetail(); }); });
     $$('[data-clhand]', body).forEach((b) => b.onclick = () => go(() => act('requestHandoff', { id: b.dataset.clhand }), (x) => x.message));
-    $$('[data-clback]', body).forEach((b) => b.onclick = () => go(() => act('move', { id: b.dataset.clback, to: 'backlog', reason: 'Hing fest, zurück ins Backlog' }), b.dataset.clback + ' zurück ins Backlog'));
+    $$('[data-clback]', body).forEach((b) => b.onclick = () => go(() => act('move', { id: b.dataset.clback, to: 'backlog', reason: tr('Was stuck, back to backlog') }), tr('{id} back to backlog', { id: b.dataset.clback })));
     $$('[data-cltable]', body).forEach((b) => b.onclick = () => { closeSide(); tableSort.key = 'effort'; tableSort.dir = -1; setView('table'); });
     $$('[data-clmerge]', body).forEach((b) => b.onclick = async () => {
       const [a, c2] = b.dataset.clmerge.split('|');
-      const keep = await showDialog('<h2>Zusammenführen</h2><p class="lead">Welche Aufgabe bleibt? Die andere wird verworfen, ihre Beschreibung und offenen Kriterien landen als Kommentar in der bleibenden.</p>' + segCtl('keep', [{ id: a, label: a + ' behalten' }, { id: c2, label: c2 + ' behalten' }], a) + foot('Zusammenführen'), (fd) => fd.get('keep'));
+      const keep = await showDialog('<h2>' + tr('Merge') + '</h2><p class="lead">' + tr('Which task stays? The other one is discarded; its description and open criteria end up as a comment in the one that stays.') + '</p>' + segCtl('keep', [{ id: a, label: tr('Keep {id}', { id: a }) }, { id: c2, label: tr('Keep {id}', { id: c2 }) }], a) + foot(tr('Merge')), (fd) => fd.get('keep'));
       if (keep) go(() => act('merge', { keep, drop: keep === a ? c2 : a }), (x) => x.message);
     });
     $$('[data-cldis]', body).forEach((b) => b.onclick = () => { const [a, c2] = b.dataset.cldis.split('|'); go(() => act('dismissDuplicate', { a, b: c2 }), (x) => x.message); });
     $$('[data-clidea]', body).forEach((b) => b.onclick = () => go(() => act('toIdeas', { ids: [b.dataset.clidea] }), (x) => x.message));
-    $$('[data-clideaall]', body).forEach((b) => b.onclick = async () => { if (await confirmBox({ title: c.old.length + ' Aufgaben zu Ideen machen', lead: 'Sie werden verworfen und als Idee notiert. Mit Rückgängig lässt sich das zurückholen.', confirm: 'Zu Ideen machen' })) go(() => act('toIdeas', { ids: c.old.map((x) => x.id) }), (x) => x.message); });
+    $$('[data-clideaall]', body).forEach((b) => b.onclick = async () => { if (await confirmBox({ title: tr('Turn {n} tasks into ideas', { n: c.old.length }), lead: tr('They are discarded and noted as ideas. Undo brings them back.'), confirm: tr('Turn into ideas') })) go(() => act('toIdeas', { ids: c.old.map((x) => x.id) }), (x) => x.message); });
   }
 
   // ---------- Duplikate beim Anlegen ----------
@@ -3312,12 +3329,12 @@
       if (!list.length) { box.hidden = true; return; }
       const x = list[0];
       box.hidden = false;
-      box.innerHTML = '<strong>Klingt wie eine offene Aufgabe</strong><button type="button" class="btn link" data-dupopen="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</button><span class="sublabel">' + esc(L(x.status) + ', ' + x.priority + ', ' + x.score + ' Prozent ähnlich') + '</span><div class="row-btns"><button type="button" class="btn small primary" data-dupcomment="' + esc(x.id) + '">Als Kommentar zu ' + esc(x.id) + '</button><button type="button" class="btn small ghost" data-dupignore>Trotzdem anlegen</button></div>';
+      box.innerHTML = '<strong>' + tr('Sounds like an open task') + '</strong><button type="button" class="btn link" data-dupopen="' + esc(x.id) + '">' + esc(x.id + ' ' + x.title) + '</button><span class="sublabel">' + esc(L(x.status) + ', ' + x.priority + ', ' + tr('{n} percent similar', { n: x.score })) + '</span><div class="row-btns"><button type="button" class="btn small primary" data-dupcomment="' + esc(x.id) + '">' + tr('As a comment on {id}', { id: esc(x.id) }) + '</button><button type="button" class="btn small ghost" data-dupignore>' + tr('Create anyway') + '</button></div>';
       $('[data-dupignore]', box).onclick = () => { dismissed = x.id; box.hidden = true; };
       $('[data-dupopen]', box).onclick = () => { $('button[value="cancel"]', form).click(); openTask(x.id); };
       $('[data-dupcomment]', box).onclick = async () => {
         const desc = String((($('textarea[name="description"], textarea[name="text"]', f) || {}).value) || '').trim();
-        const r = await run(() => act('comment', { id: x.id, text: 'Ergänzung statt neuer Aufgabe „' + title + '“' + (desc ? ':\n\n' + desc : '.') }), 'Als Kommentar zu ' + x.id + ' gespeichert');
+        const r = await run(() => act('comment', { id: x.id, text: tr('Addition instead of a new task “{title}”', { title }) + (desc ? ':\n\n' + desc : '.') }), tr('Saved as a comment on {id}', { id: x.id }));
         if (r) $('button[value="cancel"]', form).click();
       };
     };
@@ -3327,23 +3344,23 @@
 
   // ---------- Import ----------
 
-  const IMPORT_HELP = 'Trello (JSON-Export), Notion (CSV oder ZIP-Export), Linear (CSV), CSV und TSV, Excel (.xlsx), Word (.docx) mit Listen, Häkchen oder Tabellen, Markdown und Text mit Listen.';
+  const IMPORT_HELP = tr('Trello (JSON export), Notion (CSV or ZIP export), Linear (CSV), CSV and TSV, Excel (.xlsx), Word (.docx) with lists, checkboxes or tables, Markdown and text with lists.');
   async function openImport(prev) {
     let file = null;
-    const fmts = [['auto', 'Automatisch erkennen'], ['trello', 'Trello'], ['notion', 'Notion'], ['linear', 'Linear'], ['csv', 'CSV'], ['xlsx', 'Excel'], ['docx', 'Word'], ['md', 'Markdown oder Text']];
-    const pre = await showDialog('<h2>Aufgaben importieren</h2><p class="lead">' + esc(IMPORT_HELP) + ' Du siehst vorher eine Vorschau und wählst aus.</p>' +
-      '<label class="imp-drop" id="impDrop"><input type="file" id="impFile" accept=".json,.csv,.tsv,.xlsx,.xlsm,.docx,.md,.markdown,.txt,.zip" hidden><strong id="impName">Datei wählen oder hierher ziehen</strong><span class="sublabel">bis 20 MB</span></label>' +
+    const fmts = [['auto', tr('Detect automatically')], ['trello', 'Trello'], ['notion', 'Notion'], ['linear', 'Linear'], ['csv', 'CSV'], ['xlsx', 'Excel'], ['docx', 'Word'], ['md', tr('Markdown or text')]];
+    const pre = await showDialog('<h2>' + tr('Import tasks') + '</h2><p class="lead">' + esc(IMPORT_HELP) + ' ' + tr('You see a preview first and pick what to import.') + '</p>' +
+      '<label class="imp-drop" id="impDrop"><input type="file" id="impFile" accept=".json,.csv,.tsv,.xlsx,.xlsm,.docx,.md,.markdown,.txt,.zip" hidden><strong id="impName">' + tr('Choose a file or drag it here') + '</strong><span class="sublabel">' + tr('up to 20 MB') + '</span></label>' +
       '<div class="grid"><label class="field span2"><span>Format</span><select name="format">' + fmts.map((f) => '<option value="' + f[0] + '"' + (prev && prev.format === f[0] ? ' selected' : '') + '>' + esc(f[1]) + '</option>').join('') + '</select></label>' +
-      '<label class="field span2"><span>Spalten zuordnen, optional</span><input class="input" name="map" placeholder="title=Aufgabe, status=Liste" value="' + esc(prev ? prev.map : '') + '"></label></div>' +
-      '<p class="sublabel">Für Fließtext ohne Listen, etwa Protokolle oder E-Mails, ist es besser, Claude die Datei zu geben. Claude liest sie und schlägt Aufgaben vor.</p>' + foot('Vorschau'),
+      '<label class="field span2"><span>' + tr('Map columns, optional') + '</span><input class="input" name="map" placeholder="' + tr('title=Task, status=List') + '" value="' + esc(prev ? prev.map : '') + '"></label></div>' +
+      '<p class="sublabel">' + tr('For running text without lists, such as minutes or emails, it is better to give Claude the file. Claude reads it and suggests tasks.') + '</p>' + foot(tr('Preview')),
     async (fd) => {
-      if (!file) throw new Error('Bitte eine Datei wählen.');
+      if (!file) throw new Error(tr('Please choose a file.'));
       const qs = new URLSearchParams({ name: file.name, format: fd.get('format'), map: fd.get('map') || '' });
       const r = await api('POST', 'api/import?' + qs.toString(), undefined, { body: file, type: 'application/octet-stream' });
       return { ...r, chosen: fd.get('format'), map: fd.get('map') || '' };
     }, (f) => {
       const inp = $('#impFile', f); const drop = $('#impDrop', f);
-      const setF = (x) => { file = x; $('#impName', f).textContent = x ? x.name + ' (' + Math.max(1, Math.round(x.size / 1024)) + ' KB)' : 'Datei wählen oder hierher ziehen'; };
+      const setF = (x) => { file = x; $('#impName', f).textContent = x ? x.name + ' (' + Math.max(1, Math.round(x.size / 1024)) + ' KB)' : tr('Choose a file or drag it here'); };
       inp.onchange = () => setF(inp.files[0] || null);
       drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
       drop.ondragleave = () => drop.classList.remove('over');
@@ -3354,22 +3371,22 @@
 
   async function importPreviewDialog(r) {
     const sel = new Set(r.selected);
-    const st = { erledigt: 'Erledigt', verworfen: 'Verworfen', 'in-arbeit': 'dort in Arbeit', review: 'dort in Review', geplant: 'Geplant', backlog: '' };
-    const rows = r.candidates.map((c) => '<tr class="' + (c.dup ? 'dupr' : '') + '"><td><input type="checkbox" class="impc" data-n="' + c.n + '"' + (sel.has(c.n) ? ' checked' : '') + ' aria-label="' + esc(c.title) + ' übernehmen"></td>' +
+    const st = { erledigt: tr('Done'), verworfen: tr('Discarded'), 'in-arbeit': tr('in progress there'), review: tr('in review there'), geplant: tr('Planned'), backlog: '' };
+    const rows = r.candidates.map((c) => '<tr class="' + (c.dup ? 'dupr' : '') + '"><td><input type="checkbox" class="impc" data-n="' + c.n + '"' + (sel.has(c.n) ? ' checked' : '') + ' aria-label="' + tr('Import {title}', { title: esc(c.title) }) + '"></td>' +
       '<td><strong>' + esc(c.title) + '</strong>' + (c.description ? '<span class="sublabel">' + esc(c.description.split('\n')[0].slice(0, 120)) + '</span>' : '') + (c.dup ? '<span class="late sublabel">' + esc(c.dupKind) + ': ' + esc(c.dup) + '</span>' : '') + '</td>' +
-      '<td>' + esc(meta.typeLabel[c.type] || c.type) + '</td><td>' + esc(c.priority || '') + '</td><td>' + esc(st[c.status] ?? c.status) + '</td><td>' + esc([c.effort, c.due ? fmtDate(c.due) : '', c.criteria.length ? c.criteria.length + ' Krit.' : ''].filter(Boolean).join(', ')) + '</td><td>' + (c.tags || []).map((t) => '<span class="tag">#' + esc(t) + '</span>').join(' ') + '</td><td class="muted">' + esc(c.origin) + '</td></tr>').join('');
-    const html = '<h2>Vorschau: ' + esc(r.name) + '</h2><p class="lead">Format ' + esc(r.format) + (r.sheet ? ', Tabelle ' + esc(r.sheet) : '') + '. ' + r.candidates.length + ' Einträge, ' + sel.size + ' vorausgewählt. Duplikate und Erledigtes sind abgewählt.</p>' +
-      (r.mapping ? '<p class="sublabel">Spalten: ' + Object.entries(r.mapping).map(([k, v]) => esc(k) + ' = ' + esc(v)).join(', ') + (r.header ? '. Vorhanden: ' + r.header.map(esc).join(', ') : '') + '</p>' : '') +
-      (r.candidates.length ? '<div class="imp-wrap"><table class="tbl imp"><thead><tr><th><input type="checkbox" id="impAll" aria-label="Alle"></th><th>Titel</th><th>Typ</th><th>Prio</th><th>Status</th><th>Details</th><th>Tags</th><th>Herkunft</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<div class="q-empty">Keine Aufgaben erkannt. Format oder Spaltenzuordnung ändern.</div>') +
-      '<div class="grid"><label class="field span2"><span>Spalte für neue Aufgaben ohne Status</span><select name="status"><option value="backlog">Backlog</option><option value="geplant">Geplant</option></select></label><label class="field span2"><span>Zusätzliche Tags</span><input class="input" name="tags" placeholder="import, trello"></label></div>' +
-      '<p class="sublabel">Aufgaben, die dort in Arbeit oder in Review waren, kommen nach Geplant. Ohne Beschreibung und Kriterien werden sie als unvollständig markiert, Claude fragt dann nach.</p>' +
-      '<p class="err" role="alert"></p><div class="foot"><button type="button" class="btn" id="impBack" style="margin-right:auto">Andere Datei</button><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn primary" value="ok" id="impGo">Importieren</button></div>';
+      '<td>' + esc(meta.typeLabel[c.type] || c.type) + '</td><td>' + esc(c.priority || '') + '</td><td>' + esc(st[c.status] ?? c.status) + '</td><td>' + esc([c.effort, c.due ? fmtDate(c.due) : '', c.criteria.length ? tr('{n} crit.', { n: c.criteria.length }) : ''].filter(Boolean).join(', ')) + '</td><td>' + (c.tags || []).map((t) => '<span class="tag">#' + esc(t) + '</span>').join(' ') + '</td><td class="muted">' + esc(c.origin) + '</td></tr>').join('');
+    const html = '<h2>' + tr('Preview: {name}', { name: esc(r.name) }) + '</h2><p class="lead">' + tr('Format {format}', { format: esc(r.format) }) + (r.sheet ? tr(', sheet {sheet}', { sheet: esc(r.sheet) }) : '') + '. ' + tr('{n} entries, {sel} preselected. Duplicates and done items are deselected.', { n: r.candidates.length, sel: sel.size }) + '</p>' +
+      (r.mapping ? '<p class="sublabel">' + tr('Columns: {map}', { map: Object.entries(r.mapping).map(([k, v]) => esc(k) + ' = ' + esc(v)).join(', ') }) + (r.header ? tr('. Available: {cols}', { cols: r.header.map(esc).join(', ') }) : '') + '</p>' : '') +
+      (r.candidates.length ? '<div class="imp-wrap"><table class="tbl imp"><thead><tr><th><input type="checkbox" id="impAll" aria-label="' + tr('All') + '"></th><th>' + tr('Title') + '</th><th>' + tr('Type') + '</th><th>Prio</th><th>Status</th><th>Details</th><th>Tags</th><th>' + tr('Origin') + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<div class="q-empty">' + tr('No tasks recognized. Change the format or the column mapping.') + '</div>') +
+      '<div class="grid"><label class="field span2"><span>' + tr('Column for new tasks without status') + '</span><select name="status"><option value="backlog">Backlog</option><option value="geplant">' + tr('Planned') + '</option></select></label><label class="field span2"><span>' + tr('Additional tags') + '</span><input class="input" name="tags" placeholder="import, trello"></label></div>' +
+      '<p class="sublabel">' + tr('Tasks that were in progress or in review there go to Planned. Without description and criteria they are marked as incomplete, and Claude then asks.') + '</p>' +
+      '<p class="err" role="alert"></p><div class="foot"><button type="button" class="btn" id="impBack" style="margin-right:auto">' + tr('Other file') + '</button><button class="btn" value="cancel" formnovalidate>' + tr('Cancel') + '</button><button class="btn primary" value="ok" id="impGo">' + tr('Import') + '</button></div>';
     const res = await showDialog(html, (fd) => {
       const only = $$('.impc', form).filter((c) => c.checked).map((c) => +c.dataset.n);
-      if (!only.length) throw new Error('Keine Einträge gewählt.');
+      if (!only.length) throw new Error(tr('No entries selected.'));
       return act('importApply', { token: r.token, only, status: fd.get('status'), tags: String(fd.get('tags') || '').split(',').map((x) => x.trim().replace(/^#/, '')).filter(Boolean), format: r.format, map: r.map || '' });
     }, (f) => {
-      const count = () => { const n = $$('.impc', f).filter((c) => c.checked).length; $('#impGo', f).textContent = n === 1 ? '1 Aufgabe importieren' : n ? n + ' Aufgaben importieren' : 'Nichts gewählt'; $('#impGo', f).disabled = !n; };
+      const count = () => { const n = $$('.impc', f).filter((c) => c.checked).length; $('#impGo', f).textContent = n === 1 ? tr('Import 1 task') : n ? tr('Import {n} tasks', { n }) : tr('Nothing selected'); $('#impGo', f).disabled = !n; };
       $$('.impc', f).forEach((c) => c.onchange = count);
       const all = $('#impAll', f); if (all) all.onchange = () => { $$('.impc', f).forEach((c) => { c.checked = all.checked; }); count(); };
       $('#impBack', f).onclick = () => { $('button[value="cancel"]', f).click(); setTimeout(() => openImport({ format: r.chosen, map: r.map }), 50); };
@@ -3389,30 +3406,31 @@
     const ins = [];
     const done = list.filter((t) => t.status === 'erledigt');
     const fast = done.filter((t) => t.effort && t.started && t.completed && Math.round((new Date(t.completed) - new Date(t.started)) / 86400000) < (eff[t.effort] || 5));
-    if (fast.length) ins.push(['good', fast.length + (fast.length === 1 ? ' Aufgabe war' : ' Aufgaben waren') + ' schneller fertig als geschätzt.']);
+    if (fast.length) ins.push(['good', fast.length === 1 ? tr('1 task was finished faster than estimated.') : tr('{n} tasks were finished faster than estimated.', { n: fast.length })]);
     for (const t of done.filter((x) => x.effort && x.started && x.completed)) {
       const days = Math.max(1, Math.round((new Date(t.completed) - new Date(t.started)) / 86400000));
-      if (days > (eff[t.effort] || 5) * 1.3) ins.push(['bad', t.id + ' war als ' + t.effort + ' geschätzt und hat ' + days + ' Tage gebraucht.']);
+      if (days > (eff[t.effort] || 5) * 1.3) ins.push(['bad', tr('{id} was estimated as {effort} and took {days} days.', { id: t.id, effort: t.effort, days })]);
     }
     const added = list.filter((t) => t.created && t.created > sp.start);
-    if (added.length) ins.push(['warn', added.length + (added.length === 1 ? ' Aufgabe kam' : ' Aufgaben kamen') + ' nach dem Start dazu: ' + added.map((t) => t.id).join(', ') + '.']);
-    if (open.length) ins.push(['info', 'Offen geblieben: ' + open.map((t) => t.id).join(', ') + ', zusammen ' + open.reduce((a, t) => a + pts(t), 0) + ' Punkte.']);
+    if (added.length) ins.push(['warn', added.length === 1 ? tr('1 task was added after the start: {ids}.', { ids: added.map((t) => t.id).join(', ') }) : tr('{n} tasks were added after the start: {ids}.', { n: added.length, ids: added.map((t) => t.id).join(', ') })]);
+    if (open.length) ins.push(['info', tr('Left open: {ids}, {points} points in total.', { ids: open.map((t) => t.id).join(', '), points: open.reduce((a, t) => a + pts(t), 0) })]);
     const unread = list.filter((t) => t.status === 'review');
-    if (unread.length) ins.push(['warn', unread.map((t) => t.id).join(', ') + ' ' + (unread.length === 1 ? 'liegt' : 'liegen') + ' noch in Review.']);
+    if (unread.length) ins.push(['warn', unread.length === 1 ? tr('{ids} is still in review.', { ids: unread.map((t) => t.id).join(', ') }) : tr('{ids} are still in review.', { ids: unread.map((t) => t.id).join(', ') })]);
     let usage = null;
     try { usage = await api('GET', 'api/usage'); } catch (e) { usage = null; }
-    if (usage && usage.total.tokens) ins.push(['info', 'Verbrauch der letzten ' + usage.days + ' Tage: ' + fmtTok(usage.total.tokens) + ' Tokens, geschätzt ' + fmtMoney(usage.total.cost, usage.currency) + '.']);
+    if (usage && usage.total.tokens) ins.push(['info', tr('Usage of the last {days} days: {tokens} tokens, estimated {cost}.', { days: usage.days, tokens: fmtTok(usage.total.tokens), cost: fmtMoney(usage.total.cost, usage.currency) })]);
     const icon = { good: ['good', '+'], bad: ['late', '!'], warn: ['warn-t', '!'], info: ['muted', '·'] };
-    const goal = st.done >= st.planned ? 'erreicht' : st.done >= st.planned * 0.7 ? 'teilweise' : 'nicht erreicht';
+    // [CSS-Klasse, Text]
+    const goal = st.done >= st.planned ? ['good', tr('reached')] : st.done >= st.planned * 0.7 ? ['warn-t', tr('partly')] : ['late', tr('not reached')];
     const seen = [st.done, meta.lastSprint && meta.lastSprint.result ? meta.lastSprint.result.done : 0].filter((n) => n > 0);
     const nextCap = seen.length ? Math.max(1, Math.round(seen.reduce((a, n) => a + n, 0) / seen.length)) : (st.capacity || set.capacity || 20);
-    const html = '<h2>Rückblick auf ' + esc(sp.id + ' ' + sp.title) + '</h2><p class="lead">' + esc(fmtDate(sp.start)) + ' bis ' + esc(fmtDate(sp.end)) + '</p>' +
-      '<div class="code-cards"><div><small>Geschafft</small><strong>' + st.done + ' von ' + st.planned + '</strong><span class="muted">Punkten</span></div><div><small>Ziel</small><strong class="' + (goal === 'erreicht' ? 'good' : goal === 'teilweise' ? 'warn-t' : 'late') + '">' + goal + '</strong><span class="muted">' + esc(sp.goal || 'ohne Ziel') + '</span></div><div><small>Dazugekommen</small><strong>' + added.length + '</strong><span class="muted">nach dem Start</span></div>' + (meta.lastSprint && meta.lastSprint.result ? '<div><small>Vorheriger Sprint</small><strong>' + meta.lastSprint.result.done + '</strong><span class="muted">Punkte geschafft</span></div>' : '') + '</div>' +
-      '<div class="block"><div class="block-head"><h3>Was die Daten sagen</h3></div><ul class="retro">' + (ins.length ? ins.map(([k, txt]) => '<li><span class="' + icon[k][0] + '">' + icon[k][1] + '</span><span>' + esc(txt) + '</span></li>').join('') : '<li><span class="muted">·</span><span>Keine Auffälligkeiten.</span></li>') + '</ul></div>' +
-      '<div class="block"><div class="block-head"><h3>Drei Fragen an dich</h3><span class="meta">optional, Claude nutzt die Antworten für den nächsten Sprint</span></div>' +
-      '<label class="field"><span>Was lief gut?</span><input class="input" name="good" maxlength="500"></label><label class="field"><span>Was hat gebremst?</span><input class="input" name="bad" maxlength="500"></label><label class="field"><span>Was ändern wir im nächsten Sprint?</span><input class="input" name="change" maxlength="500"></label></div>' +
-      '<div class="row-btns">' + (open.length ? '<label class="toggle"><input type="checkbox" name="carry" checked> ' + esc(open.map((t) => t.id).join(', ')) + ' übernehmen</label>' : '') + '<label class="toggle">Kapazität für den nächsten Sprint <input class="input" type="number" name="cap" min="1" max="1000" value="' + nextCap + '" style="width:90px;height:30px"></label></div>' +
-      '<p class="err" role="alert"></p><div class="foot"><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn" value="close">Nur abschließen</button><button class="btn primary" value="plan">Abschließen und nächsten planen</button></div>';
+    const html = '<h2>' + tr('Retrospective on {sprint}', { sprint: esc(sp.id + ' ' + sp.title) }) + '</h2><p class="lead">' + tr('{from} to {to}', { from: esc(fmtDate(sp.start)), to: esc(fmtDate(sp.end)) }) + '</p>' +
+      '<div class="code-cards"><div><small>' + tr('Achieved') + '</small><strong>' + tr('{done} of {total}', { done: st.done, total: st.planned }) + '</strong><span class="muted">' + tr('points') + '</span></div><div><small>' + tr('Goal') + '</small><strong class="' + goal[0] + '">' + goal[1] + '</strong><span class="muted">' + esc(sp.goal || tr('no goal')) + '</span></div><div><small>' + tr('Added later') + '</small><strong>' + added.length + '</strong><span class="muted">' + tr('after the start') + '</span></div>' + (meta.lastSprint && meta.lastSprint.result ? '<div><small>' + tr('Previous sprint') + '</small><strong>' + meta.lastSprint.result.done + '</strong><span class="muted">' + tr('points achieved') + '</span></div>' : '') + '</div>' +
+      '<div class="block"><div class="block-head"><h3>' + tr('What the data says') + '</h3></div><ul class="retro">' + (ins.length ? ins.map(([k, txt]) => '<li><span class="' + icon[k][0] + '">' + icon[k][1] + '</span><span>' + esc(txt) + '</span></li>').join('') : '<li><span class="muted">·</span><span>' + tr('Nothing stands out.') + '</span></li>') + '</ul></div>' +
+      '<div class="block"><div class="block-head"><h3>' + tr('Three questions for you') + '</h3><span class="meta">' + tr('optional, Claude uses the answers for the next sprint') + '</span></div>' +
+      '<label class="field"><span>' + tr('What went well?') + '</span><input class="input" name="good" maxlength="500"></label><label class="field"><span>' + tr('What slowed you down?') + '</span><input class="input" name="bad" maxlength="500"></label><label class="field"><span>' + tr('What do we change in the next sprint?') + '</span><input class="input" name="change" maxlength="500"></label></div>' +
+      '<div class="row-btns">' + (open.length ? '<label class="toggle"><input type="checkbox" name="carry" checked> ' + tr('Carry over {ids}', { ids: esc(open.map((t) => t.id).join(', ')) }) + '</label>' : '') + '<label class="toggle">' + tr('Capacity for the next sprint') + ' <input class="input" type="number" name="cap" min="1" max="1000" value="' + nextCap + '" style="width:90px;height:30px"></label></div>' +
+      '<p class="err" role="alert"></p><div class="foot"><button class="btn" value="cancel" formnovalidate>' + tr('Cancel') + '</button><button class="btn" value="close">' + tr('Only close') + '</button><button class="btn primary" value="plan">' + tr('Close and plan the next one') + '</button></div>';
     let carry = true;
     const r = await showDialog(html, async (fd, sub) => {
       carry = fd.get('carry') === 'on';
@@ -3431,11 +3449,11 @@
   // Einstellungen sammeln sich als Entwurf unter den Schlüsseln von works discord set; Speichern schickt ihn, die
   // Vorschau rechnet schon mit ihm. Token, Schlüssel und Code stehen nie im DOM, nur kurz im Eingabefeld.
 
-  const DC_TABS = [['verbindung', 'Verbindung'], ['projekte', 'Projekte'], ['ereignisse', 'Ereignisse'], ['befehle', 'Befehle'], ['datenschutz', 'Datenschutz']];
-  const DC_PV = [['perm', 'Freigabe wartet'], ['idle', 'Fertig, wartet auf dich'], ['review', 'Im Review'], ['ci_red', 'CI rot'], ['dashboard', 'Dashboard']];
-  const DC_HINT = { review: 'Mit Knöpfen Annehmen und Zurück an Claude', shipped: 'works ship als eine Nachricht, die ihre Schritte abhakt', ci_red: 'Mit erstem Fehler und Bug-ID' };
+  const DC_TABS = [['verbindung', tr('Connection')], ['projekte', tr('Projects')], ['ereignisse', tr('Events')], ['befehle', tr('Commands')], ['datenschutz', tr('Privacy')]];
+  const DC_PV = [['perm', tr('Approval waiting')], ['idle', tr('Done, waiting for you')], ['review', tr('In review')], ['ci_red', tr('CI red')], ['dashboard', 'Dashboard']];
+  const DC_HINT = { review: tr('With the buttons Accept and Back to Claude'), shipped: tr('works ship as one message that ticks off its steps'), ci_red: tr('With the first error and bug ID') };
   const onOff = (b) => (b ? 'an' : 'aus');
-  const dcAgo = (ms) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'gerade eben' : m < 60 ? 'vor ' + m + (m === 1 ? ' Minute' : ' Minuten') : m < 1440 ? 'vor ' + Math.round(m / 60) + ' h' : 'vor ' + Math.round(m / 1440) + ' Tagen'; };
+  const dcAgo = (ms) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? tr('just now') : m < 60 ? (m === 1 ? tr('{n} minute ago', { n: m }) : tr('{n} minutes ago', { n: m })) : m < 1440 ? tr('{n} h ago', { n: Math.round(m / 60) }) : tr('{n} days ago', { n: Math.round(m / 1440) }); };
 
   // Gespeicherter Stand unter den Schlüsseln von works discord set.
   function dcValues(s) {
@@ -3448,15 +3466,15 @@
 
   // Nachricht wie in Discord: Absender, Text mit Erwähnung, Einbettung mit Feldern, Knöpfe. Nur Text, nichts aus dem Netz.
   function dcMessage(m) {
-    const md = (t) => esc(t).replace(/\\([[\]])/g, '$1').replace(/&lt;t:(\d+):R&gt;/g, (x, n) => dcAgo(+n * 1000)).replace(/&lt;@\d+&gt;/g, '<span class="dc-men">@du</span>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+    const md = (t) => esc(t).replace(/\\([[\]])/g, '$1').replace(/&lt;t:(\d+):R&gt;/g, (x, n) => dcAgo(+n * 1000)).replace(/&lt;@\d+&gt;/g, '<span class="dc-men">' + esc(tr('@you')) + '</span>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
     const e = (m.embeds || [])[0] || {};
     const fields = (e.fields || []).map((f) => '<div' + (f.inline === false ? ' class="wide"' : '') + '><strong>' + md(f.name) + '</strong>' + md(f.value) + '</div>').join('');
     const comps = (m.components || []).flatMap((r) => r.components || []);
     return '<div class="dc-who"><i>w</i><b>works</b><em>APP</em></div>' + (m.content ? '<div class="dc-txt">' + md(m.content) + '</div>' : '') +
       '<div class="dc-emb" style="--c:#' + Number(e.color || 0x5865f2).toString(16).padStart(6, '0') + '">' + (e.author ? '<span class="dc-a">' + md(e.author.name) + '</span>' : '') + (e.title ? '<b>' + md(e.title) + '</b>' : '') +
-      (e.description ? '<div>' + md(e.description) + '</div>' : '') + (fields ? '<div class="dc-f">' + fields + '</div>' : '') + (e.image ? '<div class="dc-img">Bild: Fortschritt je Projekt, erledigt je Tag</div>' : '') +
+      (e.description ? '<div>' + md(e.description) + '</div>' : '') + (fields ? '<div class="dc-f">' + fields + '</div>' : '') + (e.image ? '<div class="dc-img">' + tr('Image: progress per project, done per day') + '</div>' : '') +
       (e.footer ? '<span class="dc-ft">' + md(e.footer.text) + '</span>' : '') + '</div>' +
-      (comps.length ? '<div class="dc-btns">' + comps.map((c) => (c.type === 3 ? '<span class="sel">' + esc(c.placeholder || 'Auswahl') + ' ▾</span>' : '<span class="s' + c.style + '">' + esc(c.label) + (c.style === 5 ? ' ↗' : '') + '</span>')).join('') + '</div>' : '');
+      (comps.length ? '<div class="dc-btns">' + comps.map((c) => (c.type === 3 ? '<span class="sel">' + esc(c.placeholder || tr('Selection')) + ' ▾</span>' : '<span class="s' + c.style + '">' + esc(c.label) + (c.style === 5 ? ' ↗' : '') + '</span>')).join('') + '</div>' : '');
   }
 
   async function openDiscord() {
@@ -3474,46 +3492,46 @@
     const link = (href, text) => '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + text + '</a>';
     const sw = (k, label, hint) => '<label class="switch small"><span><b>' + esc(label) + '</b>' + (hint ? '<small>' + esc(hint) + '</small>' : '') + '</span><input type="checkbox" data-k="' + k + '"' + (on(k) ? ' checked' : '') + '><i aria-hidden="true"></i></label>';
     const bare = (k, label) => '<label class="switch dc-bare"><input type="checkbox" data-k="' + k + '"' + (on(k) ? ' checked' : '') + ' aria-label="' + esc(label) + '"><i aria-hidden="true"></i></label>';
-    const at = (k, label) => '<button type="button" class="dc-at" data-k="' + k + '" aria-pressed="' + on(k) + '" aria-label="Erwähnen bei ' + esc(label) + '">@</button>';
+    const at = (k, label) => '<button type="button" class="dc-at" data-k="' + k + '" aria-pressed="' + on(k) + '" aria-label="' + esc(tr('Mention for {label}', { label })) + '">@</button>';
     const num = (k, label, unit, max) => '<label class="field"><span>' + esc(label) + '</span><div class="dc-numin"><input class="input" type="number" min="0" max="' + max + '" step="' + (k === 'cleanup.hours' ? 'any' : '1') + '" data-k="' + k + '" value="' + esc(val(k)) + '"><small>' + esc(unit) + '</small></div></label>';
     const step = (n, cls, title, body) => '<li class="dc-step ' + cls + '"><span class="dc-num" aria-hidden="true">' + n + '</span><div><h3>' + title + '</h3>' + body + '</div></li>';
-    const tokenBox = () => '<div class="dc-box"><div class="dc-pw"><input class="input" id="dcToken" type="password" autocomplete="off" spellcheck="false" aria-label="Bot-Token"><button type="button" class="btn small primary" id="dcTokenGo">Prüfen</button></div><p class="dc-hint">Wird nur auf diesem Rechner gespeichert und danach nur maskiert gezeigt.</p></div>';
-    const codeBox = () => '<div class="dc-box"><div class="dc-pw"><input class="input" id="dcCode" autocomplete="off" spellcheck="false" placeholder="ABCD-2345" aria-label="Code aus Discord"><button type="button" class="btn small primary" id="dcCodeGo">Koppeln</button></div><p class="dc-hint">Im Terminal geht es mit <code>works discord link &lt;Code&gt;</code>.</p></div>';
+    const tokenBox = () => '<div class="dc-box"><div class="dc-pw"><input class="input" id="dcToken" type="password" autocomplete="off" spellcheck="false" aria-label="' + esc(tr('Bot token')) + '"><button type="button" class="btn small primary" id="dcTokenGo">' + tr('Verify') + '</button></div><p class="dc-hint">' + tr('Stored only on this computer and shown only masked afterwards.') + '</p></div>';
+    const codeBox = () => '<div class="dc-box"><div class="dc-pw"><input class="input" id="dcCode" autocomplete="off" spellcheck="false" placeholder="ABCD-2345" aria-label="' + esc(tr('Code from Discord')) + '"><button type="button" class="btn small primary" id="dcCodeGo">' + tr('Pair') + '</button></div><p class="dc-hint">' + tr('In the terminal, use {cmd}.', { cmd: '<code>works discord link &lt;' + esc(tr('code')) + '&gt;</code>' }) + '</p></div>';
     const enabled = () => s.projects.filter((p) => on('project.' + p.rid)).length;
     const eventsOn = () => s.events.reduce((n, g) => n + g.items.filter((e) => on('event.' + e.key + '.on')).length, 0);
-    const sub = () => (s.ready ? [s.running ? 'online seit ' + timeOf(s.running.since) : 'gestoppt', s.mode === 'shared' ? 'Gemeinsamer Bot' : 'Eigener Bot', '#' + s.channel_name + ' auf ' + s.guild_name, enabled() + (enabled() === 1 ? ' Projekt' : ' Projekte')].join(' · ') : s.secret ? 'Kanal fehlt noch' : 'nicht eingerichtet');
+    const sub = () => (s.ready ? [s.running ? tr('online since {time}', { time: timeOf(s.running.since) }) : tr('stopped'), s.mode === 'shared' ? tr('Shared bot') : tr('Own bot'), tr('#{channel} on {guild}', { channel: s.channel_name, guild: s.guild_name }), enabled() === 1 ? tr('{n} project', { n: 1 }) : tr('{n} projects', { n: enabled() })].join(' · ') : s.secret ? tr('Channel still missing') : tr('not set up'));
 
     function stepsOwn() {
       const has = !!s.secret;
-      return '<p class="dc-lead">Vier Schritte, danach läuft der Bot für alle Projekte auf diesem Rechner. Geht auch im Terminal mit <code>works discord token</code>.</p><ol class="dc-steps">' +
-        step(has ? '✓' : 1, has ? 'done' : '', 'Bot anlegen', '<p>Im ' + link('https://discord.com/developers/applications', 'Discord-Entwicklerportal') + ' eine Anwendung mit Bot anlegen und das Token kopieren.</p>') +
-        step(has ? '✓' : 2, has ? 'done' : 'cur', 'Token eintragen', has ? '<div class="dc-res">Gültig: ' + esc(s.bot_name) + '</div>' : '<p>Token aus dem Portal einfügen, works prüft es sofort.</p>' + tokenBox()) +
-        step(3, has ? 'cur' : '', 'Auf deinen Server einladen', '<p>Der Link fragt nur die Rechte an, die works braucht.' + (s.invite_url ? ' ' + link(s.invite_url, 'Einladungslink öffnen') : '') + '</p><div class="dc-rights"><span>Kanal sehen</span><span>Nachrichten senden</span><span>Links einbetten</span><span>Anheften</span><span>Befehle</span></div>') +
-        step(4, '', 'Kanal wählen', '<p>Dort stehen das Dashboard und die Hinweise aller Projekte.' + (has ? ' Die Liste steht unten.' : '') + '</p>') + '</ol>';
+      return '<p class="dc-lead">' + tr('Four steps, then the bot runs for all projects on this computer. Also possible in the terminal with {cmd}.', { cmd: '<code>works discord token</code>' }) + '</p><ol class="dc-steps">' +
+        step(has ? '✓' : 1, has ? 'done' : '', tr('Create the bot'), '<p>' + tr('Create an application with a bot in the {portal} and copy the token.', { portal: link('https://discord.com/developers/applications', tr('Discord developer portal')) }) + '</p>') +
+        step(has ? '✓' : 2, has ? 'done' : 'cur', tr('Enter the token'), has ? '<div class="dc-res">' + tr('Valid: {name}', { name: esc(s.bot_name) }) + '</div>' : '<p>' + tr('Paste the token from the portal, works checks it right away.') + '</p>' + tokenBox()) +
+        step(3, has ? 'cur' : '', tr('Invite it to your server'), '<p>' + tr('The link only asks for the permissions works needs.') + (s.invite_url ? ' ' + link(s.invite_url, tr('Open the invite link')) : '') + '</p><div class="dc-rights"><span>' + tr('View channel') + '</span><span>' + tr('Send messages') + '</span><span>' + tr('Embed links') + '</span><span>' + tr('Pin') + '</span><span>' + tr('Commands') + '</span></div>') +
+        step(4, '', tr('Choose a channel'), '<p>' + tr('The dashboard and the notifications of all projects go there.') + (has ? ' ' + tr('The list is below.') : '') + '</p>') + '</ol>';
     }
 
     function stepsShared() {
       const sv = s.service || {};
-      return '<div class="alert info">Beim gemeinsamen Bot gehen die Nachrichten über den works-Dienst: Projektname, Aufgaben-IDs, Titel und Status, je nach Datenschutz. Der Dienst speichert keine Inhalte, nur welche Nachricht zu deinem Schlüssel gehört.</div><ol class="dc-steps">' +
-        step(1, 'cur', 'Bot einladen', sv.invite_url ? '<p>' + link(sv.invite_url, 'Einladungslink öffnen') + ', Server wählen und bestätigen.</p>'
-          : '<p>' + esc(sv.error || 'Der works-Dienst antwortet gerade nicht.') + '</p><div class="dc-pw"><input class="input" id="dcService" type="url" placeholder="https://…" value="' + esc(sv.base || '') + '" aria-label="Adresse des works-Dienstes"><button type="button" class="btn small" data-dc="service">Adresse speichern</button></div>') +
-        step(2, '', 'Im Kanal /works verbinden', '<p>In Discord im Kanal, in den works schreiben soll. Braucht das Recht „Server verwalten“. Der Bot antwortet nur dir mit einem Code.</p>') +
-        step(3, '', 'Code eintragen', codeBox()) + '</ol>';
+      return '<div class="alert info">' + tr('With the shared bot, messages go through the works service: project name, task IDs, titles and status, depending on privacy. The service stores no content, only which message belongs to your key.') + '</div><ol class="dc-steps">' +
+        step(1, 'cur', tr('Invite the bot'), sv.invite_url ? '<p>' + tr('{link}, choose a server and confirm.', { link: link(sv.invite_url, tr('Open the invite link')) }) + '</p>'
+          : '<p>' + esc(sv.error || tr('The works service is not responding right now.')) + '</p><div class="dc-pw"><input class="input" id="dcService" type="url" placeholder="https://…" value="' + esc(sv.base || '') + '" aria-label="' + esc(tr('Address of the works service')) + '"><button type="button" class="btn small" data-dc="service">' + tr('Save address') + '</button></div>') +
+        step(2, '', tr('Run /works link in the channel'), '<p>' + tr('In Discord, in the channel works should write to. Needs the “Manage Server” permission. The bot replies only to you with a code.') + '</p>') +
+        step(3, '', tr('Enter the code'), codeBox()) + '</ol>';
     }
 
     function pSetup() {
       const card = (k, title, items, tag) => '<button type="button" class="dc-card" data-dc-path="' + k + '" role="radio" aria-checked="' + (way === k) + '">' + (tag ? '<span class="dc-tag">' + tag + '</span>' : '') + '<b>' + title + '</b><ul>' + items.map((x) => '<li>' + x + '</li>').join('') + '</ul></button>';
-      return '<p class="dc-lead">Hinweise aufs Handy für alle Projekte auf diesem Rechner. Wie soll works schreiben?</p><div class="dc-choice" role="radiogroup" aria-label="Weg">' +
-        card('shared', 'Gemeinsamer Bot', ['Einladen und mit einem Code koppeln', 'Kein Token, nichts im Entwicklerportal', 'Läuft über den works-Dienst'], 'Empfohlen') +
-        card('own', 'Eigener Bot', ['Bot im Discord-Entwicklerportal anlegen', 'Token nur auf diesem Rechner', 'Nichts läuft über fremde Server']) + '</div>' + (way === 'shared' ? stepsShared() : stepsOwn());
+      return '<p class="dc-lead">' + tr('Notifications on your phone for all projects on this computer. How should works write?') + '</p><div class="dc-choice" role="radiogroup" aria-label="' + esc(tr('Method')) + '">' +
+        card('shared', tr('Shared bot'), [tr('Invite and pair with a code'), tr('No token, nothing in the developer portal'), tr('Runs through the works service')], tr('Recommended')) +
+        card('own', tr('Own bot'), [tr('Create a bot in the Discord developer portal'), tr('Token only on this computer'), tr('Nothing runs through third-party servers')]) + '</div>' + (way === 'shared' ? stepsShared() : stepsOwn());
     }
 
     // Kanalwahl nach K: Server und Textkanäle live vom Bot, nach Kategorie; ohne Schreibrecht ausgegraut mit Grund.
     function pChannels() {
       let body;
       if (chErr) body = '<p class="dc-bad">' + esc(chErr) + '</p>';
-      else if (!chans) body = '<p class="dc-hint">Kanäle werden live vom Bot gelesen …</p>';
-      else if (!chans.guilds.length) body = '<p class="dc-hint">works ist noch auf keinem Server. Erst einladen, dann die Liste neu laden.</p>';
+      else if (!chans) body = '<p class="dc-hint">' + tr('Reading channels live from the bot …') + '</p>';
+      else if (!chans.guilds.length) body = '<p class="dc-hint">' + tr('works is not on any server yet. Invite it first, then reload the list.') + '</p>';
       else {
         const g = chans.guilds.find((x) => x.id === guild) || chans.guilds[0];
         let cat = '';
@@ -3521,29 +3539,29 @@
           const head = c.category && c.category !== cat ? '<div class="dc-cat">' + esc(c.category) + '</div>' : '';
           cat = c.category;
           const cur = c.id === s.channel_id;
-          return head + '<label class="dc-ch' + (cur ? ' on' : '') + (c.can ? '' : ' off') + '"><input type="radio" name="dcch" value="' + esc(c.id) + '"' + ((pick || s.channel_id) === c.id ? ' checked' : '') + (c.can ? '' : ' disabled') + '><span>#' + esc(c.name) + '</span><small>' + (cur ? 'jetzt hier' : c.can ? 'kann schreiben' : esc(c.why)) + '</small></label>';
+          return head + '<label class="dc-ch' + (cur ? ' on' : '') + (c.can ? '' : ' off') + '"><input type="radio" name="dcch" value="' + esc(c.id) + '"' + ((pick || s.channel_id) === c.id ? ' checked' : '') + (c.can ? '' : ' disabled') + '><span>#' + esc(c.name) + '</span><small>' + (cur ? tr('here now') : c.can ? tr('can write') : esc(c.why)) + '</small></label>';
         }).join('');
-        body = (chans.guilds.length > 1 ? '<label class="field"><span>Server</span><select class="input" id="dcGuild">' + chans.guilds.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === g.id ? ' selected' : '') + '>' + esc(x.name) + ' (' + x.channels.length + ' Kanäle)</option>').join('') + '</select></label>' : '<p class="dc-hint">Server <b>' + esc(g.name) + '</b></p>') +
-          '<div class="dc-list" role="radiogroup" aria-label="Kanal">' + (rows || '<p class="dc-hint dc-pad">Keine Textkanäle.</p>') + '</div>';
+        body = (chans.guilds.length > 1 ? '<label class="field"><span>Server</span><select class="input" id="dcGuild">' + chans.guilds.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === g.id ? ' selected' : '') + '>' + esc(x.name) + ' (' + tr('{n} channels', { n: x.channels.length }) + ')</option>').join('') + '</select></label>' : '<p class="dc-hint">Server <b>' + esc(g.name) + '</b></p>') +
+          '<div class="dc-list" role="radiogroup" aria-label="' + esc(tr('Channel')) + '">' + (rows || '<p class="dc-hint dc-pad">' + tr('No text channels.') + '</p>') + '</div>';
       }
-      return '<section class="dc-sec"><h3>Kanal für Dashboard und Hinweise</h3>' + body +
-        '<p class="dc-hint">' + (s.mode === 'shared' ? 'Beim gemeinsamen Bot sind es die Kanäle des gekoppelten Servers.' : 'Fehlt ein Server? Bot mit dem Einladungslink einladen.') + ' Die Liste kommt live vom Bot.</p>' +
-        '<div class="row-btns">' + (s.mode !== 'shared' && s.invite_url ? '<a class="btn small" href="' + esc(s.invite_url) + '" target="_blank" rel="noopener">Bot einladen</a>' : '') + '<button type="button" class="btn small ghost" data-dc="reload">Liste neu laden</button><span class="spacer"></span><span class="dc-hint dc-target"></span><button type="button" class="btn small primary" id="dcMove" disabled>Hierher verschieben</button></div></section>';
+      return '<section class="dc-sec"><h3>' + tr('Channel for dashboard and notifications') + '</h3>' + body +
+        '<p class="dc-hint">' + (s.mode === 'shared' ? tr('With the shared bot, these are the channels of the paired server.') : tr('Server missing? Invite the bot with the invite link.')) + ' ' + tr('The list comes live from the bot.') + '</p>' +
+        '<div class="row-btns">' + (s.mode !== 'shared' && s.invite_url ? '<a class="btn small" href="' + esc(s.invite_url) + '" target="_blank" rel="noopener">' + tr('Invite the bot') + '</a>' : '') + '<button type="button" class="btn small ghost" data-dc="reload">' + tr('Reload list') + '</button><span class="spacer"></span><span class="dc-hint dc-target"></span><button type="button" class="btn small primary" id="dcMove" disabled>' + tr('Move here') + '</button></div></section>';
     }
 
     function pConn() {
       if (!s.secret) return pSetup();
       const shared = s.mode === 'shared';
-      return (s.ready ? '<div class="dc-conn' + (s.running ? '' : ' off') + '"><b>' + (s.running ? 'works ist online' : 'works ist gestoppt') + '</b><dl class="dc-kv">' +
-          '<dt>Server</dt><dd>' + esc(s.guild_name) + '</dd><dt>Kanal</dt><dd>#' + esc(s.channel_name) + '</dd>' +
-          '<dt>Weg</dt><dd>' + (shared ? 'Gemeinsamer Bot' + (s.service && s.service.base ? ' über ' + esc(s.service.base) : '') : 'Eigener Bot ' + esc(s.bot_name)) + '</dd>' +
-          '<dt>Läuft</dt><dd>' + (s.running ? 'auf diesem Rechner seit ' + esc(timeOf(s.running.since)) + ', für alle Projekte' : s.autostart ? 'startet mit dem Board oder einer Claude-Sitzung' : 'nicht, Autostart ist aus') + '</dd>' +
-          '<dt>Erwähnt wird</dt><dd>' + (shared ? 'wer /works verbinden ausgeführt hat' : s.owner ? 'der Besitzer der Bot-Anwendung, beim Einrichten erkannt' : 'niemand, der Besitzer wurde nicht erkannt') + '</dd></dl>' +
-          '<div class="row-btns"><button type="button" class="btn small" data-dc="test">Testnachricht</button>' + (s.running ? '' : '<button type="button" class="btn small ghost" data-dc="start">Bot starten</button>') + '</div></div>' : stepsOwn()) +
+      return (s.ready ? '<div class="dc-conn' + (s.running ? '' : ' off') + '"><b>' + (s.running ? tr('works is online') : tr('works is stopped')) + '</b><dl class="dc-kv">' +
+          '<dt>Server</dt><dd>' + esc(s.guild_name) + '</dd><dt>' + tr('Channel') + '</dt><dd>#' + esc(s.channel_name) + '</dd>' +
+          '<dt>' + tr('Method') + '</dt><dd>' + (shared ? tr('Shared bot') + (s.service && s.service.base ? ' ' + tr('via {url}', { url: esc(s.service.base) }) : '') : tr('Own bot {name}', { name: esc(s.bot_name) })) + '</dd>' +
+          '<dt>' + tr('Running') + '</dt><dd>' + (s.running ? tr('on this computer since {time}, for all projects', { time: esc(timeOf(s.running.since)) }) : s.autostart ? tr('starts with the board or a Claude session') : tr('no, autostart is off')) + '</dd>' +
+          '<dt>' + tr('Mentioned') + '</dt><dd>' + (shared ? tr('whoever ran /works link') : s.owner ? tr('the owner of the bot application, detected during setup') : tr('nobody, the owner was not detected')) + '</dd></dl>' +
+          '<div class="row-btns"><button type="button" class="btn small" data-dc="test">' + tr('Test message') + '</button>' + (s.running ? '' : '<button type="button" class="btn small ghost" data-dc="start">' + tr('Start bot') + '</button>') + '</div></div>' : stepsOwn()) +
         pChannels() +
-        '<div class="dc-token">' + (shared ? 'Geräteschlüssel' : 'Token') + ' <code>' + esc(s.secret) + '</code><span class="spacer"></span><button type="button" class="btn small ghost" data-dc="replace">' + (shared ? 'Neu koppeln' : 'Ersetzen') + '</button></div><div class="dc-replace" hidden>' + (shared ? codeBox() : tokenBox()) + '</div>' +
-        '<p class="dc-hint">' + (shared ? 'Der Schlüssel liegt nur auf diesem Rechner und darf nur in den gekoppelten Kanal schreiben.' : 'Das Token liegt nur auf diesem Rechner, lesbar nur für dich. Nie im Projekt, im Git oder in Logs.') + '</p>' +
-        '<div class="dc-danger"><div><b>Bot trennen</b><small>' + (shared ? 'Widerruft den Schlüssel beim Dienst' : 'Löscht das Token von diesem Rechner') + ' und beendet den Bot. Die Nachrichten bleiben in Discord stehen.</small></div><button type="button" class="btn small danger" data-dc="disconnect">Trennen</button></div>';
+        '<div class="dc-token">' + (shared ? tr('Device key') : 'Token') + ' <code>' + esc(s.secret) + '</code><span class="spacer"></span><button type="button" class="btn small ghost" data-dc="replace">' + (shared ? tr('Pair again') : tr('Replace')) + '</button></div><div class="dc-replace" hidden>' + (shared ? codeBox() : tokenBox()) + '</div>' +
+        '<p class="dc-hint">' + (shared ? tr('The key is stored only on this computer and may only write to the paired channel.') : tr('The token is stored only on this computer, readable only by you. Never in the project, in Git or in logs.')) + '</p>' +
+        '<div class="dc-danger"><div><b>' + tr('Disconnect bot') + '</b><small>' + (shared ? tr('Revokes the key at the service and stops the bot. The messages stay in Discord.') : tr('Deletes the token from this computer and stops the bot. The messages stay in Discord.')) + '</small></div><button type="button" class="btn small danger" data-dc="disconnect">' + tr('Disconnect') + '</button></div>';
     }
 
     // Kanal je Projekt (W-0046): beim eigenen Bot aus der Liste vom Bot, leer heißt Standardkanal. Der gemeinsame Bot
@@ -3551,8 +3569,8 @@
     function chanSel(p) {
       const k = 'project.' + p.rid + '.channel';
       const cur = val(k);
-      const attrs = ' class="input" data-k="' + k + '" aria-label="Kanal für ' + esc(p.name) + '"';
-      const std = '<option value="">#' + esc(s.channel_name || '–') + ' (Standard)</option>';
+      const attrs = ' class="input" data-k="' + k + '" aria-label="' + esc(tr('Channel for {name}', { name: p.name })) + '"';
+      const std = '<option value="">#' + esc(s.channel_name || '–') + ' (' + tr('default') + ')</option>';
       if (s.mode === 'shared') return '<select' + attrs + ' disabled>' + std + '</select>';
       const many = chans && chans.guilds.length > 1;
       const all = chans ? chans.guilds.flatMap((g) => g.channels.map((c) => ({ ...c, g: g.name }))).filter((c) => c.id !== s.channel_id) : [];
@@ -3560,45 +3578,45 @@
       if (cur && !all.some((c) => c.id === cur)) opts.unshift('<option value="' + esc(cur) + '" selected>' + esc(cur === p.channel_id ? p.channel : '#' + cur) + '</option>');
       return '<select' + attrs + '>' + std + opts.join('') + '</select>';
     }
-    const pProjects = () => '<div class="dc-tblwrap"><table class="dc-tbl"><thead><tr><th>Projekt</th><th>Kanal</th><th>Dashboard</th><th>An</th></tr></thead><tbody>' +
-      s.projects.map((p) => '<tr><td>' + esc(p.name) + (p.here ? '<small>dieses Projekt</small>' : '') + '</td><td>' + chanSel(p) + '</td><td>' + (p.dash ? 'angeheftet' + (p.dash > 1e12 ? '<small>' + dcAgo(p.dash) + ' bearbeitet</small>' : '') : 'noch keins') + '</td><td>' + bare('project.' + p.rid, 'Hinweise für ' + p.name) + '</td></tr>').join('') +
-      '</tbody></table></div>' + sw('auto_enroll', 'Neue Projekte automatisch anmelden', 'Erscheinen im Dashboard des Standardkanals, sobald ihr Board oder eine Claude-Sitzung läuft') +
-      '<p class="dc-hint">' + (s.mode === 'shared' ? 'Der gemeinsame Bot schreibt in genau einen Kanal, den gekoppelten. Einen Kanal je Projekt gibt es nur mit eigenem Bot. ' : chErr ? esc(chErr) + ' ' : '') +
-      'Ein Dashboard je Kanal für alle Projekte, die dorthin melden. Abgeschaltete Projekte fehlen dort und schicken keine Hinweise.</p>';
+    const pProjects = () => '<div class="dc-tblwrap"><table class="dc-tbl"><thead><tr><th>' + tr('Project') + '</th><th>' + tr('Channel') + '</th><th>Dashboard</th><th>' + tr('On') + '</th></tr></thead><tbody>' +
+      s.projects.map((p) => '<tr><td>' + esc(p.name) + (p.here ? '<small>' + tr('current project') + '</small>' : '') + '</td><td>' + chanSel(p) + '</td><td>' + (p.dash ? tr('pinned') + (p.dash > 1e12 ? '<small>' + tr('edited {ago}', { ago: dcAgo(p.dash) }) + '</small>' : '') : tr('none yet')) + '</td><td>' + bare('project.' + p.rid, tr('Notifications for {name}', { name: p.name })) + '</td></tr>').join('') +
+      '</tbody></table></div>' + sw('auto_enroll', tr('Enroll new projects automatically'), tr('They appear in the dashboard of the default channel as soon as their board or a Claude session runs')) +
+      '<p class="dc-hint">' + (s.mode === 'shared' ? tr('The shared bot writes to exactly one channel, the paired one. A channel per project is only available with your own bot.') + ' ' : chErr ? esc(chErr) + ' ' : '') +
+      tr('One dashboard per channel for all projects that report there. Projects that are switched off are missing there and send no notifications.') + '</p>';
 
     function pEvents() {
       const grp = (g) => {
         const n = g.items.filter((e) => on('event.' + e.key + '.on')).length;
-        return '<div class="dc-grp"><div class="dc-grp-h"><b>' + esc(g.group) + '</b><small>' + n + ' von ' + g.items.length + '</small><span class="spacer"></span><label class="switch dc-bare"><input type="checkbox" data-grp="' + esc(g.group) + '"' + (n === g.items.length ? ' checked' : '') + ' aria-label="Gruppe ' + esc(g.group) + '"><i aria-hidden="true"></i></label></div>' +
-          g.items.map((e) => '<div class="dc-row"><span><b>' + esc(e.label) + '</b>' + (e.key === 'perm' && !on('privacy.commands') ? '<small>Befehl ausgeblendet, siehe Datenschutz</small>' : DC_HINT[e.key] ? '<small>' + esc(DC_HINT[e.key]) + '</small>' : '') + '</span>' + at('event.' + e.key + '.at', e.label) + bare('event.' + e.key + '.on', e.label + ' senden') + '</div>').join('') + '</div>';
+        return '<div class="dc-grp"><div class="dc-grp-h"><b>' + esc(g.group) + '</b><small>' + tr('{n} of {total}', { n, total: g.items.length }) + '</small><span class="spacer"></span><label class="switch dc-bare"><input type="checkbox" data-grp="' + esc(g.group) + '"' + (n === g.items.length ? ' checked' : '') + ' aria-label="' + esc(tr('Group {name}', { name: g.group })) + '"><i aria-hidden="true"></i></label></div>' +
+          g.items.map((e) => '<div class="dc-row"><span><b>' + esc(e.label) + '</b>' + (e.key === 'perm' && !on('privacy.commands') ? '<small>' + tr('Command hidden, see Privacy') + '</small>' : DC_HINT[e.key] ? '<small>' + esc(DC_HINT[e.key]) + '</small>' : '') + '</span>' + at('event.' + e.key + '.at', e.label) + bare('event.' + e.key + '.on', tr('Send {label}', { label: e.label })) + '</div>').join('') + '</div>';
       };
-      return '<div class="dc-legend"><span><span class="dc-at" aria-pressed="true">@</span> klingelt mit Erwähnung</span><span><span class="dc-at" aria-pressed="false">@</span> kommt still</span></div>' + s.events.map(grp).join('') +
-        '<div class="dc-quiet"><span><b>Ruhezeit</b><small>Auch Erwähnungen kommen dann still, nichts geht verloren</small></span>' + bare('quiet.on', 'Ruhezeit') +
-        '<div class="dc-times">von <input class="input" type="time" data-k="quiet.from" value="' + esc(val('quiet.from')) + '" aria-label="Ruhezeit von"> bis <input class="input" type="time" data-k="quiet.to" value="' + esc(val('quiet.to')) + '" aria-label="Ruhezeit bis"></div></div>' +
-        '<div class="dc-nums">' + num('delay.perm', 'Freigabe melden nach', 'Sekunden', 3600) + num('delay.idle', 'Fertig melden nach', 'Sekunden', 3600) + num('cleanup.hours', 'Nachrichten löschen nach', 'Stunden, 0 nie', 720) + '</div>' +
-        '<p class="dc-hint">Die Verzögerung spart Hinweise, wenn du schneller warst. Das Dashboard bleibt stehen, offene Nachrichten erst nach ihrer Erledigung gelöscht.</p>';
+      return '<div class="dc-legend"><span><span class="dc-at" aria-pressed="true">@</span> ' + tr('rings with a mention') + '</span><span><span class="dc-at" aria-pressed="false">@</span> ' + tr('arrives silently') + '</span></div>' + s.events.map(grp).join('') +
+        '<div class="dc-quiet"><span><b>' + tr('Quiet hours') + '</b><small>' + tr('Mentions also arrive silently then, nothing gets lost') + '</small></span>' + bare('quiet.on', tr('Quiet hours')) +
+        '<div class="dc-times">' + tr('from') + ' <input class="input" type="time" data-k="quiet.from" value="' + esc(val('quiet.from')) + '" aria-label="' + esc(tr('Quiet hours from')) + '"> ' + tr('until') + ' <input class="input" type="time" data-k="quiet.to" value="' + esc(val('quiet.to')) + '" aria-label="' + esc(tr('Quiet hours until')) + '"></div></div>' +
+        '<div class="dc-nums">' + num('delay.perm', tr('Report approval after'), tr('seconds'), 3600) + num('delay.idle', tr('Report done after'), tr('seconds'), 3600) + num('cleanup.hours', tr('Delete messages after'), tr('hours, 0 never'), 720) + '</div>' +
+        '<p class="dc-hint">' + tr('The delay saves notifications when you were faster. The dashboard stays; open messages are deleted only once they are dealt with.') + '</p>';
     }
 
     // Schalter nach J2 (W-0046); ausgeschaltet wird die Liste blass (CSS über :has).
-    const pCmds = () => sw('commands', 'Befehle und Knöpfe erlauben', s.mode === 'shared' ? 'Nur du, als die Person, die /works verbinden ausgeführt hat. Die Antworten siehst nur du.' : 'Nur du, als Besitzer der Bot-Anwendung. Die Antworten siehst nur du.') +
-      '<div class="dc-cmdl">' + s.commands.map((c) => '<div><code>' + esc(c.cmd) + '</code><span>' + esc(c.text) + '</span></div>').join('') + '<div><code>Knöpfe</code><span>Annehmen, Zurück an Claude, Anweisung an Claude, Neue Aufgabe, Bug ansehen</span></div></div>' +
-      '<p class="dc-hint">Ausgeschaltet zeigt works keine Knöpfe am Dashboard und an neuen Nachrichten' + (s.mode === 'shared' ? ' und antwortet auf /works nur mit einem kurzen Hinweis' : ' und meldet /works auf dem Server ab') + '. Freigaben für Werkzeuge erteilst du weiter in Claude Code.</p>';
-    const pPrivacy = () => sw('privacy.commands', 'Befehle aus Freigaben zeigen', 'Können Pfade, Adressen oder Geheimnisse enthalten') + sw('privacy.costs', 'Kosten zeigen', 'Tageskosten im Dashboard, Kosten je Aufgabe im Review') +
-      sw('privacy.ci_error', 'Fehlerzeile bei roter CI zeigen', 'Erste Zeile des Fehlers aus dem Log') + sw('privacy.titles', 'Aufgabentitel zeigen', 'Aus: nur IDs, etwa für Server mit anderen Leuten') +
-      '<p class="dc-hint">Links gehen auf GitHub, nie auf das lokale Board. ' + (s.mode === 'shared' ? 'Der Geräteschlüssel' : 'Das Token') + ' steht nirgends außer auf diesem Rechner.</p>';
+    const pCmds = () => sw('commands', tr('Allow commands and buttons'), s.mode === 'shared' ? tr('Only you, as the person who ran /works link. Only you see the replies.') : tr('Only you, as the owner of the bot application. Only you see the replies.')) +
+      '<div class="dc-cmdl">' + s.commands.map((c) => '<div><code>' + esc(c.cmd) + '</code><span>' + esc(c.text) + '</span></div>').join('') + '<div><code>' + tr('Buttons') + '</code><span>' + tr('Accept, Back to Claude, Instruction to Claude, New task, View bug') + '</span></div></div>' +
+      '<p class="dc-hint">' + (s.mode === 'shared' ? tr('When off, works shows no buttons on the dashboard and on new messages and answers /works only with a short note. You still grant tool approvals in Claude Code.') : tr('When off, works shows no buttons on the dashboard and on new messages and unregisters /works on the server. You still grant tool approvals in Claude Code.')) + '</p>';
+    const pPrivacy = () => sw('privacy.commands', tr('Show commands from approvals'), tr('May contain paths, addresses or secrets')) + sw('privacy.costs', tr('Show costs'), tr('Daily costs in the dashboard, cost per task in review')) +
+      sw('privacy.ci_error', tr('Show the error line on red CI'), tr('First line of the error from the log')) + sw('privacy.titles', tr('Show task titles'), tr('Off: only IDs, e.g. for servers with other people')) +
+      '<p class="dc-hint">' + tr('Links go to GitHub, never to the local board.') + ' ' + (s.mode === 'shared' ? tr('The device key is stored nowhere except on this computer.') : tr('The token is stored nowhere except on this computer.')) + '</p>';
     const PANELS = { verbindung: pConn, projekte: pProjects, ereignisse: pEvents, befehle: pCmds, datenschutz: pPrivacy };
 
-    const badge = (k) => (k === 'projekte' ? enabled() : k === 'ereignisse' ? eventsOn() + ' an' : '');
+    const badge = (k) => (k === 'projekte' ? enabled() : k === 'ereignisse' ? tr('{n} on', { n: eventsOn() }) : '');
     const tabsHtml = () => DC_TABS.map(([k, l]) => '<button type="button" role="tab" data-dc-tab="' + k + '" aria-selected="' + (tab === k) + '"' + (!s.ready && k !== 'verbindung' ? ' aria-disabled="true"' : '') + '>' + l + (s.ready && badge(k) !== '' ? ' <span class="dc-n">' + badge(k) + '</span>' : '') + '</button>').join('');
     const n = () => Object.keys(draft).length;
     const footHtml = () => (s.ready
-      ? '<span class="dc-dirty"' + (n() ? '' : ' hidden') + '>' + n() + (n() === 1 ? ' Änderung' : ' Änderungen') + ' nicht gespeichert</span><span class="spacer"></span><button type="button" class="btn ghost" data-dc="discard"' + (n() ? '' : ' disabled') + '>Verwerfen</button><button class="btn primary" value="save"' + (n() ? '' : ' disabled') + '>Speichern</button>'
-      : '<span class="dc-hint">Die Einstellungen kannst du nach der Einrichtung ändern.</span><span class="spacer"></span><button class="btn ghost" value="cancel" formnovalidate>Später einrichten</button>');
-    const inner = () => '<div class="dc-head"><span class="dc-bot' + (s.running ? '' : ' off') + '" aria-hidden="true">w</span><div><h2>Discord-Bot works</h2><small>' + esc(sub()) + '</small></div><span class="spacer"></span><button class="btn small ghost" value="cancel" formnovalidate>Schließen</button></div>' +
-      '<div class="dc-tabs" role="tablist" aria-label="Bereiche">' + tabsHtml() + '</div>' +
+      ? '<span class="dc-dirty"' + (n() ? '' : ' hidden') + '>' + (n() === 1 ? tr('{n} change not saved', { n: 1 }) : tr('{n} changes not saved', { n: n() })) + '</span><span class="spacer"></span><button type="button" class="btn ghost" data-dc="discard"' + (n() ? '' : ' disabled') + '>' + tr('Discard') + '</button><button class="btn primary" value="save"' + (n() ? '' : ' disabled') + '>' + tr('Save') + '</button>'
+      : '<span class="dc-hint">' + tr('You can change the settings after setup.') + '</span><span class="spacer"></span><button class="btn ghost" value="cancel" formnovalidate>' + tr('Set up later') + '</button>');
+    const inner = () => '<div class="dc-head"><span class="dc-bot' + (s.running ? '' : ' off') + '" aria-hidden="true">w</span><div><h2>' + tr('works Discord bot') + '</h2><small>' + esc(sub()) + '</small></div><span class="spacer"></span><button class="btn small ghost" value="cancel" formnovalidate>' + tr('Close') + '</button></div>' +
+      '<div class="dc-tabs" role="tablist" aria-label="' + esc(tr('Sections')) + '">' + tabsHtml() + '</div>' +
       '<div class="dc-main" role="tabpanel">' + PANELS[tab]() + '</div>' +
-      '<aside class="dc-side" aria-label="Vorschau"><b>' + (s.ready ? 'Vorschau' : 'So sieht es danach aus') + '</b><label class="field"><span>Nachricht</span><select class="input" id="dcPv">' + DC_PV.map(([k, l]) => '<option value="' + k + '"' + (k === pvType ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
-        '<div class="dc-pv" id="dcPvBox"><p class="dc-hint">Lädt …</p></div><b>Auf dem Handy</b><div class="dc-lock" id="dcLock"></div><p class="dc-cap"></p></aside>' +
+      '<aside class="dc-side" aria-label="' + esc(tr('Preview')) + '"><b>' + (s.ready ? tr('Preview') : tr('This is how it will look')) + '</b><label class="field"><span>' + tr('Message') + '</span><select class="input" id="dcPv">' + DC_PV.map(([k, l]) => '<option value="' + k + '"' + (k === pvType ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></label>' +
+        '<div class="dc-pv" id="dcPvBox"><p class="dc-hint">' + tr('Loading …') + '</p></div><b>' + tr('On the phone') + '</b><div class="dc-lock" id="dcLock"></div><p class="dc-cap"></p></aside>' +
       '<p class="err dc-err" role="alert"></p><div class="dc-foot">' + footHtml() + '</div>';
 
     async function preview() {
@@ -3612,7 +3630,7 @@
       // Ein eben erst gewählter Kanal je Projekt hat noch keinen gespeicherten Namen: aus der Liste vom Bot.
       const ch = r.channel || ((chans ? chans.guilds.flatMap((g) => g.channels) : []).find((c) => c.id === r.channel_id) || {}).name || 'works';
       lock.className = 'dc-lock' + (r.ring ? '' : ' mute');
-      lock.innerHTML = r.ring ? '<i>w</i><b>works · #' + esc(ch) + '</b><span>' + esc(String(r.content || '').replace(/<@\d+>/g, '@du')) + '</span>' : '<b>Kein Hinweis</b><span>Die Nachricht erscheint nur im Kanal.</span>';
+      lock.innerHTML = r.ring ? '<i>w</i><b>works · #' + esc(ch) + '</b><span>' + esc(String(r.content || '').replace(/<@\d+>/g, tr('@you'))) + '</span>' : '<b>' + tr('No notification') + '</b><span>' + tr('The message only appears in the channel.') + '</span>';
       $('.dc-cap', root).textContent = r.why;
     }
     const schedule = () => { clearTimeout(pvTimer); pvTimer = setTimeout(preview, 150); };
@@ -3625,7 +3643,7 @@
       if (!b) return;
       const c = pick && pick !== s.channel_id && chans ? chans.guilds.flatMap((g) => g.channels).find((x) => x.id === pick) : null;
       b.disabled = !c || !c.can;
-      $('.dc-target', root).textContent = c ? 'Neuer Kanal: #' + c.name : '';
+      $('.dc-target', root).textContent = c ? tr('New channel: #{name}', { name: c.name }) : '';
     }
     const setK = (k, v) => { if (saved[k] === v) delete draft[k]; else draft[k] = v; refresh(); schedule(); };
     function syncGroups() {
@@ -3634,7 +3652,7 @@
         if (!box) continue;
         const cnt = g.items.filter((e) => on('event.' + e.key + '.on')).length;
         box.checked = cnt === g.items.length;
-        box.closest('.dc-grp-h').querySelector('small').textContent = cnt + ' von ' + g.items.length;
+        box.closest('.dc-grp-h').querySelector('small').textContent = tr('{n} of {total}', { n: cnt, total: g.items.length });
       }
     }
     async function reload() {
@@ -3663,7 +3681,7 @@
         chans = null;
         await reload();
         loadChannels();
-        ok(op === 'token' ? 'Token gültig: ' + r.bot_name + (r.channel ? '' : '. Jetzt einladen und einen Kanal wählen.') : 'Gekoppelt: #' + r.channel_name + ' auf ' + r.guild_name);
+        ok(op !== 'token' ? tr('Paired: #{channel} on {guild}', { channel: r.channel_name, guild: r.guild_name }) : r.channel ? tr('Token valid: {name}', { name: r.bot_name }) : tr('Token valid: {name}. Now invite it and choose a channel.', { name: r.bot_name }));
       });
     }
 
@@ -3672,7 +3690,7 @@
       s = await api('POST', 'api/discord', { op: 'set', values: draft });
       saved = dcValues(s); draft = {};
       renderAll();
-      ok('Gespeichert. Der Bot übernimmt es ohne Neustart.');
+      ok(tr('Saved. The bot picks it up without a restart.'));
       return undefined;
     }, (f) => {
       root = $('.dc', f);
@@ -3692,20 +3710,20 @@
             const r = await api('POST', 'api/discord', { op: 'move', channel_id: pick });
             pick = '';
             await reload();
-            ok(r.running ? 'Dashboard zieht nach #' + r.channel_name + ' um. Der Bot legt es dort an und löscht das alte.' : 'Kanal #' + r.channel_name + ' gespeichert.');
+            ok(r.running ? tr('Dashboard moves to #{channel}. The bot creates it there and deletes the old one.', { channel: r.channel_name }) : tr('Channel #{channel} saved.', { channel: r.channel_name }));
           });
         }
         const op = b.dataset.dc;
         if (op === 'discard') { draft = {}; renderAll(); return; }
         if (op === 'replace') { const x = $('.dc-replace', root); x.hidden = !x.hidden; return; }
         if (op === 'reload') { chans = null; renderMain(); loadChannels(); return; }
-        if (op === 'test') return busy(b, async () => { const r = await api('POST', 'api/discord', { op: 'test' }); ok('Testnachricht gesendet an #' + r.channel_name); });
+        if (op === 'test') return busy(b, async () => { const r = await api('POST', 'api/discord', { op: 'test' }); ok(tr('Test message sent to #{channel}', { channel: r.channel_name })); });
         if (op === 'start') return busy(b, async () => { await api('POST', 'api/discord', { op: 'start' }); await new Promise((r) => setTimeout(r, 1500)); await reload(); });
         if (op === 'service') return busy(b, async () => { await api('POST', 'api/discord', { op: 'set', values: { service: $('#dcService', root).value.trim() } }); await reload(); });
         // Trennen in zwei Klicks statt eines zweiten Dialogs.
         if (op === 'disconnect') {
-          if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Wirklich trennen'; return; }
-          return busy(b, async () => { await api('POST', 'api/discord', { op: 'disconnect' }); chans = null; way = 'shared'; await reload(); ok('Getrennt. Die Nachrichten in Discord bleiben stehen.'); });
+          if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = tr('Really disconnect'); return; }
+          return busy(b, async () => { await api('POST', 'api/discord', { op: 'disconnect' }); chans = null; way = 'shared'; await reload(); ok(tr('Disconnected. The messages in Discord stay.')); });
         }
       });
       root.addEventListener('change', (ev) => {
@@ -3742,41 +3760,51 @@
       EDIT ? api('GET', 'api/undo').catch(() => []) : Promise.resolve([]), EDIT ? api('GET', 'api/share').catch(() => null) : Promise.resolve(null),
     ]);
     const h = [];
-    h.push('<div class="row-btns tools-top"><button class="btn small" data-openside="knowledge">Projektwissen' + (meta.knowledgeProposals ? ' (' + meta.knowledgeProposals + ' neu)' : '') + '</button><button class="btn small" data-openside="cleanup">Aufräumen</button>' + (EDIT ? '<button class="btn small" id="btnImport">Importieren</button><button class="btn small" id="btnBackup">Sichern und Wiederherstellen</button>' : '') + (EDIT && LIVE ? '<button class="btn small" id="btnDiscord">Discord-Bot</button>' : '') + '</div>');
-    h.push('<details class="sec" id="parSec"><summary>Parallelarbeit <span class="meta">' + ((meta.lanes || []).length ? meta.lanes.length + ' laufen' : 'keine') + '</span></summary><div class="body" id="parBody"><p class="md">Claude prüft vor dem Abarbeiten mehrerer Aufgaben, ob sie gleichzeitig in eigenen Git-Worktrees laufen können, und startet dann je Aufgabe einen Agenten. Ist es unsicher, fragt es dich.</p><p class="muted">Lädt beim Öffnen …</p></div></details>');
+    const loc = I18N.lang === 'de' ? 'de-DE' : 'en-GB';
+    h.push('<div class="row-btns tools-top"><button class="btn small" data-openside="knowledge">' + tr('Project knowledge') + (meta.knowledgeProposals ? tr(' ({n} new)', { n: meta.knowledgeProposals }) : '') + '</button><button class="btn small" data-openside="cleanup">' + tr('Clean up') + '</button>' + (EDIT ? '<button class="btn small" id="btnImport">' + tr('Import') + '</button><button class="btn small" id="btnBackup">' + tr('Back up and restore') + '</button>' : '') + (EDIT && LIVE ? '<button class="btn small" id="btnDiscord">' + tr('Discord bot') + '</button>' : '') + '</div>');
+    h.push('<details class="sec" id="parSec"><summary>' + tr('Parallel work') + ' <span class="meta">' + ((meta.lanes || []).length ? tr('{n} active', { n: meta.lanes.length }) : tr('none')) + '</span></summary><div class="body" id="parBody"><p class="md">' + tr('Before working through several tasks, Claude checks whether they can run at the same time in their own Git worktrees and then starts one agent per task. If it is unsure, it asks you.') + '</p><p class="muted">' + tr('Loads when opened …') + '</p></div></details>');
     if (rec) {
-      h.push('<details class="sec"><summary>Wiederkehrende Aufgaben <span class="meta">' + rec.rules.length + '</span></summary><div class="body">' +
-        '<p class="md">works legt sie zum Termin selbst an, beim Sitzungsstart oder solange das Board läuft. Ist die vorige noch offen, wird keine zweite angelegt.</p>' +
-        (rec.rules.length ? rec.rules.map((r) => '<div class="tpl-row"><div class="q-t"><strong>' + esc(r.title) + '</strong><span class="q-meta">' + esc(r.text + (r.active === false ? ', pausiert' : ', nächste ' + fmtDate(r.next[0]))) + (r.lastTask ? ', zuletzt ' + esc(r.lastTask) : '') + '</span></div>' + (EDIT ? '<button class="btn small ghost" data-recedit="' + esc(r.id) + '">Bearbeiten</button>' : '') + '</div>').join('') : '<p class="md empty-md">Noch keine Regeln.</p>') +
-        (EDIT ? '<div class="row-btns"><button class="btn small primary" id="recNew">Neue Regel</button><button class="btn small" id="recRun">Jetzt prüfen</button></div>' : '') + '</div></details>');
+      h.push('<details class="sec"><summary>' + tr('Recurring tasks') + ' <span class="meta">' + rec.rules.length + '</span></summary><div class="body">' +
+        '<p class="md">' + tr('works creates them on schedule by itself, at session start or while the board is running. If the previous one is still open, no second one is created.') + '</p>' +
+        (rec.rules.length ? rec.rules.map((r) => '<div class="tpl-row"><div class="q-t"><strong>' + esc(r.title) + '</strong><span class="q-meta">' + esc(r.text + (r.active === false ? tr(', paused') : tr(', next {date}', { date: fmtDate(r.next[0]) }))) + (r.lastTask ? tr(', last {id}', { id: esc(r.lastTask) }) : '') + '</span></div>' + (EDIT ? '<button class="btn small ghost" data-recedit="' + esc(r.id) + '">' + tr('Edit') + '</button>' : '') + '</div>').join('') : '<p class="md empty-md">' + tr('No rules yet.') + '</p>') +
+        (EDIT ? '<div class="row-btns"><button class="btn small primary" id="recNew">' + tr('New rule') + '</button><button class="btn small" id="recRun">' + tr('Check now') + '</button></div>' : '') + '</div></details>');
     }
     if (gh) {
       const s = gh.settings; const st = gh.state;
       const sw = (k, l) => '<label class="switch small"><span><b>' + esc(l) + '</b></span><input type="checkbox" data-gh="' + k + '"' + (s[k] ? ' checked' : '') + (EDIT ? '' : ' disabled') + '><i aria-hidden="true"></i></label>';
-      h.push('<details class="sec"><summary>GitHub <span class="meta">' + (st && st.repo ? esc(st.repo) : 'nicht verbunden') + '</span></summary><div class="body">' +
-        '<p class="md">Abgleich über das gh CLI beim Sitzungsstart und alle ' + s.interval_min + ' Minuten, solange das Board läuft.' + (st && st.last ? ' Zuletzt ' + esc(new Date(st.last).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })) + '.' : '') + '</p>' +
-        sw('enabled', 'Automatisch abgleichen') + sw('pr_review', 'PR geöffnet: Aufgabe nach Review') + sw('merge_done', 'PR gemergt: Aufgabe abschließen') + sw('ci_checks', 'CI-Checks als Prüfung') + sw('review_comments', 'Änderungswünsche als Kommentar an Claude') + sw('issues', 'Neue Issues als Aufgabe') + sw('close_issues', 'Erledigte Aufgabe schließt ihr Issue') +
-        '<label class="field"><span>Nur Issues mit diesen Labels, leer für alle</span><input class="input" id="ghLabels" value="' + esc((s.labels || []).join(', ')) + '"' + (EDIT ? '' : ' disabled') + '></label>' +
-        (st && st.events && st.events.length ? '<ol class="commits">' + st.events.slice(0, 8).map((e) => '<li><time class="muted num">' + esc(new Date(e.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time><span class="subj">' + esc(e.text) + '</span></li>').join('') + '</ol>' : '') +
-        (EDIT ? '<div class="row-btns"><button class="btn small" id="ghSync">Jetzt abgleichen</button></div>' : '') + '</div></details>');
+      h.push('<details class="sec"><summary>GitHub <span class="meta">' + (st && st.repo ? esc(st.repo) : tr('not connected')) + '</span></summary><div class="body">' +
+        '<p class="md">' + tr('Syncs via the gh CLI at session start and every {n} minutes while the board is running.', { n: s.interval_min }) + (st && st.last ? ' ' + tr('Last {date}.', { date: esc(new Date(st.last).toLocaleString(loc, { dateStyle: 'short', timeStyle: 'short' })) }) : '') + '</p>' +
+        sw('enabled', tr('Sync automatically')) + sw('pr_review', tr('PR opened: task to review')) + sw('merge_done', tr('PR merged: complete the task')) + sw('ci_checks', tr('CI checks as a check')) + sw('review_comments', tr('Change requests as a comment to Claude')) + sw('issues', tr('New issues as tasks')) + sw('close_issues', tr('A done task closes its issue')) +
+        '<label class="field"><span>' + tr('Only issues with these labels, empty for all') + '</span><input class="input" id="ghLabels" value="' + esc((s.labels || []).join(', ')) + '"' + (EDIT ? '' : ' disabled') + '></label>' +
+        (st && st.events && st.events.length ? '<ol class="commits">' + st.events.slice(0, 8).map((e) => '<li><time class="muted num">' + esc(new Date(e.at).toLocaleString(loc, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) + '</time><span class="subj">' + esc(e.text) + '</span></li>').join('') + '</ol>' : '') +
+        (EDIT ? '<div class="row-btns"><button class="btn small" id="ghSync">' + tr('Sync now') + '</button></div>' : '') + '</div></details>');
     }
     if (LIVE) {
       const local = location.origin + '/kalender.ics';
       const viewKey = share && share.shared && share.links[0] ? share.links[0].view.replace(/\/\?view=/, '/kalender.ics?key=') : '';
-      h.push('<details class="sec"><summary>Kalender</summary><div class="body"><p class="md">Fälligkeiten, Meilensteine und Sprints zum Abonnieren in Google Kalender, Outlook oder Apple Kalender.</p>' +
-        '<div class="share-link"><span>Auf diesem Rechner</span><input class="input mono" readonly value="' + esc(local) + '"><button type="button" class="btn small" data-copy2="' + esc(local) + '">Kopieren</button></div>' +
-        (viewKey ? '<div class="share-link"><span>Im Netzwerk, mit Leseschlüssel</span><input class="input mono" readonly value="' + esc(viewKey) + '"><button type="button" class="btn small" data-copy2="' + esc(viewKey) + '">Kopieren</button></div>' : '') +
-        '<div class="row-btns"><a class="btn small" href="kalender.ics?recurring=1" download="termine.ics">Als Datei laden</a></div><p class="sublabel">Kalender im Internet brauchen die Datei, sie kommen nicht an deinen Rechner heran.</p></div></details>');
+      h.push('<details class="sec"><summary>' + tr('Calendar') + '</summary><div class="body"><p class="md">' + tr('Due dates, milestones and sprints to subscribe to in Google Calendar, Outlook or Apple Calendar.') + '</p>' +
+        '<div class="share-link"><span>' + tr('On this computer') + '</span><input class="input mono" readonly value="' + esc(local) + '"><button type="button" class="btn small" data-copy2="' + esc(local) + '">' + tr('Copy') + '</button></div>' +
+        (viewKey ? '<div class="share-link"><span>' + tr('In the network, with read key') + '</span><input class="input mono" readonly value="' + esc(viewKey) + '"><button type="button" class="btn small" data-copy2="' + esc(viewKey) + '">' + tr('Copy') + '</button></div>' : '') +
+        '<div class="row-btns"><a class="btn small" href="kalender.ics?recurring=1" download="termine.ics">' + tr('Download as file') + '</a></div><p class="sublabel">' + tr('Online calendars need the file; they cannot reach your computer.') + '</p></div></details>');
     }
     if (usage) {
-      h.push('<details class="sec"><summary>Verbrauch <span class="meta">' + (usage.total.tokens ? fmtMoney(usage.total.cost, usage.currency) + ' in ' + usage.days + ' Tagen' : 'noch nichts erfasst') + '</span></summary><div class="body">' +
-        (usage.total.tokens ? '<div class="code-cards"><div><small>Tokens</small><strong>' + fmtTok(usage.total.tokens) + '</strong><span class="muted">davon ' + fmtTok(usage.total.cr + usage.total.cw) + ' Cache</span></div><div><small>Geschätzte Kosten</small><strong>' + fmtMoney(usage.total.cost, usage.currency) + '</strong><span class="muted">' + (usage.untrackedCost > 0 ? fmtMoney(usage.untrackedCost, usage.currency) + ' ohne aktive Aufgabe' : 'alles Aufgaben zugeordnet') + '</span></div></div>' +
-          '<div class="est-grid">' + usage.byType.map((b) => '<strong>' + esc(meta.typeLabel[b.type] || b.type) + '</strong><div class="est-track"><span class="est-bar" style="width:' + (b.cost / (usage.byType[0].cost || 1) * 100).toFixed(1) + '%"></span></div><span class="num">' + fmtMoney(b.cost, usage.currency) + ', ' + b.tasks + ' Aufg.</span>').join('') + '</div>' +
-          (usage.top.length ? '<p class="sublabel">Am teuersten: ' + usage.top.slice(0, 4).map((x) => esc(x.id) + ' ' + fmtMoney(x.cost, usage.currency)).join(', ') + '</p>' : '') : '<p class="md empty-md">Der Stop Hook rechnet den Verbrauch jeder Antwort der aktiven Aufgabe zu.</p>') +
-        '<p class="sublabel">Schätzung nach den Preisen in config.json unter prices (US-Dollar je Million Tokens). Bitte mit deinem Tarif abgleichen.</p></div></details>');
+      h.push('<details class="sec"><summary>' + tr('Usage') + ' <span class="meta">' + (usage.total.tokens ? tr('{cost} in {days} days', { cost: fmtMoney(usage.total.cost, usage.currency), days: usage.days }) : tr('nothing recorded yet')) + '</span></summary><div class="body">' +
+        (usage.total.tokens ? '<div class="code-cards"><div><small>Tokens</small><strong>' + fmtTok(usage.total.tokens) + '</strong><span class="muted">' + tr('of which {tokens} cache', { tokens: fmtTok(usage.total.cr + usage.total.cw) }) + '</span></div><div><small>' + tr('Estimated cost') + '</small><strong>' + fmtMoney(usage.total.cost, usage.currency) + '</strong><span class="muted">' + (usage.untrackedCost > 0 ? tr('{cost} without an active task', { cost: fmtMoney(usage.untrackedCost, usage.currency) }) : tr('all assigned to tasks')) + '</span></div></div>' +
+          '<div class="est-grid">' + usage.byType.map((b) => '<strong>' + esc(meta.typeLabel[b.type] || b.type) + '</strong><div class="est-track"><span class="est-bar" style="width:' + (b.cost / (usage.byType[0].cost || 1) * 100).toFixed(1) + '%"></span></div><span class="num">' + fmtMoney(b.cost, usage.currency) + ', ' + tr('across {n} tasks', { n: b.tasks }) + '</span>').join('') + '</div>' +
+          (usage.top.length ? '<p class="sublabel">' + tr('Most expensive: {list}', { list: usage.top.slice(0, 4).map((x) => esc(x.id) + ' ' + fmtMoney(x.cost, usage.currency)).join(', ') }) + '</p>' : '') : '<p class="md empty-md">' + tr('The Stop hook assigns the usage of every reply to the active task.') + '</p>') +
+        '<p class="sublabel">' + tr('Estimate based on the prices in config.json under prices (US dollars per million tokens). Please compare with your plan.') + '</p></div></details>');
     }
     if (EDIT && undos.length) {
-      h.push('<details class="sec"><summary>Letzte Änderungen <span class="meta">Strg+Z macht die letzte rückgängig</span></summary><div class="body">' + undos.slice(0, 10).map((u) => '<div class="tpl-row"><span class="muted num">' + esc(timeOf(u.at)) + '</span><span class="q-t">' + esc(u.label) + '</span><button class="btn small ghost" data-undo="' + esc(u.key) + '">Zurück</button></div>').join('') + '</div></details>');
+      h.push('<details class="sec"><summary>' + tr('Recent changes') + ' <span class="meta">' + tr('Ctrl+Z undoes the last one') + '</span></summary><div class="body">' + undos.slice(0, 10).map((u) => '<div class="tpl-row"><span class="muted num">' + esc(timeOf(u.at)) + '</span><span class="q-t">' + esc(u.label) + '</span><button class="btn small ghost" data-undo="' + esc(u.key) + '">' + tr('Revert') + '</button></div>').join('') + '</div></details>');
+    }
+    // Sprache (W-0041): global oder nur für dieses Projekt. WORKS_LANG in der Umgebung hat Vorrang.
+    if (EDIT) {
+      const langs = I18N.languages || [];
+      h.push('<details class="sec" id="langSec"><summary>' + tr('Language') + ' <span class="meta">' + esc((langs.find((l) => l.code === I18N.lang) || {}).name || I18N.lang) + '</span></summary><div class="body">' +
+        (I18N.source === 'env' ? '<p class="sublabel">' + tr('WORKS_LANG is set in the environment and takes precedence over this setting.') + '</p>' : '') +
+        '<label class="field"><span>' + tr('Language') + '</span><select id="langSel">' + langs.map((l) => '<option value="' + esc(l.code) + '"' + (l.code === I18N.lang ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('') + '</select></label>' +
+        segCtl('langScope', [{ id: 'global', label: tr('For all projects') }, { id: 'project', label: tr('Only this project') }], I18N.source === 'project' ? 'project' : 'global') +
+        '<div class="row-btns"><button class="btn small primary" id="langApply">' + tr('Apply') + '</button>' + (I18N.source === 'project' ? '<button class="btn small ghost" id="langReset">' + tr('Follow the global language') + '</button>' : '') + '</div></div></details>');
     }
     return h.join('');
   }
@@ -3790,20 +3818,34 @@
       if (!ps.open || ps.dataset.loaded) return;
       let r; try { r = await api('GET', 'api/parallel'); } catch (e) { $('#parBody', body).innerHTML = '<p class="err">' + esc(e.message) + '</p>'; return; }
       ps.dataset.loaded = '1';
-      const v = { parallel: ['good', 'Parallel möglich'], nacheinander: ['', 'Besser nacheinander'], unsicher: ['warn-t', 'Unsicher, Claude fragt dich'] }[r.plan.verdict];
-      $('#parBody', body).innerHTML = (r.lanes.length ? '<div class="block"><div class="block-head"><h3>Laufen gerade</h3></div>' + r.lanes.map((l) => '<div class="tpl-row"><div class="q-t"><button class="q-title" data-open="' + esc(l.task) + '">' + esc(l.task) + '</button><span class="q-meta mono">' + esc(l.branch) + '</span></div><span class="muted">' + l.ahead + ' Commits' + (l.dirty ? ', ' + l.dirty + ' offen' : '') + (l.status === 'konflikt' ? ', Konflikt' : '') + '</span></div>').join('') + '</div>' : '') +
-        '<div class="block"><div class="block-head"><h3>Einschätzung für die nächsten Aufgaben</h3></div><p><strong class="' + v[0] + '">' + v[1] + '</strong></p><ul class="retro">' + r.plan.reasons.map((x) => '<li><span class="muted">·</span><span>' + esc(x) + '</span></li>').join('') + '</ul>' +
-        (r.plan.lanes.length && r.plan.verdict !== 'nacheinander' ? '<p class="sublabel">Gleichzeitig: ' + r.plan.lanes.map((l) => esc(l.id)).join(', ') + (r.plan.later.length ? '. Danach: ' + r.plan.later.slice(0, 6).map((l) => esc(l.id)).join(', ') : '') + '</p>' : '') +
-        (r.plan.skipped.length ? '<p class="sublabel">Nicht für Agenten: ' + r.plan.skipped.slice(0, 6).map((x) => esc(x.id) + ' (' + esc(x.why[0]) + ')').join(', ') + '</p>' : '') + '</div>';
+      const v = { parallel: ['good', tr('Parallel possible')], nacheinander: ['', tr('Better one after another')], unsicher: ['warn-t', tr('Unsure, Claude asks you')] }[r.plan.verdict];
+      $('#parBody', body).innerHTML = (r.lanes.length ? '<div class="block"><div class="block-head"><h3>' + tr('Currently running') + '</h3></div>' + r.lanes.map((l) => '<div class="tpl-row"><div class="q-t"><button class="q-title" data-open="' + esc(l.task) + '">' + esc(l.task) + '</button><span class="q-meta mono">' + esc(l.branch) + '</span></div><span class="muted">' + tr('{n} commits', { n: l.ahead }) + (l.dirty ? tr(', {n} open', { n: l.dirty }) : '') + (l.status === 'konflikt' ? tr(', conflict') : '') + '</span></div>').join('') + '</div>' : '') +
+        '<div class="block"><div class="block-head"><h3>' + tr('Assessment for the next tasks') + '</h3></div><p><strong class="' + v[0] + '">' + v[1] + '</strong></p><ul class="retro">' + r.plan.reasons.map((x) => '<li><span class="muted">·</span><span>' + esc(x) + '</span></li>').join('') + '</ul>' +
+        (r.plan.lanes.length && r.plan.verdict !== 'nacheinander' ? '<p class="sublabel">' + tr('At the same time: {ids}', { ids: r.plan.lanes.map((l) => esc(l.id)).join(', ') }) + (r.plan.later.length ? tr('. Then: {ids}', { ids: r.plan.later.slice(0, 6).map((l) => esc(l.id)).join(', ') }) : '') + '</p>' : '') +
+        (r.plan.skipped.length ? '<p class="sublabel">' + tr('Not for agents: {list}', { list: r.plan.skipped.slice(0, 6).map((x) => esc(x.id) + ' (' + esc(x.why[0]) + ')').join(', ') }) + '</p>' : '') + '</div>';
       $$('[data-open]', $('#parBody', body)).forEach((b) => b.onclick = () => { closeSide(); openTask(b.dataset.open); });
     });
     $$('[data-openside]', body).forEach((b) => b.onclick = () => { side = null; openSide(b.dataset.openside); });
-    $$('[data-copy2]', body).forEach((b) => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy2); } catch (e) { b.previousElementSibling.select(); document.execCommand('copy'); } b.textContent = 'Kopiert'; setTimeout(() => { b.textContent = 'Kopieren'; }, 1500); });
+    $$('[data-copy2]', body).forEach((b) => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy2); } catch (e) { b.previousElementSibling.select(); document.execCommand('copy'); } b.textContent = tr('Copied'); setTimeout(() => { b.textContent = tr('Copy'); }, 1500); });
     if (!EDIT) return;
     $$('[data-undo]', body).forEach((b) => b.onclick = async () => { if (await run(() => act('undo', { key: b.dataset.undo }), (x) => x.message)) renderSide(); });
-    $$('[data-gh]', body).forEach((c) => c.onchange = () => run(() => act('githubSettings', { [c.dataset.gh]: c.checked }), 'Gespeichert'));
-    const gl = $('#ghLabels', body); if (gl) gl.onchange = () => run(() => act('githubSettings', { labels: gl.value }), 'Gespeichert');
-    const gs = $('#ghSync', body); if (gs) gs.onclick = async () => { gs.disabled = true; gs.textContent = 'Gleicht ab …'; await run(() => act('githubSync', {}), (x) => x.message || 'Abgeglichen'); renderSide(); };
+    $$('[data-gh]', body).forEach((c) => c.onchange = () => run(() => act('githubSettings', { [c.dataset.gh]: c.checked }), tr('Saved')));
+    const gl = $('#ghLabels', body); if (gl) gl.onchange = () => run(() => act('githubSettings', { labels: gl.value }), tr('Saved'));
+    const gs = $('#ghSync', body); if (gs) gs.onclick = async () => { gs.disabled = true; gs.textContent = tr('Syncing …'); await run(() => act('githubSync', {}), (x) => x.message || tr('Synced')); renderSide(); };
+    // Sprache wechseln: der Server ruft works lang auf, danach lädt die Seite in der neuen Sprache.
+    const la = $('#langApply', body);
+    if (la) la.onclick = async () => {
+      la.disabled = true;
+      const scope = ($('input[name="langScope"]:checked', body) || {}).value || 'global';
+      if (await run(() => api('POST', 'api/lang', { lang: $('#langSel', body).value, scope }))) location.reload();
+      else la.disabled = false;
+    };
+    const lr = $('#langReset', body);
+    if (lr) lr.onclick = async () => {
+      lr.disabled = true;
+      if (await run(() => api('POST', 'api/lang', { lang: '', scope: 'project' }))) location.reload();
+      else lr.disabled = false;
+    };
     const rn = $('#recRun', body); if (rn) rn.onclick = () => run(() => act('recurRun', {}), (x) => x.message);
     const rr = $('#recNew', body); if (rr) rr.onclick = () => editRule(null);
     $$('[data-recedit]', body).forEach((b) => b.onclick = () => editRule(b.dataset.recedit));
@@ -3813,20 +3855,20 @@
     let info;
     try { info = await api('GET', 'api/recurring'); } catch (e) { return fail(e); }
     const r = rid ? info.rules.find((x) => x.id === rid) : { title: '', kind: 'weekly', weekday: 1, nth: 1, interval: 1, status: 'geplant', active: true, priority: 'P3', type: 'chore' };
-    const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+    const days = [tr('Monday'), tr('Tuesday'), tr('Wednesday'), tr('Thursday'), tr('Friday'), tr('Saturday'), tr('Sunday')];
     const opt = (list, cur) => list.map((o) => '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(cur ?? '') ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
-    const html = '<h2>' + (rid ? 'Regel bearbeiten' : 'Neue wiederkehrende Aufgabe') + '</h2>' +
-      '<label class="field"><span>Titel, {Datum} und {Monat} werden ersetzt</span><input class="input" name="title" required maxlength="150" value="' + esc(r.title) + '" placeholder="Abhängigkeiten aktualisieren ({Monat})" autofocus></label>' +
-      '<div class="grid"><label class="field span2"><span>Grundlage</span><select name="template"><option value="">Ohne Vorlage</option>' + info.templates.map((t) => '<option value="' + esc(t.slug) + '"' + (r.template === t.slug ? ' selected' : '') + '>Vorlage ' + esc(t.name) + '</option>').join('') + '</select></label>' +
-      '<label class="field"><span>Typ</span><select name="type">' + opt(Object.entries(meta.typeLabel), r.type) + '</select></label><label class="field"><span>Priorität</span><select name="priority">' + opt(PRIOS.map((p) => [p, p]), r.priority) + '</select></label></div>' +
-      '<div class="field"><span>Rhythmus</span>' + segCtl('kind', [{ id: 'daily', label: 'Täglich' }, { id: 'weekly', label: 'Wöchentlich' }, { id: 'monthly', label: 'Monatlich' }, { id: 'days', label: 'Alle N Tage' }], r.kind) + '</div>' +
-      '<div class="grid"><label class="field"><span>Alle wie viele</span><input class="input" type="number" name="interval" min="1" max="365" value="' + esc(r.interval || 1) + '"></label><label class="field"><span>Wochentag</span><select name="weekday">' + opt(days.map((d, i) => [i + 1, d]), r.weekday || 1) + '</select></label><label class="field"><span>Im Monat</span><select name="nth">' + opt([[1, 'erster'], [2, 'zweiter'], [3, 'dritter'], [4, 'vierter'], [5, 'letzter']], r.nth || 1) + '</select></label><label class="field"><span>Fällig nach Tagen</span><input class="input" type="number" name="due_days" min="0" max="365" value="' + esc(r.due_days || '') + '"></label></div>' +
-      '<div class="row-btns"><label class="toggle"><input type="checkbox" name="queue"' + (r.queue ? ' checked' : '') + '> In die Warteschlange</label><label class="toggle"><input type="checkbox" name="sprint"' + (r.sprint ? ' checked' : '') + '> In den laufenden Sprint</label><label class="toggle"><input type="checkbox" name="active"' + (r.active !== false ? ' checked' : '') + '> Aktiv</label></div>' +
-      foot(rid ? 'Speichern' : 'Regel anlegen', { extra: rid ? '<button type="button" class="btn danger" id="recDel" style="margin-right:auto">Löschen</button>' : '' });
+    const html = '<h2>' + (rid ? tr('Edit rule') : tr('New recurring task')) + '</h2>' +
+      '<label class="field"><span>' + tr('Title; {Datum} (date) and {Monat} (month) are replaced') + '</span><input class="input" name="title" required maxlength="150" value="' + esc(r.title) + '" placeholder="' + tr('Update dependencies ({Monat})') + '" autofocus></label>' +
+      '<div class="grid"><label class="field span2"><span>' + tr('Basis') + '</span><select name="template"><option value="">' + tr('No template') + '</option>' + info.templates.map((t) => '<option value="' + esc(t.slug) + '"' + (r.template === t.slug ? ' selected' : '') + '>' + tr('Template {name}', { name: esc(t.name) }) + '</option>').join('') + '</select></label>' +
+      '<label class="field"><span>' + tr('Type') + '</span><select name="type">' + opt(Object.entries(meta.typeLabel), r.type) + '</select></label><label class="field"><span>' + tr('Priority') + '</span><select name="priority">' + opt(PRIOS.map((p) => [p, p]), r.priority) + '</select></label></div>' +
+      '<div class="field"><span>' + tr('Frequency') + '</span>' + segCtl('kind', [{ id: 'daily', label: tr('Daily') }, { id: 'weekly', label: tr('Weekly') }, { id: 'monthly', label: tr('Monthly') }, { id: 'days', label: tr('Every N days') }], r.kind) + '</div>' +
+      '<div class="grid"><label class="field"><span>' + tr('Every how many') + '</span><input class="input" type="number" name="interval" min="1" max="365" value="' + esc(r.interval || 1) + '"></label><label class="field"><span>' + tr('Weekday') + '</span><select name="weekday">' + opt(days.map((d, i) => [i + 1, d]), r.weekday || 1) + '</select></label><label class="field"><span>' + tr('In the month') + '</span><select name="nth">' + opt([[1, tr('first')], [2, tr('second')], [3, tr('third')], [4, tr('fourth')], [5, tr('last')]], r.nth || 1) + '</select></label><label class="field"><span>' + tr('Due after days') + '</span><input class="input" type="number" name="due_days" min="0" max="365" value="' + esc(r.due_days || '') + '"></label></div>' +
+      '<div class="row-btns"><label class="toggle"><input type="checkbox" name="queue"' + (r.queue ? ' checked' : '') + '> ' + tr('Into the queue') + '</label><label class="toggle"><input type="checkbox" name="sprint"' + (r.sprint ? ' checked' : '') + '> ' + tr('Into the current sprint') + '</label><label class="toggle"><input type="checkbox" name="active"' + (r.active !== false ? ' checked' : '') + '> ' + tr('Active') + '</label></div>' +
+      foot(rid ? tr('Save') : tr('Create rule'), { extra: rid ? '<button type="button" class="btn danger" id="recDel" style="margin-right:auto">' + tr('Delete') + '</button>' : '' });
     const res = await showDialog(html, (fd) => {
       const rule = { title: fd.get('title'), template: fd.get('template'), type: fd.get('type'), priority: fd.get('priority'), kind: fd.get('kind'), interval: fd.get('kind') === 'days' || fd.get('kind') === 'weekly' ? fd.get('interval') : '', weekday: fd.get('weekday'), nth: fd.get('kind') === 'monthly' ? fd.get('nth') : '', due_days: fd.get('due_days'), queue: fd.get('queue') === 'on', sprint: fd.get('sprint') === 'on', active: fd.get('active') === 'on', status: 'geplant' };
       return act('recurSave', { rule, rid: rid || '' });
-    }, (f) => { const d = $('#recDel', f); if (d) d.onclick = async () => { if (await run(() => act('recurRemove', { rid }), 'Regel gelöscht')) { $('button[value="cancel"]', f).click(); if (side === 'tools') renderSide(); } }; });
+    }, (f) => { const d = $('#recDel', f); if (d) d.onclick = async () => { if (await run(() => act('recurRemove', { rid }), tr('Rule deleted'))) { $('button[value="cancel"]', f).click(); if (side === 'tools') renderSide(); } }; });
     if (res) { ok(res.message); if (side === 'tools') renderSide(); }
   }
 
@@ -3840,30 +3882,30 @@
 
   function paletteCommands() {
     const c = [];
-    if (EDIT) c.push({ label: 'Neue Aufgabe', hint: 'N', run: () => newTask() });
-    VIEWS.forEach((v, i) => c.push({ label: VIEW_LABEL[v] + ' anzeigen', hint: String(i + 1), run: () => setView(v) }));
-    (meta.views || []).forEach((v) => c.push({ label: 'Ansicht „' + v.name + '“', run: () => applySavedView(v) }));
-    if (LIVE) c.push({ label: 'Wochenbericht, Vorlagen, Prüfungen, Benachrichtigungen', run: () => openSide('tools') });
-    if (LIVE) c.push({ label: 'Projektwissen', run: () => openSide('knowledge') });
-    if (LIVE) c.push({ label: 'Aufräumen', run: () => openSide('cleanup') });
-    if (LIVE && EDIT) c.push({ label: 'Aufgaben importieren', run: () => openImport() });
-    if (LIVE && EDIT) c.push({ label: 'Sichern und Wiederherstellen (JSON)', run: () => openBackup() });
-    if (EDIT) c.push({ label: 'Letzte Änderung rückgängig', hint: 'Strg+Z', run: () => run(() => act('undo', {}), (x) => x.message) });
+    if (EDIT) c.push({ label: tr('New task'), hint: 'N', run: () => newTask() });
+    VIEWS.forEach((v, i) => c.push({ label: tr('Show {view}', { view: VIEW_LABEL[v] }), hint: String(i + 1), run: () => setView(v) }));
+    (meta.views || []).forEach((v) => c.push({ label: tr('View “{name}”', { name: v.name }), run: () => applySavedView(v) }));
+    if (LIVE) c.push({ label: tr('Weekly report, templates, checks, notifications'), run: () => openSide('tools') });
+    if (LIVE) c.push({ label: tr('Project knowledge'), run: () => openSide('knowledge') });
+    if (LIVE) c.push({ label: tr('Clean up'), run: () => openSide('cleanup') });
+    if (LIVE && EDIT) c.push({ label: tr('Import tasks'), run: () => openImport() });
+    if (LIVE && EDIT) c.push({ label: tr('Back up and restore (JSON)'), run: () => openBackup() });
+    if (EDIT) c.push({ label: tr('Undo last change'), hint: tr('Ctrl+Z'), run: () => run(() => act('undo', {}), (x) => x.message) });
     if (LIVE) {
-      c.push({ label: 'Nächste Aufgabe vorschlagen', run: () => openSide('next') });
-      c.push({ label: 'Ideen öffnen', run: () => openSide('ideas') });
-      c.push({ label: 'Aktivität anzeigen', run: () => openSide('activity') });
+      c.push({ label: tr('Suggest next task'), run: () => openSide('next') });
+      c.push({ label: tr('Open ideas'), run: () => openSide('ideas') });
+      c.push({ label: tr('Show activity'), run: () => openSide('activity') });
     }
     if (EDIT) {
-      c.push({ label: 'Board teilen oder exportieren', run: () => openShare() });
-      c.push({ label: 'Meilenstein anlegen', run: () => editMilestone(null) });
+      c.push({ label: tr('Share or export board'), run: () => openShare() });
+      c.push({ label: tr('Create milestone'), run: () => editMilestone(null) });
     }
-    c.push({ label: 'Farbschema wechseln', run: () => $('#btnTheme').click() });
-    c.push({ label: state.closed ? 'Archiv und Verworfene ausblenden' : 'Archiv und Verworfene anzeigen', run: () => { state.closed = !state.closed; renderAll(); } });
-    if (filtersActive()) c.push({ label: 'Filter zurücksetzen', run: resetFilters });
-    PRIOS.forEach((p) => c.push({ label: 'Nur ' + p + ' ' + meta.prioLabel[p] + ' zeigen', run: () => { state.prios = new Set([p]); renderAll(); } }));
-    meta.milestones.forEach((m) => c.push({ label: 'Meilenstein ' + m.id + ' ' + m.title + ' filtern', run: () => { state.ms = m.id; renderAll(); } }));
-    COLS.forEach((s) => c.push({ label: 'Zu Spalte ' + L(s) + ' springen', run: () => { const col = $('.col[data-col="' + s + '"]'); if (col) col.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', inline: 'start', block: 'nearest' }); } }));
+    c.push({ label: tr('Change color scheme'), run: () => $('#btnTheme').click() });
+    c.push({ label: state.closed ? tr('Hide archive and discarded') : tr('Show archive and discarded'), run: () => { state.closed = !state.closed; renderAll(); } });
+    if (filtersActive()) c.push({ label: tr('Reset filters'), run: resetFilters });
+    PRIOS.forEach((p) => c.push({ label: tr('Show only {prio} {label}', { prio: p, label: meta.prioLabel[p] }), run: () => { state.prios = new Set([p]); renderAll(); } }));
+    meta.milestones.forEach((m) => c.push({ label: tr('Filter milestone {id} {title}', { id: m.id, title: m.title }), run: () => { state.ms = m.id; renderAll(); } }));
+    COLS.forEach((s) => c.push({ label: tr('Jump to column {col}', { col: L(s) }), run: () => { const col = $('.col[data-col="' + s + '"]'); if (col) col.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', inline: 'start', block: 'nearest' }); } }));
     return c.map((x) => ({ ...x, kind: 'cmd' }));
   }
 
@@ -3911,7 +3953,7 @@
     palSel = Math.min(palSel, Math.max(0, items.length - 1));
     let lastGroup = '';
     palList.innerHTML = items.length ? items.map((it, i) => {
-      const group = it.kind === 'task' ? (raw ? 'Aufgaben' : 'Offene Aufgaben') : it.kind === 'tag' ? 'Tags' : 'Befehle';
+      const group = it.kind === 'task' ? (raw ? tr('Tasks') : tr('Open tasks')) : it.kind === 'tag' ? 'Tags' : tr('Commands');
       const head = group !== lastGroup ? '<li class="pal-group" role="presentation">' + esc(group) + '</li>' : '';
       lastGroup = group;
       let body;
@@ -3919,12 +3961,12 @@
         const t = it.t;
         body = '<span class="st" style="--c:' + statusVar(t.status) + '" title="' + esc(L(t.status)) + '"></span><span class="pal-id num">' + mark(t.id, it.q) + '</span><span class="pal-t">' + mark(t.title, it.q) + '</span><span class="pal-m">' + esc(L(t.status)) + '</span><span class="pal-p" style="color:' + prioVar(t.priority) + '">' + esc(t.priority) + '</span>';
       } else if (it.kind === 'tag') {
-        body = '<span class="pal-ic">#</span><span class="pal-t">' + mark(it.label, it.q) + '</span><span class="pal-m">' + it.count + ' offen</span>';
+        body = '<span class="pal-ic">#</span><span class="pal-t">' + mark(it.label, it.q) + '</span><span class="pal-m">' + tr('{n} open', { n: it.count }) + '</span>';
       } else {
         body = '<span class="pal-ic">›</span><span class="pal-t">' + mark(it.label, it.q) + '</span>' + (it.hint ? '<kbd>' + esc(it.hint) + '</kbd>' : '');
       }
       return head + '<li role="option" id="pal-' + i + '" data-i="' + i + '" aria-selected="' + (i === palSel) + '">' + body + '</li>';
-    }).join('') : '<li class="pal-empty">Keine Treffer. Mit &gt; nach Befehlen suchen, mit # nach Tags.</li>';
+    }).join('') : '<li class="pal-empty">' + tr('No matches. Type &gt; to search commands, # for tags.') + '</li>';
     palIn.setAttribute('aria-activedescendant', items.length ? 'pal-' + palSel : '');
     $$('li[data-i]', palList).forEach((li) => {
       li.onmousemove = () => { if (palSel !== +li.dataset.i) { palSel = +li.dataset.i; updateSel(); } };
@@ -3991,7 +4033,7 @@
       dark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>',
     };
     b.innerHTML = icons[t] || icons.auto;
-    b.title = 'Farbschema: ' + (t === 'auto' ? 'System' : t === 'dark' ? 'Dunkel' : 'Hell') + '. Klicken zum Wechseln.';
+    b.title = tr('Color scheme: {scheme}. Click to change.', { scheme: t === 'auto' ? 'System' : t === 'dark' ? tr('Dark') : tr('Light') });
   }
   $('#btnTheme').onclick = () => {
     const order = ['auto', 'light', 'dark'];
@@ -4014,7 +4056,7 @@
       if (boardCount !== null && boardCount < 2 && n >= 2 && !fromHub) { location.href = '/hub'; return; }
       boardCount = n;
       hubLink.hidden = n < 2;
-      hubLink.textContent = '← Hub (' + n + ' Boards)';
+      hubLink.textContent = tr('← Hub ({n} boards)', { n });
     };
     pollBoards();
     setInterval(pollBoards, 5000);
@@ -4048,8 +4090,8 @@
   if (!EDIT) {
     const ro = $('#readonly');
     ro.hidden = false;
-    if (MODE === 'view') ro.innerHTML = '<strong>Nur Ansehen.</strong> Du siehst das Board von ' + esc(meta.project) + ' live über einen geteilten Link. Änderungen erscheinen automatisch.';
-    else if (MODE === 'snapshot') ro.innerHTML = '<strong>Schnappschuss</strong> vom ' + esc(new Date(meta.snapshot || Date.now()).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })) + '. Nur zum Ansehen, Details per Klick auf eine Aufgabe.';
+    if (MODE === 'view') ro.innerHTML = '<strong>' + tr('View only.') + '</strong> ' + tr('You are watching the board of {project} live via a shared link. Changes appear automatically.', { project: esc(meta.project) });
+    else if (MODE === 'snapshot') ro.innerHTML = '<strong>' + tr('Snapshot') + '</strong> ' + tr('of {date}. View only, click a task for details.', { date: esc(new Date(meta.snapshot || Date.now()).toLocaleString(I18N.lang === 'de' ? 'de-DE' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' })) });
   }
   $$('#views [data-view]').forEach((b) => b.onclick = () => setView(b.dataset.view));
   if (EDIT) {
@@ -4063,16 +4105,18 @@
     $('#btnActivity').onclick = () => openSide('activity');
     setLive(true, 'Live');
     let first = true;
+    // Sprache gewechselt (Board, works lang, anderer Tab): Seite neu laden, Texte stecken im Katalog der Seite.
+    const langChanged = (m) => !!(BOOT.i18n && m && m.lang && m.lang !== I18N.lang);
     const es = new EventSource('events');
     liveSource = es;
     es.addEventListener('update', () => {
       // Das erste update nach dem Verbinden prüft nur die Version, die Daten sind schon in der Seite.
-      if (first) { first = false; fetch('data.json', { cache: 'no-store' }).then((r) => r.json()).then((n) => { if (isForeign(n.meta)) becomeOrphan(n.meta); else if (outdated(n.meta)) reloadForUpdate(); }).catch(() => {}); return; }
-      reload();
+      if (first) { first = false; fetch('data.json', { cache: 'no-store' }).then((r) => r.json()).then((n) => { if (isForeign(n.meta)) becomeOrphan(n.meta); else if (outdated(n.meta)) reloadForUpdate(); else if (langChanged(n.meta)) location.reload(); }).catch(() => {}); return; }
+      reload().then(() => { if (!orphan && langChanged(meta)) location.reload(); });
     });
-    es.addEventListener('restart', () => { first = true; setLive(true, 'Neue Version startet'); });
+    es.addEventListener('restart', () => { first = true; setLive(true, tr('New version starting')); });
     es.onopen = () => { if ($('#live').classList.contains('off')) setLive(true, 'Live'); };
-    es.onerror = () => setLive(false, 'Verbindung getrennt, neuer Versuch läuft');
+    es.onerror = () => setLive(false, tr('Disconnected, retrying'));
     ensureMeta().then(() => { if (detail) renderDetail(); }).catch(() => {});
     setInterval(() => {
       let d = false;
@@ -4104,6 +4148,6 @@
     window.scrollTo(0, restored.scrollY || 0);
     if (LIVE && restored.openId) openTask(restored.openId);
     else if (LIVE && restored.side) openSide(restored.side);
-    if (LIVE) toast('<div class="what">Board neu geladen</div><div class="why">Der Board-Server wurde neu gestartet oder aktualisiert. Ansicht und Filter sind übernommen.</div>');
+    if (LIVE) toast('<div class="what">' + tr('Board reloaded') + '</div><div class="why">' + tr('The board server was restarted or updated. View and filters have been kept.') + '</div>');
   }
 })();

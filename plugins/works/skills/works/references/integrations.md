@@ -1,128 +1,128 @@
-# Zusammenspiel mit anderen Skills und Werkzeugen
+# Working with other skills and tools
 
-Jede Integration ist optional. Ist ein Skill nicht installiert, den Schritt auslassen oder von Hand erledigen.
+Every integration is optional. If a skill is not installed, skip the step or do it by hand.
 
-## Gestaltung mit UI UX Pro Max und Superpowers Brainstorming
+## Design with UI UX Pro Max and Superpowers Brainstorming
 
-Bei Gestaltungsaufgaben (Typ design oder Tag ui, design, ux) arbeitet Claude die Entwürfe selbst aus, sobald einer der beiden Skills installiert ist. Der Nutzer muss nicht darum bitten. `works start` sucht unter `~/.claude/skills` und `~/.claude/plugins` nach Ordnern namens `ui-ux-pro-max` und `brainstorm*` und nennt die gefundenen Skills in der Ausgabe.
+For design tasks (type design or tag ui, design, ux), Claude works out the design variants itself as soon as one of the two skills is installed. The user does not have to ask. `works start` looks in `~/.claude/skills` and `~/.claude/plugins` for folders named `ui-ux-pro-max` and `brainstorm*` and lists the skills it finds in its output.
 
-Alles landet im Aufgabenordner unter `design/`, Index in `design/design.json`. Das Board zeigt es im Tab Entwürfe: Farben und Schrift, die Varianten als Vorschau (HTML-Mockups laufen in einem abgeschotteten iframe), das Brainstorming und die Wahl des Nutzers.
+Everything goes into the task folder under `design/`, indexed in `design/design.json`. The board shows it in the Design variants tab: colors and fonts, the variants as previews (HTML mockups run in a sandboxed iframe), the brainstorming and the user's choice.
 
-Ablauf:
+Steps:
 
-1. Brainstorming (Superpowers) mit der Aufgaben-ID, der Beschreibung und den Kriterien starten. Fragen an den Nutzer wie gewohnt stellen. Das Ergebnis anhängen:
+1. Start brainstorming (Superpowers) with the task ID, the description and the criteria. Ask the user questions as usual. Attach the result:
    ```
    works design brainstorm W-0006 --file docs/superpowers/specs/2026-10-31-bracket-design.md
    ```
-2. UI UX Pro Max mit Produktart, Zielgruppe und Stilwunsch aus der Aufgabe befragen. Die Designrichtung anhängen:
+2. Ask UI UX Pro Max with the product type, audience and style wishes from the task. Attach the design direction:
    ```
-   works design direction W-0006 --file richtung.md --colors "Grund #0F1420,Akzent #3DD6B5,Live #FF5A5F" --fonts "Space Grotesk,Inter"
+   works design direction W-0006 --file direction.md --colors "Base #0F1420,Accent #3DD6B5,Live #FF5A5F" --fonts "Space Grotesk,Inter"
    ```
-   `--file` ist ein Markdown-Text mit Stil, Regeln und Begründung, `--colors` die Palette als `Name #hex` mit Komma getrennt.
-3. Zwei bis drei Varianten als eigenständige HTML-Datei (alles inline, keine externen Skripte) oder als Bild bauen und einzeln anhängen:
+   `--file` is a Markdown text with style, rules and reasoning, `--colors` the palette as `Name #hex`, comma-separated.
+3. Build two or three variants as standalone HTML files (everything inline, no external scripts) or as images, and attach each one:
    ```
-   works design add W-0006 --name A --title "Klassisches Bracket" --file /tmp/a.html --note "Alle Runden nebeneinander"
-   works design add W-0006 --name B --title "Runden als Tabs" --file /tmp/b.html
+   works design add W-0006 --name A --title "Classic bracket" --file /tmp/a.html --note "All rounds side by side"
+   works design add W-0006 --name B --title "Rounds as tabs" --file /tmp/b.html
    ```
-   Namen sind kurz (A, B, C). Die Datei wird als `design/A-klassisches-bracket.html` kopiert.
-   Das Board zeigt HTML-Entwürfe in einem abgesicherten iframe, das nur `data:`, `blob:` und `https` lädt. Verweist der Entwurf auf lokale CSS, Schriften oder Bilder (relativ oder `file://`), warnt `design add` und nennt die Verweise: Im Board fehlen sie. Vorher einbetten, mit dem Plugin mockups: `entwurf.mjs inline <datei> --variant A`.
-4. Dem Nutzer sagen, dass die Entwürfe im Board unter Entwürfe liegen, und auf seine Wahl warten. Er wählt im Board mit "Diese nehmen" oder im Gespräch, dann `works design choose W-0006 B --reason "..."`. Die Wahl landet in decisions.md unter "Gewählter Entwurf". Die Sitzungsübersicht meldet Aufgaben mit Entwürfen ohne Wahl.
-5. Erst danach umsetzen. Die gewählte Variante ist die Vorgabe. Abweichungen mit dem Nutzer klären.
-6. Vor dem Review einen Screenshot des Ergebnisses ablegen: `works shot --url <seite> --asset W-0006 --kind nachher --desc "..."` (oder ein vorhandenes Bild mit `works asset W-0006 shot.png --kind nachher --desc "..."`). Das Board stellt ihn in der Abnahme neben den gewählten Entwurf. Für den Vergleich in gleicher Breite und gleichem Schema je Kombination ein Bild ablegen, etwa `works shot --url <seite> --widths=1440,390 --themes=light,dark --asset W-0006 --kind nachher` (Namen mit `-light-1440`, `-dark-390`).
+   Names are short (A, B, C). The file is copied as `design/A-classic-bracket.html`.
+   The board shows HTML variants in a locked-down iframe that only loads `data:`, `blob:` and `https`. If the variant refers to local CSS, fonts or images (relative or `file://`), `design add` warns and lists the references: they will be missing in the board. Inline them first with the mockups plugin: `entwurf.mjs inline <file> --variant A`.
+4. Tell the user the variants are in the board under Design variants, and wait for their choice. They choose in the board with "Use this one" or in the conversation, then `works design choose W-0006 B --reason "..."`. The choice goes into decisions.md under "Chosen design". The session overview reports tasks with design variants but no choice.
+5. Only then implement. The chosen variant is the spec. Clear any deviations with the user.
+6. Before the review, store a screenshot of the result: `works shot --url <page> --asset W-0006 --kind after --desc "..."` (or an existing image with `works asset W-0006 shot.png --kind after --desc "..."`). The board puts it next to the chosen variant in the acceptance review. For a comparison at the same width and scheme, store one image per combination, for example `works shot --url <page> --widths=1440,390 --themes=light,dark --asset W-0006 --kind after` (names with `-light-1440`, `-dark-390`).
 
-Zusätzlich bleiben die bisherigen Wege gültig: Entscheidungen als E-Block in `decisions.md` mit `--source "UI UX Pro Max"`, verworfene Varianten mit Grund. Projektweite Design-Systeme nur mit `works attach-doc` verlinken, nicht in eine Aufgabe kopieren.
+The previous ways remain valid as well: decisions as an E block in `decisions.md` with `--source "UI UX Pro Max"`, rejected variants with a reason. Only link project-wide design systems with `works attach-doc`; do not copy them into a task.
 
-Ist keiner der beiden Skills installiert, die Gestaltung wie bisher mit dem Nutzer klären und trotzdem mindestens einen Entwurf mit `works design add` zeigen, wenn es um sichtbare Oberflächen geht.
+If neither skill is installed, clarify the design with the user as before, and still show at least one variant with `works design add` when visible interfaces are involved.
 
-## Superpowers Brainstorming ohne Gestaltung
+## Superpowers Brainstorming without design
 
-Für Brainstormings zu Architektur oder Abläufen das erzeugte Dokument mit `attach-doc` übernehmen, statt den Skill umzubauen:
+For brainstorming on architecture or processes, take over the generated document with `attach-doc` instead of modifying the skill:
 
 ```
-works attach-doc W-0012 docs/superpowers/specs/2026-10-29-login-design.md --label "Brainstorm Login"
+works attach-doc W-0012 docs/superpowers/specs/2026-10-29-login-design.md --label "Brainstorm login"
 ```
 
-Der Modus kommt aus `config.json` unter `brainstorm.mode`: `link` (Standard, verlinkt), `copy` (Kopie nach `tasks/<ID>/docs/`) oder `move`. Mit `--mode` pro Aufruf überschreibbar. Danach in `decisions.md` die Brainstorm-Zusammenfassung schreiben, Entscheidungen als E-Block festhalten und Kriterien und Umsetzungsplan ableiten. Ergeben sich mehrere Arbeitspakete, je eine Aufgabe anlegen und verknüpfen. Einen Implementierungsplan von Superpowers ebenfalls anhängen.
+The mode comes from `config.json` under `brainstorm.mode`: `link` (default, links it), `copy` (copy to `tasks/<ID>/docs/`) or `move`. Override per call with `--mode`. Afterwards write the brainstorm summary in `decisions.md`, record decisions as E blocks, and derive criteria and the implementation plan. If several work packages come out of it, create one task each and link them. Attach a Superpowers implementation plan the same way.
 
 ## git-workflow
 
-- `works start <ID>` schlägt einen Branch nach dem Schema `<präfix>/<id>-<slug>` vor und schreibt ihn ins Frontmatter. Präfixe: feature und design → `feature/`, bug → `fix/` (bei P1 `hotfix/`), refactor und debt → `refactor/`, chore und spike → `chore/`.
-- Ist der git-workflow Skill aktiv, legt dieser den Branch an und verwendet dabei genau diesen Namen. Sonst `works start <ID> --git`.
-- Commit-Messages enthalten die ID: `fix(W-0007): Rolle nach Captcha vergeben`. Dadurch findet `works commits <ID>` alle zugehörigen Commits.
-- Bei Parallelarbeit legt `works parallel start` die Branches selbst an, jeweils in einem eigenen Worktree. Der git-workflow Skill legt dann keinen weiteren Branch an. Gemergt wird mit `works parallel finish <ID> --merge` (ebenfalls `--no-ff`) oder über einen Pull Request.
-- Beim Merge über git-workflow anschließend `works done <ID>` ausführen. Umgekehrt gilt: `works done --confirm` erst, wenn der Merge erfolgreich war oder der Nutzer ihn bewusst später machen will.
+- `works start <ID>` suggests a branch following the scheme `<prefix>/<id>-<slug>` and writes it into the frontmatter. Prefixes: feature and design → `feature/`, bug → `fix/` (`hotfix/` for P1), refactor and debt → `refactor/`, chore and spike → `chore/`.
+- If the git-workflow skill is active, it creates the branch using exactly this name. Otherwise `works start <ID> --git`.
+- Commit messages contain the ID: `fix(W-0007): Assign role after captcha`. That lets `works commits <ID>` find all related commits.
+- For parallel work, `works parallel start` creates the branches itself, each in its own worktree. The git-workflow skill then does not create another branch. Merge with `works parallel finish <ID> --merge` (also `--no-ff`) or through a pull request.
+- After merging via git-workflow, run `works done <ID>`. Conversely: only run `works done --confirm` once the merge has succeeded or the user deliberately wants to do it later.
 
 ## code-audit
 
-Steht standardmäßig in der Definition of Done. Vor `works done --confirm` den code-audit Skill auf die Änderungen der Aufgabe anwenden. Funde mit hoher Schwere sind entweder zu beheben oder als neue Aufgabe zu erfassen (`works new --type bug ... --related <ID>`). Bewusst akzeptierte Abkürzungen als technische Schuld (Typ debt) anlegen.
+Part of the Definition of Done by default. Before `works done --confirm`, apply the code-audit skill to the task's changes. High-severity findings are either fixed or recorded as a new task (`works new --type bug ... --related <ID>`). Record deliberately accepted shortcuts as tech debt (type debt).
 
 ## responsive-website-check
 
-Gilt für Aufgaben mit Tag `ui`. Vor dem Abschluss ausführen. Gefundene Darstellungsfehler entweder direkt beheben oder als Bug mit Screenshot (`--kind fehler`) erfassen.
+Applies to tasks with the tag `ui`. Run it before finishing. Fix display bugs right away or record them as a bug with a screenshot (`--kind error`).
 
 ## second-brain-sync
 
-Meldet `works done`, dass decisions.md Entscheidungen enthält, dem Nutzer anbieten, die wichtigen davon ins Decision Log des Second Brain zu übernehmen. Übertragen werden Entscheidung, Begründung und verworfene Alternativen, nicht der Verlauf.
+When `works done` reports that decisions.md contains decisions, offer the user to copy the important ones into the Second Brain's decision log. Transfer the decision, the reasoning and the rejected alternatives, not the history.
 
 ## GitHub
 
-Der Abgleich läuft automatisch über das gh CLI, sobald das Projekt ein GitHub-Repository ist und gh angemeldet ist: beim Sitzungsstart im Hintergrund und alle `interval_min` Minuten, solange das Board läuft. Der erste Lauf merkt sich nur den Stand und ändert nichts. Änderungen tragen `[GitHub]` im Verlauf.
+Sync runs automatically through the gh CLI as soon as the project is a GitHub repository and gh is logged in: in the background at session start and every `interval_min` minutes while the board is running. The first run only records the current state and changes nothing. Changes carry `[GitHub]` in the history.
 
-| Ereignis | Folge |
+| Event | Result |
 |---|---|
-| PR mit der ID im Titel oder Branch wird geöffnet | Aufgabe in Arbeit geht nach Review |
-| CI eines PR wird grün oder rot | Prüfung `ci` an der Aufgabe, rot blockiert den Abschluss |
-| Review mit Änderungswünschen | Text als Kommentar an Claude, Aufgabe zurück nach In Arbeit |
-| PR wird gemergt | `works done --confirm` ohne erneute Prüfungen. Ist die Definition of Done offen, bleibt die Aufgabe in Review und bekommt einen Kommentar mit den offenen Punkten |
-| Neues Issue nach dem ersten Lauf | Neue Aufgabe, unvollständig markiert, Typ und Priorität aus den Labels |
-| Aufgabe aus einem Issue ist erledigt | Issue wird mit Hinweis auf die ID geschlossen |
+| A PR with the ID in its title or branch is opened | Task in progress moves to Review |
+| A PR's CI turns green or red | Check `ci` on the task; red blocks completion |
+| Review requesting changes | Text arrives as a comment for Claude, task goes back to In progress |
+| PR is merged | `works done --confirm` without running the checks again. If the Definition of Done is still open, the task stays in Review and gets a comment listing the open items |
+| New issue after the first run | New task, marked incomplete, type and priority from the labels |
+| Task created from an issue is done | The issue is closed with a note pointing to the ID |
 
-Befehle: `works github status` zeigt Repository, letzten Lauf und Ereignisse, `works github sync` gleicht sofort ab, `works github set issues=false labels=bug,works` ändert Einstellungen. Im Board unter Werkzeuge, GitHub. Einstellungen in `config.json` unter `github_sync`, siehe config.md.
+Commands: `works github status` shows the repository, the last run and events, `works github sync` syncs right away, `works github set issues=false labels=bug,works` changes settings. In the board under Tools, GitHub. Settings in `config.json` under `github_sync`, see config.md.
 
-Weiterhin verfügbar: `works gh-import` für einen einmaligen Import alter Issues und `works gh-export <ID>` (nur nach Zustimmung). Label-Zuordnung in `config.json` unter `github`.
+Still available: `works gh-import` for a one-off import of old issues and `works gh-export <ID>` (only after the user agrees). Label mapping in `config.json` under `github`.
 
-## Discord-Bot works
+## Discord bot works
 
-Hinweise aufs Handy für alle Projekte, auch ohne offenes Board. Zwei Wege, `works discord` zeigt beide (Entwurf R aus W-0040). Claude fragt nie nach Token, Schlüssel oder Code und gibt sie nie aus.
+Notifications on your phone for all projects, even without an open board. There are two ways; `works discord` shows both (design R from W-0040). Claude never asks for a token, key or code and never prints them.
 
-Gemeinsamer Bot (empfohlen, W-0040): Der Dienst `services/works-bot` läuft auf einem Server und kennt als einziger das Token. Der Nutzer lädt den Bot mit dem Link aus `works discord` ein, tippt im gewünschten Kanal `/works verbinden` (braucht „Server verwalten“) und trägt den Code ein: `works discord link <Code>`. works bekommt einen Geräteschlüssel (nur in `~/.works/discord/secret.json`), darf damit nur in diesen Kanal schreiben und nur eigene Nachrichten bearbeiten. Erwähnt wird, wer `/works verbinden` ausgeführt hat. Der lokale Bot läuft wie beim eigenen Bot, schickt aber über den Dienst und braucht kein Gateway. Adresse des Dienstes: `works discord set service=https://…` (bis sie im Plugin hinterlegt ist). Trennen: `works discord unlink` oder in Discord `/works trennen`. Betrieb des Dienstes: `services/works-bot/README.md`.
+Shared bot (recommended, W-0040): the service `services/works-bot` runs on a server and is the only thing that knows the token. The user invites the bot with the link from `works discord`, types `/works link` in the desired channel (needs "Manage Server") and enters the code: `works discord link <code>`. works receives a device key (stored only in `~/.works/discord/secret.json`), which lets it write only to that channel and edit only its own messages. The user who ran `/works link` is the one mentioned. The local bot runs as with your own bot, but sends through the service and needs no gateway. Service address: `works discord set service=https://…` (until it is built into the plugin). Disconnect: `works discord unlink`, or `/works unlink` in Discord. Running the service: `services/works-bot/README.md`.
 
-Eigener Bot, Einrichtung (der Nutzer im eigenen Terminal):
-1. Im Discord-Entwicklerportal eine Anwendung mit Bot anlegen und das Token kopieren.
-2. `Get-Clipboard | works discord token` oder `works discord token` (fragt versteckt). Prüft das Token, erkennt den Besitzer der Anwendung (der wird erwähnt) und gibt den Einladungslink mit genau den nötigen Rechten aus: Kanal sehen, Nachrichten senden, Links einbetten, Verlauf lesen, Nachrichten anheften.
-3. Einladen, dann `works discord channel` und `works discord channel works`.
+Your own bot, setup (the user, in their own terminal):
+1. In the Discord developer portal, create an application with a bot and copy the token.
+2. `Get-Clipboard | works discord token` or `works discord token` (asks with hidden input). Checks the token, detects the application owner (who gets mentioned) and prints the invite link with exactly the permissions needed: View Channel, Send Messages, Embed Links, Read Message History, Pin Messages.
+3. Invite it, then `works discord channel` and `works discord channel works`.
 
-Danach startet der Bot mit jedem Board und beim Sitzungsstart, einer je Rechner (Sperrdatei `bot.pid`); eine neue works-Version ersetzt ihn. Unter Node 22 verbindet er sich mit dem Gateway (online sichtbar, mit Status), darunter schickt er nur über REST.
+From then on the bot starts with every board and at session start, one per machine (lock file `bot.pid`); a new works version replaces it. On Node 22 or later it connects to the gateway (visible online, with a status); below that it only sends via REST.
 
-Was er schickt (Entwurf F2 aus W-0036, Dashboard nach D3 aus W-0044):
-- Dauerhaft im Kanal steht nur das Dashboard: eine angeheftete Nachricht für alle Projekte, die in diesen Kanal melden. Je Projekt eine Zeile mit Ampel (🟢 arbeitet, 🟠 wartet auf dich, ⚪ ruhig, dazu 🔴 CI), Felder Heute, Wartet auf dich, Als Nächstes, und ein Bild, das works selbst zeichnet (`discord-image.mjs`: Fortschritt je Projekt, erledigte Aufgaben der letzten 7 Tage; Pixelschrift nur in Großbuchstaben, PNG über zlib, kein fremder Dienst). Darunter das Auswahlmenü „Projekt wählen“ (Details nur für dich, mit Knöpfen Aufgaben und Anweisung) und die Knöpfe Warteschlange, Anweisung an Claude, Neue Aufgabe, Hilfe. Das Dashboard wird gebündelt bearbeitet (höchstens alle 10 s), das Bild höchstens alle 5 Minuten neu gezeichnet und bei jeder Bearbeitung mit hochgeladen. Wird es gelöscht oder ist es nicht mehr bearbeitbar, legt der Bot ein neues an. Statusposts je Projekt aus älteren Versionen löscht er.
-- Aufräumen: Alle anderen Nachrichten löscht der Bot nach `cleanup.hours` Stunden (Standard 24, 0 heißt nie). Nachrichten, die auf dich warten (Freigabe, Claude fertig, Review, Frage), bleiben, solange sie offen sind; die Frist läuft ab ihrer Erledigung. Eine beantwortete Frage wird grau.
-- Status des Bots (nur eigener Bot, mit Gateway): das Wichtigste über alle Projekte, etwa „Trainingsplan wartet auf dich“, „arbeitet an W-0040 (mycron)“ oder „3 Projekte im Blick“. Der gemeinsame Bot ist einer für alle und zeigt „/works help“.
-- Ereignisse mit Feldern: Freigabe wartet (nach 30 s), Claude fertig (nach 120 s), Frage, Review, angenommen, zurückgegeben, erledigt, works ship als eine Nachricht mit Schritten, CI rot mit Bug und wieder grün, neue P1, Warteschlange leer, Wochenbericht.
-- Erledigtes wird nachträglich bearbeitet: Freigabe beantwortet wird grau, Review angenommen grün.
-- Nur Ereignisse mit `at` erwähnen den Nutzer (Standard: die drei aus „Claude braucht dich“), alles andere kommt still. In der Ruhezeit (Standard 22 bis 7 Uhr) kommt auch das still.
-- Befehle aus Freigaben gehen nur mit `privacy.commands=an` mit. Links nur auf GitHub, nie auf das lokale Board.
+What it sends (design F2 from W-0036, dashboard after D3 from W-0044):
+- The only permanent message in the channel is the dashboard: one pinned message for all projects reporting to this channel. One line per project with a traffic light (🟢 working, 🟠 waiting for you, ⚪ quiet, plus 🔴 CI), the fields Today, Waiting for you, Up next, and an image works draws itself (`discord-image.mjs`: progress per project, tasks done in the last 7 days; pixel font in capitals only, PNG via zlib, no external service). Below it the "Pick a project" menu (details only for you, with the buttons Tasks and Instruction) and the buttons Queue, Instruction for Claude, New task, Help. The dashboard is edited in batches (at most every 10 s), the image redrawn at most every 5 minutes and uploaded with every edit. If it is deleted or can no longer be edited, the bot creates a new one. It deletes per-project status posts from older versions.
+- Cleanup: the bot deletes all other messages after `cleanup.hours` hours (default 24, 0 means never). Messages waiting for you (approval, Claude done, review, question) stay as long as they are open; the timer starts once they are handled. An answered question turns grey.
+- Bot status (own bot only, with gateway): the most important thing across all projects, such as "Trainingsplan is waiting for you", "working on W-0040 (mycron)" or "watching 3 projects". The shared bot is one for everyone and shows "/works help".
+- Events with fields: approval waiting (after 30 s), Claude done (after 120 s), question, review, accepted, returned, done, works ship as one message with steps, CI red with a bug and green again, new P1, queue empty, weekly report.
+- Handled items are edited afterwards: an answered approval turns grey, an accepted review green.
+- Only events with `at` mention the user (default: the three under "Claude needs you"); everything else arrives silently. During quiet hours (default 22:00 to 7:00) those arrive silently too.
+- Commands from approvals are only included with `privacy.commands=on`. Links only to GitHub, never to the local board.
 
-Wie Ereignisse entstehen: Der Bot liest den Stand der angemeldeten Projekte (Aufgaben, Warteschlange, `activity.json`) und vergleicht ihn mit dem letzten. Hooks tun dafür nichts zusätzlich. ship, ci-watch und `report --week` legen Ereignisse mit `works discord emit` in `~/.works/discord/outbox`; läuft der Bot nicht, holt er sie beim nächsten Start ab. Fehler bei Discord (429, 5xx, Netz) werden später wiederholt, nichts geht verloren.
+How events come about: the bot reads the state of the registered projects (tasks, queue, `activity.json`) and compares it with the previous one. Hooks do nothing extra for this. ship, ci-watch and `report --week` put events into `~/.works/discord/outbox` with `works discord emit`; if the bot is not running, it picks them up on its next start. Discord errors (429, 5xx, network) are retried later; nothing gets lost.
 
-Doppelmeldungen vermeidet er so: Wechselt der Branch, übernimmt er den Stand ohne Vergleich; während `works ship` friert er ihn ein und vergleicht am Ende mit dem Stand davor; P1, Erledigung und Fragen meldet er je Aufgabe höchstens einmal am Tag. Freigaben aus parallelen Bahnen meldet er wie die der Hauptsitzung, solange die Bahn in `lanes.json` steht.
+How it avoids duplicate messages: when the branch changes, it takes over the state without comparing; during `works ship` it freezes the state and compares with the state before at the end; it reports a P1, a completion or a question at most once a day per task. It reports approvals from parallel lanes like those of the main session, as long as the lane is listed in `lanes.json`.
 
-Prozess: `bot.pid` ist die Sperrdatei, der Bot erneuert sie alle 5 s. Eine alte Datei, deren PID inzwischen ein anderer Prozess hat, zählt nicht; `stop` beendet nie einen fremden Prozess. Arbeitsordner ist `~/.works/discord`, damit kein Projekt- oder Worktree-Ordner gesperrt bleibt. Eine neue works-Version ersetzt den Bot, ohne dass Board oder Sitzungsstart warten. Wechselt das Token auf eine andere Bot-Anwendung, beginnt der Bot mit neuen Statusposts.
+Process: `bot.pid` is the lock file; the bot renews it every 5 s. An old file whose PID now belongs to another process does not count; `stop` never ends a foreign process. The working directory is `~/.works/discord`, so no project or worktree folder stays locked. A new works version replaces the bot without the board or session start having to wait. If the token switches to a different bot application, the bot starts over with new status posts.
 
-Befehle und Knöpfe (W-0037, Entwurf HS): `/works help` (hilfe), `status`, `tasks` (aufgaben), `new` (neu, Titel und Priorität), `instruct` (anweisung, an die Aufgabe in Arbeit oder mit `task`); beim gemeinsamen Bot dazu `link` (verbinden) und `unlink` (trennen). Englische Namen, im deutschen Discord deutsch; die Antworten folgen der Sprache des Discord-Clients. Bei mehreren Projekten nennt man es mit `project` (der Anfang des Namens reicht). Knöpfe: Review mit „Annehmen“ und „Zurück an Claude“ (Dialog für die Begründung, die als Kommentar ankommt), „Claude ist fertig“ mit „Anweisung an Claude“ (Dialog), CI rot mit „Bug ansehen“. Nach Annahme oder Rückgabe verschwinden die Knöpfe. Nur der eingetragene Nutzer (Besitzer der Anwendung beim eigenen Bot, wer `/works verbinden` ausgeführt hat beim gemeinsamen) darf etwas auslösen, andere bekommen eine Absage; alle Antworten sieht nur, wer geklickt hat. Freigaben aus Claude Code erteilt der Bot nicht. Aktionen laufen über dieselbe API wie das Board: Verlaufseinträge mit `[Discord]`, Rückgängig im Board, neue Aufgaben mit `source: discord` und `incomplete: true` (beim nächsten passenden Moment mit dem Nutzer vervollständigen). Annehmen läuft wie `works done --confirm`; ist die Definition of Done nicht erfüllt, sagt der Bot das, statt abzuschließen.
+Commands and buttons (W-0037, design HS): `/works help` (German: hilfe), `status`, `tasks` (aufgaben), `new` (neu; title and priority), `instruct` (anweisung; to the task in progress or with `task`); with the shared bot also `link` (verbinden) and `unlink` (trennen). English names, German in a German Discord client; replies follow the language of the Discord client. With several projects, name it with `project` (the start of the name is enough). Buttons: review with "Accept" and "Back to Claude" (a dialog for the reason, which arrives as a comment), "Claude is done" with "Instruction for Claude" (dialog), CI red with "View bug". After accepting or returning, the buttons disappear. Only the registered user (the application owner with your own bot, whoever ran `/works link` with the shared one) can trigger anything; others get a refusal. Only the person who clicked sees the replies. The bot does not grant approvals from Claude Code. Actions go through the same API as the board: history entries with `[Discord]`, undo in the board, new tasks with `source: discord` and `incomplete: true` (complete them with the user at the next suitable moment). Accept works like `works done --confirm`; if the Definition of Done is not met, the bot says so instead of finishing.
 
-So kommen Klicks an: Der eigene Bot registriert `/works` für den Server des Kanals und bekommt Klicks über sein Gateway (ab Node 22, sonst gibt es keine Knöpfe). Beim gemeinsamen Bot antwortet der Dienst sofort vorläufig, öffnet Dialoge selbst und legt die Anfrage in eine Inbox des Geräts, das die Nachricht geschrieben hat (Befehle: das zuletzt aktive Gerät des Aufrufers im Kanal). Der lokale Bot holt sie mit Long-Poll ab, bestätigt sie mit der nächsten Abfrage (sonst kommen sie noch einmal) und antwortet über den Dienst; das Token der Interaktion bleibt im Dienst. Ist das Gerät aus, sagt der Dienst das nach 10 s; läuft dort ein works ohne Befehle, rät er zum Update.
+How clicks arrive: your own bot registers `/works` for the channel's server and receives clicks through its gateway (Node 22 or later, otherwise there are no buttons). With the shared bot, the service answers immediately with a provisional reply, opens dialogs itself and puts the request into an inbox of the device that wrote the message (commands: the caller's most recently active device in the channel). The local bot fetches it by long poll, acknowledges it with the next poll (otherwise it arrives again) and replies through the service; the interaction token stays in the service. If the device is off, the service says so after 10 s; if it runs a works version without commands, the service suggests an update.
 
-Schalter Befehle und Knöpfe (W-0046): `commands` (Standard an), im Board im Reiter Befehle oder mit `works discord set commands=aus`. Ausgeschaltet zeigt der Bot keine Knöpfe und kein Auswahlmenü mehr, am Dashboard (wird gleich bearbeitet) und an neuen Nachrichten; ältere Nachrichten behalten ihre Knöpfe. Der eigene Bot meldet `/works` für den Server ab (leere Liste), auch ohne Gateway. Beim gemeinsamen Bot bleibt `/works` registriert, weil der Dienst einer für alle ist; das Gerät beantwortet Befehle dann mit einem kurzen Hinweis, ebenso Klicks auf alte Knöpfe beim eigenen Bot. Wieder an: `/works` wird registriert, die Knöpfe kommen zurück. Beides ohne Neustart.
+Log in `~/.works/discord/bot.log` (without the token).
 
-Protokoll in `~/.works/discord/bot.log` (ohne Token).
+Settings in the board (W-0038, design J2): Tools, "Discord bot" opens a dialog with the tabs Connection, Projects, Events (on and @ per event, quiet hours, delays, deletion period), Commands and Privacy, and on the right a preview of the message as in Discord and as it appears on the lock screen. The preview already uses the unsaved changes; saving writes `config.json` with the same keys as `works discord set`. The first time, the Connection tab guides through the choice from design R: shared bot with a code or own bot with a token. The token sits in a password field that is emptied after saving; token, key and code never appear in a board response, only `…abcd` is shown. Token, code and disconnecting only work directly on the computer, not via a shared link.
 
-Einstellungen im Board (W-0038, Entwurf J2): Werkzeuge, „Discord-Bot“ öffnet einen Dialog mit den Reitern Verbindung, Projekte, Ereignisse (an und @ je Ereignis, Ruhezeit, Verzögerungen, Frist zum Löschen), Befehle und Datenschutz, rechts eine Vorschau der Nachricht wie in Discord und wie sie auf dem Sperrbildschirm erscheint. Die Vorschau rechnet schon mit den ungespeicherten Änderungen; Speichern schreibt `config.json` mit denselben Schlüsseln wie `works discord set`. Beim ersten Mal führt der Reiter Verbindung durch die Wahl nach Entwurf R: gemeinsamer Bot mit Code oder eigener Bot mit Token. Das Token steht in einem Passwortfeld, das nach dem Speichern leer wird; Token, Schlüssel und Code kommen in keiner Antwort des Boards vor, gezeigt wird nur `…abcd`. Token, Code und Trennen gehen nur direkt am Rechner, nicht über einen geteilten Link.
+Channel choice (design K): the Connection tab reads servers and text channels live from the bot, by category. Whether the bot may write in a channel, works computes like Discord from roles and overwrites (view, send, embed links); channels without this permission are greyed out, with the reason. With the shared bot these are the channels of the linked server, the service checks the permission itself. "Move here" sets `channel_id` (with the shared bot the service moves the link first). The running bot reads `config.json` on every pass, creates the dashboard in the new channel, pins it and deletes the old one. Neither this nor any other setting needs a restart. In the terminal it works with `works discord channel`, for both ways.
 
-Kanalwahl (Entwurf K): Der Reiter Verbindung liest Server und Textkanäle live vom Bot, nach Kategorie. Ob der Bot in einem Kanal schreiben darf, rechnet works wie Discord aus Rollen und Overwrites (sehen, senden, Links einbetten); Kanäle ohne dieses Recht sind ausgegraut, mit Grund. Beim gemeinsamen Bot sind es die Kanäle des gekoppelten Servers, der Dienst prüft das Recht selbst. „Hierher verschieben“ setzt `channel_id` (beim gemeinsamen Bot zieht vorher der Dienst die Kopplung um). Der laufende Bot liest `config.json` bei jedem Durchgang, legt das Dashboard im neuen Kanal an, heftet es an und löscht das alte. Einen Neustart braucht weder das noch eine andere Einstellung. Im Terminal geht es mit `works discord channel`, für beide Wege.
+Commands and buttons switch (W-0046): `commands` (default on), in the board on the Commands tab or with `works discord set commands=off`. When off, the bot shows no buttons and no select menu any more, on the dashboard (edited right away) and on new messages; older messages keep their buttons. The own bot unregisters `/works` for the server (empty list), even without a gateway. With the shared bot `/works` stays registered, because the service is one for everyone; the device then answers commands with a short note, as does the own bot for clicks on old buttons. On again: `/works` is registered, the buttons come back. Both without a restart.
 
-Kanal je Projekt (W-0046, nur eigener Bot): Im Reiter Projekte hat jedes Projekt eine Kanalwahl aus derselben Liste vom Bot, Standard ist der Kanal oben; Kanäle ohne Schreibrecht sind nicht wählbar. Gespeichert als `projects.<rootId>.channel_id` und `channel_name` in `config.json`, im Terminal mit `works discord set project.<id>.channel=<Kanal-ID>` (leer: zurück in den Standardkanal); works prüft dabei Kanal und Schreibrecht. Jedes Projekt erscheint im Dashboard seines Kanals, dort gehen auch seine Hinweise hin. Wechselt ein Projekt den Kanal, legt der laufende Bot dort ein Dashboard an, nimmt das Projekt aus dem alten und löscht ein Dashboard, zu dem kein Projekt mehr gehört. Der gemeinsame Bot schreibt in genau einen Kanal, den gekoppelten: Dort ist die Wahl gesperrt, `works discord set` lehnt sie ab, und eigene Kanäle aus der Zeit mit eigenem Bot gelten nicht. Die Vorschau im Dialog nennt den Kanal des Projekts.
+Channel per project (W-0046, own bot only): on the Projects tab every project has a channel choice from the same list from the bot, the default is the channel above; channels without write permission cannot be chosen. Stored as `projects.<rootId>.channel_id` and `channel_name` in `config.json`, in the terminal with `works discord set project.<id>.channel=<channel id>` (empty: back to the default channel); works checks the channel and the write permission. Every project appears in the dashboard of its channel, and its notices go there too. When a project changes channel, the running bot creates a dashboard there, removes the project from the old one and deletes a dashboard that no longer has any project. The shared bot writes to exactly one channel, the linked one: there the choice is locked, `works discord set` refuses it, and own channels from the time with an own bot do not apply. The preview in the dialog names the project's channel.
 
-## Playwright und Browser-Werkzeuge
+## Playwright and browser tools
 
-Für Vorher- und Nachher-Screenshots, siehe assets.md.
+For before and after screenshots, see assets.md.

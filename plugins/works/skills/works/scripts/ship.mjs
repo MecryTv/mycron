@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { readJson, exists, loadState } from './lib.mjs';
 import { readServer, stopProcess, clearServer, newestCli, OWN_CLI } from './server-control.mjs';
 import { emit } from './discord.mjs';
+import { tr } from './i18n.mjs';
 
 export class ShipStop extends Error {}
 
@@ -68,19 +69,19 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
   // der Projektordner kann aber einen 8.3-Kurznamen enthalten (Windows-Runner: C:\Users\RUNNER~1). Gemischt
   // ergäben sich relative Pfade außerhalb des Repos.
   const cdup = git(root, ['rev-parse', '--show-cdup']);
-  if (!cdup.ok) stop('Kein Git-Repository. ship braucht Git.');
+  if (!cdup.ok) stop(tr('Not a Git repository. ship needs Git.'));
   const repo = path.resolve(root, cdup.out || '.');
   const worksRel = (path.relative(repo, path.join(root, '.works')) || '.works').split(path.sep).join('/');
   const task = id || loadState(root).active;
-  if (!task) stop('Keine aktive Aufgabe. Aufgabe angeben: works ship <ID>.');
+  if (!task) stop(tr('No active task. Name the task: works ship <ID>.'));
   const branch = git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).out;
   const base = baseBranch(repo);
-  if (branch === base || branch === 'HEAD') stop(`Du bist auf ${branch}. ship schließt einen Feature-Branch ab; erst auf den Branch der Aufgabe wechseln.`);
+  if (branch === base || branch === 'HEAD') stop(tr('You are on {branch}. ship completes a feature branch; switch to the branch of the task first.', { branch }));
 
   // 1. Definition of Done, solange noch nichts verändert ist.
   const dod = works(cli, root, ['done', task]);
-  if (!dod.ok) stop(`${dod.out}\n\nship hält an: Definition of Done nicht erfüllt. Nichts wurde gemergt oder gepusht.`);
-  log(`ok  Definition of Done erfüllt (${task})`);
+  if (!dod.ok) stop(`${dod.out}\n\n${tr('ship stops: Definition of Done not met. Nothing was merged or pushed.')}`);
+  log(`ok  ${tr('Definition of Done met ({id})', { id: task })}`);
   // Discord-Bot (W-0036): eine Nachricht je Lauf, die ihre Schritte abhakt. Ohne Einrichtung passiert nichts.
   const run = Date.now().toString(36);
   const tell = (step, extra = {}) => emit('ship', { id: task, step, run, ...extra }, root);
@@ -91,16 +92,16 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
   // Die Ausgabe ist gekürzt: Der ersten Zeile kann das führende Leerzeichen des Status fehlen.
   const inWorks = new RegExp(`^\\s*\\S{1,2}\\s+"?${worksRel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`);
   const dirty = git(repo, ['status', '--porcelain']).out.split('\n').filter((l) => l.trim() && !inWorks.test(l));
-  if (dirty.length) stop(`Nicht committete Änderungen (?? = neue Datei):\n${dirty.join('\n')}\nErst committen, verwerfen oder in .gitignore eintragen, dann ship erneut.`);
+  if (dirty.length) stop(tr('Uncommitted changes (?? = new file):\n{list}\nCommit, discard or add them to .gitignore first, then run ship again.', { list: dirty.join('\n') }));
 
   // 3. Board stoppen. Es startet am Ende mit der neuen Version auf demselben Port, bei einem Abbruch sofort.
   const board = readServer(root);
-  if (board) { await stopProcess(board.pid); clearServer(root, board.pid); log(`ok  Board gestoppt (Port ${board.port})`); }
+  if (board) { await stopProcess(board.pid); clearServer(root, board.pid); log(`ok  ${tr('Board stopped (port {port})', { port: board.port })}`); }
   const restartBoard = () => {
     if (!board) return;
     const args = ['board', '--serve', '--detach', `--port=${board.port}`, ...(board.host && board.host !== '127.0.0.1' ? [`--host=${board.host}`] : []), ...(open ? ['--open'] : [])];
     const r = works(newestCli(), root, args);
-    log(r.ok ? `ok  ${r.out.split('\n').filter(Boolean).join(' · ')}` : `--  Board startet nicht: ${r.out.split('\n').pop()}`);
+    log(r.ok ? `ok  ${r.out.split('\n').filter(Boolean).join(' · ')}` : `--  ${tr('Board does not start: {msg}', { msg: r.out.split('\n').pop() })}`);
   };
   try {
     const result = await finish();
@@ -123,8 +124,8 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
     if (tracked.length) git(repo, ['checkout', '--', ...tracked]);
     git(repo, ['add', '--', worksRel]);
     if (!git(repo, ['diff', '--cached', '--quiet']).ok) {
-      const c = git(repo, ['commit', '-q', '-m', `works: ${task} Stand vor dem Abschluss`]);
-      if (!c.ok) stop(`Commit der .works-Änderungen fehlgeschlagen: ${c.err}`);
+      const c = git(repo, ['commit', '-q', '-m', tr('works: {id} state before completion', { id: task })]);
+      if (!c.ok) stop(tr('Commit of the .works changes failed: {err}', { err: c.err }));
     }
 
     // 5. Merge in den Hauptbranch.
@@ -134,7 +135,7 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
       cleanLeftovers();
       const sb = git(repo, ['switch', '-q', branch]);
       if (sb.ok) appendTail(repo, timeTarget, tail);
-      stop(sb.ok ? msg : `${msg}\nAchtung: Zurück auf ${branch} ging nicht (${sb.err}). Du stehst auf ${git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).out}.`);
+      stop(sb.ok ? msg : `${msg}\n${tr('Caution: switching back to {branch} failed ({err}). You are on {current}.', { branch, err: sb.err, current: git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).out })}`);
     };
     // Unter Windows sperrt etwa ein Virenscanner frisch geschriebene Dateien kurz. git switch lässt sie dann liegen
     // (nur eine Warnung), und Merge oder Rückwechsel scheitern an "untracked files would be overwritten".
@@ -150,11 +151,11 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
       }
     }
     const sw = git(repo, ['switch', '-q', base]);
-    if (!sw.ok) back(`Wechsel nach ${base} fehlgeschlagen: ${sw.err}`);
+    if (!sw.ok) back(tr('Switching to {base} failed: {err}', { base, err: sw.err }));
     cleanLeftovers();
     if (remote.ok && push) {
       const pull = git(repo, ['pull', '-q', '--ff-only', 'origin', base]);
-      if (!pull.ok) back(`${base} lässt sich nicht vorspulen (git pull --ff-only): ${pull.err}. Erst ${base} abgleichen.`);
+      if (!pull.ok) back(tr('{base} cannot be fast-forwarded (git pull --ff-only): {err}. Sync {base} first.', { base, err: pull.err }));
     }
     const merge = git(repo, ['merge', '--no-ff', branch, '-m', `Merge branch '${branch}'`]);
     if (!merge.ok) {
@@ -162,50 +163,52 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
       const started = git(repo, ['rev-parse', '-q', '--verify', 'MERGE_HEAD']).ok;
       if (started) git(repo, ['merge', '--abort']);
       back(started
-        ? `Merge von ${branch} in ${base} hat Konflikte und wurde abgebrochen. Konflikte auf ${branch} lösen (git merge ${base}), dann ship erneut.`
-        : `Merge von ${branch} in ${base} nicht möglich: ${(merge.err || merge.out).split('\n').slice(0, 6).join('\n')}`);
+        ? tr('Merge of {branch} into {base} has conflicts and was aborted. Resolve the conflicts on {branch} (git merge {base}), then run ship again.', { branch, base })
+        : tr('Merge of {branch} into {base} is not possible: {err}', { branch, base, err: (merge.err || merge.out).split('\n').slice(0, 6).join('\n') }));
     }
-    log(`ok  ${branch} mit --no-ff in ${base} gemergt`);
+    log(`ok  ${tr('{branch} merged into {base} with --no-ff', { branch, base })}`);
     tell('merge');
     // Die aufgehobenen Zeiten gleich zurückschreiben, damit sie auch bei einem Abbruch danach erhalten bleiben.
     appendTail(repo, timeTarget, tail);
 
     // 6. Aufgabe abschließen und .works committen.
     const done = works(cli, root, ['done', task, '--confirm']);
-    if (!done.ok) stop(`${done.out}\n\nship hält an: works done --confirm fehlgeschlagen. Der Merge ist lokal und nicht gepusht.`);
+    if (!done.ok) stop(`${done.out}\n\n${tr('ship stops: works done --confirm failed. The merge is local and not pushed.')}`);
     git(repo, ['add', '--', worksRel]);
-    if (!git(repo, ['diff', '--cached', '--quiet']).ok) git(repo, ['commit', '-q', '-m', `works: ${task} erledigt`]);
-    log(`ok  ${task} erledigt und committet`);
+    if (!git(repo, ['diff', '--cached', '--quiet']).ok) git(repo, ['commit', '-q', '-m', tr('works: {id} done', { id: task })]);
+    log(`ok  ${tr('{id} done and committed', { id: task })}`);
 
     // 7. Pushen, Branch löschen.
     const sha = git(repo, ['rev-parse', 'HEAD']).out;
-    if (!remote.ok) log('--  Kein Remote origin, nicht gepusht.');
-    else if (!push) log('--  Push übersprungen (--no-push).');
+    const sha7 = sha.slice(0, 7);
+    if (!remote.ok) log(`--  ${tr('No remote origin, not pushed.')}`);
+    else if (!push) log(`--  ${tr('Push skipped (--no-push).')}`);
     else {
       const p = git(repo, ['push', '-q', 'origin', base], 300000);
-      if (!p.ok) stop(`Push fehlgeschlagen: ${p.err}\nDer Abschluss ist lokal committet (${sha.slice(0, 7)}).`);
-      log(`ok  Gepusht: ${base} auf ${sha.slice(0, 7)}`);
+      if (!p.ok) stop(tr('Push failed: {err}\nThe completion is committed locally ({sha}).', { err: p.err, sha: sha7 }));
+      log(`ok  ${tr('Pushed: {base} at {sha}', { base, sha: sha7 })}`);
       tell('push', { sha });
     }
     git(repo, ['branch', '-d', branch]);
     if (remote.ok && push && git(repo, ['ls-remote', '--exit-code', '--heads', 'origin', branch]).ok) git(repo, ['push', '-q', 'origin', '--delete', branch]);
-    log(`ok  Branch ${branch} gelöscht`);
+    log(`ok  ${tr('Branch {branch} deleted', { branch })}`);
 
     // 8. CI des letzten Commits. Rot: anhalten, nichts aktualisieren.
     const github = remote.ok && /github\.com[:/]/.test(remote.out);
     const ciJs = github && ci && push ? ciScript() : null;
-    if (!remote.ok || !push) log('--  CI: nichts gepusht, übersprungen.');
-    else if (!github) log('--  CI: kein GitHub-Remote, übersprungen.');
-    else if (!ci) log('--  CI übersprungen (--no-ci).');
-    else if (!ciJs) log(`--  CI: Plugin ci-watch nicht gefunden. Stand prüfen: ${sha.slice(0, 7)} auf GitHub.`);
+    if (!remote.ok || !push) log(`--  ${tr('CI: nothing pushed, skipped.')}`);
+    else if (!github) log(`--  ${tr('CI: no GitHub remote, skipped.')}`);
+    else if (!ci) log(`--  ${tr('CI skipped (--no-ci).')}`);
+    else if (!ciJs) log(`--  ${tr('CI: plugin ci-watch not found. Check {sha} on GitHub.', { sha: sha7 })}`);
     else {
-      log(`..  CI für ${sha.slice(0, 7)} läuft, warte auf das Ergebnis`);
+      log(`..  ${tr('CI for {sha} is running, waiting for the result', { sha: sha7 })}`);
       const r = spawnSync(process.execPath, [ciJs, '--sha', sha], { cwd: repo, encoding: 'utf8', timeout: 25 * 60000, windowsHide: true });
       const msg = `${r.stdout || ''}${r.stderr || ''}`.trim().split('\n').slice(-6).join('\n');
-      if (r.status === 0) tell('ci', { ok: true, workflows: ((msg.match(/CI grün für \w+: (.+)\./) || [])[1] || '').split(', ').filter(Boolean).length });
+      // ci-watch meldet "CI grün für <sha>: A, B." oder englisch "CI green for <sha>: A, B.".
+      if (r.status === 0) tell('ci', { ok: true, workflows: ((msg.match(/CI (?:grün für|green for) \w+: (.+)\./) || [])[1] || '').split(', ').filter(Boolean).length });
       if (r.status === 1) tell('ci', { ok: false });
-      if (r.status === 1) stop(`CI rot für ${sha.slice(0, 7)}:\n${msg}\nPlugins nicht aktualisiert.`);
-      log(r.status === 0 ? `ok  CI grün für ${sha.slice(0, 7)}` : `--  CI: ${msg.split('\n').pop()}`);
+      if (r.status === 1) stop(tr('CI red for {sha}:\n{msg}\nPlugins not updated.', { sha: sha7, msg }));
+      log(r.status === 0 ? `ok  ${tr('CI green for {sha}', { sha: sha7 })}` : `--  CI: ${msg.split('\n').pop()}`);
     }
 
     // 9. Plugins aktualisieren, wenn das Repo ein Marketplace ist.
@@ -214,7 +217,7 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
       const mp = readJson(mpFile, {}) || {};
       const reg = readJson(path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json'), { plugins: {} }) || { plugins: {} };
       const safe = (n) => /^[\w.-]+$/.test(String(n || ''));
-      if (!safe(mp.name)) stop(`Ungültiger Marketplace-Name in ${mpFile}.`);
+      if (!safe(mp.name)) stop(tr('Invalid marketplace name in {file}.', { file: mpFile }));
       const installed = (mp.plugins || []).map((p) => p.name).filter((n) => safe(n) && (reg.plugins || {})[`${n}@${mp.name}`]);
       // claude als .exe direkt; als npm-Installation (claude.cmd) unter Windows nur über die Shell aufrufbar, die Namen sind oben geprüft.
       const claude = (args) => {
@@ -222,13 +225,13 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
         return r.error && r.error.code === 'ENOENT' && process.platform === 'win32' ? spawnSync('claude.cmd', args, { cwd: repo, encoding: 'utf8', timeout: 300000, windowsHide: true, shell: true }) : r;
       };
       const m = claude(['plugin', 'marketplace', 'update', mp.name]);
-      if (m.error || m.status !== 0) log(`--  Plugins nicht aktualisiert (claude plugin marketplace update ${mp.name}): ${String(m.error ? m.error.message : m.stderr || m.stdout).trim().split('\n').pop()}`);
+      if (m.error || m.status !== 0) log(`--  ${tr('Plugins not updated (claude plugin marketplace update {name}): {err}', { name: mp.name, err: String(m.error ? m.error.message : m.stderr || m.stdout).trim().split('\n').pop() })}`);
       else {
         for (const n of installed) {
           const u = claude(['plugin', 'update', `${n}@${mp.name}`]);
-          log(u.status === 0 ? `ok  Plugin ${n} aktualisiert` : `--  Plugin ${n}: ${String(u.stderr || u.stdout).trim().split('\n').pop()}`);
+          log(u.status === 0 ? `ok  ${tr('Plugin {name} updated', { name: n })}` : `--  Plugin ${n}: ${String(u.stderr || u.stdout).trim().split('\n').pop()}`);
         }
-        if (!installed.length) log(`--  Keine Plugins aus ${mp.name} installiert.`);
+        if (!installed.length) log(`--  ${tr('No plugins from {name} installed.', { name: mp.name })}`);
         else tell('update');
       }
     }

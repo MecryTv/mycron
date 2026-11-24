@@ -50,7 +50,9 @@ function newest() {
 
 const cli = process.env.WORKS_CLI && exists(process.env.WORKS_CLI) ? process.env.WORKS_CLI : newest();
 if (!cli) {
-  process.stderr.write('works ist nicht mehr installiert. In Claude Code: /plugin install works@mycron\n');
+  // Ohne works gibt es kein i18n.mjs: Sprache nur aus WORKS_LANG oder ~/.works/settings.json.
+  const lang = String(process.env.WORKS_LANG || (readJson(path.join(home, '.works', 'settings.json')) || {}).language || '').toLowerCase();
+  process.stderr.write(lang.startsWith('de') ? 'works ist nicht mehr installiert. In Claude Code: /plugin install works@mycron\n' : 'works is no longer installed. In Claude Code: /plugin install works@mycron\n');
   process.exit(1);
 }
 if (process.argv[2] === 'which') { process.stdout.write(cli + '\n'); process.exit(0); }

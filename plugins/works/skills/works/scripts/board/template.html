@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="__LANG__">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +9,7 @@
 </head>
 <body>
 <div class="orphan-bar" id="orphanBar" role="alert" hidden></div>
-<a class="skip" href="#board">Zum Board springen</a>
+<a class="skip" href="#board">{{t:Skip to the board}}</a>
 
 <header class="top">
   <div class="brand">
@@ -18,53 +18,53 @@
     <span class="live" id="live" hidden></span>
     <button class="busy" id="busy" hidden></button>
   </div>
-  <nav class="views" id="views" aria-label="Ansicht">
-    <button data-view="board" aria-pressed="true">Board</button>
-    <button data-view="sprint" aria-pressed="false">Sprint</button>
-    <button data-view="queue" aria-pressed="false">Warteschlange <span class="count" id="queueCount" hidden></span></button>
-    <button data-view="timeline" aria-pressed="false">Zeitleiste</button>
-    <button data-view="graph" aria-pressed="false">Abhängigkeiten</button>
-    <button data-view="table" aria-pressed="false">Tabelle</button>
-    <button data-view="live" aria-pressed="false" data-live><i class="lv-dot" id="livePulse" hidden aria-hidden="true"></i>Live</button>
+  <nav class="views" id="views" aria-label="{{t:View}}">
+    <button data-view="board" aria-pressed="true">{{t:Board}}</button>
+    <button data-view="sprint" aria-pressed="false">{{t:Sprint}}</button>
+    <button data-view="queue" aria-pressed="false">{{t:Queue}} <span class="count" id="queueCount" hidden></span></button>
+    <button data-view="timeline" aria-pressed="false">{{t:Timeline}}</button>
+    <button data-view="graph" aria-pressed="false">{{t:Dependencies}}</button>
+    <button data-view="table" aria-pressed="false">{{t:Table}}</button>
+    <button data-view="live" aria-pressed="false" data-live><i class="lv-dot" id="livePulse" hidden aria-hidden="true"></i>{{t:Live}}</button>
   </nav>
   <label class="search">
-    <span class="sr">Aufgaben durchsuchen</span>
-    <input id="q" type="search" placeholder="Suchen nach Titel, ID oder Tag" autocomplete="off">
+    <span class="sr">{{t:Search tasks}}</span>
+    <input id="q" type="search" placeholder="{{t:Search by title, ID or tag}}" autocomplete="off">
     <kbd>/</kbd>
   </label>
-  <nav class="actions" aria-label="Aktionen">
-    <button class="btn ghost" id="btnNext" data-live>Nächste Aufgabe</button>
-    <button class="btn ghost" id="btnIdeas" data-live>Ideen <span class="count" id="ideaCount" hidden></span></button>
-    <button class="btn ghost" id="btnActivity" data-live>Aktivität <span class="count" id="actCount" hidden></span></button>
-    <button class="btn ghost" id="btnShare" data-edit>Teilen</button>
-    <button class="btn ghost icon" id="btnTools" data-live title="Berichte, Vorlagen, Prüfungen und Benachrichtigungen" aria-label="Werkzeuge und Einstellungen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="count" id="toolsCount" hidden></span></button>
-    <button class="btn ghost icon" id="btnTheme" title="Farbschema wechseln" aria-label="Farbschema wechseln"></button>
-    <button class="btn primary" id="btnNew" data-edit>Neue Aufgabe <kbd>N</kbd></button>
+  <nav class="actions" aria-label="{{t:Actions}}">
+    <button class="btn ghost" id="btnNext" data-live>{{t:Next task}}</button>
+    <button class="btn ghost" id="btnIdeas" data-live>{{t:Ideas}} <span class="count" id="ideaCount" hidden></span></button>
+    <button class="btn ghost" id="btnActivity" data-live>{{t:Activity}} <span class="count" id="actCount" hidden></span></button>
+    <button class="btn ghost" id="btnShare" data-edit>{{t:Share}}</button>
+    <button class="btn ghost icon" id="btnTools" data-live title="{{t:Reports, templates, checks and notifications}}" aria-label="{{t:Tools and settings}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="count" id="toolsCount" hidden></span></button>
+    <button class="btn ghost icon" id="btnTheme" title="{{t:Switch color scheme}}" aria-label="{{t:Switch color scheme}}"></button>
+    <button class="btn primary" id="btnNew" data-edit>{{t:New task}} <kbd>N</kbd></button>
   </nav>
 </header>
 
 <div class="readonly" id="readonly" hidden>
-  Nur Ansicht. Zum Bearbeiten das Board mit <code>works board --serve</code> öffnen oder Claude bitten, das Board zu starten.
+  {{t:View only. To edit, open the board with}} <code>works board --serve</code> {{t:or ask Claude to start the board.}}
 </div>
 
-<section class="overview" aria-label="Überblick" data-only="board">
+<section class="overview" aria-label="{{t:At a glance}}" data-only="board">
   <div class="flow" id="flow" role="list"></div>
   <div class="signals" id="signals"></div>
 </section>
 
-<section class="filters" aria-label="Filter" data-only="board timeline graph table">
-  <div class="prio-filter" id="prioFilter" role="group" aria-label="Priorität"></div>
-  <select id="typeFilter" aria-label="Typ"><option value="">Alle Typen</option></select>
-  <select id="tagFilter" aria-label="Tag"><option value="">Alle Tags</option></select>
-  <select id="msFilter" aria-label="Meilenstein"><option value="">Alle Meilensteine</option></select>
-  <button class="btn small ghost" id="msEdit" hidden data-edit>Meilenstein bearbeiten</button>
-  <label class="toggle"><input type="checkbox" id="showClosed"> Archiv und Verworfene</label>
-  <button class="btn link" id="resetFilters" hidden>Filter zurücksetzen</button>
+<section class="filters" aria-label="{{t:Filters}}" data-only="board timeline graph table">
+  <div class="prio-filter" id="prioFilter" role="group" aria-label="{{t:Priority}}"></div>
+  <select id="typeFilter" aria-label="{{t:Type}}"><option value="">{{t:All types}}</option></select>
+  <select id="tagFilter" aria-label="{{t:Tag}}"><option value="">{{t:All tags}}</option></select>
+  <select id="msFilter" aria-label="{{t:Milestone}}"><option value="">{{t:All milestones}}</option></select>
+  <button class="btn small ghost" id="msEdit" hidden data-edit>{{t:Edit milestone}}</button>
+  <label class="toggle"><input type="checkbox" id="showClosed"> {{t:Archive and dropped}}</label>
+  <button class="btn link" id="resetFilters" hidden>{{t:Reset filters}}</button>
 </section>
 
-<section class="saved-views" id="savedViews" aria-label="Gespeicherte Ansichten" data-only="board timeline graph table"></section>
+<section class="saved-views" id="savedViews" aria-label="{{t:Saved views}}" data-only="board timeline graph table"></section>
 
-<section class="progress" id="progress" aria-label="Fortschritt" data-only="board"></section>
+<section class="progress" id="progress" aria-label="{{t:Progress}}" data-only="board"></section>
 
 <main class="board" id="board" tabindex="-1" data-only="board"></main>
 <main class="view sprint-view" id="viewSprint" tabindex="-1" data-only="sprint" hidden></main>
@@ -73,14 +73,14 @@
 <main class="view tl-view" id="viewTimeline" tabindex="-1" data-only="timeline" hidden></main>
 <main class="view table-view" id="viewTable" tabindex="-1" data-only="table" hidden></main>
 <main class="view live-view" id="viewLive" tabindex="-1" data-only="live" hidden></main>
-<div class="bulk" id="bulk" hidden role="toolbar" aria-label="Mehrere Aufgaben bearbeiten"></div>
+<div class="bulk" id="bulk" hidden role="toolbar" aria-label="{{t:Edit several tasks}}"></div>
 
-<aside class="panel" id="panel" aria-label="Aufgabendetails" hidden>
+<aside class="panel" id="panel" aria-label="{{t:Task details}}" hidden>
   <div class="panel-inner" id="panelBody"></div>
 </aside>
 <div class="scrim" id="scrim" hidden></div>
 
-<aside class="panel narrow" id="sidePanel" aria-label="Seitenleiste" hidden>
+<aside class="panel narrow" id="sidePanel" aria-label="{{t:Sidebar}}" hidden>
   <div class="panel-inner" id="sideBody"></div>
 </aside>
 
@@ -89,13 +89,13 @@
 <div class="sr" aria-live="polite" id="liveSay"></div>
 
 <div class="palette" id="palette" hidden>
-  <div class="pal-box" role="dialog" aria-modal="true" aria-label="Schnellsuche">
+  <div class="pal-box" role="dialog" aria-modal="true" aria-label="{{t:Quick search}}">
     <div class="pal-head">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="palIn" type="text" autocomplete="off" spellcheck="false" placeholder="Aufgabe suchen, # für Tags, &gt; für Befehle" role="combobox" aria-expanded="true" aria-controls="palList">
+      <input id="palIn" type="text" autocomplete="off" spellcheck="false" placeholder="{{t:Search tasks, # for tags, > for commands}}" role="combobox" aria-expanded="true" aria-controls="palList">
     </div>
     <ul id="palList" role="listbox"></ul>
-    <div class="pal-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> auswählen</span><span><kbd>Enter</kbd> öffnen</span><span><kbd>Esc</kbd> schließen</span><span class="spacer"></span><span>Öffnen mit rechter <kbd>Shift</kbd> oder <kbd>Strg</kbd> <kbd>K</kbd></span></div>
+    <div class="pal-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> {{t:to select}}</span><span><kbd>Enter</kbd> {{t:to open}}</span><span><kbd>Esc</kbd> {{t:to close}}</span><span class="spacer"></span><span>{{t:Open with right}} <kbd>Shift</kbd> {{t:or}} <kbd>{{t:Ctrl}}</kbd> <kbd>K</kbd></span></div>
   </div>
 </div>
 

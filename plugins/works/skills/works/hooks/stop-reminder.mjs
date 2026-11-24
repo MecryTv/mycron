@@ -8,6 +8,7 @@ import { recordEvent } from '../scripts/timelog.mjs';
 import { setIdle, takeInstructions, instructionText } from '../scripts/live.mjs';
 import { loadLanes } from '../scripts/parallel.mjs';
 import { collectUsage, recordUsage } from '../scripts/usage.mjs';
+import { tr, language, setLanguage } from '../scripts/i18n.mjs';
 
 let input = {};
 try {
@@ -17,6 +18,7 @@ try {
 function main() {
   const root = findRoot(input.cwd || process.cwd());
   if (!root) return;
+  setLanguage(language(root));
   const config = loadConfig(root);
   const state = loadState(root);
   // Zeiterfassung: Ende der Anfrage. Läuft auch bei abgeschalteter Erinnerung.
@@ -58,9 +60,7 @@ function main() {
   const rel = path.relative(root, task._file).split(path.sep).join('/');
   process.stdout.write(JSON.stringify({
     decision: 'block',
-    reason: `works: An ${task.id} (${task.title}) wurden Dateien geändert, die task.md ist aber älter. `
-      + `Bitte kurz Verlauf (works log), abgehakte Kriterien und die Übergabe (works handoff ${task.id} --text "...") in ${rel} aktualisieren. `
-      + 'Falls nichts Relevantes passiert ist, einfach fortfahren.',
+    reason: tr('works: Files were changed for {id} ({title}), but task.md is older. Please briefly update the history (works log), checked criteria and the handoff (works handoff {id} --text "...") in {file}. If nothing relevant happened, just continue.', { id: task.id, title: task.title, file: rel }),
   }) + '\n');
 }
 

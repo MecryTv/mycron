@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { tr } from './i18n.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MARK = '# works CLI (works install-cli)';
@@ -39,7 +40,7 @@ export function installCli({ dir, path: addPath = true, dryRun = false, home } =
   const write = (f, text, mode) => { if (dryRun) return; fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); if (mode) fs.chmodSync(f, mode); };
   write(p.launcher, fs.readFileSync(path.join(HERE, 'launcher.mjs'), 'utf8'), 0o755);
   write(p.conf, JSON.stringify({ fallback: path.join(HERE, 'works.mjs'), installed: new Date().toISOString() }, null, 2) + '\n');
-  notes.push(`Startscript: ${p.launcher}`);
+  notes.push(tr('Launcher: {file}', { file: p.launcher }));
   const node = process.execPath;
   if (WIN) {
     write(p.shims[0], `@echo off\r\nset "WORKS_NODE=node"\r\nwhere node >nul 2>nul || set "WORKS_NODE=${node}"\r\n"%WORKS_NODE%" "${p.launcher}" %*\r\n`);
@@ -50,14 +51,14 @@ export function installCli({ dir, path: addPath = true, dryRun = false, home } =
   } else {
     write(p.shims[0], `#!/bin/sh\n${MARK}\nif command -v node >/dev/null 2>&1; then exec node "${p.launcher}" "$@"; fi\nexec "${node}" "${p.launcher}" "$@"\n`, 0o755);
   }
-  notes.push(`Befehl: ${p.shims.join(', ')}`);
+  notes.push(tr('Command: {files}', { files: p.shims.join(', ') }));
   let pathChanged = '';
   if (!onPath(p.shimDir)) {
-    if (!addPath) notes.push(`${p.shimDir} steht nicht im PATH. Selbst ergänzen, damit works überall funktioniert.`);
+    if (!addPath) notes.push(tr('{dir} is not in PATH. Add it yourself so works runs everywhere.', { dir: p.shimDir }));
     else if (WIN) {
       const ps = `$d='${p.shimDir.replace(/'/g, "''")}'; $c=[Environment]::GetEnvironmentVariable('Path','User'); if (-not $c) { $c='' }; if (($c -split ';') -notcontains $d) { [Environment]::SetEnvironmentVariable('Path', ($c.TrimEnd(';') + ';' + $d).TrimStart(';'), 'User') }`;
-      if (!dryRun) { const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8', windowsHide: true }); if (r.status !== 0) notes.push(`PATH ließ sich nicht setzen: ${(r.stderr || '').trim()}. Ordner ${p.shimDir} selbst in den Benutzer-PATH eintragen.`); else pathChanged = 'Benutzer-PATH'; }
-      else pathChanged = 'Benutzer-PATH';
+      if (!dryRun) { const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8', windowsHide: true }); if (r.status !== 0) notes.push(tr('Could not set PATH: {msg}. Add the folder {dir} to the user PATH yourself.', { msg: (r.stderr || '').trim(), dir: p.shimDir })); else pathChanged = tr('user PATH'); }
+      else pathChanged = tr('user PATH');
     } else {
       const files = rcFiles(p.home);
       for (const f of files) {
@@ -69,7 +70,7 @@ export function installCli({ dir, path: addPath = true, dryRun = false, home } =
     }
   }
   const others = whichOther().filter((x) => !p.shims.some((s) => path.resolve(s).toLowerCase() === path.resolve(x).toLowerCase()));
-  if (others.length) notes.push(`Achtung: Es gibt schon einen anderen Befehl works (${others[0]}). Je nach Reihenfolge im PATH wird dieser zuerst gefunden.`);
+  if (others.length) notes.push(tr('Caution: there is already another works command ({file}). Depending on the order in PATH it may be found first.', { file: others[0] }));
   return { ...p, pathChanged, onPath: onPath(p.shimDir), notes };
 }
 
@@ -84,12 +85,12 @@ export function uninstallCli({ dir, home, dryRun = false } = {}) {
       if (!cur.includes(MARK)) continue;
       const next = cur.replace(new RegExp(`\\n?${MARK.replace(/[()]/g, '\\$&')}\\nexport PATH="[^"\\n]*"\\n`, 'g'), '\n');
       if (!dryRun) fs.writeFileSync(f, next);
-      removed.push(`PATH-Zeile in ${path.basename(f)}`);
+      removed.push(tr('PATH line in {file}', { file: path.basename(f) }));
     }
   } else if (!dryRun) {
     const ps = `$d='${p.shimDir.replace(/'/g, "''")}'; $c=[Environment]::GetEnvironmentVariable('Path','User'); if ($c) { [Environment]::SetEnvironmentVariable('Path', (($c -split ';') | Where-Object { $_ -and $_ -ne $d }) -join ';', 'User') }`;
     spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { windowsHide: true });
-    removed.push('Eintrag im Benutzer-PATH');
+    removed.push(tr('Entry in the user PATH'));
   }
   return removed;
 }

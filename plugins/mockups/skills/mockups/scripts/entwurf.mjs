@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { tr } from './i18n.mjs';
 
 const MIME = { '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.avif': 'image/avif', '.svg': 'image/svg+xml' };
 const remote = (u) => /^(https?:|data:|blob:|#)/i.test(u) || u.startsWith('//');
@@ -40,7 +41,7 @@ function inline(file, out, variant) {
     if (!/\brel=["']?stylesheet\b/i.test(tag) || !href || remote(href)) return tag;
     const css = local(href, base);
     if (!fs.existsSync(css)) { skipped.push(href); return tag; }
-    return `<style>/* eingebettet: ${path.basename(css)} */\n${cssUrls(fs.readFileSync(css, 'utf8'), path.dirname(css))}</style>`;
+    return `<style>/* ${tr('inlined: {file}', { file: path.basename(css) })} */\n${cssUrls(fs.readFileSync(css, 'utf8'), path.dirname(css))}</style>`;
   });
   html = html.replace(/<img\b[^>]*>/gi, (tag) => tag.replace(/\bsrc=(["'])([^"']+)\1/i, (m, q, src) => {
     const d = !remote(src) && dataUri(src, base);
@@ -48,8 +49,8 @@ function inline(file, out, variant) {
   }));
   if (variant) html = html.replace(/<html\b([^>]*)>/i, (m, attrs) => `<html${attrs.replace(/\sdata-v=(["'])[^"']*\1/i, '')} data-v="${variant}">`);
   fs.writeFileSync(out, html);
-  console.log(`eingebettet: ${out} (${Math.round(html.length / 1024)} KB)`);
-  for (const s of [...new Set(skipped)]) console.log(`nicht eingebettet: ${s} (Datei fehlt oder Typ unbekannt, Verweis bleibt stehen)`);
+  console.log(tr('inlined: {file} ({kb} KB)', { file: out, kb: Math.round(html.length / 1024) }));
+  for (const s of [...new Set(skipped)]) console.log(tr('not inlined: {ref} (file missing or unknown type, the reference stays as it is)', { ref: s }));
   return skipped.length ? 1 : 0;
 }
 
@@ -67,29 +68,29 @@ async function shots(src, a) {
   const widths = list(a.widths, '1440,768,390').map(Number);
   const themes = list(a.themes, 'light,dark');
   const variants = a.variants ? list(a.variants, '') : [''];
-  if (widths.some((w) => !(w >= 200 && w <= 4000)) || themes.some((t) => !['light', 'dark'].includes(t))) { console.log('Fehler: --widths 200 bis 4000, --themes light oder dark.'); return 2; }
+  if (widths.some((w) => !(w >= 200 && w <= 4000)) || themes.some((t) => !['light', 'dark'].includes(t))) { console.log(tr('Error: --widths 200 to 4000, --themes light or dark.')); return 2; }
   const isUrl = /^(https?|file):/i.test(src);
-  if (!isUrl && !fs.existsSync(src)) { console.log(`Fehler: ${src} nicht gefunden.`); return 2; }
+  if (!isUrl && !fs.existsSync(src)) { console.log(tr('Error: {file} not found.', { file: src })); return 2; }
   const target = isUrl ? src : pathToFileURL(path.resolve(src)).href;
   const name = isUrl ? 'seite' : path.basename(src, path.extname(src));
   const out = typeof a.out === 'string' ? a.out : path.join(isUrl ? '.' : path.dirname(src), `${name}-shots`);
   const pw = playwright();
-  if (!pw) { console.log('Playwright fehlt. Einmalig `npm install -g playwright` (lädt keine Browser, genutzt wird das installierte Chrome) oder NODE_PATH auf einen Ordner mit playwright setzen.'); return 2; }
+  if (!pw) { console.log(tr('Playwright is missing. Run `npm install -g playwright` once (it downloads no browsers, the installed Chrome is used) or set NODE_PATH to a folder that contains playwright.')); return 2; }
   let browser; let err;
   const tries = [process.env.ENTWURF_BROWSER && { executablePath: process.env.ENTWURF_BROWSER }, { channel: 'chrome' }, { channel: 'msedge' }, {}];
   for (const opt of tries.filter(Boolean)) {
     try { browser = await pw.chromium.launch(opt); break; } catch (e) { err = e; }
   }
-  if (!browser) { console.log(`Fehler: kein Browser startbar (Chrome, Edge, Chromium): ${String(err.message).split('\n')[0]}`); return 2; }
+  if (!browser) { console.log(tr('Error: no browser could be started (Chrome, Edge, Chromium): {msg}', { msg: String(err.message).split('\n')[0] })); return 2; }
   fs.mkdirSync(out, { recursive: true });
   let problems = 0;
   try {
     for (const v of variants) for (const theme of themes) for (const w of widths) {
       const page = await browser.newPage({ viewport: { width: w, height: 900 }, colorScheme: theme });
       const found = [];
-      page.on('pageerror', (e) => found.push(`Fehler: ${e.message}`));
-      page.on('console', (m) => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) found.push(`Konsole: ${m.text()}`); });
-      page.on('requestfailed', (r) => found.push(`nicht geladen: ${r.url()}`));
+      page.on('pageerror', (e) => found.push(tr('Error: {msg}', { msg: e.message })));
+      page.on('console', (m) => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) found.push(tr('Console: {msg}', { msg: m.text() })); });
+      page.on('requestfailed', (r) => found.push(tr('not loaded: {url}', { url: r.url() })));
       const u = new URL(target);
       if (v) u.searchParams.set('v', v);
       u.searchParams.set('theme', theme);
@@ -106,9 +107,10 @@ async function shots(src, a) {
           if (over(el) && !over(el.parentElement)) els.push(el.tagName.toLowerCase() + [...el.classList].map((c) => `.${c}`).join(''));
           if (els.length >= 3) break;
         }
-        return `seitliches Scrollen (Seite ${sw} px, Fenster ${W} px)${els.length ? `: ${els.join(', ')}` : ''}`;
+        return { sw, W, els };
       });
-      if (wide) found.unshift(wide);
+      // Text erst hier bauen: page.evaluate läuft im Browser und kennt tr() nicht.
+      if (wide) found.unshift(tr('horizontal scrolling (page {sw} px, window {w} px)', { sw: wide.sw, w: wide.W }) + (wide.els.length ? `: ${wide.els.join(', ')}` : ''));
       const file = path.join(out, `${name}${v ? `-${v}` : ''}-${theme}-${w}.png`);
       await page.screenshot({ path: file, fullPage: true });
       await page.close();
@@ -118,7 +120,7 @@ async function shots(src, a) {
   } finally {
     await browser.close();
   }
-  console.log(problems ? `${problems} Screenshot(s) mit Problemen.` : 'Alle Screenshots ohne Probleme.');
+  console.log(problems ? tr('{n} screenshot(s) with problems.', { n: problems }) : tr('All screenshots without problems.'));
   return problems ? 1 : 0;
 }
 
@@ -137,13 +139,13 @@ async function main() {
   const [cmd, file] = a._;
   if (cmd === 'shots' && file) return shots(file, a);
   if (cmd === 'inline' && file) {
-    if (!fs.existsSync(file)) { console.log(`Fehler: ${file} nicht gefunden.`); return 2; }
-    if (a.variant !== undefined && !/^[\w-]+$/.test(String(a.variant))) { console.log('Fehler: --variant nur Buchstaben, Ziffern, - und _.'); return 2; }
+    if (!fs.existsSync(file)) { console.log(tr('Error: {file} not found.', { file })); return 2; }
+    if (a.variant !== undefined && !/^[\w-]+$/.test(String(a.variant))) { console.log(tr('Error: --variant only letters, digits, - and _.')); return 2; }
     const out = typeof a.out === 'string' ? a.out : file.replace(/(\.html?)?$/i, '-eingebettet.html');
-    try { return inline(file, out, a.variant); } catch (e) { console.log(`Fehler: ${e.message}`); return 2; }
+    try { return inline(file, out, a.variant); } catch (e) { console.log(tr('Error: {msg}', { msg: e.message })); return 2; }
   }
-  console.log('node entwurf.mjs shots <datei.html|url> [--out ordner] [--widths 1440,768,390] [--themes light,dark] [--variants A,B]\nnode entwurf.mjs inline <datei.html> [--out datei.html] [--variant B]');
+  console.log(tr('node entwurf.mjs shots <file.html|url> [--out folder] [--widths 1440,768,390] [--themes light,dark] [--variants A,B]\nnode entwurf.mjs inline <file.html> [--out file.html] [--variant B]'));
   return 2;
 }
 
-main().then((code) => { process.exitCode = code; }, (e) => { console.log(`Fehler: ${e.message}`); process.exitCode = 2; });
+main().then((code) => { process.exitCode = code; }, (e) => { console.log(tr('Error: {msg}', { msg: e.message })); process.exitCode = 2; });

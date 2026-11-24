@@ -3,7 +3,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readText, exists, readJson, writeJson, slugify, stripComments, today, nowStamp } from './lib.mjs';
+import { readText, exists, readJson, writeJson, slugify, stripComments, today, nowStamp, sectionRegex, sectionTitle } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 const IMAGE = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
 const ALLOWED = [...IMAGE, '.html', '.htm', '.md', '.pdf'];
@@ -26,8 +27,8 @@ function ensure(task) { return loadDesign(task) || { direction: null, variants: 
 
 function copyIn(task, src, base) {
   const ext = path.extname(src).toLowerCase();
-  if (!ALLOWED.includes(ext)) throw new Error(`Dateityp ${ext || 'ohne Endung'} wird nicht unterstützt. Erlaubt: ${ALLOWED.join(', ')}`);
-  if (!exists(src)) throw new Error(`Datei ${src} nicht gefunden.`);
+  if (!ALLOWED.includes(ext)) throw new Error(tr('File type {ext} is not supported. Allowed: {list}', { ext: ext || tr('without extension'), list: ALLOWED.join(', ') }));
+  if (!exists(src)) throw new Error(tr('File {file} not found.', { file: src }));
   const name = `${base}${ext === '.htm' ? '.html' : ext}`;
   fs.mkdirSync(designDir(task), { recursive: true });
   fs.copyFileSync(src, path.join(designDir(task), name));
@@ -38,7 +39,7 @@ export function parseColors(v) {
   if (!v) return [];
   return String(v).split(',').map((s) => s.trim()).filter(Boolean).map((p) => {
     const m = p.match(/^(?:([^=#]{1,40}?)\s*[=:]?\s*)?(#[0-9a-fA-F]{3,8})$/);
-    if (!m) throw new Error(`Farbe "${p}" verstehe ich nicht. Format: Name #RRGGBB oder Name=#RRGGBB, durch Komma getrennt.`);
+    if (!m) throw new Error(tr('I do not understand the color "{color}". Format: Name #RRGGBB or Name=#RRGGBB, separated by commas.', { color: p }));
     return { name: (m[1] || '').trim(), hex: m[2].toUpperCase() };
   }).slice(0, 12);
 }
@@ -46,7 +47,7 @@ export function parseColors(v) {
 export function setDirection(task, { text, file, source = '', colors = [], fonts = [], notes = '' }) {
   const d = ensure(task);
   const body = file ? readText(file) : String(text || '');
-  if (!body.trim() && !colors.length) throw new Error('Leere Designrichtung. --file oder --text angeben.');
+  if (!body.trim() && !colors.length) throw new Error(tr('Empty design direction. Pass --file or --text.'));
   fs.mkdirSync(designDir(task), { recursive: true });
   fs.writeFileSync(path.join(designDir(task), 'richtung.md'), body.trim() + '\n');
   d.direction = { source, at: nowStamp(), file: 'richtung.md', colors, fonts, notes: String(notes || '').slice(0, 300) };
@@ -65,8 +66,8 @@ export function localRefs(html) {
 }
 
 export function addVariant(task, { name, title = '', file, source = '', note = '' }) {
-  if (!VARIANT_RE.test(name || '')) throw new Error('Name der Variante: Buchstaben oder Zahlen, etwa A, B oder tabs.');
-  if (!file) throw new Error('Datei fehlt: --file mockup.html oder bild.png');
+  if (!VARIANT_RE.test(name || '')) throw new Error(tr('Name of the variant: letters or digits, such as A, B or tabs.'));
+  if (!file) throw new Error(tr('File missing: --file mockup.html or image.png'));
   const d = ensure(task);
   const stored = copyIn(task, file, `${name}-${slugify(title || name, 30)}`);
   const ext = path.extname(stored).toLowerCase();
@@ -78,9 +79,9 @@ export function addVariant(task, { name, title = '', file, source = '', note = '
 
 export function removeVariant(task, name) {
   const d = loadDesign(task);
-  if (!d) throw new Error('Keine Entwürfe vorhanden.');
+  if (!d) throw new Error(tr('No design variants yet.'));
   const v = d.variants.find((x) => x.name === name);
-  if (!v) throw new Error(`Variante ${name} gibt es nicht.`);
+  if (!v) throw new Error(tr('Variant {name} does not exist.', { name }));
   try { fs.unlinkSync(path.join(designDir(task), v.file)); } catch { /* weg */ }
   d.variants = d.variants.filter((x) => x.name !== name);
   if (d.chosen && d.chosen.name === name) d.chosen = null;
@@ -89,7 +90,7 @@ export function removeVariant(task, name) {
 
 export function addBrainstorm(task, { file, text, source = 'superpowers', title = '' }) {
   const body = file ? readText(file) : String(text || '');
-  if (!body.trim()) throw new Error('Leeres Brainstorming.');
+  if (!body.trim()) throw new Error(tr('Empty brainstorming.'));
   const d = ensure(task);
   const n = d.brainstorm.length + 1;
   const name = `brainstorm${n > 1 ? `-${n}` : ''}.md`;
@@ -102,19 +103,21 @@ export function addBrainstorm(task, { file, text, source = 'superpowers', title 
 
 export function chooseVariant(task, name, reason = '') {
   const d = loadDesign(task);
-  if (!d) throw new Error('Keine Entwürfe vorhanden.');
+  if (!d) throw new Error(tr('No design variants yet.'));
   const v = d.variants.find((x) => x.name === name);
-  if (!v) throw new Error(`Variante ${name} gibt es nicht. Vorhanden: ${d.variants.map((x) => x.name).join(', ') || 'keine'}`);
+  if (!v) throw new Error(tr('Variant {name} does not exist. Available: {list}', { name, list: d.variants.map((x) => x.name).join(', ') || tr('none') }));
   d.chosen = { name, at: nowStamp(), reason: String(reason || '').slice(0, 300) };
   saveDesign(task, d);
   // In decisions.md festhalten, damit die Entscheidung auch ohne Board nachlesbar ist.
   const dec = path.join(task._dir, 'decisions.md');
-  const line = `\n- ${today()}: Variante ${name} „${v.title}“ gewählt${reason ? `, Grund: ${reason}` : ''}. Datei: design/${v.file}${d.variants.length > 1 ? `. Nicht gewählt: ${d.variants.filter((x) => x.name !== name).map((x) => `${x.name} ${x.title}`).join(', ')}` : ''}\n`;
+  const others = d.variants.filter((x) => x.name !== name).map((x) => `${x.name} ${x.title}`).join(', ');
+  const line = `\n- ${today()}: ${tr('Variant {name} "{title}" chosen', { name, title: v.title })}${reason ? tr(', reason: {reason}', { reason }) : ''}. ${tr('File: {file}', { file: `design/${v.file}` })}${d.variants.length > 1 ? `. ${tr('Not chosen: {list}', { list: others })}` : ''}\n`;
   if (exists(dec)) {
     let s = readText(dec);
-    if (!/^## Gewählter Entwurf/m.test(s)) s = s.replace(/\s*$/, '\n\n## Gewählter Entwurf\n');
-    fs.writeFileSync(dec, s.replace(/(## Gewählter Entwurf\n)/, `$1${line}`));
-  } else fs.writeFileSync(dec, `# Entscheidungen ${task.id}\n\n## Gewählter Entwurf\n${line}`);
+    const re = sectionRegex('Gewählter Entwurf');
+    if (!re.test(s)) s = s.replace(/\s*$/, `\n\n## ${sectionTitle('Gewählter Entwurf', s)}\n`);
+    fs.writeFileSync(dec, s.replace(re, (all, pre, name, body) => `${pre}## ${name}\n${line}${body}`));
+  } else fs.writeFileSync(dec, `# ${tr('Decisions')} ${task.id}\n\n## ${sectionTitle('Gewählter Entwurf')}\n${line}`);
   return { design: d, variant: v };
 }
 

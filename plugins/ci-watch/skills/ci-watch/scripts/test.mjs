@@ -3,8 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { repoFromUrl, errorExcerpt, failureLines, bugFor, fileBug, findWorksCli, notifyWorks } from './ci-status.mjs';
+import { tr, setLanguage, placeholders } from './i18n.mjs';
+
+// W-0041: Die Prüfungen bis zum englischen Teil erwarten deutsche Texte. Kindprozesse (works-CLI) erben die Sprache.
+process.env.WORKS_LANG = 'de';
+setLanguage(null);
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 assert.equal(repoFromUrl('https://github.com/MecryTv/mycron.git'), 'MecryTv/mycron');
 assert.equal(repoFromUrl('git@github.com:MecryTv/mycron.git'), 'MecryTv/mycron');
@@ -39,6 +46,8 @@ assert.equal(bug.title, 'CI rot: works Selbsttest, Schritt Selbsttest');
 for (const part of ['a5cfc20', 'a/b', 'Node 22 auf windows-latest', 'Node 20 auf windows-latest', 'https://github.com/a/b/actions/runs/1/job/11']) assert.ok(bug.description.includes(part), `Beschreibung ohne ${part}`);
 assert.ok(bug.log.includes('Wechsel nach main fehlgeschlagen'));
 assert.equal(bugFor({ repo: 'a/b', sha: 'x'.repeat(40), failures: [{ run: 'CI', job: 'build', steps: [], url: '', lines: [], excerpt: '' }] }).title, 'CI rot: CI, Job build');
+// Ein offener Bug aus einer anderen Sprache wird wiedererkannt (W-0041).
+assert.deepEqual(bugFor({ repo: 'a/b', sha: 'x'.repeat(40), failures: [{ run: 'CI', job: 'build', steps: [], url: '', lines: [], excerpt: '' }] }).titles, ['CI red: CI, job build', 'CI rot: CI, Job build']);
 
 // fileBug legt den Bug im works-Projekt an, ergänzt ihn beim nächsten roten Commit und lässt denselben Commit aus.
 const cli = findWorksCli();
@@ -87,4 +96,59 @@ try {
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }
+
+// W-0041: Englisch (Standard). Wichtige Ausgaben englisch und ohne deutsche Wörter.
+const GERMAN = /[äöüß]|\b(?:Fehler|rot|grün|Schritt|Lauf|angelegt|ergänzt|erneut|nicht|keine?|und|oder|für|mit|nur|von|der|die|das|ist|Rote|gibt|sonst)\b/i;
+process.env.WORKS_LANG = 'en';
+setLanguage(null);
+assert.equal(errorExcerpt(log, 0), 'Error: Process completed with exit code 1.');
+const enFailures = [
+  { run: 'works self-test', job: 'Node 22 on windows-latest', steps: ['Self-test'], url: 'https://github.com/a/b/actions/runs/1/job/11', lines: ['Self-test: works ship: switch to main failed'], excerpt: '' },
+  { run: 'works self-test', job: 'build', steps: [], url: 'https://github.com/a/b/actions/runs/1/job/12', lines: [], excerpt: '' },
+];
+const enBug = bugFor({ repo: 'a/b', sha: 'a5cfc20aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', failures: enFailures });
+assert.equal(enBug.title, 'CI red: works self-test, step Self-test');
+assert.ok(enBug.description.startsWith('Created by the CI watcher: CI red for commit a5cfc20 in a/b.\n\nFailed jobs:\n- Node 22 on windows-latest (step Self-test): https://github.com/a/b/actions/runs/1/job/11\n- build: https://github.com/a/b/actions/runs/1/job/12\n'), enBug.description);
+assert.ok(!GERMAN.test(enBug.title + enBug.description), `deutsche Wörter im Bug: ${enBug.description}`);
+assert.equal(bugFor({ repo: 'a/b', sha: 'x'.repeat(40), failures: [enFailures[1]] }).title, 'CI red: works self-test, job build');
+// works ship erkennt die grüne Zeile in beiden Sprachen (Muster wie in works/scripts/ship.mjs).
+for (const lang of ['en', 'de']) assert.equal((tr('CI green for {sha}: {workflows}.', { sha: 'a5cfc20', workflows: 'A, B' }, lang).match(/CI (?:grün für|green for) \w+: (.+)\./) || [])[1], 'A, B', lang);
+// Fehlerzeile des Skripts, ohne Netz: kaputter Repo-Name (oder kein Git) endet vor jeder Abfrage mit Exit 3.
+const tmpEn = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-watch-test-en-'));
+try {
+  for (const [lang, prefix] of [['en', 'Error: '], ['de', 'Fehler: ']]) {
+    const r = spawnSync(process.execPath, [path.join(here, 'ci-status.mjs'), '--repo', 'bad..repo', '--no-bug'], { cwd: tmpEn, env: { ...process.env, WORKS_LANG: lang }, encoding: 'utf8', windowsHide: true });
+    assert.equal(r.status, 3, r.stdout + r.stderr);
+    assert.ok(r.stdout.startsWith(prefix), `${lang}: ${r.stdout}`);
+  }
+  // fileBug in einem englischen works-Projekt: works meldet "Created: …", der Verlauf bekommt die englische Zeile.
+  const envEn = { ...process.env, HOME: tmpEn, USERPROFILE: tmpEn, WORKS_ACTOR: '', WORKS_LANG: 'en' };
+  const proj = path.join(tmpEn, 'p');
+  fs.mkdirSync(proj);
+  execFileSync(process.execPath, [cli, 'init'], { cwd: proj, env: envEn, stdio: 'ignore' });
+  const r1 = fileBug({ cwd: proj, bug: enBug, sha: 'a5cfc20aaaa', cli, env: envEn });
+  assert.equal(r1 && r1.action, 'neu');
+  const show = () => execFileSync(process.execPath, [cli, 'show', r1.id], { cwd: proj, env: envEn, encoding: 'utf8' });
+  assert.ok(show().includes('switch to main failed'), 'Log-Auszug fehlt im englischen Bug');
+  assert.equal(fileBug({ cwd: proj, bug: enBug, sha: 'b6d0e11bbbb', cli, env: envEn }).action, 'ergänzt');
+  assert.ok(show().includes('CI red again for b6d0e11: Node 22 on windows-latest, build'), show());
+} finally {
+  fs.rmSync(tmpEn, { recursive: true, force: true });
+}
+
+// W-0041: i18n.mjs ist eine wortgleiche Kopie aus works, jeder tr()-Text steht im Katalog mit gleichen Platzhaltern.
+const worksI18n = path.resolve(here, '..', '..', '..', '..', 'works', 'skills', 'works', 'scripts', 'i18n.mjs');
+if (fs.existsSync(worksI18n)) assert.ok(fs.readFileSync(worksI18n).equals(fs.readFileSync(path.join(here, 'i18n.mjs'))), 'i18n.mjs weicht von works/skills/works/scripts/i18n.mjs ab');
+else console.log('i18n.mjs-Vergleich übersprungen: works-Plugin liegt nicht nebenan');
+const de = JSON.parse(fs.readFileSync(path.join(here, 'i18n', 'de.json'), 'utf8'));
+for (const [en, d] of Object.entries(de)) assert.equal(placeholders(d).join(), placeholders(en).join(), `de.json: Platzhalter verschieden in "${en}"`);
+const unesc = (s) => s.replace(/\\(.)/g, (a, c) => ({ n: '\n', t: '\t' })[c] || c);
+const keys = new Set();
+for (const f of fs.readdirSync(here).filter((x) => x.endsWith('.mjs'))) {
+  const src = fs.readFileSync(path.join(here, f), 'utf8');
+  if (!/import \{[^}]*\btr\b[^}]*\} from '\.\/i18n\.mjs'/.test(src)) continue;
+  for (const m of src.matchAll(/\btr\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.)*)`)\s*[,)]/g)) keys.add(unesc(m[1] ?? m[2] ?? m[3]));
+}
+assert.deepEqual([...keys].filter((k) => !(k in de)), [], 'Texte ohne deutsche Übersetzung in i18n/de.json');
+assert.ok(keys.has('CI green for {sha}: {workflows}.'), 'grüne Zeile nicht mehr in ci-status.mjs');
 console.log('ci-watch: alle Prüfungen bestanden');

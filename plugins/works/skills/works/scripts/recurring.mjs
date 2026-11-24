@@ -2,6 +2,7 @@
 // aber nur, wenn die zuletzt angelegte nicht mehr offen ist.
 import { today, OPEN_STATUSES } from './lib.mjs';
 import { addDays } from './sprint.mjs';
+import { tr } from './i18n.mjs';
 
 export const KINDS = ['daily', 'weekly', 'monthly', 'days'];
 export const RULE_ID_RE = /^R\d{1,4}$/;
@@ -69,12 +70,14 @@ export function upcoming(rule, n = 3, from = today()) {
 }
 
 export function describe(rule) {
-  const days = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-  if (rule.kind === 'daily') return 'täglich';
-  if (rule.kind === 'days') return `alle ${rule.interval || 1} Tage`;
-  if (rule.kind === 'weekly') return `${(rule.interval || 1) > 1 ? `alle ${rule.interval} Wochen` : 'jede Woche'} am ${days[rule.weekday || 1]}`;
-  if (rule.day) return `monatlich am ${rule.day}.`;
-  return `jeden ${['', 'ersten', 'zweiten', 'dritten', 'vierten', 'letzten'][rule.nth || 1]} ${days[rule.weekday || 1]} im Monat`;
+  const days = ['', tr('Monday'), tr('Tuesday'), tr('Wednesday'), tr('Thursday'), tr('Friday'), tr('Saturday'), tr('Sunday')];
+  const day = days[rule.weekday || 1];
+  if (rule.kind === 'daily') return tr('daily');
+  if (rule.kind === 'days') return tr('every {n} days', { n: rule.interval || 1 });
+  if (rule.kind === 'weekly') return (rule.interval || 1) > 1 ? tr('every {n} weeks on {day}', { n: rule.interval, day }) : tr('every week on {day}', { day });
+  if (rule.day) return tr('monthly on day {n}', { n: rule.day });
+  return ['', tr('every first {day} of the month', { day }), tr('every second {day} of the month', { day }), tr('every third {day} of the month', { day }),
+    tr('every fourth {day} of the month', { day }), tr('every last {day} of the month', { day })][rule.nth || 1];
 }
 
 // Welche Regeln sind heute fällig? Gibt Paare aus Regel und Termin zurück.
@@ -93,7 +96,7 @@ export function dueRules(config, tasks, now = today()) {
 
 export function fillTitle(title, date) {
   const d = new Date(date + 'T00:00:00');
-  const months = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  const months = [tr('January'), tr('February'), tr('March'), tr('April'), tr('May'), tr('June'), tr('July'), tr('August'), tr('September'), tr('October'), tr('November'), tr('December')];
   const [y, m, dd] = date.split('-');
-  return String(title).replace(/\{Datum\}/g, `${dd}.${m}.${y}`).replace(/\{Monat\}/g, `${months[d.getMonth()]} ${y}`);
+  return String(title).replace(/\{(?:Datum|Date)\}/g, tr('{y}-{m}-{d}', { y, m, d: dd })).replace(/\{(?:Monat|Month)\}/g, `${months[d.getMonth()]} ${y}`);
 }

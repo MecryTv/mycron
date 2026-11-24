@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { tr } from './i18n.mjs';
 
 export const FORMATS = ['auto', 'trello', 'notion', 'linear', 'csv', 'xlsx', 'docx', 'md', 'json'];
 const MAX = 2000;
@@ -14,7 +15,7 @@ const MAX = 2000;
 export function readZip(buf) {
   let eocd = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 66000); i--) if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
-  if (eocd < 0) throw new Error('Keine gültige ZIP-Datei.');
+  if (eocd < 0) throw new Error(tr('Not a valid ZIP file.'));
   const count = buf.readUInt16LE(eocd + 10);
   let off = buf.readUInt32LE(eocd + 16);
   const files = new Map();
@@ -33,7 +34,7 @@ export function readZip(buf) {
       const data = buf.slice(start, start + csize);
       if (method === 0) return data;
       if (method === 8) return zlib.inflateRawSync(data, { maxOutputLength: 100 * 1024 * 1024 });
-      throw new Error(`ZIP-Kompression ${method} wird nicht unterstützt.`);
+      throw new Error(tr('ZIP compression {method} is not supported.', { method }));
     });
   }
   return files;
@@ -87,7 +88,7 @@ export function readXlsx(buf, sheetName) {
   const xfs = ((styles.match(/<cellXfs[\s\S]*?<\/cellXfs>/) || [''])[0].match(/<xf\b[^>]*>/g) || []).map((x) => +((x.match(/numFmtId="(\d+)"/) || [])[1] || 0));
   const isDateStyle = (s) => { const f = xfs[s]; return f !== undefined && ((f >= 14 && f <= 22) || (f >= 45 && f <= 47) || customDate.has(f)); };
   const pick = sheets.find((s) => s.name === sheetName) || sheets[0];
-  if (!pick || !z.has(pick.file)) throw new Error('Keine Tabelle in der Excel-Datei gefunden.');
+  if (!pick || !z.has(pick.file)) throw new Error(tr('No sheet found in the Excel file.'));
   const xml = z.get(pick.file)().toString('utf8');
   const rows = [];
   for (const rm of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
@@ -101,7 +102,7 @@ export function readXlsx(buf, sheetName) {
       let v = decodeXml((inner.match(/<v>([\s\S]*?)<\/v>/) || [])[1] || '');
       if (t === 's') v = shared[+v] ?? '';
       else if (t === 'inlineStr') v = decodeXml((inner.match(/<t[^>]*>[\s\S]*?<\/t>/g) || []).map((x) => x.replace(/<[^>]+>/g, '')).join(''));
-      else if (t === 'b') v = v === '1' ? 'ja' : 'nein';
+      else if (t === 'b') v = v === '1' ? tr('yes') : tr('no');
       else if (v && !t && isDateStyle(s) && /^\d+(\.\d+)?$/.test(v)) v = excelDate(+v);
       row[col] = v;
     }
@@ -117,7 +118,7 @@ const excelDate = (n) => new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 86400
 // Absätze mit Stil, Listenebene und Häkchen, dazu Tabellen als Zeilen.
 export function readDocx(buf) {
   const z = readZip(buf);
-  if (!z.has('word/document.xml')) throw new Error('Keine Word-Datei (word/document.xml fehlt).');
+  if (!z.has('word/document.xml')) throw new Error(tr('Not a Word file (word/document.xml is missing).'));
   const xml = z.get('word/document.xml')().toString('utf8');
   const styles = z.has('word/styles.xml') ? z.get('word/styles.xml')().toString('utf8') : '';
   const styleName = {};
@@ -266,16 +267,17 @@ export function detectMapping(header, rows = []) {
 export function applyMapping(map, overrides = {}, header = []) {
   const m = { ...map };
   for (const [field, col] of Object.entries(overrides)) {
-    if (!(field in SYN)) throw new Error(`Unbekanntes Feld "${field}". Möglich: ${Object.keys(SYN).join(', ')}`);
+    if (!(field in SYN)) throw new Error(tr('Unknown field "{field}". Possible: {list}', { field, list: Object.keys(SYN).join(', ') }));
     if (col === '' || col === '-') { delete m[field]; continue; }
     const i = /^\d+$/.test(col) ? +col - 1 : header.findIndex((h) => low(h) === low(col));
-    if (i < 0 || i >= header.length) throw new Error(`Spalte "${col}" nicht gefunden. Vorhanden: ${header.join(', ')}`);
+    if (i < 0 || i >= header.length) throw new Error(tr('Column "{col}" not found. Available: {list}', { col, list: header.join(', ') }));
     m[field] = i;
   }
   return m;
 }
 
-function fromTable(rows, fmt, { mapping = {}, origin = 'Zeile' } = {}) {
+// where: Herkunft einer Zeile für die Vorschau, etwa "Zeile 3" oder "Aufgaben, Zeile 3".
+function fromTable(rows, fmt, { mapping = {}, where = (n) => tr('Row {n}', { n }) } = {}) {
   if (rows.length < 2) return { candidates: [], header: rows[0] || [], mapping: {} };
   // Kopfzeile: erste Zeile, in der die meisten Zellen gefüllt sind, unter den ersten fünf.
   let hi = 0;
@@ -283,7 +285,7 @@ function fromTable(rows, fmt, { mapping = {}, origin = 'Zeile' } = {}) {
   const header = rows[hi].map((h) => clean(h));
   const body = rows.slice(hi + 1);
   const map = applyMapping(detectMapping(header, body), mapping, header);
-  if (map.title === undefined) throw new Error(`Keine Titelspalte erkannt. Spalten: ${header.join(', ')}. Mit --map title=Spaltenname festlegen.`);
+  if (map.title === undefined) throw new Error(tr('No title column found. Columns: {list}. Set it with --map title=<column name>.', { list: header.join(', ') }));
   const cell = (r, f) => (map[f] === undefined ? '' : clean(r[map[f]]));
   const known = new Set(Object.values(map));
   const candidates = [];
@@ -292,12 +294,12 @@ function fromTable(rows, fmt, { mapping = {}, origin = 'Zeile' } = {}) {
     if (!title) return;
     // Spalten ohne Zuordnung landen als Liste in der Beschreibung, damit nichts verloren geht.
     const extra = header.map((h, idx) => (!known.has(idx) && clean(r[idx]) && h ? `- ${h}: ${clean(r[idx]).replace(/\n/g, ' ')}` : '')).filter(Boolean);
-    const desc = [cell(r, 'description'), extra.length ? `Weitere Angaben aus dem Import:\n${extra.join('\n')}` : ''].filter(Boolean).join('\n\n');
+    const desc = [cell(r, 'description'), extra.length ? `${tr('More details from the import:')}\n${extra.join('\n')}` : ''].filter(Boolean).join('\n\n');
     const crit = cell(r, 'criteria').split(/\n|;\s*/).map((x) => x.replace(/^[-*•]\s*(\[[ xX]\]\s*)?/, '').trim()).filter(Boolean).map((text) => ({ text, done: false }));
     candidates.push({
       title, description: desc, status: normStatus(cell(r, 'status')), priority: normPriority(cell(r, 'priority')),
       type: normType(cell(r, 'type'), title), effort: normEffort(cell(r, 'effort')), tags: normTags(cell(r, 'tags')), due: normDate(cell(r, 'due')),
-      criteria: crit, key: cell(r, 'key'), origin: `${origin} ${hi + i + 2}`, format: fmt,
+      criteria: crit, key: cell(r, 'key'), origin: where(hi + i + 2), format: fmt,
     });
   });
   return { candidates, header, mapping: Object.fromEntries(Object.entries(map).map(([k, v]) => [k, header[v]])) };
@@ -321,10 +323,10 @@ function fromTrello(j, { includeArchived = false } = {}) {
       (/(akzeptanz|acceptance|kriter|dod|definition)/i.test(cl.name) || !plan.length && !crit.length ? crit : plan).push(...items);
     }
     candidates.push({
-      title: clean(c.name), description: clean(c.desc) + (plan.length ? `\n\nSchritte aus Trello:\n${plan.map((p) => `- [${p.done ? 'x' : ' '}] ${p.text}`).join('\n')}` : ''),
+      title: clean(c.name), description: clean(c.desc) + (plan.length ? `\n\n${tr('Steps from Trello:')}\n${plan.map((p) => `- [${p.done ? 'x' : ' '}] ${p.text}`).join('\n')}` : ''),
       status: c.dueComplete ? 'erledigt' : normStatus(list ? list.name : ''), priority: prioLabel, type: normType(labels.find((l) => /bug|fehler|design/i.test(l)) || '', c.name),
       effort: '', tags: normTags(labels.filter((l) => !normPriority(l)).join(',')), due: c.due ? String(c.due).slice(0, 10) : '',
-      criteria: crit, key: c.shortLink || c.id, origin: `Karte in „${list ? list.name : '?'}“`, format: 'trello',
+      criteria: crit, key: c.shortLink || c.id, origin: tr('Card in "{list}"', { list: list ? list.name : '?' }), format: 'trello',
     });
   }
   return { candidates, board: j.name || '' };
@@ -337,7 +339,7 @@ const BULLET = /^\s*(?:[-*+•]|\d+[.)])\s+(.+)$/;
 const TODO = /^\s*(?:TODO|FIXME|AUFGABE|TASK)\s*[:-]\s*(.+)$/i;
 
 // Listenpunkte werden Aufgaben, eingerückte Punkte darunter Kriterien, Überschriften Tags.
-function fromLines(lines, fmt, { headingAsTag = true } = {}) {
+function fromLines(lines, fmt, { headingAsTag = true, where = (n) => tr('Line {n}', { n }) } = {}) {
   const candidates = [];
   let heading = ''; let headStatus = ''; let headTag = '';
   let cur = null; let curIndent = 0;
@@ -380,8 +382,8 @@ function fromLines(lines, fmt, { headingAsTag = true } = {}) {
       cur.criteria.push({ text, done: !!(c && /[xX✓✔☑☒✅]/.test(c[1])) });
       return;
     }
-    if (c) return push(c[3], /[xX✓✔☑☒✅]/.test(c[1]), indent, `Zeile ${i + 1}`);
-    if (b || td) return push((b ? b[1] : td[1]), false, indent, `Zeile ${i + 1}`);
+    if (c) return push(c[3], /[xX✓✔☑☒✅]/.test(c[1]), indent, where(i + 1));
+    if (b || td) return push((b ? b[1] : td[1]), false, indent, where(i + 1));
     if (cur && indent > curIndent) { cur.description = [cur.description, clean(line)].filter(Boolean).join('\n'); return; }
   });
   return { candidates };
@@ -390,7 +392,7 @@ function fromLines(lines, fmt, { headingAsTag = true } = {}) {
 function fromDocx(blocks) {
   const tables = blocks.filter((b) => b.kind === 'table' && b.rows.length >= 2 && b.rows[0].length >= 2);
   let out = [];
-  for (const t of tables) { try { out.push(...fromTable(t.rows, 'docx', { origin: 'Tabellenzeile' }).candidates); } catch { /* Tabelle ohne Aufgaben */ } }
+  for (const t of tables) { try { out.push(...fromTable(t.rows, 'docx', { where: (n) => tr('Table row {n}', { n }) }).candidates); } catch { /* Tabelle ohne Aufgaben */ } }
   // Listen und Häkchen in Markdown übersetzen und gemeinsam auswerten.
   const lines = [];
   for (const b of blocks) {
@@ -400,7 +402,7 @@ function fromDocx(blocks) {
       lines.push(`${'  '.repeat(Math.max(0, b.level))}- ${box ? (/[☑☒✅xX]/.test(box[1]) ? '[x] ' : '[ ] ') + b.text.slice(box[0].length) : b.text}`);
     } else if (b.kind === 'para') lines.push(`${'  '.repeat(4)}${b.text}`);
   }
-  out.push(...fromLines(lines, 'docx').candidates.map((c) => ({ ...c, origin: c.origin.replace('Zeile', 'Absatz') })));
+  out.push(...fromLines(lines, 'docx', { where: (n) => tr('Paragraph {n}', { n }) }).candidates);
   return { candidates: out };
 }
 
@@ -411,7 +413,7 @@ function fromNotionZip(z) {
   const csv = names.filter((n) => /\.csv$/i.test(n) && !/_all\.csv$/i.test(n));
   let candidates = [];
   for (const n of csv.length ? csv : names.filter((x) => /_all\.csv$/i.test(x))) {
-    candidates.push(...fromTable(parseCsv(z.get(n)().toString('utf8')), 'notion', { origin: `${path.basename(n)}, Zeile` }).candidates);
+    candidates.push(...fromTable(parseCsv(z.get(n)().toString('utf8')), 'notion', { where: (row) => tr('{name}, row {n}', { name: path.basename(n), n: row }) }).candidates);
   }
   // Seiteninhalte (Markdown) als Beschreibung zuordnen: Dateiname beginnt mit dem Titel.
   const pages = names.filter((n) => /\.md$/i.test(n));
@@ -466,7 +468,7 @@ export function detectFormat(file, buf) {
 
 export function parseImport(file, { format = 'auto', mapping = {}, sheet = '', includeArchived = false } = {}) {
   const buf = fs.readFileSync(file);
-  if (buf.length > 30 * 1024 * 1024) throw new Error('Datei ist größer als 30 MB.');
+  if (buf.length > 30 * 1024 * 1024) throw new Error(tr('File is larger than 30 MB.'));
   const fmt = format === 'auto' ? detectFormat(file, buf) : format;
   let r;
   if (fmt === 'trello') r = fromTrello(JSON.parse(buf.toString('utf8')), { includeArchived });
@@ -478,9 +480,9 @@ export function parseImport(file, { format = 'auto', mapping = {}, sheet = '', i
       type: ['feature', 'bug', 'refactor', 'spike', 'chore', 'design', 'debt'].includes(c.type) ? c.type : normType(c.type || '', c.title), effort: normEffort(c.effort || ''),
       tags: Array.isArray(c.tags) ? normTags(c.tags.join(',')) : normTags(c.tags || ''), due: normDate(c.due || ''),
       criteria: (Array.isArray(c.criteria) ? c.criteria : []).map((x) => (typeof x === 'string' ? { text: clean(x), done: false } : { text: clean(x.text), done: !!x.done })).filter((x) => x.text),
-      key: c.key ? String(c.key) : '', origin: c.origin || `Eintrag ${i + 1}`, format: 'json',
+      key: c.key ? String(c.key) : '', origin: c.origin || tr('Entry {n}', { n: i + 1 }), format: 'json',
     })) };
-  } else if (fmt === 'xlsx') { const x = readXlsx(buf, sheet); r = { ...fromTable(x.rows, 'xlsx', { mapping, origin: `${x.sheet}, Zeile` }), sheets: x.sheets, sheet: x.sheet }; }
+  } else if (fmt === 'xlsx') { const x = readXlsx(buf, sheet); r = { ...fromTable(x.rows, 'xlsx', { mapping, where: (n) => tr('{name}, row {n}', { name: x.sheet, n }) }), sheets: x.sheets, sheet: x.sheet }; }
   else if (fmt === 'docx') r = fromDocx(readDocx(buf));
   else if (fmt === 'notion' && buf[0] === 0x50 && buf[1] === 0x4b) r = fromNotionZip(readZip(buf));
   else if (['csv', 'linear'].includes(fmt) || (fmt === 'notion' && /\.(csv|tsv)$/i.test(file))) r = fromTable(parseCsv(buf.toString('utf8'), /\.tsv$/i.test(file) ? '\t' : ''), fmt, { mapping });

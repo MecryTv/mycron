@@ -1,41 +1,41 @@
 # {{title}}
 
-## Ziel
-<!-- Welche Struktur soll am Ende stehen? -->
+## Goal
+<!-- What structure should be in place at the end? -->
 
-## Ist-Zustand
-<!-- Wie sieht der Code heute aus und was ist daran problematisch? -->
+## Current state
+<!-- What does the code look like today, and what is wrong with it? -->
 
-## Zielarchitektur
-<!-- Module, Schnittstellen, Verantwortlichkeiten nach dem Umbau. -->
+## Target architecture
+<!-- Modules, interfaces, responsibilities after the rework. -->
 
 ## Motivation
-<!-- Warum jetzt? Welche Aufgaben werden dadurch einfacher oder erst möglich? -->
+<!-- Why now? Which tasks become easier or possible at all because of it? -->
 
-## Risiken
-<!-- Was kann brechen? Welche Stellen sind schlecht getestet? -->
+## Risks
+<!-- What can break? Which parts are poorly tested? -->
 
 ## Rollback
-<!-- Wie wird der Umbau rückgängig gemacht, falls etwas schiefgeht? -->
+<!-- How is the rework undone if something goes wrong? -->
 
-## Umsetzungsplan
-<!-- Kleine, einzeln lauffähige Schritte. -->
+## Implementation plan
+<!-- Small steps that each run on their own. -->
 - [ ] 
 
-## Akzeptanzkriterien
-- [ ] Verhalten nach außen ist unverändert
-- [ ] Bestehende Tests laufen ohne Anpassung der Erwartungen
+## Acceptance criteria
+- [ ] Externally visible behavior is unchanged
+- [ ] Existing tests pass without changing their expectations
 - [ ] 
 
-## Betroffene Dateien
+## Affected files
 
-## Designentscheidungen
+## Design decisions
 
 ## Assets
 
-## Offene Fragen
+## Open questions
 
-## Übergabe
+## Handoff
 
-## Verlauf
-- {{date}}: Aufgabe angelegt
+## History
+- {{date}}: Task created

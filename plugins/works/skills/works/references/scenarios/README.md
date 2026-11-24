@@ -1,42 +1,42 @@
-# Szenarien für works shot
+# Scenarios for works shot
 
-`works shot --scenario <datei.mjs> [--widths 1440,390] [--themes light,dark] [--name ..] [--out ordner]` stellt vor jeder Aufnahme einen Zustand her, nimmt auf und räumt danach auf. Gedacht für Bilder, die sich mit `works shot <ansicht>` nicht herstellen lassen: ein verwaister Tab, eine wartende Freigabe im Hub, der Abnahmedialog.
+`works shot --scenario <file.mjs> [--widths 1440,390] [--themes light,dark] [--name ..] [--out folder]` sets up a state before each capture, takes the screenshot and cleans up afterwards. Meant for images that `works shot <view>` cannot produce: an orphaned tab, a pending approval in the hub, the acceptance review dialog.
 
-Jede Breite und jedes Schema bekommt einen frischen Aufbau, damit sich Zustände nicht gegenseitig stören. Die Bilder durchlaufen dieselbe Prüfung wie bei `works shot` (seitliches Scrollen, Fehler auf der Seite, nicht geladene Dateien).
+Every width and every scheme gets a fresh setup so states do not interfere with each other. The images go through the same check as with `works shot` (horizontal scrolling, errors on the page, files that failed to load).
 
-## Aufbau einer Szenario-Datei
+## Structure of a scenario file
 
 ```js
 export default {
-  name: 'verwaister-tab',               // Dateiname der Bilder, sonst der Name der Datei
-  async setup(kit) {                    // Zustand herstellen, Start-URL zurückgeben
-    const a = kit.project('mycron', [{ title: 'Hub-Seite', priority: 'P3' }]);
+  name: 'verwaister-tab',               // file name of the images, otherwise the name of the file
+  async setup(kit) {                    // set up the state, return the start URL
+    const a = kit.project('mycron', [{ title: 'Hub page', priority: 'P3' }]);
     return { url: await kit.board(a), a };
   },
-  async prepare(page, kit, state) {     // optional: auf der Seite klicken, warten, umschalten
+  async prepare(page, kit, state) {     // optional: click, wait, toggle on the page
     await page.waitForSelector('.card');
   },
 };
 ```
 
-## Was das kit kann
+## What the kit can do
 
-| Aufruf | Wirkung |
+| Call | Effect |
 |---|---|
-| `kit.project(name, aufgaben)` | Wegwerf-Projekt mit `works init`, Aufgaben als Titel oder `{ title, priority, type }`. Gibt den Ordner zurück |
-| `kit.works(ordner, args, { env })` | works-Befehl im Projekt, wirft bei Fehlern. `env: kit.realProfile` für Befehle, die selbst Chrome starten (etwa `works shot`) |
-| `await kit.board(ordner, { port })` | Board auf einem freien Port (ab 49300) oder dem angegebenen starten, gibt die URL zurück |
-| `kit.stop(ordner)` | Board stoppen |
-| `kit.hook(ordner, 'permission.mjs', eingabe)` | Hook von works auslösen, etwa eine wartende Freigabe |
-| `kit.file(name, inhalt)` | Datei im Wegwerf-Ordner anlegen, gibt den Pfad zurück |
-| `kit.dir` | Der Wegwerf-Ordner |
+| `kit.project(name, tasks)` | Throwaway project with `works init`, tasks as titles or `{ title, priority, type }`. Returns the folder |
+| `kit.works(folder, args, { env })` | works command in the project, throws on errors. `env: kit.realProfile` for commands that start Chrome themselves (such as `works shot`) |
+| `await kit.board(folder, { port })` | Starts the board on a free port (from 49300) or the given one, returns the URL |
+| `kit.stop(folder)` | Stops the board |
+| `kit.hook(folder, 'permission.mjs', input)` | Triggers a works hook, such as a pending approval |
+| `kit.file(name, content)` | Creates a file in the throwaway folder, returns the path |
+| `kit.dir` | The throwaway folder |
 
-Das kit arbeitet mit eigenem HOME: Die Projekte landen nicht in der echten Projektliste, es öffnet sich kein Browser. Am Ende stoppt es alle Boards seiner Projekte und löscht den Ordner, auch wenn `setup` scheitert.
+The kit uses its own HOME: the projects do not end up in the real project list and no browser opens. At the end it stops all boards of its projects and deletes the folder, even if `setup` fails.
 
-Eine Szenario-Datei ist ausführbarer Code. Nur eigene oder geprüfte Dateien verwenden.
+A scenario file is executable code. Only use your own or reviewed files.
 
-## Beispiele
+## Examples
 
-- `verwaister-tab.mjs`: Board endet, auf seinem Port startet ein anderes Projekt (W-0029)
-- `freigabe-im-hub.mjs`: zwei Boards, in einem wartet Claude auf eine Freigabe (W-0028)
-- `abnahme.mjs`: Aufgabe im Review mit gewähltem Entwurf und Nachher-Bild (W-0030)
+- `verwaister-tab.mjs`: a board ends, another project starts on its port (W-0029)
+- `freigabe-im-hub.mjs`: two boards, in one of them Claude is waiting for an approval (W-0028)
+- `abnahme.mjs`: task in review with a chosen design variant and an after image (W-0030)

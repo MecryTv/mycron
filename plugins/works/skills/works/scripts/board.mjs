@@ -19,6 +19,7 @@ import { loadKnowledge } from './knowledge.mjs';
 import { loadLanes } from './parallel.mjs';
 import { liveUsage } from './usage.mjs';
 import { fileConflicts } from './files.mjs';
+import { tr, language, languageSource, languages, LANGUAGE_NAMES, catalog, setLanguage } from './i18n.mjs';
 
 function excerpt(t) {
   for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Beschreibung', 'Abkürzung', 'Kontext und Problem', 'Problem', 'Herkunft']) {
@@ -38,7 +39,7 @@ function lastLog(t) {
 
 // Erster Start laut Verlauf, für die Zeitleiste.
 function startedOf(t) {
-  const m = (getSection(t._body, 'Verlauf') || '').match(/^- (\d{4}-\d{2}-\d{2}): Gestartet/m);
+  const m = (getSection(t._body, 'Verlauf') || '').match(/^- (\d{4}-\d{2}-\d{2}): (?:Gestartet|Started)/m);
   return m ? m[1] : '';
 }
 
@@ -56,6 +57,9 @@ function liveChecks(config, t) {
 }
 
 export function boardData(root) {
+  // Sprache je Aufbau frisch bestimmen (W-0041): Der Board-Server läuft lange, works lang wirkt ohne Neustart.
+  const lang = language(root);
+  setLanguage(lang);
   const config = loadConfig(root);
   const all = loadTasks(root);
   const byId = byIdMap(all);
@@ -93,6 +97,7 @@ export function boardData(root) {
   const open = new Set(all.filter((t) => OPEN_STATUSES.includes(t.status)).map((t) => t.id));
   const meta = {
     generated: nowStamp(),
+    lang,
     queue: queueOf(config).filter((id) => open.has(id)),
     sprint: (() => { const sp = activeSprint(config); return sp ? { ...sp, stats: sprintStats(config, sp, all) } : null; })(),
     lastSprint: (() => { const sp = lastClosedSprint(config); return sp ? { id: sp.id, title: sp.title, result: sp.result || null, carry: sp.carry || [] } : null; })(),
@@ -126,24 +131,52 @@ function boardAssets() {
   if (assetCache && !process.env.WORKS_DEV) return assetCache;
   const read = (f) => fs.readFileSync(path.join(ASSET_DIR, f), 'utf8');
   const font = fs.readFileSync(path.join(ASSET_DIR, 'fonts', 'Geist-Variable.woff2')).toString('base64');
+  const template = read('template.html');
+  const js = read('board.js');
   assetCache = {
-    template: read('template.html'),
+    template,
     css: read('board.css').replace('__FONT__', `data:font/woff2;base64,${font}`),
-    js: read('board.js'),
+    js,
+    keys: boardKeys(js, template),
   };
   return assetCache;
+}
+
+// Texte, die das Board übersetzt (W-0041): die tr-Aufrufe in board.js und {{t:Text}} in template.html. Nur diese gehen als
+// Katalog in die Seite, damit sie klein bleibt. Gleiche Suche wie im Selbsttest.
+const TR_RE = /\btr\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.)*)`)\s*[,)]/g;
+const T_RE = /\{\{t:(.+?)\}\}/g;
+const unesc = (s) => s.replace(/\\(.)/g, (a, c) => ({ n: '\n', t: '\t' })[c] || c);
+function boardKeys(js, template) {
+  const keys = [...js.replace(/\r\n?/g, '\n').matchAll(TR_RE)].map((m) => unesc(m[1] ?? m[2] ?? m[3]));
+  return [...new Set([...keys, ...[...template.matchAll(T_RE)].map((m) => m[1])])];
+}
+
+// Sprache, Herkunft, verfügbare Sprachen und die Übersetzungen der Board-Texte für window.WORKS.i18n.
+function boardI18n(root, lang, keys) {
+  const cat = catalog(lang);
+  return {
+    lang, source: languageSource(root).source,
+    languages: languages().map((code) => ({ code, name: LANGUAGE_NAMES[code] || code })),
+    catalog: Object.fromEntries(keys.filter((k) => typeof cat[k] === 'string' && cat[k]).map((k) => [k, cat[k]])),
+  };
 }
 
 export function boardCss() { return boardAssets().css; }
 
 // Setzt Vorlage, Stile, Skript und Daten zu einer eigenständigen HTML-Datei zusammen.
 // mode: edit (Live mit Bearbeiten), view (Live nur lesen, geteilter Link), static (board.html), snapshot (Export).
-export function renderBoard(data, { live = false, token = '', mode = live ? 'edit' : 'static', details = null } = {}) {
+// root: Projekt, f\u00fcr die Herkunft der Sprache (works lang, W-0041).
+export function renderBoard(data, { live = false, token = '', mode = live ? 'edit' : 'static', details = null, root } = {}) {
   const a = boardAssets();
-  const boot = JSON.stringify({ data, live, token, mode, details }).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-  const title = `Works ${data.meta.project}`.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+  const lang = data.meta.lang || language(root);
+  const i18n = boardI18n(root, lang, a.keys);
+  const boot = JSON.stringify({ data, live, token, mode, details, i18n }).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
   return a.template
-    .replace('__TITLE__', () => title)
+    .replace(T_RE, (all, text) => esc(tr(text, null, lang)))
+    .replace('__LANG__', () => esc(lang))
+    .replace('__TITLE__', () => esc(`Works ${data.meta.project}`))
     .replace('/*__CSS__*/', () => a.css)
     .replace('/*__BOOT__*/', () => `window.WORKS = ${boot};`)
     .replace('/*__JS__*/', () => a.js.replace(/<\/script/gi, '<\\/script'));
@@ -155,7 +188,7 @@ export function boardFile(root) {
 
 export function generateBoard(root) {
   const file = boardFile(root);
-  fs.writeFileSync(file, renderBoard(boardData(root)));
+  fs.writeFileSync(file, renderBoard(boardData(root), { root }));
   return file;
 }
 

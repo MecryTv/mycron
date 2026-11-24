@@ -3,6 +3,7 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { tr } from './i18n.mjs';
 
 const MAX_DIFF_LINES = 400;
 
@@ -102,7 +103,7 @@ export async function fileDiff(root, task, file, { uncommitted = false } = {}) {
   const info = await codeInfo(root, task);
   if (!info.git) return { diff: '' };
   const known = [...info.files, ...info.uncommitted].some((f) => f.file === file);
-  if (!known) return { error: 'Diese Datei gehört nicht zu den Änderungen der Aufgabe.' };
+  if (!known) return { error: tr('This file is not part of the changes of this task.') };
   let r;
   if (uncommitted) r = await git(root, ['diff', 'HEAD', '--', file]);
   else if (info.source === 'branch') r = await git(root, ['diff', `${info.base}...${info.branch}`, '--', file]);
@@ -129,7 +130,7 @@ export async function liveFileDiff(root, task, file, dir = root) {
     const text = fs.readFileSync(abs, 'utf8');
     if (text.slice(0, 8000).includes('\0')) return { diff: '', source: 'binary' };
     const lines = text.replace(/\n$/, '').split('\n');
-    return { diff: '@@ neue Datei @@\n' + lines.slice(0, MAX_DIFF_LINES).map((l) => '+' + l).join('\n'), truncated: lines.length > MAX_DIFF_LINES, source: 'new' };
+    return { diff: tr('@@ new file @@') + '\n' + lines.slice(0, MAX_DIFF_LINES).map((l) => '+' + l).join('\n'), truncated: lines.length > MAX_DIFF_LINES, source: 'new' };
   }
   const c = await fileDiff(root, task, file);
   return c.error ? { diff: '', source: 'none' } : { ...c, source: 'task' };

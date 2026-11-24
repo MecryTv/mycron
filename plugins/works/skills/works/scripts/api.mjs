@@ -8,8 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { readText,
   loadTasks, loadConfig, saveConfig, worksDir, getSection, stripComments, imageLinks, checkboxes,
   isBlocked, openBlockers, openQuestions, relFromWorks, exists,
-  STATUSES, OPEN_STATUSES, STATUS_LABEL, PRIORITIES, PRIO_LABEL, TYPES, TYPE_LABEL, EFFORTS, RISKS,
+  STATUSES, OPEN_STATUSES, STATUS_LABEL, PRIORITIES, PRIO_LABEL, TYPES, TYPE_LABEL, EFFORTS, RISKS, sectionKey, sectionTitle,
 } from './lib.mjs';
+import { tr, languages, languageSource } from './i18n.mjs';
 import { dodCheck, nextCandidates, byIdMap } from './views.mjs';
 import { loadComments, unreadForClaude } from './comments.mjs';
 import { listTemplates, templateFromTask, normalizeTemplate, SLUG_RE } from './templates.mjs';
@@ -59,35 +60,37 @@ export class ApiError extends Error {
 const bad = (msg) => { throw new ApiError(400, msg); };
 
 function str(v, name, { max = 2000, required = false } = {}) {
-  if (v === undefined || v === null || v === '') { if (required) bad(`${name} fehlt.`); return ''; }
-  if (typeof v !== 'string') bad(`${name} muss Text sein.`);
+  if (v === undefined || v === null || v === '') { if (required) bad(tr('{name} missing.', { name })); return ''; }
+  if (typeof v !== 'string') bad(tr('{name} must be text.', { name }));
   const s = v.trim();
-  if (required && !s) bad(`${name} fehlt.`);
-  if (s.length > max) bad(`${name} ist zu lang (höchstens ${max} Zeichen).`);
+  if (required && !s) bad(tr('{name} missing.', { name }));
+  if (s.length > max) bad(tr('{name} is too long (at most {max} characters).', { name, max }));
   return s;
 }
 function oneOf(v, name, allowed, { required = false } = {}) {
-  if (v === undefined || v === null || v === '') { if (required) bad(`${name} fehlt.`); return ''; }
-  if (!allowed.includes(v)) bad(`Ungültiger Wert für ${name}.`);
+  if (v === undefined || v === null || v === '') { if (required) bad(tr('{name} missing.', { name })); return ''; }
+  if (!allowed.includes(v)) bad(tr('Invalid value for {key}.', { key: name }));
   return v;
 }
 function id(v) {
-  if (typeof v !== 'string' || !ID_RE.test(v)) bad('Ungültige Aufgaben-ID.');
+  if (typeof v !== 'string' || !ID_RE.test(v)) bad(tr('Invalid task ID.'));
   return v.toUpperCase();
 }
 function date(v, name) {
   if (v === undefined || v === null || v === '') return '';
-  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) bad(`${name} braucht das Format JJJJ-MM-TT.`);
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) bad(tr('{name} needs the format YYYY-MM-DD.', { name }));
   return v;
 }
 function list(v, name, re) {
   if (v === undefined || v === null || v === '') return [];
   const arr = Array.isArray(v) ? v : String(v).split(',');
   return arr.map((x) => String(x).trim()).filter(Boolean).map((x) => {
-    if (x.length > 40 || (re && !re.test(x))) bad(`Ungültiger Eintrag in ${name}: ${x.slice(0, 40)}`);
+    if (x.length > 40 || (re && !re.test(x))) bad(tr('Invalid entry in {name}: {value}', { name, value: x.slice(0, 40) }));
     return x;
   });
 }
+// Abschnitt aus dem Board (Überschrift in der Sprache der Aufgabe oder deutscher Schlüssel) → Schlüssel für das CLI.
+const checkSection = (v) => oneOf(sectionKey(v || 'Akzeptanzkriterien'), tr('Section'), CHECK_SECTIONS);
 const TAG_RE = /^[\p{L}\p{N}_.+-]+$/u;
 
 // ---------- CLI-Aufrufe, nacheinander ausgeführt ----------
@@ -109,9 +112,9 @@ async function must(root, args, opts) {
   const r = await cli(root, args, opts);
   if (!r.ok) {
     // Fehler stehen auf stderr (erste Zeile zählt). Ohne stderr, etwa bei nicht erfüllter DoD, steht die Erklärung in der letzten Zeile von stdout.
-    const errLines = r.stderr.split('\n').map((l) => l.replace(/^(Fehler|Hinweis):\s*/, '').trim()).filter(Boolean);
+    const errLines = r.stderr.split('\n').map((l) => l.replace(/^(Fehler|Hinweis|Error|Note):\s*/, '').trim()).filter(Boolean);
     const outLines = r.stdout.split('\n').map((l) => l.trim()).filter(Boolean);
-    const msg = errLines.find((l) => !/^at |node:/.test(l)) || outLines[outLines.length - 1] || 'Aktion fehlgeschlagen.';
+    const msg = errLines.find((l) => !/^at |node:/.test(l)) || outLines[outLines.length - 1] || tr('Action failed.');
     throw new ApiError(422, msg);
   }
   return r.stdout.trim();
@@ -135,7 +138,7 @@ async function withTextFile(root, text, fn) {
 
 function findTaskSafe(root, taskId) {
   const t = loadTasks(root).find((x) => x.id === taskId);
-  if (!t) throw new ApiError(404, `Aufgabe ${taskId} nicht gefunden.`);
+  if (!t) throw new ApiError(404, tr('Task {id} not found.', { id: taskId }));
   return t;
 }
 
@@ -162,10 +165,11 @@ function assetsOf(t) {
     const file = !img && l.match(/^\s*\[([^\]]*)\]\((assets\/[^)\s]+)\)/);
     const m = img || file;
     if (!m) return;
-    const desc = (lines[i + 1] || '').match(/^Beschreibung:\s*(.*)$/i);
+    // Zeilen in der Sprache der Aufgabe (W-0041): deutsch oder englisch.
+    const desc = (lines[i + 1] || '').match(/^(?:Beschreibung|Description):\s*(.*)$/i);
     const metaLine = desc ? lines[i + 2] || '' : lines[i + 1] || '';
-    const kind = (metaLine.match(/Art:\s*([\wäöü-]+)/i) || [])[1] || '';
-    const added = (metaLine.match(/Hinzugefügt:\s*(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
+    const kind = (metaLine.match(/(?:Art|Kind):\s*([\wäöü-]+)/i) || [])[1] || '';
+    const added = (metaLine.match(/(?:Hinzugefügt|Added):\s*(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
     const src = decodeURI(m[2]);
     out.push({
       alt: m[1], src: /^https?:/.test(src) ? src : relFromWorks(t._root, path.resolve(t._dir, src)),
@@ -180,33 +184,36 @@ export function taskDetail(root, taskId) {
   const all = loadTasks(root);
   const byId = byIdMap(all);
   const t = all.find((x) => x.id === taskId);
-  if (!t) throw new ApiError(404, `Aufgabe ${taskId} nicht gefunden.`);
+  if (!t) throw new ApiError(404, tr('Task {id} not found.', { id: taskId }));
   t._root = root;
-  const ref = (x) => { const o = byId.get(x); return { id: x, title: o ? o.title : 'unbekannt', status: o ? o.status : '' }; };
+  const ref = (x) => { const o = byId.get(x); return { id: x, title: o ? o.title : tr('unknown'), status: o ? o.status : '' }; };
   const history = (getSection(t._body, 'Verlauf') || '').split('\n')
     .map((l) => l.match(/^- (\d{4}-\d{2}-\d{2}): (.*?)(?: \[([^\]]+)\])?$/)).filter(Boolean)
     .map((m) => ({ date: m[1], text: m[2], actor: m[3] || '' })).reverse();
   const questions = checkboxes(getSection(t._body, 'Offene Fragen') || '').items.map((q, i) => ({ n: i + 1, done: q.done, text: q.text }));
   const decFile = path.join(t._dir, 'decisions.md');
-  const checklists = CHECK_SECTIONS.map((name) => ({ name, items: checklist(t._body, name) })).filter((c) => c.items !== null);
+  // Namen wie in der Datei (Sprache der Aufgabe, W-0041); Vergleiche im Code über den deutschen Schlüssel (sectionKey).
+  const title = (key) => sectionTitle(key, t._body);
+  const checklists = CHECK_SECTIONS.map((key) => ({ name: title(key), items: checklist(t._body, key) })).filter((c) => c.items !== null);
   const data = Object.fromEntries(Object.entries(t).filter(([k]) => !k.startsWith('_')));
-  const sections = sectionList(t._body).filter((s) => !SKIP_IN_DETAIL.has(s.name));
-  let goalSection = GOAL_SECTION[t.type] || 'Ziel';
-  const typed = sections.find((s) => s.name === goalSection);
+  const sections = sectionList(t._body).filter((s) => !SKIP_IN_DETAIL.has(sectionKey(s.name)));
+  const goalKey = GOAL_SECTION[t.type] || 'Ziel';
+  let goalSection = title(goalKey);
+  const typed = sections.find((s) => sectionKey(s.name) === goalKey);
   if (!typed || !typed.content) {
-    const alt = DESCRIPTION_SECTIONS.map((n) => sections.find((s) => s.name === n && s.content)).find(Boolean)
-      || sections.find((s) => s.content && !EDITABLE_SECTIONS.includes(s.name));
+    const alt = DESCRIPTION_SECTIONS.map((n) => sections.find((s) => sectionKey(s.name) === n && s.content)).find(Boolean)
+      || sections.find((s) => s.content && !EDITABLE_SECTIONS.includes(sectionKey(s.name)));
     if (alt) goalSection = alt.name;
   }
-  if (!checklists.some((c) => c.name === 'Akzeptanzkriterien')) checklists.unshift({ name: 'Akzeptanzkriterien', items: [] });
+  if (!checklists.some((c) => sectionKey(c.name) === 'Akzeptanzkriterien')) checklists.unshift({ name: title('Akzeptanzkriterien'), items: [] });
   return {
     task: data,
     file: relFromWorks(root, t._file),
     archived: t._archived,
     goalSection,
-    typeGoal: GOAL_SECTION[t.type] || 'Ziel',
+    typeGoal: title(goalKey),
     sections,
-    editable: [...new Set([...EDITABLE_SECTIONS, ...sections.map((s) => s.name).filter((n) => n !== t.title)])],
+    editable: [...new Set([...EDITABLE_SECTIONS, ...EDITABLE_SECTIONS.map(title), ...sections.map((s) => s.name).filter((n) => n !== t.title)])],
     checklists,
     questions,
     history,
@@ -288,10 +295,10 @@ export async function codeOf(root, taskId) {
 
 export async function diffOf(root, taskId, file, uncommitted, live = false) {
   const { fileDiff, liveFileDiff } = await import('./git.mjs');
-  if (typeof file !== 'string' || !file || file.length > 500 || file.includes('\0')) bad('Ungültige Datei.');
+  if (typeof file !== 'string' || !file || file.length > 500 || file.includes('\0')) bad(tr('Invalid file.'));
   if (live) {
     // Diff im Verlauf der Live-Ansicht: nur Pfade im Projekt, relativ und ohne "..".
-    if (path.isAbsolute(file) || /^[a-z]:/i.test(file) || file.split(/[\\/]/).includes('..')) bad('Ungültige Datei.');
+    if (path.isAbsolute(file) || /^[a-z]:/i.test(file) || file.split(/[\\/]/).includes('..')) bad(tr('Invalid file.'));
     const { checkDir } = await import('./checks.mjs');
     const task = findTaskSafe(root, taskId);
     return liveFileDiff(root, task, file, checkDir(root, task));
@@ -309,34 +316,34 @@ export function dodOf(root, taskId) {
 // ---------- Schreiben ----------
 
 const SETTABLE = {
-  title: (v) => str(v, 'Titel', { max: 160, required: true }),
-  priority: (v) => oneOf(v, 'Priorität', PRIORITIES, { required: true }),
-  type: (v) => oneOf(v, 'Typ', TYPES, { required: true }),
-  effort: (v) => oneOf(v, 'Aufwand', EFFORTS),
-  risk: (v) => oneOf(v, 'Risiko', RISKS),
-  due: (v) => date(v, 'Fälligkeit'),
-  milestone: (v) => { if (v && !MS_RE.test(v)) bad('Ungültiger Meilenstein.'); return v ? v.toUpperCase() : ''; },
-  tags: (v) => list(v, 'Tags', TAG_RE).join(','),
+  title: (v) => str(v, tr('Title'), { max: 160, required: true }),
+  priority: (v) => oneOf(v, tr('Priority'), PRIORITIES, { required: true }),
+  type: (v) => oneOf(v, tr('Type'), TYPES, { required: true }),
+  effort: (v) => oneOf(v, tr('Effort'), EFFORTS),
+  risk: (v) => oneOf(v, tr('Risk'), RISKS),
+  due: (v) => date(v, tr('Due date')),
+  milestone: (v) => { if (v && !MS_RE.test(v)) bad(tr('Invalid milestone.')); return v ? v.toUpperCase() : ''; },
+  tags: (v) => list(v, tr('Tags'), TAG_RE).join(','),
   incomplete: (v) => (v ? 'true' : 'false'),
 };
 
 const actions = {
   async create(root, b) {
-    const type = oneOf(b.type || 'feature', 'Typ', TYPES, { required: true });
-    const args = ['new', `--type=${type}`, `--title=${str(b.title, 'Titel', { max: 160, required: true })}`];
-    args.push(`--priority=${oneOf(b.priority || 'P3', 'Priorität', PRIORITIES)}`);
-    const status = oneOf(b.status || 'backlog', 'Status', ['backlog', 'geplant']);
+    const type = oneOf(b.type || 'feature', tr('Type'), TYPES, { required: true });
+    const args = ['new', `--type=${type}`, `--title=${str(b.title, tr('Title'), { max: 160, required: true })}`];
+    args.push(`--priority=${oneOf(b.priority || 'P3', tr('Priority'), PRIORITIES)}`);
+    const status = oneOf(b.status || 'backlog', tr('Status'), ['backlog', 'geplant']);
     args.push(`--status=${status}`);
-    const effort = oneOf(b.effort, 'Aufwand', EFFORTS); if (effort) args.push(`--effort=${effort}`);
-    const risk = oneOf(b.risk, 'Risiko', RISKS); if (risk) args.push(`--risk=${risk}`);
-    const due = date(b.due, 'Fälligkeit'); if (due) args.push(`--due=${due}`);
-    if (b.milestone) { if (!MS_RE.test(b.milestone)) bad('Ungültiger Meilenstein.'); args.push(`--milestone=${b.milestone.toUpperCase()}`); }
-    const tags = list(b.tags, 'Tags', TAG_RE); if (tags.length) args.push(`--tags=${tags.join(',')}`);
-    const blockedBy = list(b.blocked_by, 'Blockiert durch', ID_RE); if (blockedBy.length) args.push(`--blocked-by=${blockedBy.join(',')}`);
+    const effort = oneOf(b.effort, tr('Effort'), EFFORTS); if (effort) args.push(`--effort=${effort}`);
+    const risk = oneOf(b.risk, tr('Risk'), RISKS); if (risk) args.push(`--risk=${risk}`);
+    const due = date(b.due, tr('Due date')); if (due) args.push(`--due=${due}`);
+    if (b.milestone) { if (!MS_RE.test(b.milestone)) bad(tr('Invalid milestone.')); args.push(`--milestone=${b.milestone.toUpperCase()}`); }
+    const tags = list(b.tags, tr('Tags'), TAG_RE); if (tags.length) args.push(`--tags=${tags.join(',')}`);
+    const blockedBy = list(b.blocked_by, tr('Blocked by'), ID_RE); if (blockedBy.length) args.push(`--blocked-by=${blockedBy.join(',')}`);
     args.push(`--source=${b.source === 'discord' ? 'discord' : 'board'}`);
-    const goal = str(b.goal, 'Ziel', { max: 20000 });
-    const description = str(b.description, 'Beschreibung', { max: 50000 });
-    const criteria = (Array.isArray(b.criteria) ? b.criteria : []).map((c) => str(c, 'Kriterium', { max: 500 })).filter(Boolean).slice(0, 50);
+    const goal = str(b.goal, tr('Goal'), { max: 20000 });
+    const description = str(b.description, tr('Description'), { max: 50000 });
+    const criteria = (Array.isArray(b.criteria) ? b.criteria : []).map((c) => str(c, tr('Criterion'), { max: 500 })).filter(Boolean).slice(0, 50);
     if ((!goal && !description) || !criteria.length) args.push('--incomplete');
     // Alles in einem einzigen CLI-Aufruf, Texte über Dateien. So entsteht die Aufgabe ganz oder gar nicht.
     const files = [];
@@ -346,145 +353,147 @@ const actions = {
     fileArg('criteria', criteria.join('\n'));
     let outText;
     try { outText = await must(root, args); } finally { files.forEach(removeQuiet); }
-    const newId = (outText.match(/Angelegt: (\S+)/) || [])[1];
-    if (!newId) throw new ApiError(500, 'Neue Aufgaben-ID nicht erkannt.');
-    return { id: newId, message: `${newId} angelegt.` };
+    const newId = (outText.match(/(?:Angelegt|Created): (\S+)/) || [])[1];
+    if (!newId) throw new ApiError(500, tr('New task ID not recognized.'));
+    return { id: newId, message: tr('{id} created.', { id: newId }) };
   },
 
   async set(root, b) {
     const tid = id(b.id);
-    const fields = b.fields && typeof b.fields === 'object' ? b.fields : bad('Keine Felder angegeben.');
+    const fields = b.fields && typeof b.fields === 'object' ? b.fields : bad(tr('No fields given.'));
     const pairs = [];
     for (const [k, v] of Object.entries(fields)) {
-      if (!SETTABLE[k]) bad(`Feld ${k} kann im Board nicht geändert werden.`);
+      if (!SETTABLE[k]) bad(tr('Field {key} cannot be changed in the board.', { key: k }));
       pairs.push(`${k}=${SETTABLE[k](v)}`);
     }
-    if (!pairs.length) bad('Keine Felder angegeben.');
-    const reason = str(b.reason, 'Begründung', { max: 300 });
+    if (!pairs.length) bad(tr('No fields given.'));
+    const reason = str(b.reason, tr('Reason'), { max: 300 });
     await must(root, ['set', tid, ...pairs, ...(reason ? [`--reason=${reason}`] : [])]);
-    return { message: `${tid} gespeichert.` };
+    return { message: tr('{id} saved.', { id: tid }) };
   },
 
   async move(root, b) {
     const tid = id(b.id);
-    const to = oneOf(b.to, 'Status', STATUSES, { required: true });
+    const to = oneOf(b.to, tr('Status'), STATUSES, { required: true });
     const t = findTaskSafe(root, tid);
     const from = t.status;
-    if (from === to) return { message: 'Keine Änderung.' };
-    const reason = str(b.reason, 'Begründung', { max: 300 });
+    if (from === to) return { message: tr('No change.') };
+    const reason = str(b.reason, tr('Reason'), { max: 300 });
     if (['erledigt', 'verworfen'].includes(from)) {
-      if (!reason) bad('Zum Wiedereröffnen ist eine Begründung nötig.');
-      if (to === 'verworfen' || to === 'erledigt') bad('Aufgabe zuerst wiedereröffnen.');
+      if (!reason) bad(tr('Reopening needs a reason.'));
+      if (to === 'verworfen' || to === 'erledigt') bad(tr('Reopen the task first.'));
       await must(root, ['reopen', tid, `--reason=${reason}`, `--status=${to}`]);
-      return { message: `${tid} wiedereröffnet.` };
+      return { message: tr('{id} reopened.', { id: tid }) };
     }
     if (to === 'in-arbeit') {
       await must(root, ['start', tid, ...(b.force ? ['--force'] : [])]);
-      return { message: `${tid} gestartet.` };
+      return { message: tr('{id} started.', { id: tid }) };
     }
     if (to === 'erledigt') {
       const args = ['done', tid, '--confirm'];
-      if (b.force) { if (!reason) bad('Zum Abschließen trotz offener Punkte ist eine Begründung nötig.'); args.push('--force', `--reason=${reason}`); }
+      if (b.force) { if (!reason) bad(tr('Closing despite open items needs a reason.')); args.push('--force', `--reason=${reason}`); }
       try { await must(root, args); } catch (e) {
-        if (/Definition of Done/.test(e.message)) throw new ApiError(422, 'Die Definition of Done ist noch nicht erfüllt. Offene Punkte erledigen oder mit Begründung abschließen.');
+        if (/Definition of Done/.test(e.message)) throw new ApiError(422, tr('The Definition of Done is not met yet. Finish the open items or close it with a reason.'));
         throw e;
       }
-      return { message: `${tid} erledigt.` };
+      return { message: tr('{id} done.', { id: tid }) };
     }
     if (to === 'verworfen') {
-      if (!reason) bad('Zum Verwerfen ist eine Begründung nötig.');
+      if (!reason) bad(tr('Dropping needs a reason.'));
       await must(root, ['drop', tid, `--reason=${reason}`]);
-      return { message: `${tid} verworfen.` };
+      return { message: tr('{id} dropped.', { id: tid }) };
     }
     await must(root, ['set', tid, `status=${to}`, ...(reason ? [`--reason=${reason}`] : [])]);
-    return { message: `${tid} verschoben.` };
+    return { message: tr('{id} moved.', { id: tid }) };
   },
 
   async log(root, b) {
     const tid = id(b.id);
-    await must(root, ['log', tid, `--text=${str(b.text, 'Notiz', { max: 2000, required: true })}`]);
-    return { message: 'Notiz gespeichert.' };
+    await must(root, ['log', tid, `--text=${str(b.text, tr('History note'), { max: 2000, required: true })}`]);
+    return { message: tr('Note saved.') };
   },
   async question(root, b) {
     const tid = id(b.id);
-    await must(root, ['question', tid, `--text=${str(b.text, 'Frage', { max: 500, required: true })}`]);
-    return { message: 'Frage gespeichert.' };
+    await must(root, ['question', tid, `--text=${str(b.text, tr('Question'), { max: 500, required: true })}`]);
+    return { message: tr('Question saved.') };
   },
   async resolve(root, b) {
     const tid = id(b.id);
-    const n = parseInt(b.n, 10); if (!(n > 0)) bad('Ungültige Frage.');
-    const answer = str(b.answer, 'Antwort', { max: 1000 });
+    const n = parseInt(b.n, 10); if (!(n > 0)) bad(tr('Invalid question.'));
+    const answer = str(b.answer, tr('Answer'), { max: 1000 });
     await must(root, ['question', tid, `--resolve=${n}`, ...(answer ? [`--answer=${answer}`] : [])]);
-    return { message: 'Frage geklärt.' };
+    return { message: tr('Question resolved.') };
   },
   async check(root, b) {
     const tid = id(b.id);
-    const section = oneOf(b.section || 'Akzeptanzkriterien', 'Abschnitt', CHECK_SECTIONS);
-    const n = parseInt(b.n, 10); if (!(n > 0)) bad('Ungültiger Punkt.');
+    const section = checkSection(b.section);
+    const n = parseInt(b.n, 10); if (!(n > 0)) bad(tr('Invalid item.'));
     await must(root, ['check', tid, String(n), `--section=${section}`, ...(b.done ? [] : ['--undo'])]);
-    return { message: 'Gespeichert.' };
+    return { message: tr('Saved.') };
   },
   async item(root, b) {
     const tid = id(b.id);
-    const section = oneOf(b.section || 'Akzeptanzkriterien', 'Abschnitt', CHECK_SECTIONS);
-    await must(root, ['item', tid, `--section=${section}`, `--text=${str(b.text, 'Punkt', { max: 500, required: true })}`]);
-    return { message: 'Punkt ergänzt.' };
+    const section = checkSection(b.section);
+    await must(root, ['item', tid, `--section=${section}`, `--text=${str(b.text, tr('Item'), { max: 500, required: true })}`]);
+    return { message: tr('Item added.') };
   },
   async itemRemove(root, b) {
     const tid = id(b.id);
-    const section = oneOf(b.section || 'Akzeptanzkriterien', 'Abschnitt', CHECK_SECTIONS);
-    const n = parseInt(b.n, 10); if (!(n > 0)) bad('Ungültiger Punkt.');
+    const section = checkSection(b.section);
+    const n = parseInt(b.n, 10); if (!(n > 0)) bad(tr('Invalid item.'));
     await must(root, ['item', tid, `--section=${section}`, `--remove=${n}`]);
-    return { message: 'Punkt entfernt.' };
+    return { message: tr('Item removed.') };
   },
   async section(root, b) {
     const tid = id(b.id);
     // Erlaubt sind die bekannten Abschnitte und jeder eigene Abschnitt, den die Aufgabe bereits hat.
-    const name = str(b.name, 'Abschnitt', { max: 80, required: true });
-    if (/[\n#]/.test(name) || ['Verlauf', 'Assets', 'Offene Fragen', ...CHECK_SECTIONS].includes(name)) bad('Dieser Abschnitt lässt sich hier nicht bearbeiten.');
-    if (!EDITABLE_SECTIONS.includes(name) && getSection(findTaskSafe(root, tid)._body, name) === null) bad(`Abschnitt ${name} gibt es in dieser Aufgabe nicht.`);
-    const text = typeof b.text === 'string' ? b.text : bad('Text fehlt.');
-    if (text.length > 50000) bad('Text ist zu lang.');
-    if (name === 'Übergabe') {
-      if (!text.trim()) bad('Übergabe ist leer.');
+    const name = str(b.name, tr('Section'), { max: 80, required: true });
+    // Name in der Sprache der Aufgabe oder als deutscher Schlüssel, beide gelten (W-0041).
+    const key = sectionKey(name);
+    if (/[\n#]/.test(name) || ['Verlauf', 'Assets', 'Offene Fragen', ...CHECK_SECTIONS].includes(key)) bad(tr('This section cannot be edited here.'));
+    if (!EDITABLE_SECTIONS.includes(key) && getSection(findTaskSafe(root, tid)._body, name) === null) bad(tr('Section {name} does not exist in this task.', { name }));
+    const text = typeof b.text === 'string' ? b.text : bad(tr('Text missing.'));
+    if (text.length > 50000) bad(tr('Text is too long.'));
+    if (key === 'Übergabe') {
+      if (!text.trim()) bad(tr('Handoff is empty.'));
       await withTextFile(root, text, (f) => must(root, ['handoff', tid, `--file=${f}`]));
     } else {
       const after = b.after && typeof b.after === 'string' && b.after.length < 80 && !/[\n#]/.test(b.after) ? [`--after=${b.after}`] : [];
       await withTextFile(root, text, (f) => must(root, ['section', tid, name, `--file=${f}`, ...after]));
     }
-    return { message: `${name} gespeichert.` };
+    return { message: tr('{id} saved.', { id: name }) };
   },
   async link(root, b) {
     const a = id(b.id); const target = id(b.target);
-    const rel = oneOf(b.rel, 'Beziehung', ['blocks', 'blocked-by', 'related'], { required: true });
+    const rel = oneOf(b.rel, tr('Relation'), ['blocks', 'blocked-by', 'related'], { required: true });
     await must(root, [b.remove ? 'unlink' : 'link', a, rel, target]);
-    return { message: b.remove ? 'Verknüpfung entfernt.' : 'Verknüpft.' };
+    return { message: b.remove ? tr('Link removed.') : tr('Linked.') };
   },
   async archive(root, b) {
     const tid = id(b.id);
     await must(root, ['archive', tid]);
-    return { message: `${tid} archiviert.` };
+    return { message: tr('{id} archived.', { id: tid }) };
   },
   async idea(root, b) {
-    const text = str(b.text, 'Idee', { max: 500, required: true });
-    const tags = list(b.tags, 'Tags', TAG_RE);
+    const text = str(b.text, tr('Idea'), { max: 500, required: true });
+    const tags = list(b.tags, tr('Tags'), TAG_RE);
     await must(root, ['idea', `--text=${text}`, ...(tags.length ? [`--tags=${tags.join(',')}`] : [])]);
-    return { message: 'Idee notiert.' };
+    return { message: tr('Idea noted.') };
   },
   async ideaPromote(root, b) {
-    if (typeof b.iid !== 'string' || !IDEA_RE.test(b.iid)) bad('Ungültige Idee.');
+    if (typeof b.iid !== 'string' || !IDEA_RE.test(b.iid)) bad(tr('Invalid idea.'));
     const args = ['promote', b.iid.toUpperCase()];
-    args.push(`--type=${oneOf(b.type || 'feature', 'Typ', TYPES)}`);
-    args.push(`--priority=${oneOf(b.priority || 'P3', 'Priorität', PRIORITIES)}`);
+    args.push(`--type=${oneOf(b.type || 'feature', tr('Type'), TYPES)}`);
+    args.push(`--priority=${oneOf(b.priority || 'P3', tr('Priority'), PRIORITIES)}`);
     const outText = await must(root, args);
-    const newId = (outText.match(/als (\S+?):/) || [])[1] || '';
-    return { id: newId, message: `Idee übernommen${newId ? ` als ${newId}` : ''}.` };
+    const newId = (outText.match(/\b(?:als|as) (\S+?):/) || [])[1] || '';
+    return { id: newId, message: newId ? tr('Idea promoted as {id}.', { id: newId }) : tr('Idea promoted.') };
   },
   async ideaDrop(root, b) {
-    if (typeof b.iid !== 'string' || !IDEA_RE.test(b.iid)) bad('Ungültige Idee.');
-    const reason = str(b.reason, 'Begründung', { max: 300 });
+    if (typeof b.iid !== 'string' || !IDEA_RE.test(b.iid)) bad(tr('Invalid idea.'));
+    const reason = str(b.reason, tr('Reason'), { max: 300 });
     await must(root, ['idea-drop', b.iid.toUpperCase(), ...(reason ? [`--reason=${reason}`] : [])]);
-    return { message: 'Idee verworfen.' };
+    return { message: tr('Idea dropped.') };
   },
   async milestoneAdd(root, b) {
     const config = loadConfig(root);
@@ -493,31 +502,31 @@ const actions = {
       const max = Math.max(0, ...(config.milestones || []).map((m) => parseInt(String(m.id).slice(1), 10) || 0));
       mid = `M${max + 1}`;
     }
-    if (!MS_RE.test(mid)) bad('Meilenstein-ID im Format M1, M2 angeben.');
-    const args = ['milestone', 'add', mid.toUpperCase(), `--title=${str(b.title, 'Titel', { max: 120, required: true })}`];
-    const due = date(b.due, 'Zieldatum'); if (due) args.push(`--due=${due}`);
-    const desc = str(b.description, 'Beschreibung', { max: 500 }); if (desc) args.push(`--desc=${desc}`);
+    if (!MS_RE.test(mid)) bad(tr('Give the milestone ID as M1, M2.'));
+    const args = ['milestone', 'add', mid.toUpperCase(), `--title=${str(b.title, tr('Title'), { max: 120, required: true })}`];
+    const due = date(b.due, tr('Target date')); if (due) args.push(`--due=${due}`);
+    const desc = str(b.description, tr('Description'), { max: 500 }); if (desc) args.push(`--desc=${desc}`);
     await must(root, args);
-    return { id: mid.toUpperCase(), message: `Meilenstein ${mid.toUpperCase()} angelegt.` };
+    return { id: mid.toUpperCase(), message: tr('Milestone {id} created.', { id: mid.toUpperCase() }) };
   },
   async milestoneSet(root, b) {
-    if (typeof b.mid !== 'string' || !MS_RE.test(b.mid)) bad('Ungültiger Meilenstein.');
+    if (typeof b.mid !== 'string' || !MS_RE.test(b.mid)) bad(tr('Invalid milestone.'));
     const f = b.fields || {};
     const pairs = [];
-    if ('title' in f) pairs.push(`title=${str(f.title, 'Titel', { max: 120, required: true })}`);
-    if ('due' in f) pairs.push(`due=${date(f.due, 'Zieldatum')}`);
-    if ('status' in f) pairs.push(`status=${oneOf(f.status, 'Status', ['offen', 'erledigt'], { required: true })}`);
-    if ('description' in f) pairs.push(`description=${str(f.description, 'Beschreibung', { max: 500 })}`);
-    if (!pairs.length) bad('Keine Felder angegeben.');
+    if ('title' in f) pairs.push(`title=${str(f.title, tr('Title'), { max: 120, required: true })}`);
+    if ('due' in f) pairs.push(`due=${date(f.due, tr('Target date'))}`);
+    if ('status' in f) pairs.push(`status=${oneOf(f.status, tr('Status'), ['offen', 'erledigt'], { required: true })}`);
+    if ('description' in f) pairs.push(`description=${str(f.description, tr('Description'), { max: 500 })}`);
+    if (!pairs.length) bad(tr('No fields given.'));
     await must(root, ['milestone', 'set', b.mid.toUpperCase(), ...pairs]);
-    return { message: 'Meilenstein gespeichert.' };
+    return { message: tr('Milestone saved.') };
   },
 
   // ---------- Sprint ----------
   async sprintStart(root, b) {
-    const args = ['sprint', 'start', `--title=${str(b.title, 'Titel', { max: 120, required: true })}`];
-    const goal = str(b.goal, 'Ziel', { max: 300 }); if (goal) args.push(`--goal=${goal}`);
-    const start = date(b.start, 'Start'); if (start) args.push(`--start=${start}`);
+    const args = ['sprint', 'start', `--title=${str(b.title, tr('Title'), { max: 120, required: true })}`];
+    const goal = str(b.goal, tr('Goal'), { max: 300 }); if (goal) args.push(`--goal=${goal}`);
+    const start = date(b.start, tr('Start date')); if (start) args.push(`--start=${start}`);
     const days = parseInt(b.days, 10); if (days > 0 && days <= 60) args.push(`--days=${days}`);
     const cap = parseInt(b.capacity, 10); if (cap > 0 && cap <= 1000) args.push(`--capacity=${cap}`);
     if (b.carry) args.push('--carry');
@@ -533,11 +542,11 @@ const actions = {
   async sprintSet(root, b) {
     const f = b.fields || {};
     const pairs = [];
-    if ('title' in f) pairs.push(`title=${str(f.title, 'Titel', { max: 120, required: true })}`);
-    if ('goal' in f) pairs.push(`goal=${str(f.goal, 'Ziel', { max: 300 })}`);
-    if ('end' in f) pairs.push(`end=${date(f.end, 'Ende') || bad('Ende fehlt.')}`);
-    if ('capacity' in f) { const c = parseInt(f.capacity, 10); if (!(c > 0 && c <= 1000)) bad('Kapazität zwischen 1 und 1000.'); pairs.push(`capacity=${c}`); }
-    if (!pairs.length) bad('Keine Felder angegeben.');
+    if ('title' in f) pairs.push(`title=${str(f.title, tr('Title'), { max: 120, required: true })}`);
+    if ('goal' in f) pairs.push(`goal=${str(f.goal, tr('Goal'), { max: 300 })}`);
+    if ('end' in f) pairs.push(`end=${date(f.end, tr('End')) || bad(tr('{name} missing.', { name: tr('End') }))}`);
+    if ('capacity' in f) { const c = parseInt(f.capacity, 10); if (!(c > 0 && c <= 1000)) bad(tr('Capacity between 1 and 1000.')); pairs.push(`capacity=${c}`); }
+    if (!pairs.length) bad(tr('No fields given.'));
     return { message: await must(root, ['sprint', 'set', ...pairs]) };
   },
   async sprintClose(root, b) {
@@ -551,35 +560,35 @@ const actions = {
   // ---------- Kommentare ----------
   async comment(root, b) {
     const tid = id(b.id);
-    const text = str(b.text, 'Kommentar', { max: 10000, required: true });
+    const text = str(b.text, tr('Comment'), { max: 10000, required: true });
     await withTextFile(root, text, (f) => must(root, ['comment', tid, `--file=${f}`, '--as=Nutzer']));
-    return { message: 'Kommentar gesendet. Claude liest ihn beim nächsten Start.' };
+    return { message: tr('Comment sent. Claude reads it at the next start.') };
   },
 
   // ---------- Gespeicherte Ansichten ----------
   async viewSave(root, b) {
-    const name = str(b.name, 'Name', { max: 40, required: true });
+    const name = str(b.name, tr('Name'), { max: 40, required: true });
     const f = b.filter && typeof b.filter === 'object' ? b.filter : {};
     const filter = {
-      prios: list(f.prios, 'Priorität', /^P[1-4]$/),
-      type: oneOf(f.type, 'Typ', TYPES), tag: f.tag ? list([f.tag], 'Tag', TAG_RE)[0] : '',
+      prios: list(f.prios, tr('Priority'), /^P[1-4]$/),
+      type: oneOf(f.type, tr('Type'), TYPES), tag: f.tag ? list([f.tag], tr('Tag'), TAG_RE)[0] : '',
       ms: f.ms && MS_RE.test(f.ms) ? f.ms.toUpperCase() : '',
-      signal: oneOf(f.signal, 'Signal', ['blocked', 'unblocked', 'overdue', 'questions', 'incomplete']),
-      q: str(f.q, 'Suche', { max: 80 }), closed: !!f.closed,
+      signal: oneOf(f.signal, tr('Signal'), ['blocked', 'unblocked', 'overdue', 'questions', 'incomplete']),
+      q: str(f.q, tr('Search'), { max: 80 }), closed: !!f.closed,
     };
-    const view = oneOf(b.view || 'board', 'Ansicht', ['board', 'sprint', 'queue', 'timeline', 'graph', 'table']);
+    const view = oneOf(b.view || 'board', tr('Board view'), ['board', 'sprint', 'queue', 'timeline', 'graph', 'table']);
     const sort = b.sort && typeof b.sort === 'object' && /^[a-z]{1,12}$/.test(b.sort.key || '') ? { key: b.sort.key, dir: b.sort.dir === -1 ? -1 : 1 } : null;
     await saveConfigField(root, (config) => {
       const views = (Array.isArray(config.views) ? config.views : []).filter((v) => v.name !== name);
       views.push({ name, filter, view, sort });
       config.views = views.slice(-20);
     });
-    return { message: `Ansicht ${name} gespeichert.` };
+    return { message: tr('View {name} saved.', { name }) };
   },
   async viewDelete(root, b) {
-    const name = str(b.name, 'Name', { max: 40, required: true });
+    const name = str(b.name, tr('Name'), { max: 40, required: true });
     await must(root, ['views', 'delete', name]);
-    return { message: `Ansicht ${name} gelöscht.` };
+    return { message: tr('View {name} deleted.', { name }) };
   },
 
   // ---------- Vorlagen ----------
@@ -589,30 +598,30 @@ const actions = {
     if (b.oldSlug && SLUG_RE.test(b.oldSlug) && b.oldSlug !== tpl.slug) await must(root, ['template', 'delete', b.oldSlug]);
     const scope = b.scope === 'user' ? 'user' : 'project';
     await withTextFile(root, JSON.stringify(tpl), (f) => must(root, ['template', 'save', `--file=${f}`, `--scope=${scope}`]));
-    return { slug: tpl.slug, message: `Vorlage ${tpl.name} gespeichert.` };
+    return { slug: tpl.slug, message: tr('Template {name} saved.', { name: tpl.name }) };
   },
   async templateDelete(root, b) {
-    if (typeof b.slug !== 'string' || !SLUG_RE.test(b.slug)) bad('Ungültige Vorlage.');
+    if (typeof b.slug !== 'string' || !SLUG_RE.test(b.slug)) bad(tr('Invalid template.'));
     await must(root, ['template', 'delete', b.slug]);
-    return { message: 'Vorlage gelöscht.' };
+    return { message: tr('Template deleted.') };
   },
   async createFromTemplate(root, b) {
-    if (typeof b.slug !== 'string' || !SLUG_RE.test(b.slug)) bad('Ungültige Vorlage.');
+    if (typeof b.slug !== 'string' || !SLUG_RE.test(b.slug)) bad(tr('Invalid template.'));
     const args = ['new', `--template=${b.slug}`, '--source=board'];
     const values = b.values && typeof b.values === 'object' ? b.values : {};
     for (const [k, v] of Object.entries(values).slice(0, 12)) {
-      if (!/^[\p{L}\p{N}_]{1,30}$/u.test(k)) bad('Ungültiges Feld.');
+      if (!/^[\p{L}\p{N}_]{1,30}$/u.test(k)) bad(tr('Invalid field.'));
       const val = str(v, k, { max: 300 }); if (val) args.push(`--field=${k}=${val}`);
     }
-    const title = str(b.title, 'Titel', { max: 160 }); if (title) args.push(`--title=${title}`);
-    const pr = oneOf(b.priority, 'Priorität', PRIORITIES); if (pr) args.push(`--priority=${pr}`);
-    const status = oneOf(b.status || 'backlog', 'Status', ['backlog', 'geplant']); args.push(`--status=${status}`);
+    const title = str(b.title, tr('Title'), { max: 160 }); if (title) args.push(`--title=${title}`);
+    const pr = oneOf(b.priority, tr('Priority'), PRIORITIES); if (pr) args.push(`--priority=${pr}`);
+    const status = oneOf(b.status || 'backlog', tr('Status'), ['backlog', 'geplant']); args.push(`--status=${status}`);
     if (Array.isArray(b.criteria)) args.push(`--criteria=${b.criteria.map((n) => parseInt(n, 10)).filter((n) => n >= 0 && n < 100).join(',') || '999'}`);
-    const text = str(b.text, 'Beschreibung', { max: 50000 });
+    const text = str(b.text, tr('Description'), { max: 50000 });
     const run = (extra) => must(root, [...args, ...extra]);
     const outText = text ? await withTextFile(root, text, (f) => run([`--text-file=${f}`])) : await run([]);
-    const newId = (outText.match(/Angelegt: (\S+)/) || [])[1];
-    return { id: newId, message: `${newId} aus Vorlage angelegt.` };
+    const newId = (outText.match(/(?:Angelegt|Created): (\S+)/) || [])[1];
+    return { id: newId, message: tr('{id} created from template.', { id: newId }) };
   },
 
   // ---------- Prüfungen ----------
@@ -621,60 +630,60 @@ const actions = {
     // only: nur diese Prüfungen neu starten (Erneut prüfen in der Live-Ansicht), die übrigen Ergebnisse bleiben stehen.
     let only = [];
     if (b.only !== undefined) {
-      if (!Array.isArray(b.only) || !b.only.length || b.only.length > 200 || b.only.some((n) => typeof n !== 'string' || !NAME_RE.test(n))) bad('Ungültige Auswahl an Prüfungen.');
+      if (!Array.isArray(b.only) || !b.only.length || b.only.length > 200 || b.only.some((n) => typeof n !== 'string' || !NAME_RE.test(n))) bad(tr('Invalid selection of checks.'));
       only = [`--only=${b.only.join(',')}`];
     }
     await must(root, ['checks', 'run', tid, ...only], { timeout: 11 * 60 * 1000 });
-    return { message: b.only ? `${b.only.length === 1 ? b.only[0] : `${b.only.length} Prüfungen`} erneut geprüft.` : 'Prüfungen gelaufen.' };
+    return { message: !b.only ? tr('Checks ran.') : b.only.length === 1 ? tr('{name} checked again.', { name: b.only[0] }) : tr('{n} checks checked again.', { n: b.only.length }) };
   },
   async checksAck(root, b) {
     const tid = id(b.id);
-    if (typeof b.name !== 'string' || !NAME_RE.test(b.name)) bad('Ungültige Prüfung.');
-    const reason = str(b.reason, 'Begründung', { max: 300 });
+    if (typeof b.name !== 'string' || !NAME_RE.test(b.name)) bad(tr('Invalid check.'));
+    const reason = str(b.reason, tr('Reason'), { max: 300 });
     await must(root, ['checks', 'ack', tid, b.name, ...(reason ? [`--reason=${reason}`] : [])]);
-    return { message: 'Als bekannt markiert.' };
+    return { message: tr('Marked as known.') };
   },
   async checksSave(root, b) {
-    const c = b.checks && typeof b.checks === 'object' && !Array.isArray(b.checks) ? b.checks : bad('Prüfungen fehlen.');
+    const c = b.checks && typeof b.checks === 'object' && !Array.isArray(b.checks) ? b.checks : bad(tr('Checks missing.'));
     const cur = configuredChecks(loadConfig(root));
     // Alles als JSON an works checks set --file: Befehl als Text oder { cmd, cwd }, entfernte Prüfungen mit leerem Wert.
     const next = {};
     for (const k of Object.keys(cur)) if (!(k in c)) next[k] = '';
     for (const [k, v] of Object.entries(c).slice(0, 200)) {
-      if (!NAME_RE.test(k)) bad(`Ungültiger Name ${k}.`);
+      if (!NAME_RE.test(k)) bad(tr('Invalid name {name}.', { name: k }));
       const isObj = v && typeof v === 'object';
-      const cmd = str(isObj ? v.cmd : v, `${k}: Befehl`, { max: 300 });
-      const cwd = isObj && v.cwd ? str(v.cwd, `${k}: Ordner`, { max: 200 }) : '';
+      const cmd = str(isObj ? v.cmd : v, tr('{name}: command', { name: k }), { max: 300 });
+      const cwd = isObj && v.cwd ? str(v.cwd, tr('{name}: folder', { name: k }), { max: 200 }) : '';
       next[k] = cwd ? { cmd, cwd } : cmd;
     }
-    if (!Object.keys(next).length) return { message: 'Keine Änderung.' };
+    if (!Object.keys(next).length) return { message: tr('No change.') };
     await withTextFile(root, JSON.stringify(next), (file) => must(root, ['checks', 'set', `--file=${file}`]));
-    return { message: 'Prüfungen gespeichert.' };
+    return { message: tr('Checks saved.') };
   },
 
   // ---------- Wochenbericht und Zeit ----------
   async reportSettings(root, b) {
     const pairs = [];
     if ('enabled' in b) pairs.push(`enabled=${!!b.enabled}`);
-    if ('weekday' in b) { const w = parseInt(b.weekday, 10); if (!(w >= 1 && w <= 7)) bad('Ungültiger Wochentag.'); pairs.push(`weekday=${w}`); }
-    if ('time' in b) { if (!/^\d{2}:\d{2}$/.test(b.time || '')) bad('Uhrzeit im Format HH:MM.'); pairs.push(`time=${b.time}`); }
+    if ('weekday' in b) { const w = parseInt(b.weekday, 10); if (!(w >= 1 && w <= 7)) bad(tr('Invalid weekday.')); pairs.push(`weekday=${w}`); }
+    if ('time' in b) { if (!/^\d{2}:\d{2}$/.test(b.time || '')) bad(tr('Time in the format HH:MM.')); pairs.push(`time=${b.time}`); }
     for (const k of ['discord', 'file', 'done', 'attention', 'next', 'milestones']) if (k in b) pairs.push(`${k}=${!!b[k]}`);
-    if (!pairs.length) bad('Keine Einstellung angegeben.');
+    if (!pairs.length) bad(tr('No setting given.'));
     await must(root, ['report', '--settings', ...pairs]);
-    return { message: 'Einstellung gespeichert.' };
+    return { message: tr('Setting saved.') };
   },
   async reportWebhook(root, b) {
-    const url = str(b.url, 'Webhook', { max: 300 });
+    const url = str(b.url, tr('Webhook'), { max: 300 });
     await must(root, ['report', url ? `--webhook=${url}` : '--webhook']);
-    return { message: url ? 'Webhook gespeichert.' : 'Webhook entfernt.' };
+    return { message: url ? tr('Webhook saved.') : tr('Webhook removed.') };
   },
   async reportRun(root, b) {
-    const summary = str(b.summary, 'Zusammenfassung', { max: 3000 });
+    const summary = str(b.summary, tr('Summary'), { max: 3000 });
     const msg = await must(root, ['report', '--week', ...(summary ? [`--summary=${summary}`] : [])]);
     return { message: msg.split('\n').filter((l) => !l.startsWith('  ')).join(' ') };
   },
   async effortMode(root, b) {
-    const mode = oneOf(b.mode, 'Modus', ['measured', 'fixed'], { required: true });
+    const mode = oneOf(b.mode, tr('Mode'), ['measured', 'fixed'], { required: true });
     return { message: await must(root, ['time', `--mode=${mode}`]) };
   },
 
@@ -683,56 +692,56 @@ const actions = {
     const tid = id(b.id);
     const p = parseInt(b.pos, 10);
     await must(root, ['queue', 'add', tid, ...(p > 0 ? [`--pos=${p}`] : [])]);
-    return { message: `${tid} eingereiht.` };
+    return { message: tr('{id} queued.', { id: tid }) };
   },
   async queueRemove(root, b) {
     const tid = id(b.id);
     await must(root, ['queue', 'remove', tid]);
-    return { message: `${tid} aus der Warteschlange genommen.` };
+    return { message: tr('{id} taken out of the queue.', { id: tid }) };
   },
   async queueOrder(root, b) {
-    const ids = Array.isArray(b.ids) ? b.ids.slice(0, 200).map(id) : bad('Reihenfolge fehlt.');
+    const ids = Array.isArray(b.ids) ? b.ids.slice(0, 200).map(id) : bad(tr('Order missing.'));
     await must(root, ids.length ? ['queue', 'order', ids.join(',')] : ['queue', 'clear']);
-    return { message: ids.length ? 'Reihenfolge gespeichert.' : 'Warteschlange geleert.' };
+    return { message: ids.length ? tr('Order saved.') : tr('Queue cleared.') };
   },
   async queueSettings(root, b) {
     const pairs = ['auto_next', 'skip_blocked', 'ask_before'].filter((k) => k in b).map((k) => `${k}=${b[k] ? 'true' : 'false'}`);
-    if (!pairs.length) bad('Keine Einstellung angegeben.');
+    if (!pairs.length) bad(tr('No setting given.'));
     await must(root, ['queue', 'set', ...pairs]);
-    return { message: 'Einstellung gespeichert.' };
+    return { message: tr('Setting saved.') };
   },
 
   // ---------- Mehrere Aufgaben auf einmal ----------
   // Jede Aufgabe läuft als eigener CLI-Aufruf. Fehler einzelner Aufgaben brechen den Rest nicht ab.
   async bulk(root, b) {
-    const ids = Array.isArray(b.ids) ? [...new Set(b.ids.slice(0, 200).map(id))] : bad('Keine Aufgaben gewählt.');
-    if (!ids.length) bad('Keine Aufgaben gewählt.');
-    const op = oneOf(b.op, 'Aktion', ['priority', 'status', 'milestone', 'effort', 'tagAdd', 'tagRemove', 'queueAdd', 'queueRemove', 'drop', 'archive'], { required: true });
-    const reason = str(b.reason, 'Begründung', { max: 300 });
+    const ids = Array.isArray(b.ids) ? [...new Set(b.ids.slice(0, 200).map(id))] : bad(tr('No tasks selected.'));
+    if (!ids.length) bad(tr('No tasks selected.'));
+    const op = oneOf(b.op, tr('Action'), ['priority', 'status', 'milestone', 'effort', 'tagAdd', 'tagRemove', 'queueAdd', 'queueRemove', 'drop', 'archive'], { required: true });
+    const reason = str(b.reason, tr('Reason'), { max: 300 });
     const all = new Map(loadTasks(root).map((t) => [t.id, t]));
     const okIds = []; const errors = [];
     for (const tid of ids) {
       const t = all.get(tid);
       try {
-        if (!t) throw new ApiError(404, 'nicht gefunden');
+        if (!t) throw new ApiError(404, tr('not found'));
         if (op === 'priority') await actions.set(root, { id: tid, fields: { priority: b.value }, reason });
         else if (op === 'effort') await actions.set(root, { id: tid, fields: { effort: b.value } });
         else if (op === 'milestone') await actions.set(root, { id: tid, fields: { milestone: b.value || '' } });
         else if (op === 'tagAdd' || op === 'tagRemove') {
-          const tag = list(b.value, 'Tag', TAG_RE)[0] || bad('Tag fehlt.');
+          const tag = list(b.value, tr('Tag'), TAG_RE)[0] || bad(tr('{name} missing.', { name: tr('Tag') }));
           const cur = t.tags || [];
           const next = op === 'tagAdd' ? [...new Set([...cur, tag])] : cur.filter((x) => x !== tag);
           if (next.length !== cur.length) await actions.set(root, { id: tid, fields: { tags: next } });
         } else if (op === 'status') {
-          const to = oneOf(b.value, 'Status', ['backlog', 'geplant', 'in-arbeit', 'review'], { required: true });
+          const to = oneOf(b.value, tr('Status'), ['backlog', 'geplant', 'in-arbeit', 'review'], { required: true });
           await actions.move(root, { id: tid, to, reason });
         } else if (op === 'queueAdd') await must(root, ['queue', 'add', tid]);
         else if (op === 'queueRemove') await must(root, ['queue', 'remove', tid]);
         else if (op === 'drop') {
-          if (!reason) bad('Zum Verwerfen ist eine Begründung nötig.');
+          if (!reason) bad(tr('Dropping needs a reason.'));
           if (OPEN_STATUSES.includes(t.status)) await actions.move(root, { id: tid, to: 'verworfen', reason });
         } else if (op === 'archive') {
-          if (OPEN_STATUSES.includes(t.status)) throw new ApiError(422, 'ist noch offen');
+          if (OPEN_STATUSES.includes(t.status)) throw new ApiError(422, tr('is still open'));
           if (!t._archived) await must(root, ['archive', tid]);
         }
         okIds.push(tid);
@@ -741,7 +750,7 @@ const actions = {
         errors.push({ id: tid, error: e.message });
       }
     }
-    const message = `${okIds.length} von ${ids.length} Aufgaben geändert.` + (errors.length ? ` Nicht geändert: ${errors.map((x) => `${x.id} (${x.error})`).join(', ')}` : '');
+    const message = tr('{ok} of {n} tasks changed.', { ok: okIds.length, n: ids.length }) + (errors.length ? ' ' + tr('Not changed: {list}', { list: errors.map((x) => `${x.id} (${x.error})`).join(', ') }) : '');
     if (!okIds.length) throw new ApiError(422, message);
     return { message, done: okIds, errors };
   },
@@ -759,9 +768,9 @@ async function saveConfigField(root, fn) {
 }
 
 export async function runAction(root, body) {
-  if (!body || typeof body !== 'object') bad('Ungültige Anfrage.');
+  if (!body || typeof body !== 'object') bad(tr('Invalid request.'));
   const fn = actions[body.action];
-  if (!fn) bad('Unbekannte Aktion.');
+  if (!fn) bad(tr('Unknown action.'));
   return fn(root, body);
 }
 
@@ -770,11 +779,11 @@ export async function saveAsset(root, { taskId, contentType, data, desc, kind, n
   const tid = id(taskId);
   findTaskSafe(root, tid);
   const ext = IMAGE_TYPES[(contentType || '').split(';')[0].trim().toLowerCase()];
-  if (!ext) bad('Nur PNG, JPEG, GIF, WebP oder AVIF.');
-  if (!data || !data.length) bad('Leere Datei.');
-  const k = oneOf(kind, 'Art', ASSET_KINDS);
-  const d = str(desc, 'Beschreibung', { max: 1000 });
-  const n = str(name, 'Name', { max: 60 });
+  if (!ext) bad(tr('Only PNG, JPEG, GIF, WebP or AVIF.'));
+  if (!data || !data.length) bad(tr('Empty file.'));
+  const k = oneOf(kind, tr('Kind'), ASSET_KINDS);
+  const d = str(desc, tr('Description'), { max: 1000 });
+  const n = str(name, tr('Name'), { max: 60 });
   const inbox = path.join(worksDir(root), 'inbox');
   fs.mkdirSync(inbox, { recursive: true });
   const file = path.join(inbox, `board-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${ext}`);
@@ -788,29 +797,29 @@ export async function saveAsset(root, { taskId, contentType, data, desc, kind, n
   } finally {
     removeQuiet(file);
   }
-  return { message: 'Bild gespeichert.' };
+  return { message: tr('Image saved.') };
 }
 
 // Import aus dem Board: Datei kommt roh, liegt kurz in .works/.tmp und wird nach dem Anlegen gelöscht.
 const IMPORT_EXT = ['.json', '.csv', '.tsv', '.xlsx', '.xlsm', '.docx', '.md', '.markdown', '.txt', '.zip'];
 const IMPORT_FORMATS = ['', 'auto', 'trello', 'notion', 'linear', 'csv', 'xlsx', 'docx', 'md', 'json'];
 const importFile = (root, token) => {
-  if (!/^[a-f0-9]{16}(\.[a-z]{2,8})$/.test(token || '')) bad('Ungültiger Import.');
+  if (!/^[a-f0-9]{16}(\.[a-z]{2,8})$/.test(token || '')) bad(tr('Invalid import.'));
   const f = path.join(worksDir(root), '.tmp', `import-${token}`);
-  if (!exists(f)) bad('Die hochgeladene Datei ist abgelaufen. Bitte erneut wählen.');
+  if (!exists(f)) bad(tr('The uploaded file has expired. Please choose it again.'));
   return f;
 };
 function importArgs(b) {
   const a = [];
-  const fmt = oneOf(b.format || '', 'Format', IMPORT_FORMATS); if (fmt && fmt !== 'auto') a.push(`--format=${fmt}`);
-  if (b.map) a.push(`--map=${str(b.map, 'Spalten', { max: 400 }).replace(/[^\p{L}\p{N} _=,.()/-]/gu, '')}`);
-  if (b.sheet) a.push(`--sheet=${str(b.sheet, 'Tabelle', { max: 80 })}`);
+  const fmt = oneOf(b.format || '', tr('Format'), IMPORT_FORMATS); if (fmt && fmt !== 'auto') a.push(`--format=${fmt}`);
+  if (b.map) a.push(`--map=${str(b.map, tr('Columns'), { max: 400 }).replace(/[^\p{L}\p{N} _=,.()/-]/gu, '')}`);
+  if (b.sheet) a.push(`--sheet=${str(b.sheet, tr('Sheet'), { max: 80 })}`);
   return a;
 }
 export async function importUpload(root, { name, data, format, map, sheet }) {
   const ext = path.extname(String(name || '')).toLowerCase();
-  if (!IMPORT_EXT.includes(ext)) bad(`Dateityp ${ext || 'unbekannt'} wird nicht unterstützt. Möglich: ${IMPORT_EXT.join(', ')}`);
-  if (!data || !data.length) bad('Leere Datei.');
+  if (!IMPORT_EXT.includes(ext)) bad(tr('File type {ext} is not supported. Possible: {list}', { ext: ext || tr('unknown'), list: IMPORT_EXT.join(', ') }));
+  if (!data || !data.length) bad(tr('Empty file.'));
   const dir = path.join(worksDir(root), '.tmp');
   fs.mkdirSync(dir, { recursive: true });
   for (const f of fs.readdirSync(dir)) if (f.startsWith('import-')) { try { if (Date.now() - fs.statSync(path.join(dir, f)).mtimeMs > 3600000) fs.rmSync(path.join(dir, f)); } catch { /* egal */ } }
@@ -818,7 +827,7 @@ export async function importUpload(root, { name, data, format, map, sheet }) {
   const file = path.join(dir, `import-${token}`);
   fs.writeFileSync(file, data);
   const r = await cli(root, ['import', file, '--json', ...importArgs({ format, map, sheet })]);
-  if (!r.ok) { removeQuiet(file); throw new ApiError(422, (r.stderr.split('\n').find((l) => l.trim()) || 'Import nicht lesbar.').replace(/^Fehler:\s*/, '')); }
+  if (!r.ok) { removeQuiet(file); throw new ApiError(422, (r.stderr.split('\n').find((l) => l.trim()) || tr('Import not readable.')).replace(/^(Fehler|Error):\s*/, '')); }
   return { token, name: path.basename(String(name)).slice(0, 120), ...JSON.parse(r.stdout) };
 }
 
@@ -826,7 +835,7 @@ export async function importUpload(root, { name, data, format, map, sheet }) {
 // mit dem Board verglichen. backupApply holt sie über das Token und führt zusammen oder stellt wieder her.
 const backupTmp = (root, token) => path.join(worksDir(root), '.tmp', `backup-${token}.json`);
 export function backupPreview(root, { name, data }) {
-  if (!data || !data.length) bad('Leere Datei.');
+  if (!data || !data.length) bad(tr('Empty file.'));
   let d;
   try { d = readBackup(data.toString('utf8')); } catch (e) { bad(e.message); }
   const dir = path.join(worksDir(root), '.tmp');
@@ -871,11 +880,11 @@ export function cleanupInfo(root) {
   const ref = (t, why) => ({ id: t.id, title: t.title, status: t.status, priority: t.priority, why });
   const stuck = [];
   for (const t of open) {
-    if (t.status === 'in-arbeit' && age(lastLogDate(t)) >= 7) stuck.push(ref(t, `seit ${age(lastLogDate(t))} Tagen ohne Eintrag im Verlauf`));
-    if (t.status === 'review' && age(lastLogDate(t)) >= 3) stuck.push({ ...ref(t, `seit ${age(lastLogDate(t))} Tagen in Review`), review: true });
+    if (t.status === 'in-arbeit' && age(lastLogDate(t)) >= 7) stuck.push(ref(t, tr('no history entry for {n} days', { n: age(lastLogDate(t)) })));
+    if (t.status === 'review' && age(lastLogDate(t)) >= 3) stuck.push({ ...ref(t, tr('in review for {n} days', { n: age(lastLogDate(t)) })), review: true });
   }
   const incomplete = open.filter((t) => t.incomplete || !checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '').total || !stripComments(getSection(t._body, 'Beschreibung') || getSection(t._body, 'Ziel') || '').trim())
-    .map((t) => ref(t, [t.incomplete ? 'als unvollständig markiert' : '', !checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '').total ? 'keine Akzeptanzkriterien' : '', !stripComments(getSection(t._body, 'Beschreibung') || getSection(t._body, 'Ziel') || '').trim() ? 'keine Beschreibung' : ''].filter(Boolean).join(', ')));
+    .map((t) => ref(t, [t.incomplete ? tr('marked as incomplete') : '', !checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '').total ? tr('no acceptance criteria') : '', !stripComments(getSection(t._body, 'Beschreibung') || getSection(t._body, 'Ziel') || '').trim() ? tr('no description') : ''].filter(Boolean).join(', ')));
   const noEffort = open.filter((t) => !t.effort).map((t) => t.id);
   const ignore = new Set((config.cleanup_ignore || []).map((p) => [...p].sort().join('|')));
   const dups = [];
@@ -885,21 +894,22 @@ export function cleanupInfo(root) {
     const sc = similarity({ title: a.title, tags: a.tags, text: getSection(a._body, 'Beschreibung') || '' }, { title: b.title, tags: b.tags, text: getSection(b._body, 'Beschreibung') || '' });
     if (sc >= 0.6) dups.push({ a: ref(a, ''), b: ref(b, ''), score: Math.round(sc * 100) });
   }
-  const old = open.filter((t) => t.status === 'backlog' && age(t.created) >= 60 && age(lastLogDate(t)) >= 60).map((t) => ref(t, `seit ${age(t.created)} Tagen im Backlog`));
+  const old = open.filter((t) => t.status === 'backlog' && age(t.created) >= 60 && age(lastLogDate(t)) >= 60).map((t) => ref(t, tr('in the backlog for {n} days', { n: age(t.created) })));
   const design = open.map((t) => ({ t, d: loadDesign(t) })).filter((x) => x.d && x.d.variants.length && !x.d.chosen)
-    .map((x) => ref(x.t, `${x.d.variants.length} Entwürfe, noch keine Wahl`));
+    .map((x) => ref(x.t, tr('{n} design variants, none chosen yet', { n: x.d.variants.length })));
   const count = stuck.length + incomplete.length + dups.length + old.length + design.length + (noEffort.length ? 1 : 0);
   const penalty = stuck.length * 8 + incomplete.length * 4 + dups.length * 6 + old.length * 2 + design.length * 3 + noEffort.length;
   const score = Math.max(0, Math.round(100 - (penalty / Math.max(5, open.length)) * 10));
   return { count, score, stuck, incomplete, noEffort, dups: dups.sort((x, y) => y.score - x.score).slice(0, 10), old, design };
 }
 
-const LABEL = {
-  create: 'Aufgabe angelegt', createFromTemplate: 'Aufgabe aus Vorlage', set: 'Felder geändert', move: 'Status geändert', section: 'Text geändert',
-  check: 'Häkchen', item: 'Punkt ergänzt', itemRemove: 'Punkt entfernt', link: 'Verknüpfung', archive: 'Archiviert', bulk: 'Mehrere Aufgaben',
-  queueAdd: 'Eingereiht', queueRemove: 'Aus der Warteschlange', queueOrder: 'Warteschlange sortiert', comment: 'Kommentar', designChoose: 'Entwurf gewählt',
-  review: 'Abnahme', merge: 'Zusammengeführt', toIdeas: 'In Ideen verschoben', importApply: 'Importiert', sprintAdd: 'Eingeplant', sprintRemove: 'Aus dem Sprint',
-};
+// Beschriftung für Rückgängig, in der Sprache beim Speichern (W-0041).
+const LABEL = () => ({
+  create: tr('Task created'), createFromTemplate: tr('Task from template'), set: tr('Fields changed'), move: tr('Status changed'), section: tr('Text changed'),
+  check: tr('Checkmark'), item: tr('Item added'), itemRemove: tr('Item removed'), link: tr('Dependency link'), archive: tr('Archived'), bulk: tr('Several tasks'),
+  queueAdd: tr('Queued'), queueRemove: tr('Out of the queue'), queueOrder: tr('Queue sorted'), comment: tr('Comment'), designChoose: tr('Design variant chosen'),
+  review: tr('Acceptance review'), merge: tr('Merged'), toIdeas: tr('Moved to ideas'), importApply: tr('Imported'), sprintAdd: tr('Planned in'), sprintRemove: tr('Out of the sprint'),
+});
 const NO_UNDO = new Set(['undo', 'backupApply', 'checksRun', 'githubSync', 'reportRun', 'reportWebhook', 'instruct', 'recurRun', 'requestHandoff']);
 const CONFIG_ACTIONS = /^(queue|sprint|view|milestone|recur|checksSave|reportSettings|effortMode|githubSettings|dismissDuplicate|importApply)/;
 
@@ -908,10 +918,10 @@ export async function runActionWithUndo(root, body) {
   if (!body || typeof body !== 'object' || NO_UNDO.has(body.action)) return runAction(root, body);
   const ids = [body.id, body.target, body.keep, body.drop, ...(Array.isArray(body.ids) ? body.ids : [])].filter((x) => typeof x === 'string' && ID_RE.test(x)).map((x) => x.toUpperCase());
   const extra = /^idea/.test(body.action) || body.action === 'toIdeas' ? ['ideas.md'] : /^know/.test(body.action) ? ['wissen.md'] : [];
-  const key = snapshot(root, { label: LABEL[body.action] || body.action, ids, config: CONFIG_ACTIONS.test(body.action) || ['create', 'createFromTemplate', 'bulk'].includes(body.action), extra });
+  const key = snapshot(root, { label: LABEL()[body.action] || body.action, ids, config: CONFIG_ACTIONS.test(body.action) || ['create', 'createFromTemplate', 'bulk'].includes(body.action), extra });
   try {
     const r = await runAction(root, body);
-    relabel(root, key, r && r.message ? r.message.replace(/\.$/, '') : LABEL[body.action] || body.action);
+    relabel(root, key, r && r.message ? r.message.replace(/\.$/, '') : LABEL()[body.action] || body.action);
     return { ...r, undo: key };
   } catch (e) { dropSnapshot(root, key); throw e; }
 }
@@ -921,134 +931,145 @@ Object.assign(actions, {
     const key = typeof b.key === 'string' && /^[a-z0-9-]{4,40}$/.test(b.key) ? b.key : undefined;
     let e;
     await new Promise((resolve, reject) => { queue = queue.then(() => { try { e = undoFn(root, key); resolve(); } catch (err) { reject(new ApiError(422, err.message)); } }); });
-    return { message: `Rückgängig: ${e.label}` };
+    return { message: tr('Undo: {label}', { label: e.label }) };
   },
   async designChoose(root, b) {
     const tid = id(b.id);
-    if (typeof b.name !== 'string' || !VARIANT_RE.test(b.name)) bad('Ungültige Variante.');
-    const reason = str(b.reason, 'Grund', { max: 300 });
+    if (typeof b.name !== 'string' || !VARIANT_RE.test(b.name)) bad(tr('Invalid variant.'));
+    const reason = str(b.reason, tr('Reason'), { max: 300 });
     await must(root, ['design', 'choose', tid, b.name, ...(reason ? [`--reason=${reason}`] : [])]);
-    return { message: `Variante ${b.name} gewählt. Claude setzt sie um.` };
+    return { message: tr('Variant {name} chosen. Claude implements it.', { name: b.name }) };
   },
   async instruct(root, b) {
     const tid = id(b.id);
-    const text = str(b.text, 'Anweisung', { max: 4000, required: true });
+    const text = str(b.text, tr('Instruction'), { max: 4000, required: true });
     await withTextFile(root, text, () => must(root, ['instruct', tid, `--text=${text}`]));
-    return { message: 'Anweisung gesendet. Claude liest sie, sobald es passt.' };
+    return { message: tr('Instruction sent. Claude reads it when it fits.') };
   },
   async knowAdd(root, b) {
-    const args = ['know', 'add', `--title=${str(b.title, 'Titel', { max: 140, required: true })}`, `--area=${str(b.area, 'Bereich', { max: 60 }) || 'Allgemein'}`];
-    const text = str(b.text, 'Text', { max: 4000 });
+    const args = ['know', 'add', `--title=${str(b.title, tr('Title'), { max: 140, required: true })}`, `--area=${str(b.area, tr('Area'), { max: 60 })}`];
+    const text = str(b.text, tr('Text'), { max: 4000 });
     await withTextFile(root, text, (f) => must(root, [...args, `--file=${f}`]));
-    return { message: 'Eintrag gespeichert.' };
+    return { message: tr('Entry saved.') };
   },
   async knowEdit(root, b) {
-    if (typeof b.kid !== 'string' || !/^[a-f0-9]{6}$/.test(b.kid)) bad('Ungültiger Eintrag.');
+    if (typeof b.kid !== 'string' || !/^[a-f0-9]{6}$/.test(b.kid)) bad(tr('Invalid entry.'));
     const f = b.fields || {};
     const args = ['know', 'edit', b.kid];
-    if ('title' in f) args.push(`--title=${str(f.title, 'Titel', { max: 140, required: true })}`);
-    if ('area' in f) args.push(`--area=${str(f.area, 'Bereich', { max: 60, required: true })}`);
+    if ('title' in f) args.push(`--title=${str(f.title, tr('Title'), { max: 140, required: true })}`);
+    if ('area' in f) args.push(`--area=${str(f.area, tr('Area'), { max: 60, required: true })}`);
     if (f.ok) args.push('--ok');
-    if ('text' in f) { const text = str(f.text, 'Text', { max: 4000 }); await withTextFile(root, text, (file) => must(root, [...args, `--file=${file}`])); } else await must(root, args);
-    return { message: 'Gespeichert.' };
+    if ('text' in f) { const text = str(f.text, tr('Text'), { max: 4000 }); await withTextFile(root, text, (file) => must(root, [...args, `--file=${file}`])); } else await must(root, args);
+    return { message: tr('Saved.') };
   },
-  async knowAccept(root, b) { if (!/^[a-f0-9]{6}$/.test(b.kid || '')) bad('Ungültiger Eintrag.'); await must(root, ['know', 'accept', b.kid]); return { message: 'Ins Projektwissen übernommen.' }; },
-  async knowRemove(root, b) { if (!/^[a-f0-9]{6}$/.test(b.kid || '')) bad('Ungültiger Eintrag.'); await must(root, ['know', 'remove', b.kid]); return { message: 'Eintrag entfernt.' }; },
-  async knowFlag(root, b) { if (!/^[a-f0-9]{6}$/.test(b.kid || '')) bad('Ungültiger Eintrag.'); await must(root, ['know', 'flag', b.kid]); return { message: 'Als veraltet markiert.' }; },
+  async knowAccept(root, b) { if (!/^[a-f0-9]{6}$/.test(b.kid || '')) bad(tr('Invalid entry.')); await must(root, ['know', 'accept', b.kid]); return { message: tr('Added to the project knowledge.') }; },
+  async knowRemove(root, b) { if (!/^[a-f0-9]{6}$/.test(b.kid || '')) bad(tr('Invalid entry.')); await must(root, ['know', 'remove', b.kid]); return { message: tr('Entry removed.') }; },
+  async knowFlag(root, b) { if (!/^[a-f0-9]{6}$/.test(b.kid || '')) bad(tr('Invalid entry.')); await must(root, ['know', 'flag', b.kid]); return { message: tr('Marked as outdated.') }; },
   async recurSave(root, b) {
-    const r = b.rule && typeof b.rule === 'object' ? b.rule : bad('Regel fehlt.');
+    const r = b.rule && typeof b.rule === 'object' ? b.rule : bad(tr('Rule missing.'));
     const args = [];
-    args.push(`--title=${str(r.title, 'Titel', { max: 150, required: true })}`);
-    const kind = oneOf(r.kind, 'Rhythmus', ['daily', 'weekly', 'monthly', 'days'], { required: true });
+    args.push(`--title=${str(r.title, tr('Title'), { max: 150, required: true })}`);
+    const kind = oneOf(r.kind, tr('Rhythm'), ['daily', 'weekly', 'monthly', 'days'], { required: true });
     args.push(`--every=${kind}${r.interval ? `:${Math.min(365, Math.max(1, parseInt(r.interval, 10) || 1))}` : ''}`);
     for (const k of ['weekday', 'nth', 'day', 'due_days']) if (r[k] !== undefined && r[k] !== '' && r[k] !== null) args.push(`--${k}=${Math.max(0, parseInt(r[k], 10) || 0)}`);
-    if (r.template) { if (!SLUG_RE.test(r.template)) bad('Ungültige Vorlage.'); args.push(`--template=${r.template}`); }
-    if (r.type) args.push(`--type=${oneOf(r.type, 'Typ', TYPES)}`);
-    if (r.priority) args.push(`--priority=${oneOf(r.priority, 'Priorität', PRIORITIES)}`);
-    if (r.status) args.push(`--status=${oneOf(r.status, 'Spalte', ['backlog', 'geplant'])}`);
+    if (r.template) { if (!SLUG_RE.test(r.template)) bad(tr('Invalid template.')); args.push(`--template=${r.template}`); }
+    if (r.type) args.push(`--type=${oneOf(r.type, tr('Type'), TYPES)}`);
+    if (r.priority) args.push(`--priority=${oneOf(r.priority, tr('Priority'), PRIORITIES)}`);
+    if (r.status) args.push(`--status=${oneOf(r.status, tr('Column'), ['backlog', 'geplant'])}`);
     args.push(`--queue=${!!r.queue}`, `--sprint=${!!r.sprint}`, `--active=${r.active !== false}`);
-    if (b.rid) { if (!RULE_ID_RE.test(b.rid)) bad('Ungültige Regel.'); await must(root, ['recur', 'set', b.rid, ...args]); } else await must(root, ['recur', 'add', ...args]);
-    return { message: 'Regel gespeichert.' };
+    if (b.rid) { if (!RULE_ID_RE.test(b.rid)) bad(tr('Invalid rule.')); await must(root, ['recur', 'set', b.rid, ...args]); } else await must(root, ['recur', 'add', ...args]);
+    return { message: tr('Rule saved.') };
   },
-  async recurRemove(root, b) { if (!RULE_ID_RE.test(b.rid || '')) bad('Ungültige Regel.'); await must(root, ['recur', 'remove', b.rid]); return { message: 'Regel entfernt.' }; },
-  async recurRun(root) { const m = await must(root, ['recur', 'run']); return { message: m.split('\n')[0] || 'Nichts fällig.' }; },
+  async recurRemove(root, b) { if (!RULE_ID_RE.test(b.rid || '')) bad(tr('Invalid rule.')); await must(root, ['recur', 'remove', b.rid]); return { message: tr('Rule removed.') }; },
+  async recurRun(root) { const m = await must(root, ['recur', 'run']); return { message: m.split('\n')[0] || tr('Nothing due.') }; },
   async githubSync(root) { const m = await must(root, ['github', 'sync'], { timeout: 90000 }); return { message: m.split('\n').pop() }; },
   async githubSettings(root, b) {
     const pairs = Object.entries(b).filter(([k]) => k in DEFAULT_SYNC && typeof DEFAULT_SYNC[k] === 'boolean').map(([k, v]) => `${k}=${!!v}`);
-    if (typeof b.labels === 'string') pairs.push(`labels=${list(b.labels, 'Labels', /^[\p{L}\p{N} _.:-]+$/u).join(',')}`);
-    if (!pairs.length) bad('Keine Einstellung.');
+    if (typeof b.labels === 'string') pairs.push(`labels=${list(b.labels, tr('Labels'), /^[\p{L}\p{N} _.:-]+$/u).join(',')}`);
+    if (!pairs.length) bad(tr('No setting.'));
     await must(root, ['github', 'set', ...pairs]);
-    return { message: 'Gespeichert.' };
+    return { message: tr('Saved.') };
   },
   async review(root, b) {
     const tid = id(b.id);
-    const text = str(b.text, 'Begründung', { max: 4000, required: true });
+    const text = str(b.text, tr('Reason'), { max: 4000, required: true });
     const t = findTaskSafe(root, tid);
-    if (t.status !== 'review') bad('Die Aufgabe ist nicht in Review.');
+    if (t.status !== 'review') bad(tr('The task is not in review.'));
     const nums = (Array.isArray(b.uncheck) ? b.uncheck : []).map((n) => parseInt(n, 10)).filter((n) => n > 0).slice(0, 50);
     for (const n of nums) await must(root, ['check', tid, String(n), '--section=Akzeptanzkriterien', '--undo']);
-    await withTextFile(root, `Abnahme: zurückgegeben.\n\n${text}`, (f) => must(root, ['comment', tid, `--file=${f}`, '--as=Nutzer']));
-    await must(root, ['set', tid, 'status=in-arbeit', `--reason=Abnahme zurückgegeben: ${text.split('\n')[0].slice(0, 120)}`]);
-    return { message: `${tid} geht zurück an Claude.` };
+    await withTextFile(root, `${tr('Acceptance review: returned.')}\n\n${text}`, (f) => must(root, ['comment', tid, `--file=${f}`, '--as=Nutzer']));
+    await must(root, ['set', tid, 'status=in-arbeit', `--reason=${tr('Acceptance review returned: {text}', { text: text.split('\n')[0].slice(0, 120) })}`]);
+    return { message: tr('{id} goes back to Claude.', { id: tid }) };
   },
   async requestHandoff(root, b) {
     const tid = id(b.id);
-    await must(root, ['comment', tid, '--as=Nutzer', '--text=Bitte die Übergabe aktualisieren: Stand, nächster Schritt und was blockiert. Hängt die Aufgabe fest, sag mir, was fehlt.']);
-    return { message: 'Claude wird um eine Übergabe gebeten.' };
+    await must(root, ['comment', tid, '--as=Nutzer', `--text=${tr('Please update the handoff: status, next step and what is blocking. If the task is stuck, tell me what is missing.')}`]);
+    return { message: tr('Claude is asked for a handoff.') };
   },
   async dismissDuplicate(root, b) {
     const a = id(b.a); const c = id(b.b);
     await saveConfigField(root, (config) => { config.cleanup_ignore = [...(config.cleanup_ignore || []), [a, c]].slice(-200); });
-    return { message: 'Als kein Duplikat gemerkt.' };
+    return { message: tr('Remembered as not a duplicate.') };
   },
   async merge(root, b) {
     const keep = id(b.keep); const drop = id(b.drop);
-    if (keep === drop) bad('Zwei verschiedene Aufgaben wählen.');
+    if (keep === drop) bad(tr('Choose two different tasks.'));
     const d = findTaskSafe(root, drop);
     const desc = stripComments(getSection(d._body, 'Beschreibung') || getSection(d._body, 'Ziel') || '').trim();
     const crit = checkboxes(getSection(d._body, 'Akzeptanzkriterien') || '').items.filter((i) => !i.done).map((i) => `- ${i.text}`).join('\n');
-    await withTextFile(root, `Zusammengeführt mit ${drop} „${d.title}“.${desc ? `\n\nBeschreibung von ${drop}:\n${desc}` : ''}${crit ? `\n\nOffene Kriterien von ${drop}:\n${crit}` : ''}`, (f) => must(root, ['comment', keep, `--file=${f}`, '--as=Nutzer']));
+    await withTextFile(root, `${tr('Merged with {id} “{title}”.', { id: drop, title: d.title })}${desc ? `\n\n${tr('Description of {id}:', { id: drop })}\n${desc}` : ''}${crit ? `\n\n${tr('Open criteria of {id}:', { id: drop })}\n${crit}` : ''}`, (f) => must(root, ['comment', keep, `--file=${f}`, '--as=Nutzer']));
     await must(root, ['link', keep, 'related', drop]);
-    await must(root, ['drop', drop, `--reason=Zusammengeführt in ${keep}`]);
-    return { message: `${drop} in ${keep} zusammengeführt.` };
+    await must(root, ['drop', drop, `--reason=${tr('Merged into {id}', { id: keep })}`]);
+    return { message: tr('{drop} merged into {keep}.', { drop, keep }) };
   },
   async backupApply(root, b) {
-    const token = typeof b.token === 'string' && /^[a-f0-9]{16}$/.test(b.token) ? b.token : bad('Ungültige Vorschau.');
+    const token = typeof b.token === 'string' && /^[a-f0-9]{16}$/.test(b.token) ? b.token : bad(tr('Invalid preview.'));
     const file = backupTmp(root, token);
-    if (!exists(file)) bad('Die Vorschau ist abgelaufen. Datei bitte neu wählen.');
-    const mode = oneOf(b.mode, 'Art des Imports', ['merge', 'restore'], { required: true });
+    if (!exists(file)) bad(tr('The preview has expired. Please choose the file again.'));
+    const mode = oneOf(b.mode, tr('Import type'), ['merge', 'restore'], { required: true });
     try {
       const d = readBackup(fs.readFileSync(file, 'utf8'));
       if (mode === 'restore') {
         const r = restoreBackup(root, d);
-        const key = snapshotRestore(root, { label: `Wiederhergestellt aus ${d.project || 'einer Sicherung'} (${r.tasks} Aufgaben)`, backup: r.backup });
-        return { message: `Wiederhergestellt: ${r.tasks} ${r.tasks === 1 ? 'Aufgabe' : 'Aufgaben'}. Der vorherige Stand ist gesichert.`, undo: key };
+        const key = snapshotRestore(root, { label: tr('Restored from {name} ({n} tasks)', { name: d.project || tr('a backup'), n: r.tasks }), backup: r.backup });
+        return { message: r.tasks === 1 ? tr('Restored: 1 task. The previous state is saved.') : tr('Restored: {n} tasks. The previous state is saved.', { n: r.tasks }), undo: key };
       }
       const only = (Array.isArray(b.only) ? b.only : []).map((n) => parseInt(n, 10)).filter((n) => n > 0 && n <= 20000);
-      if (!only.length) bad('Nichts gewählt.');
+      if (!only.length) bad(tr('Nothing selected.'));
       const r = mergeBackup(root, d, { only, snapshot: (o) => snapshot(root, o) });
-      return { message: `Übernommen: ${r.created.length} neu, ${r.updated.length} geändert.`, undo: r.undoKey };
+      return { message: tr('Applied: {created} new, {updated} changed.', { created: r.created.length, updated: r.updated.length }), undo: r.undoKey };
     } finally { removeQuiet(file); }
   },
   async importApply(root, b) {
     const file = importFile(root, b.token);
     const only = (Array.isArray(b.only) ? b.only : []).map((n) => parseInt(n, 10)).filter((n) => n > 0 && n <= 5000);
-    if (!only.length) bad('Keine Einträge gewählt.');
+    if (!only.length) bad(tr('No entries selected.'));
     const args = ['import', file, '--apply', `--only=${only.join(',')}`, '--keep-dups', '--include-done', '--include-archived', ...importArgs(b)];
-    const st = oneOf(b.status || '', 'Spalte', ['', 'backlog', 'geplant']); if (st) args.push(`--status=${st}`);
-    if (b.tags) args.push(`--tags=${list(b.tags, 'Tags', /^[\p{L}\p{N}_-]+$/u).join(',')}`);
+    const st = oneOf(b.status || '', tr('Column'), ['', 'backlog', 'geplant']); if (st) args.push(`--status=${st}`);
+    if (b.tags) args.push(`--tags=${list(b.tags, tr('Tags'), /^[\p{L}\p{N}_-]+$/u).join(',')}`);
     try { const m = await must(root, args, { timeout: 120000 }); return { message: m.split('\n')[0] }; } finally { removeQuiet(file); }
   },
   async toIdeas(root, b) {
     const ids = (Array.isArray(b.ids) ? b.ids : []).slice(0, 50).map(id);
     for (const tid of ids) {
       const t = findTaskSafe(root, tid);
-      await must(root, ['idea', `--text=${t.title} (war ${tid})`, ...(t.tags && t.tags.length ? [`--tags=${t.tags.join(',')}`] : [])]);
-      await must(root, ['drop', tid, '--reason=In die Ideen verschoben']);
+      await must(root, ['idea', `--text=${tr('{title} (was {id})', { title: t.title, id: tid })}`, ...(t.tags && t.tags.length ? [`--tags=${t.tags.join(',')}`] : [])]);
+      await must(root, ['drop', tid, `--reason=${tr('Moved to the ideas')}`]);
     }
-    return { message: `${ids.length} Aufgabe${ids.length === 1 ? '' : 'n'} in die Ideen verschoben.` };
+    return { message: ids.length === 1 ? tr('1 task moved to the ideas.') : tr('{n} tasks moved to the ideas.', { n: ids.length }) };
   },
 });
+
+// Sprache aus dem Board (W-0041): { lang, scope: 'global' | 'project' }, lang '' entfernt die Einstellung dieses Bereichs.
+// Global wirkt auf alle Projekte, deshalb nur direkt am Rechner (local). Schreibt über works lang wie im Terminal.
+export async function setLang(root, b, { local = false } = {}) {
+  if (!b || typeof b !== 'object') bad(tr('Invalid request.'));
+  const scope = oneOf(b.scope || 'global', tr('Scope'), ['global', 'project']);
+  const lang = b.lang === '' || b.lang === null ? '' : oneOf(b.lang, tr('Language'), languages(), { required: true });
+  if (scope === 'global' && !local) throw new ApiError(403, tr('This only works directly on the computer the board runs on.'));
+  await must(root, ['lang', ...(lang ? [lang] : ['--reset']), ...(scope === 'project' ? ['--project'] : [])]);
+  return { ok: true, ...languageSource(root) };
+}
 
 // Befehl im Hintergrund über dieselbe Warteschlange wie das Board, ohne auf das Ergebnis zu warten.
 export function background(root, args, timeout = 60000) { cli(root, args, { timeout }).catch(() => {}); }

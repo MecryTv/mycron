@@ -3,7 +3,12 @@
 // beantworten, deshalb öffnet sie beim gemeinsamen Bot der Dienst selbst. Ohne Abhängigkeiten und ohne Dateizugriff.
 
 export const isDe = (locale) => String(locale || '').toLowerCase().startsWith('de');
-export const tr = (locale) => (de, en) => (isDe(locale) ? de : en);
+// Weitere Sprachen (W-0041): Der eigene Bot setzt einen Katalog (Sprachcode, englischer Text → Übersetzung oder nichts),
+// ohne Import, damit der Dienst nur diese Datei braucht. Der Dienst setzt keinen und bleibt bei Deutsch und Englisch.
+// ponytail: Texte mit eingesetzten Werten (${…}) findet der Katalog nicht, die bleiben in weiteren Sprachen englisch.
+let extra = null;
+export const useCatalog = (fn) => { extra = fn; };
+export const tr = (locale) => (de, en) => (isDe(locale) ? de : (extra && extra(String(locale || '').toLowerCase().split(/[-_]/)[0], en)) || en);
 export const DOCS = 'https://github.com/MecryTv/mycron/blob/main/plugins/works/skills/works/references/integrations.md#discord-bot-works';
 
 // custom_id an Knöpfen und Dialogen: w:<aktion>:<projekt>:<aufgabe>. Projekt ist die rootId (16 hex), Aufgabe eine ID

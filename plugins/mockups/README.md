@@ -1,6 +1,8 @@
 # mockups
 
-Ein Skill für Gestaltungsaufgaben: Varianten als HTML-Entwurf mit den echten Styles des Projekts bauen, in drei Breiten hell und dunkel fotografieren, auf Fehler prüfen und zur Wahl vorlegen. Mit [works](../works/README.md) hängt er die Entwürfe an die Aufgabe, ohne works bleiben sie als Dateien im Projekt.
+> English. Deutsche Fassung: [README.de.md](README.de.md)
+
+A skill for design tasks: build variants as HTML mockups with the project's real styles, capture them at three widths in light and dark, check them for errors and present them for you to choose. With [works](../works/README.md) it attaches the mockups to the task; without works they stay as files in the project.
 
 ## Installation
 
@@ -9,14 +11,14 @@ Ein Skill für Gestaltungsaufgaben: Varianten als HTML-Entwurf mit den echten St
 /plugin install mockups@mycron
 ```
 
-Für die Screenshots braucht es Node 18 oder neuer, ein installiertes Chrome (oder Edge) und Playwright. Fehlt Playwright, nennt das Skript den Befehl dafür: `npm install -g playwright`. Browser lädt Playwright dabei keine herunter: das Skript nimmt Chrome, sonst Edge, sonst das Chromium von Playwright. Einen anderen Browser, etwa `/usr/bin/chromium`, setzt `ENTWURF_BROWSER=<Pfad>`.
+The screenshots need Node 18 or newer, an installed Chrome (or Edge) and Playwright. If Playwright is missing, the script names the command for it: `npm install -g playwright`. Playwright does not download any browsers for this: the script uses Chrome, otherwise Edge, otherwise Playwright's Chromium. A different browser, for example `/usr/bin/chromium`, is set with `ENTWURF_BROWSER=<path>`.
 
-## Auslöser
+## Triggers
 
-„Zeig mir Entwürfe“, „mach zwei Varianten“, „wie könnte das aussehen“, Gestaltungsaufgaben in works, oder Screenshots einer Seite in mehreren Breiten.
+"Show me mockups", "make two variants", "what could this look like", design tasks in works, or screenshots of a page at several widths.
 
-## Bestandteile
+## Contents
 
-- `skills/mockups/vorlage.html`: Entwurfsseite mit Rahmen zum Umschalten von Varianten und hell/dunkel. `?v=B`, `?theme=dark` und `?frame=0` steuern sie auch über die Adresse.
-- `skills/mockups/scripts/entwurf.mjs shots <seite.html> [--variants A,B] [--widths 1440,768,390] [--themes light,dark] [--out ordner]`: ein Screenshot je Variante, Farbschema und Breite. Meldet seitliches Scrollen mit den Elementen, die überstehen, Seitenfehler, Konsolenfehler und Dateien, die nicht geladen wurden. Exit 0 ohne Probleme, 1 mit Problemen, 2 bei falschem Aufruf oder fehlendem Playwright.
-- `skills/mockups/scripts/entwurf.mjs inline <seite.html> [--variant B] [--out datei.html]`: bettet lokales CSS, Schriften und Bilder als `data:` ein und setzt die Startvariante. Nötig für das works-Board, das Entwürfe in einem abgesicherten iframe zeigt.
+- `skills/mockups/vorlage.html`: mockup page with a frame for switching variants and light/dark. `?v=B`, `?theme=dark` and `?frame=0` also control it through the URL.
+- `skills/mockups/scripts/entwurf.mjs shots <page.html> [--variants A,B] [--widths 1440,768,390] [--themes light,dark] [--out folder]`: one screenshot per variant, color scheme and width. Reports horizontal scrolling with the elements that stick out, page errors, console errors and files that did not load. Exit 0 without problems, 1 with problems, 2 for a wrong call or missing Playwright.
+- `skills/mockups/scripts/entwurf.mjs inline <page.html> [--variant B] [--out file.html]`: embeds local CSS, fonts and images as `data:` and sets the starting variant. Needed for the works board, which shows mockups in a sandboxed iframe.

@@ -1,150 +1,150 @@
-# Abläufe
+# Workflows
 
-`works` steht für `node "${CLAUDE_SKILL_DIR}/scripts/works.mjs"` (siehe SKILL.md).
+`works` stands for `node "${CLAUDE_SKILL_DIR}/scripts/works.mjs"` (see SKILL.md).
 
-## Einrichtung
+## Setup
 
-`works init` nur auf Wunsch des Nutzers. Vorher klären, wie `.works/` mit Git umgehen soll:
+Run `works init` only when the user asks for it. Settle first how `.works/` should be handled in Git:
 
-| Option | Wirkung |
+| Option | Effect |
 |---|---|
-| `--gitignore default` | Alles wird committet außer `board.html`, `state.json` und der Inbox. Empfohlen für Einzelprojekte und Team-Transparenz |
-| `--gitignore assets` | Zusätzlich die `assets/` Ordner ignorieren. Sinnvoll bei vielen großen Screenshots |
-| `--gitignore all` | Der ganze Ordner bleibt lokal |
-| `--gitignore none` | Keine `.works/.gitignore` anlegen |
+| `--gitignore default` | Everything is committed except `board.html`, `state.json` and the inbox. Recommended for solo projects and team transparency |
+| `--gitignore assets` | Also ignore the `assets/` folders. Useful with many large screenshots |
+| `--gitignore all` | The whole folder stays local |
+| `--gitignore none` | Don't create a `.works/.gitignore` |
 
-Danach optional Meilensteine (`works milestone add M1 --title "Beta" --due 2026-12-01`) und den Git pre-commit Hook (`works install-hooks --git`, siehe hooks.md). Bei der Plugin-Installation sind die Claude Code Hooks bereits aktiv.
+Then optionally milestones (`works milestone add M1 --title "Beta" --due 2026-12-01`) and the Git pre-commit hook (`works install-hooks --git`, see hooks.md). With the plugin installation, the Claude Code hooks are already active.
 
-## Sessionbeginn
+## Session start
 
-1. Wenn der SessionStart Hook aktiv ist, steht die Übersicht bereits im Kontext. Sonst `works status` ausführen.
-2. Offene P1 dem Nutzer nennen, bevor mit etwas anderem begonnen wird.
-3. Gibt es eine aktive Aufgabe mit Übergabe, die Übergabe lesen und dem Nutzer in ein bis zwei Sätzen sagen, wo es weitergeht. Offene Fragen aus der Übergabe zuerst klären.
-4. Liegt etwas in der Inbox, den Nutzer fragen, zu welcher Aufgabe es gehört.
+1. If the SessionStart hook is active, the overview is already in the context. Otherwise run `works status`.
+2. Tell the user about open P1s before starting anything else.
+3. If there is an active task with a handoff, read the handoff and tell the user in one or two sentences where work continues. Settle open questions from the handoff first.
+4. If something is in the inbox, ask the user which task it belongs to.
 
-## Erfassen
+## Capturing
 
-### Schnellerfassung
+### Quick capture
 
-Auslöser: "notier dir das", "pack das auf die Liste", "das müssen wir später machen".
+Triggers: "note this down", "put that on the list", "we need to do that later".
 
 ```
-works new --type bug --title "Avatar wird bei Webhook-Nachrichten nicht angezeigt" --priority P3 --incomplete
+works new --type bug --title "Avatar not shown on webhook messages" --priority P3 --incomplete
 ```
 
-Typ und Priorität aus dem Gesagten ableiten, im Zweifel P3. Dem Nutzer ID und Annahmen in einem Satz nennen. Die eigentliche Arbeit nicht unterbrechen.
+Derive type and priority from what was said, P3 when in doubt. Tell the user the ID and your assumptions in one sentence. Don't interrupt the actual work.
 
-### Vollständige Erfassung
+### Full capture
 
-1. Typ, Priorität, Aufwand klären. Fehlt etwas Wesentliches, nachfragen.
+1. Settle type, priority and effort. If something essential is missing, ask.
 2. `works new --type feature --title "..." --priority P2 --effort M [--tags ui] [--due ...] [--milestone M1] [--blocked-by W-0003]`
-3. Die angelegte task.md mit Read öffnen und die Abschnitte per Edit füllen. Akzeptanzkriterien mit dem Nutzer abstimmen.
-4. Bei Oberflächen `--tags ui` setzen oder Typ `design` wählen. Dann gelten zusätzliche DoD-Prüfungen.
-5. Bei Bedarf `works decisions <ID>` für eine decisions.md.
+3. Open the new task.md with Read and fill in the sections with Edit. Agree on the acceptance criteria with the user.
+4. For user interfaces, set `--tags ui` or choose type `design`. Additional DoD checks apply then.
+5. If needed, `works decisions <ID>` for a decisions.md.
 
-### Aus Fehlermeldung oder Stacktrace
+### From an error message or stack trace
 
-1. Log in eine Datei im Scratchpad schreiben.
-2. `works new --type bug --title "<Kernaussage des Fehlers>" --priority <nach Auswirkung> --source stacktrace --log-file <pfad>`
-3. Zusammenfassung, Umgebung und, soweit bekannt, Reproduktion ergänzen. Ursache erst nach Analyse.
+1. Write the log to a file in the scratchpad.
+2. `works new --type bug --title "<gist of the error>" --priority <by impact> --source stacktrace --log-file <path>`
+3. Add summary, environment and, as far as known, reproduction. Root cause only after analysis.
 
-### Aus TODO-Kommentaren
+### From TODO comments
 
 ```
-works scan                       # zeigt alle Marker, neu oder bekannt
+works scan                       # shows all markers, new or known
 works scan --create --marker FIXME,HACK
 ```
 
-FIXME und XXX werden Bugs mit P2, HACK wird technische Schuld mit P3, TODO wird Chore mit P3. Alle sind `incomplete` und tragen den Tag `code-scan`. Dem Nutzer vorher die Liste zeigen und fragen, welche übernommen werden sollen. Ein erneuter Scan erkennt bereits übernommene Marker.
+FIXME and XXX become bugs with P2, HACK becomes tech debt with P3, TODO becomes a chore with P3. All of them are `incomplete` and carry the tag `code-scan`. Show the user the list first and ask which ones to take over. A repeated scan recognizes markers that were already taken over.
 
-### Aus GitHub Issues
+### From GitHub issues
 
 ```
 works gh-import --dry-run
 works gh-import --state open --limit 50
 ```
 
-Benötigt die `gh` CLI mit Anmeldung. Labels werden über `config.json` auf Typ und Priorität abgebildet. Bereits importierte Issues werden übersprungen. In die andere Richtung legt `works gh-export <ID>` ein Issue an; das ist eine Veröffentlichung und braucht vorher die ausdrückliche Zustimmung des Nutzers.
+Needs the `gh` CLI, signed in. Labels are mapped to type and priority via `config.json`. Issues that were already imported are skipped. In the other direction, `works gh-export <ID>` creates an issue; that is a publication and needs the user's explicit consent first.
 
-### Ideen
+### Ideas
 
 ```
-works idea "Leaderboard mit Wochenranking" --tags dashboard
+works idea "Leaderboard with weekly ranking" --tags dashboard
 works ideas
 works promote I-001 --type feature --priority P3
 ```
 
-Ideen sind bewusst unverbindlich. Übernommene Ideen werden in `ideas.md` durchgestrichen und verweisen auf die neue Aufgabe.
+Ideas are deliberately non-binding. Promoted ideas are struck through in `ideas.md` and point to the new task.
 
-## Planen
+## Planning
 
-- Reihenfolge: `works link W-0005 blocked-by W-0003`. Zyklen werden abgelehnt.
-- Verwandtschaft ohne Reihenfolge: `works link W-0005 related W-0007`.
-- Meilensteine: `works milestone add M2 --title "Release 1.0" --due 2027-01-15`, Zuordnung mit `works set <ID> milestone=M2`, Fortschritt in WORKS.md und `works milestone list`.
-- Fristen: `works set <ID> due=2026-11-15`. Überfällige Aufgaben erscheinen in WORKS.md, im Board und im Bericht.
-- Große Aufgaben (XL) dem Nutzer zum Aufteilen vorschlagen.
-- Empfehlung: `works next` und die Begründung wiedergeben.
+- Order: `works link W-0005 blocked-by W-0003`. Cycles are rejected.
+- Related without order: `works link W-0005 related W-0007`.
+- Milestones: `works milestone add M2 --title "Release 1.0" --due 2027-01-15`, assign with `works set <ID> milestone=M2`, progress in WORKS.md and `works milestone list`.
+- Deadlines: `works set <ID> due=2026-11-15`. Overdue tasks show up in WORKS.md, in the board and in the report.
+- Suggest that the user split large tasks (XL).
+- Recommendation: run `works next` and pass on its reasoning.
 
-## Arbeiten
+## Working
 
-1. `works start <ID>`. Gibt Kontext, Akzeptanzkriterien, Übergabe und Asset-Beschreibungen aus und setzt die Aufgabe als aktiv. Blockierte Aufgaben starten nur mit `--force` nach Rücksprache.
-2. Branch: Die Ausgabe enthält einen Branchnamen nach dem Schema `<präfix>/<id>-<slug>`. Ist der git-workflow Skill verfügbar, diesen Namen dort verwenden. Sonst `works start <ID> --git`.
-3. Bei UI-Aufgaben vor der ersten Änderung den Ist-Zustand festhalten (assets.md).
-4. Während der Umsetzung Häkchen im Umsetzungsplan und bei den Akzeptanzkriterien setzen. Wichtige Erkenntnisse oder Richtungswechsel mit `works log <ID> "..."` dokumentieren.
-5. Neue Erkenntnisse, die eine eigene Aufgabe sind, sofort mit `works new` erfassen statt den Umfang still zu erweitern.
-6. Entscheidungen mit Alternativen in `decisions.md` festhalten, nicht nur im Chat.
-7. Fragen an den Nutzer, die nicht sofort beantwortet werden, mit `works question` speichern.
-8. Zur Prüfung durch den Nutzer: `works set <ID> status=review`.
+1. `works start <ID>`. Prints context, acceptance criteria, handoff and asset descriptions and sets the task as active. Blocked tasks only start with `--force` after checking with the user.
+2. Branch: the output contains a branch name following the pattern `<prefix>/<id>-<slug>`. If the git-workflow skill is available, use this name there. Otherwise `works start <ID> --git`.
+3. For UI tasks, capture the current state before the first change (assets.md).
+4. While implementing, check off items in the implementation plan and the acceptance criteria. Record important findings or changes of direction with `works log <ID> "..."`.
+5. New findings that are a task of their own go in right away with `works new` instead of silently growing the scope.
+6. Record decisions with alternatives in `decisions.md`, not only in the chat.
+7. Save questions for the user that aren't answered right away with `works question`.
+8. For review by the user: `works set <ID> status=review`.
 
-Nur eine Aufgabe gleichzeitig in Arbeit halten. Wechselt der Nutzer zu einer anderen Aufgabe, zuerst eine Übergabe für die bisherige schreiben.
+Keep only one task in progress at a time. If the user switches to another task, write a handoff for the previous one first.
 
-## Übergabe
+## Handoff
 
-Wann: am Ende jeder Arbeitsphase, vor einem Aufgabenwechsel, wenn der Nutzer Pause macht, wenn der Kontext absehbar knapp wird oder komprimiert werden könnte, und wenn der Stop Hook daran erinnert.
+When: at the end of every work phase, before switching tasks, when the user takes a break, when the context is foreseeably running low or could get compacted, and when the Stop hook reminds you.
 
 ```
 works handoff W-0012 --text "..."
 ```
 
-Die Übergabe ersetzt die vorherige und enthält:
+The handoff replaces the previous one and contains:
 
-- Erledigt: was seit der letzten Übergabe fertig wurde
-- Stand: wo genau weitergemacht wird (Datei, Funktion, nächster konkreter Schritt)
-- Offene Punkte und Annahmen: was vorläufig angenommen wurde und bestätigt werden muss
-- Hinweise: Fallstricke, laufende Prozesse, temporäre Änderungen, die zurückgenommen werden müssen
+- Done: what was finished since the last handoff
+- State: exactly where work continues (file, function, next concrete step)
+- Open points and assumptions: what was assumed for now and needs confirmation
+- Notes: pitfalls, running processes, temporary changes that need to be reverted
 
-Beispiel:
-
-```
-Erledigt: Formular auf zentriertes Layout umgebaut, Dark-Mode-Tokens angelegt.
-Stand: src/pages/login.tsx, Fehlerzustände fehlen noch. Nächster Schritt: Fehlermeldungen unter den Feldern statt als Toast.
-Annahmen: Passwort vergessen bleibt als Link, nicht als Button (mit Nutzer klären).
-Hinweise: In vite.config.ts ist der Proxy für Tests temporär auf Port 4000 gestellt.
-```
-
-## Abschließen
-
-1. `works done <ID>` prüft automatisch: Akzeptanzkriterien, offene Fragen, Umsetzungsschritte, bei Bugs die Ursache, bei Spikes Ergebnis und Empfehlung, bei Refactorings den Rollback, bei UI-Aufgaben Vorher und Nachher Screenshots sowie Einträge in decisions.md.
-2. Manuelle Punkte aus der Definition of Done wirklich ausführen: Tests oder Build starten (oder `works done <ID> --run`, wenn `dod.commands` gepflegt ist), code-audit Skill auf die Änderungen anwenden, bei UI den responsive-website-check.
-3. `works done <ID> --confirm`. Die Übergabe wird geleert, der Status gesetzt, freigewordene Aufgaben werden genannt.
-4. Hinweise aus der Ausgabe beachten, etwa die Übernahme ins Decision Log.
-5. Gelegentlich `works archive --older-than 14` und vor Releases `works changelog --version x.y.z --write`.
-
-Kann ein DoD-Punkt nicht erfüllt werden, den Nutzer fragen. Nur mit seiner Zustimmung `--force --reason "..."`; der Grund landet im Verlauf.
-
-## Verwerfen und Wiedereröffnen
+Example:
 
 ```
-works drop W-0008 --reason "Durch W-0003 abgedeckt"
-works reopen W-0002 --reason "Fehler tritt bei Neustart wieder auf" --status in-arbeit
+Done: rebuilt the form as a centered layout, created dark mode tokens.
+State: src/pages/login.tsx, error states are still missing. Next step: error messages below the fields instead of a toast.
+Assumptions: "Forgot password" stays a link, not a button (check with the user).
+Notes: in vite.config.ts the proxy is temporarily set to port 4000 for tests.
 ```
 
-Wiedereröffnen holt die Aufgabe aus dem Archiv zurück und zählt `reopened` hoch.
+## Finishing
 
-## Auswertung
+1. `works done <ID>` checks automatically: acceptance criteria, open questions, implementation steps, the root cause for bugs, results and recommendation for spikes, the rollback for refactorings, before and after screenshots plus entries in decisions.md for UI tasks.
+2. Actually carry out the manual items from the definition of done: run tests or the build (or `works done <ID> --run` if `dod.commands` is maintained), apply the code-audit skill to the changes, and responsive-website-check for UI.
+3. `works done <ID> --confirm`. The handoff is cleared, the status set, and tasks that are now unblocked are listed.
+4. Follow the notes in the output, for example taking entries over into the decision log.
+5. Now and then `works archive --older-than 14`, and before releases `works changelog --version x.y.z --write`.
 
-- `works report --days 7 [--write]`: Wochenbericht mit Erledigtem, Neuem, Blockiertem, Überfälligem und Meilensteinen
-- `works changelog [--since 2026-10-01] [--milestone M1] [--version 1.2.0] [--write]`: gruppiert nach Neu, Behoben, Verbessert, Sonstiges
-- `works commits <ID> [--write]`: alle Commits mit der ID
-- `works board --serve`: Live-Kanban im Browser, siehe board.md
-- `works doctor [--fix]`: Konsistenzprüfung, danach Warnungen mit dem Nutzer durchgehen
+If a DoD item can't be met, ask the user. Only with their consent use `--force --reason "..."`; the reason goes into the history.
+
+## Dropping and reopening
+
+```
+works drop W-0008 --reason "Covered by W-0003"
+works reopen W-0002 --reason "Error comes back after a restart" --status in-progress
+```
+
+Reopening brings the task back from the archive and increments `reopened`.
+
+## Reporting
+
+- `works report --days 7 [--write]`: weekly report with what was done, new, blocked, overdue, and milestones
+- `works changelog [--since 2026-10-01] [--milestone M1] [--version 1.2.0] [--write]`: grouped into new, fixed, improved, other
+- `works commits <ID> [--write]`: all commits with the ID
+- `works board --serve`: live Kanban in the browser, see board.md
+- `works doctor [--fix]`: consistency check, then go through the warnings with the user

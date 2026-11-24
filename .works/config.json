@@ -4,7 +4,6 @@
   "id_digits": 4,
   "next_id": 52,
   "next_idea_id": 2,
-  "language": "de",
   "milestones": [],
   "dod": {
     "global": [
@@ -136,6 +135,8 @@
     "ask_before": true
   },
   "migrations": [
-    "sections-1"
-  ]
+    "sections-1",
+    "language-1"
+  ],
+  "language_removed": "de"
 }
