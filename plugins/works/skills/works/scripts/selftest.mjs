@@ -1980,6 +1980,80 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       }
     });
 
+    await step('Discord: Dialog mit Schalter Befehle und Knöpfe und Kanal je Projekt (W-0046)', async () => {
+      const br = await launchChromium(log);
+      if (!br) return;
+      const { url, call } = await boardFor();
+      const cfgFile = path.join(ddir, 'config.json'); const secFile = path.join(ddir, 'secret.json');
+      let rid = '';
+      try {
+        await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+        if (!(await call('GET', '/api/discord')).ready) { await call('POST', '/api/discord', { op: 'token', token: DTOKEN }); await call('POST', '/api/discord', { op: 'move', channel_id: '11' }); }
+        // Freigabe klingelt (ohne Ruhezeit, mit @), damit die Handy-Vorschau den Kanal nennt.
+        const s0 = await call('POST', '/api/discord', { op: 'set', values: { 'quiet.on': 'aus', 'event.perm.on': 'an', 'event.perm.at': 'an', commands: 'an' } });
+        rid = s0.projects.find((x) => x.here).rid;
+        await call('POST', '/api/discord', { op: 'set', values: { [`project.${rid}.channel`]: '' } });
+        const p = await br.newPage({ viewport: { width: 1280, height: 900 } });
+        const errs = [];
+        p.on('pageerror', (e) => errs.push(e.message));
+        const open = async () => {
+          await p.goto(url + '/'); await p.waitForSelector('#btnTools');
+          await p.click('#btnTools'); await p.waitForSelector('#btnDiscord');
+          await p.click('#btnDiscord'); await p.waitForSelector('dialog[open] .dc');
+        };
+        const lockHas = (re) => p.waitForFunction((src) => new RegExp(src).test(document.querySelector('dialog[open] #dcLock').textContent), re, { timeout: 10000 });
+        // Nebensache aus dem Audit von W-0038: Nach dem Verschieben nennt die Handy-Vorschau den neuen Kanal.
+        await open();
+        await lockHas('#works');
+        await p.waitForSelector('dialog[open] input[name="dcch"][value="15"]');
+        await p.check('dialog[open] input[name="dcch"][value="15"]');
+        await p.click('dialog[open] #dcMove');
+        await lockHas('#dev');
+        await call('POST', '/api/discord', { op: 'move', channel_id: '11' });
+        // Reiter Befehle: Schalter an, aus macht die Vorschau ohne Knöpfe, Speichern schreibt commands.
+        await open();
+        await p.click('dialog[open] [data-dc-tab="befehle"]');
+        has(await p.textContent('dialog[open] .dc-main'), 'Befehle und Knöpfe erlauben', 'Schalter');
+        const sw = p.locator('dialog[open] [data-k="commands"]');
+        expect(await sw.isChecked(), 'Schalter nicht an');
+        await p.selectOption('dialog[open] #dcPv', 'dashboard');
+        await p.waitForSelector('dialog[open] #dcPvBox .dc-btns');
+        await sw.setChecked(false, { force: true });
+        await p.waitForFunction(() => { const b = document.querySelector('dialog[open] #dcPvBox'); return b.querySelector('.dc-emb') && !b.querySelector('.dc-btns'); });
+        await p.click('dialog[open] button[value="save"]');
+        await dwait(() => dcfg().commands === false, 'Schalter gespeichert', 10000);
+        // Reiter Projekte: Kanal je Projekt aus der Liste vom Bot, ohne Schreibrecht nicht wählbar.
+        await p.click('dialog[open] [data-dc-tab="projekte"]');
+        const sel = `dialog[open] select[data-k="project.${rid}.channel"]`;
+        await p.waitForSelector(`${sel} option[value="15"]`, { state: 'attached' });
+        expect(await p.isDisabled(`${sel} option[value="16"]`), '#regeln wählbar');
+        await p.selectOption(sel, '15');
+        await p.selectOption('dialog[open] #dcPv', 'perm');
+        await lockHas('#dev');
+        await p.click('dialog[open] button[value="save"]');
+        await dwait(() => (dcfg().projects[rid] || {}).channel_name === 'dev', 'Kanal je Projekt gespeichert', 10000);
+        // Handy: nichts ragt heraus.
+        await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(200);
+        const over = await p.evaluate(() => { const d = document.querySelector('dialog[open]'); return d.scrollWidth - d.clientWidth; });
+        expect(over <= 1, `Dialog auf 390 px ${over} px zu breit`);
+        await p.setViewportSize({ width: 1280, height: 900 });
+        // Gemeinsamer Bot: Kanalwahl je Projekt gesperrt, mit Hinweis.
+        const keep = [fs.readFileSync(cfgFile, 'utf8'), fs.readFileSync(secFile, 'utf8')];
+        try {
+          fs.writeFileSync(cfgFile, JSON.stringify({ ...JSON.parse(keep[0]), mode: 'shared' }));
+          fs.writeFileSync(secFile, JSON.stringify({ key: 'wk_selbsttest' }));
+          await open();
+          await p.click('dialog[open] [data-dc-tab="projekte"]');
+          expect(await p.isDisabled(sel), 'Kanalwahl je Projekt beim gemeinsamen Bot offen');
+          has(await p.textContent('dialog[open] .dc-main'), 'eigenem Bot', 'Hinweis beim gemeinsamen Bot');
+        } finally { fs.writeFileSync(cfgFile, keep[0]); fs.writeFileSync(secFile, keep[1]); }
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        if (rid) await call('POST', '/api/discord', { op: 'set', values: { commands: 'an', [`project.${rid}.channel`]: '' } }).catch(() => {});
+        w(['board', '--stop'], { ok: false });
+      }
+    });
   }
   await wa(['discord', 'stop'], { extraEnv: denv, ok: false }).catch(() => {});
   await fake.close();

@@ -1378,6 +1378,8 @@ dialog:has(.dc) form { padding: 0; gap: 0; }
 .dc-tbl th { text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); padding: 6px 8px; }
 .dc-tbl td { padding: 8px; border-top: 1px solid var(--line); vertical-align: middle; }
 .dc-tbl td small { display: block; color: var(--muted); font-size: 12px; }
+.dc-tbl select.input { height: 30px; min-width: 120px; padding: 0 6px; font-size: 13px; }
+.dc-tbl select.input:disabled { opacity: .7; cursor: default; }
 /* Ereignisse */
 .dc-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text-2); }
 .dc-legend > span { display: inline-flex; align-items: center; gap: 6px; }
@@ -1406,6 +1408,7 @@ dialog:has(.dc) form { padding: 0; gap: 0; }
 .dc-cmdl div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; padding: 9px 12px; border-top: 1px solid var(--line); font-size: 13px; }
 .dc-cmdl div:first-child { border-top: 0; }
 .dc-cmdl code { font-size: 12.5px; }
+.dc-main:has([data-k="commands"]:not(:checked)) .dc-cmdl { opacity: .55; }
 /* Vorschau: Discord-ähnlich, hell und dunkel */
 .dc-pv { --dc-bg: #ffffff; --dc-fg: #313338; --dc-emb: #f2f3f5; --dc-btn: #e3e5e8; --dc-men: #e6e8fd; --dc-menfg: #4752c4; border-radius: 10px; padding: 12px; background: var(--dc-bg); color: var(--dc-fg); font: 14px/1.375 "gg sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif; border: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
 :root[data-theme="dark"] .dc-pv { --dc-bg: #313338; --dc-fg: #dbdee1; --dc-emb: #2b2d31; --dc-btn: #4e5058; --dc-men: #3c4270; --dc-menfg: #c9cdfb; border-color: #3f4147; }
