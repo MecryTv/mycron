@@ -37,7 +37,7 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 ## Akzeptanzkriterien
 - [ ] Nachrichten außer Dashboard und wartenden verschwinden nach etwa 10 s
 - [ ] Wartende Nachrichten bleiben bis zur Erledigung und verschwinden etwa 10 s danach
-- [ ] Knopf Verlauf im Dashboard und /works verlauf zeigen die letzten Nachrichten nur dem Aufrufer, nach Projekt filterbar
+- [ ] Knopf Verlauf im Discord-Panel (der angehefteten Dashboard-Nachricht nach D3, neben Warteschlange, Anweisung an Claude, Neue Aufgabe, Hilfe) und /works verlauf zeigen die letzten Nachrichten nur dem Aufrufer, nach Projekt filterbar
 - [ ] Der Verlauf übersteht einen Neustart des Bots und ist begrenzt (Anzahl oder Alter)
 - [ ] Frist einstellbar in Sekunden (Dialog im Board, works discord set), Standard 10 s
 - [ ] Geht beim eigenen und beim gemeinsamen Bot, Tests ohne echtes Discord, auch ohne WebSocket
@@ -64,3 +64,4 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
 - 2026-11-24: Beziehung: blocked-by W-0041
+- 2026-11-24: Nutzer am 2026-11-24: Knopf Verlauf auch im Discord-Panel (Dashboard-Nachricht in Discord)
