@@ -43,7 +43,12 @@ Wunsch des Nutzers am 2026-11-24, Verhalten von ihm bestätigt (Skizze: Projekt 
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] 
+- [ ] Bestand lesen: Board-Start in works.mjs (cmdBoard --serve), server-control.mjs, Hub in hub.mjs (Seite /hub, hubAction start/stop/restart, Tab-Zählung /tabs, Wechsel zum Hub aus W-0025/W-0032), Sitzungsstart-Hook und works start
+- [ ] Test zuerst (Selbsttest, feste Ports ab 48200): Board A läuft; works board --serve in Projekt B startet keinen Server für B und nennt die Hub-Adresse von A; Hub listet A (läuft) und B (gestoppt); Öffnen bei B startet B auf einem freien Port und liefert dessen Adresse; Öffnen bei A ohne zweiten Server
+- [ ] Start eines Boards: läuft schon ein Board eines anderen Projekts, keinen Server starten, Hub-Adresse ausgeben, mit --open den Hub zeigen (offener works-Tab wechselt zum Hub, sonst neuer Tab mit dem Hub); gilt für works board --serve, works start und den Sitzungsstart
+- [ ] Hub: laufende und gestoppte Projekte (nur Ordner mit .works), Öffnen startet ein gestopptes über hubAction start (freier Port, zuletzt genutzter bevorzugt) und leitet dorthin weiter
+- [ ] Verhalten aus W-0032 (Hub nur bei mindestens zwei laufenden Boards, springt bei einem zurück) an die Antwort des Nutzers anpassen
+- [ ] Doku (board.md, cli.md, hooks.md in beiden Sprachen), Selbsttest in beiden Sprachen grün
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->

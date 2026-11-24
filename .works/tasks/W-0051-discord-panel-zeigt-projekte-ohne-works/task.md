@@ -30,11 +30,21 @@ Gemeldet vom Nutzer am 2026-11-24 mit Bild seines echten Kanals: Das Panel (Dash
 
 ## Reproduktion
 <!-- Nummerierte Schritte, die den Fehler zuverlässig auslösen. Häufigkeit angeben (immer, manchmal, einmalig). -->
-1. 
+1. Bot läuft, ein Projekt (etwa ein Testprojekt) wird angelegt und steht in ~/.works/projects.json.
+2. Der Bot nimmt es ins Panel auf.
+3. Den Ordner des Projekts löschen (oder nur .works darin).
+4. Das Projekt bleibt im Panel, im Status des Bots und in /works status stehen. Immer.
 
 ## Erwartetes Verhalten
+Projekte ohne .works/config.json fallen heraus; ein nur kurz unlesbares Projekt (Branch-Wechsel) bleibt.
 
 ## Tatsächliches Verhalten
+Der Bot behält den letzten Stand aus state.json für immer.
+
+## Plan
+- Test zuerst (Selbsttest, eigener Schritt): Projekt im Test-Home anlegen, Bot nimmt es auf; Ordner löschen → nach einer kurzen Gnadenfrist weg aus Panel, Status und /works status und aus state.json; aus projects.json entfernen → ebenso; kurz unlesbar (Snapshot-Fehler) → bleibt.
+- Bot (discord-bot.mjs): je Durchgang die angemeldeten Projekte mit vorhandenem .works/config.json bestimmen; fehlt eines länger als die Gnadenfrist (normal 60 s, im Testtakt kurz), state.projects-Eintrag samt Dashboard-Zeile löschen; liveProjects und alle Anzeigen nutzen nur vorhandene.
+- Prüfen: works hub/projectList zeigen fehlende Ordner schon heute nicht; gleiche Regel teilen statt doppelt schreiben.
 
 ## Umgebung
 <!-- Version, Branch, Betriebssystem, Browser, Node-Version, Konfiguration. -->

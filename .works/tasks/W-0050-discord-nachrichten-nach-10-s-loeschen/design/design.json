@@ -1,0 +1,34 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "V1",
+      "title": "Liste, neueste zuerst",
+      "file": "V1-liste-neueste-zuerst.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "",
+      "at": "2026-11-24 20:45"
+    },
+    {
+      "name": "V2",
+      "title": "Nach Tagen, Eintrag aufklappen",
+      "file": "V2-nach-tagen-eintrag-aufklappen.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "",
+      "at": "2026-11-24 20:45"
+    },
+    {
+      "name": "V3",
+      "title": "Filter nach Art",
+      "file": "V3-filter-nach-art.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "",
+      "at": "2026-11-24 20:45"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": null
+}

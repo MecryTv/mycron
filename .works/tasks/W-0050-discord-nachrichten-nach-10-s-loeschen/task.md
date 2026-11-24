@@ -65,3 +65,6 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 - 2026-11-24: Aufgabe angelegt
 - 2026-11-24: Beziehung: blocked-by W-0041
 - 2026-11-24: Nutzer am 2026-11-24: Knopf Verlauf auch im Discord-Panel (Dashboard-Nachricht in Discord)
+- 2026-11-24: Entwurf V1 „Liste, neueste zuerst“ angehängt
+- 2026-11-24: Entwurf V2 „Nach Tagen, Eintrag aufklappen“ angehängt
+- 2026-11-24: Entwurf V3 „Filter nach Art“ angehängt
