@@ -35,11 +35,12 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Nachrichten außer Dashboard und wartenden verschwinden nach etwa 10 s
-- [ ] Wartende Nachrichten bleiben bis zur Erledigung und verschwinden etwa 10 s danach
+- [ ] Je Aufgabe genau eine Nachricht (Karte nach Entwurf I3, verbessert), die bei jedem Schritt bearbeitet wird: Start, Frage, Freigabe, fertig und wartet, Review, zurückgegeben, erledigt, Auslieferung (Wunsch des Nutzers vom 2026-11-24, ersetzt „nach 10 s löschen“)
+- [ ] Braucht die Karte den Nutzer (Freigabe, Frage, Review, fertig und wartet), kommt sie als neue Nachricht nach unten, damit Discord benachrichtigt; die alte Fassung wird gelöscht
+- [ ] Karten bleiben, solange die Aufgabe offen ist, und verschwinden nach der Frist ab Erledigung; Nachrichten ohne Aufgabe nach der Frist ab Senden
 - [ ] Knopf Verlauf im Discord-Panel (der angehefteten Dashboard-Nachricht nach D3, neben Warteschlange, Anweisung an Claude, Neue Aufgabe, Hilfe) und /works verlauf zeigen die letzten Nachrichten nur dem Aufrufer, nach Projekt filterbar
 - [ ] Der Verlauf übersteht einen Neustart des Bots und ist begrenzt (Anzahl oder Alter)
-- [ ] Frist einstellbar in Sekunden (Dialog im Board, works discord set), Standard 10 s
+- [ ] Frist einstellbar in Sekunden (Dialog im Board, works discord set), Standard 1 Std. (3600 s)
 - [ ] Geht beim eigenen und beim gemeinsamen Bot, Tests ohne echtes Discord, auch ohne WebSocket
 - [ ] Panel-Text nach Entwurf P2: Zusammenfassung oben (wartet, arbeitet, heute erledigt, Kosten), Zeile je Projekt mit Ampel, Zustand und Aufgabe, darunter Als Nächstes
 - [ ] Panel-Bild nach P2: Fortschritt mit Ampel und Aufgabe je Balken, letzte 24 Stunden je Projekt als Spur (ein Punkt je Nachricht in der Farbe ihrer Art), Woche mit heute hervorgehoben
@@ -47,7 +48,9 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] Frist in Sekunden: cleanup.seconds (Standard 10, 0 nie) statt cleanup.hours in discord.mjs (DEFAULTS, normalizeConfig, works discord set, Liste der Schlüssel), Bot cleanup() und prune(), Board-Dialog (Feld in Sekunden), Tests zuerst
+- [ ] Frist in Sekunden: cleanup.seconds (Standard 3600, 0 nie) statt cleanup.hours in discord.mjs (DEFAULTS, normalizeConfig, works discord set, Liste der Schlüssel), Bot cleanup() und prune(), Board-Dialog (Feld in Sekunden), Tests zuerst
+- [ ] Karte je Aufgabe: Ereignisse mit Aufgaben-ID (neues Ereignis start beim Wechsel auf in Arbeit, perm, idle mit Aufgabe, question, review, returned, done, ship, p1) laufen in upsert() in eine Karte card:<rid>:<id> mit Einträgen je ursprünglichem Schlüssel; Zustand aus dem jüngsten offenen Eintrag; neue wartende Einträge senden die Karte neu (alte löschen, Erwähnung wie bisher je Ereignis); Knöpfe Annehmen und Zurückgeben im Review wie bisher
+- [ ] Kartenbild nach I3 verbessert (Entwurf I4 in design/): Status-Quadrat links, Zeitachse der Aufgabe rechts, Bild nur bei Ereignissen neu, Minuten im Footer
 - [ ] Verlauf speichern: jede gesendete oder bearbeitete Nachricht als Eintrag (Schlüssel, Projekt, Art, Zeit, Ereignis) in state.history, neueste Fassung je Schlüssel, höchstens 7 Tage und 300 Einträge, übersteht Neustart
 - [ ] Verlauf zeigen: Knopf Verlauf (w:hist) im Dashboard und /works verlauf (history) mit Option project, nur für den Aufrufer; Liste mit Symbol je Art, Projekt, Text, relativer Zeit; Auswahl „Eintrag ansehen“ holt die Nachricht mit allen Feldern; Auswahl Projekt und Zeitraum (24 Std., 3 Tage, 7 Tage), Knopf Ältere; custom_ids passen zu CID_RE (Dienst des gemeinsamen Bots)
 - [ ] Panel-Text nach P2: Zusammenfassung oben, Zeile je Projekt mit Ampel, Zustand, Werkzeug bei Freigabe und Aufgabe, Feld Als Nächstes; Kosten in der Zusammenfassung nur mit privacy.costs
@@ -93,3 +96,4 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 - 2026-11-24: Entwurf I1 „Karte mit Vorschaubild“ angehängt
 - 2026-11-24: Entwurf I2 „Karte mit Phasenstreifen“ angehängt
 - 2026-11-24: Entwurf I3 „Karte mit Zeitachse“ angehängt
+- 2026-11-24: Entwurf I3 „Karte mit Zeitachse“ gewählt. Grund: Nutzer am 2026-11-24: „L3 verbessert“, gemeint ist I3 (Karte mit Zeitachse) in verbesserter Fassung: auf dem Handy lesbar, Bild nur bei Ereignissen neu
