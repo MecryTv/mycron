@@ -72,3 +72,6 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 - 2026-11-24: Entwurf B1 „Zeitstrahl als Bild“ angehängt
 - 2026-11-24: Entwurf B2 „Karten wie im Kanal“ angehängt
 - 2026-11-24: Entwurf B3 „Tagesbild und Liste“ angehängt
+- 2026-11-24: Nutzer am 2026-11-24 (mit Bild seines Panels): Das Bild im Panel soll bleiben, aber verbessert oder weiterentwickelt werden, ebenso der Text oben im Panel. Entwürfe darauf aufbauen statt das Panel zu ersetzen.
+- 2026-11-24: Entwurf P1 „Panel im Feinschliff“ angehängt
+- 2026-11-24: Entwurf P2 „Panel weiterentwickelt mit 24-Stunden-Spuren“ angehängt

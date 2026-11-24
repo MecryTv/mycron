@@ -54,6 +54,24 @@
       "source": "ui-ux-pro-max",
       "note": "Säulen je Stunde nach Art, Liste nach Tagen, tageweise blättern",
       "at": "2026-11-24 20:50"
+    },
+    {
+      "name": "P1",
+      "title": "Panel im Feinschliff",
+      "file": "P1-panel-im-feinschliff.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Bisheriges Panel mit klarerem Text (Zusammenfassung, Aufgabe je Projekt, Kosten als Summe) und verbessertem Bild (Ampel je Projekt, Aufgabe am Balken, heute hervorgehoben), Knopf Verlauf",
+      "at": "2026-11-24 20:56"
+    },
+    {
+      "name": "P2",
+      "title": "Panel weiterentwickelt mit 24-Stunden-Spuren",
+      "file": "P2-panel-weiterentwickelt-mit-24.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Wie P1, Bild zusätzlich mit den letzten 24 Stunden je Projekt als Spur; Text knapper; Verlauf-Ansicht nach dem Klick",
+      "at": "2026-11-24 20:56"
     }
   ],
   "brainstorm": [],
