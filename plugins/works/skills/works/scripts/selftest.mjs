@@ -1616,10 +1616,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(fake.inChannel('11').filter((m) => isDash(m.embeds[0])).length === dashCount, 'Dashboard doppelt');
       expect(!fake.inChannel('11').some((m) => / · Stand$/.test(((m.embeds[0] || {}).author || {}).name || '')), 'alter Statuspost steht noch');
       const comps = d.m.components.flatMap((r) => r.components);
-      const sel = comps.find((c) => c.type === 3);
-      expect(sel && sel.custom_id === 'w:proj::' && sel.options.some((o) => o.label === 'projekt'), `Auswahlmenü fehlt: ${JSON.stringify(comps).slice(0, 300)}`);
-      for (const id of ['w:queue::', 'w:ins::', 'w:new::', 'w:help::']) expect(comps.some((c) => c.custom_id === id), `Knopf ${id} fehlt`);
+      // Ohne Gateway (Node unter 22) kämen Klicks nicht an: dann keine Knöpfe, alles andere wie sonst (W-0045).
+      if (!hasWs) expect(!comps.length, `Knöpfe ohne Gateway: ${JSON.stringify(comps).slice(0, 200)}`);
       if (hasWs) {
+        const sel = comps.find((c) => c.type === 3);
+        expect(sel && sel.custom_id === 'w:proj::' && sel.options.some((o) => o.label === 'projekt'), `Auswahlmenü fehlt: ${JSON.stringify(comps).slice(0, 300)}`);
+        for (const id of ['w:queue::', 'w:ins::', 'w:new::', 'w:help::']) expect(comps.some((c) => c.custom_id === id), `Knopf ${id} fehlt`);
         const send = async (opts, what) => {
           for (let n = 1; ; n++) {
             const id = fake.interact(opts);

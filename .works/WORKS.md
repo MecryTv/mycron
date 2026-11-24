@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-24 14:57 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-24 15:06 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 0 | 0 | 0 | 0 | 42 | 0 |
+| 2 | 0 | 1 | 0 | 0 | 0 | 42 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 2 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 3 · P3 Mittel: 0 · P4 Niedrig: 0
+
+## Aktive Aufgabe
+
+[W-0045](tasks/W-0045-ci-rot-works-selbsttest-schritt/task.md) CI rot: works Selbsttest, Schritt Selbsttest (In Arbeit), letzte Übergabe 2026-11-24 15:06
 
 ## Kritisch (P1)
 
@@ -16,7 +20,9 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0045](tasks/W-0045-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest | Bug | P2 Hoch | In Arbeit |  |  |  |  |
 
 ## Geplant und Backlog
 
