@@ -2098,6 +2098,68 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  // W-0041: Nachrichten im Kanal in der globalen Sprache, bei jedem Aufbau frisch (works lang wirkt ohne Neustart);
+  // Antworten auf Befehle in der Sprache des Clients, auch Meldungen der Board-API. Weitere Sprachen über useCatalog.
+  await step('Sprache: Discord global und je Client', async () => {
+    const botM = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
+    const uiM = await import(pathToFileURL(path.join(HERE, 'discord-ui.mjs')).href);
+    const { catalog } = await import(pathToFileURL(path.join(HERE, 'i18n.mjs')).href);
+    const cfg = botM.normalizeConfig({ quiet: { on: false } });
+    const snap = { name: 'projekt', tasks: {}, perm: { since: new Date().toISOString(), tool: 'Bash' }, perms: [], busy: true, active: { id: 'W-9', title: 'Probe' }, today: { done: 1 }, progress: { done: 1, wip: 1, total: 3 } };
+    const list = [{ rid: 'r1', snap }];
+    const perm = { type: 'perm', project: 'projekt', id: 'W-9', tool: 'Bash' };
+    const langBefore2 = process.env.WORKS_LANG;
+    try {
+      process.env.WORKS_LANG = 'en';
+      let d = botM.renderDashboard(list, cfg, { interactive: true });
+      expect(d.embeds[0].title === 'works · 1 project' && d.embeds[0].fields[0].name === 'Today' && d.components[1].components[0].label === 'Queue', `Dashboard global englisch: ${JSON.stringify(d).slice(0, 300)}`);
+      let ev = botM.renderEvent(perm, cfg, { owner: '1' });
+      expect(ev.embeds[0].title === 'Waiting for your approval' && ev.content.includes('projekt is waiting for your approval'), `Hinweis global englisch: ${JSON.stringify(ev).slice(0, 300)}`);
+      expect(botM.dashImageData(list).labels.progress === 'PROGRESS', 'Bild global englisch');
+      // Ohne Neustart: dieselben Module, andere Einstellung.
+      process.env.WORKS_LANG = 'de';
+      d = botM.renderDashboard(list, cfg, { interactive: true });
+      expect(d.embeds[0].title === 'works · 1 Projekt' && d.embeds[0].fields[0].name === 'Heute' && d.components[1].components[0].label === 'Warteschlange', `Dashboard global deutsch: ${JSON.stringify(d).slice(0, 300)}`);
+      ev = botM.renderEvent(perm, cfg, { owner: '1' });
+      expect(ev.embeds[0].title === 'Wartet auf deine Freigabe' && ev.content.includes('projekt wartet auf deine Freigabe'), `Hinweis global deutsch: ${JSON.stringify(ev).slice(0, 300)}`);
+      // Antworten bekommen die Sprache des Clients.
+      expect(botM.renderStatus(snap, cfg, { lang: 'en-US' }).embeds[0].author.name === 'projekt · Status', 'Statuspost für en-US nicht englisch');
+      // Weitere Sprache: Katalog von außen (der Dienst setzt keinen und bleibt bei Deutsch und Englisch).
+      uiM.useCatalog((l, en) => (l === 'xx' && en === 'Queue' ? 'Kø' : undefined));
+      expect(uiM.tr('xx-YY')('Warteschlange', 'Queue') === 'Kø' && uiM.tr('xx')('Hilfe', 'Help') === 'Help' && uiM.tr('de-AT')('Warteschlange', 'Queue') === 'Warteschlange', 'useCatalog wirkt nicht');
+    } finally {
+      uiM.useCatalog((l, en) => catalog(l)[en]);
+      if (langBefore2 === undefined) delete process.env.WORKS_LANG; else process.env.WORKS_LANG = langBefore2;
+    }
+    if (!hasWs) return; // Ohne Gateway kommen keine Befehle an.
+    await wa(['discord', 'start'], { extraEnv: denv, ok: false });
+    try {
+      const send = async (opts, what) => {
+        for (let n = 1; ; n++) {
+          const id = fake.interact(opts);
+          try { await dwait(() => fake.callbacks.get(id), `${what}: Eingang`, 5000); return id; } catch (e) { if (n >= 3) throw e; }
+        }
+      };
+      const ask = async (opts, what) => { const id = await send(opts, what); return dwait(() => fake.answerOf(id), what); };
+      const title = (a) => ((a.data.embeds || [])[0] || {}).title || '';
+      let a = await ask({ sub: 'status', locale: 'en-US' }, '/works status auf Englisch');
+      expect(/^works · \d+ projects?$/.test(title(a)), `Antwort für en-US: ${title(a)}`);
+      a = await ask({ sub: 'status', locale: 'de' }, '/works status auf Deutsch');
+      expect(/^works · \d+ Projekte?$/.test(title(a)), `Antwort für de: ${title(a)}`);
+      // Fehler aus der Board-API (api.mjs): Anweisung ohne Text.
+      const bad = (locale) => ({ sub: 'instruct', locale, options: [{ name: 'text', value: ' ' }, { name: 'task', value: 'W-0001' }, { name: 'project', value: 'projekt' }] });
+      a = await ask(bad('en-US'), 'Fehler auf Englisch');
+      expect(title(a) === 'That did not work' && JSON.stringify(a.data).includes('Instruction missing.'), `Fehler für en-US: ${JSON.stringify(a.data).slice(0, 300)}`);
+      a = await ask(bad('de'), 'Fehler auf Deutsch');
+      expect(title(a) === 'Ging nicht' && JSON.stringify(a.data).includes('Anweisung fehlt.'), `Fehler für de: ${JSON.stringify(a.data).slice(0, 300)}`);
+      // Der Kanal bleibt in der globalen Sprache, auch gleich nach einer englischen Antwort.
+      await ask(bad('en-US'), 'noch ein Fehler auf Englisch');
+      w(['discord', 'emit', 'ci', `--json=${JSON.stringify({ ok: false, sha: 'c0de0041aa', failed: 1, total: 2 })}`], { extraEnv: denv });
+      await dwait(() => findMsg((e) => e.title === 'CI rot für c0de004'), 'CI-Nachricht global deutsch');
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+    } finally { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); }
+  });
+
   if (browser) {
     await step('Discord: Dialog Discord-Bot im Browser mit Reitern, Vorschau, Kanalwahl und Einrichtung (W-0038)', async () => {
       const br = await launchChromium(log);

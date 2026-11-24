@@ -2899,124 +2899,124 @@ async function cmdDiscord() {
     if (!token && !key) {
       // Entwurf R (W-0040): zuerst die Wahl, der gemeinsame Bot ist empfohlen.
       const info = await d.serviceInfo(cfg);
-      out('Discord-Bot works: nicht eingerichtet. Zwei Wege:\n');
-      out('Gemeinsamer Bot (empfohlen, ohne Token):');
-      out(`  1. Bot einladen: ${info ? info.invite_url : '(der Dienst ist nicht erreichbar oder hat noch keine Adresse: works discord set service=https://…)'}`);
-      out('  2. In Discord im gewünschten Kanal: /works verbinden (braucht „Server verwalten“)');
-      out('  3. Code eintragen: works discord link <Code>');
-      out('  Die Nachrichten laufen dann über den works-Dienst. Er speichert keine Inhalte.\n');
-      out('Eigener Bot (nichts läuft über fremde Server):');
-      out('  1. Im Discord-Entwicklerportal eine Anwendung mit Bot anlegen: https://discord.com/developers/applications');
-      out('  2. Token eintragen: works discord token (fragt danach, oder Get-Clipboard | works discord token)');
-      out('  3. Bot mit dem Link aus Schritt 2 einladen, dann Kanal wählen: works discord channel');
+      out(tr('Discord bot works: not set up. Two ways:\n'));
+      out(tr('Shared bot (recommended, no token):'));
+      out(tr('  1. Invite the bot: {url}', { url: info ? info.invite_url : tr('(the service is not reachable or has no address yet: works discord set service=https://…)') }));
+      out(tr('  2. In Discord, in the channel you want: /works link (needs “Manage Server”)'));
+      out(tr('  3. Enter the code: works discord link <code>'));
+      out(tr('  Messages then go through the works service. It stores no content.\n'));
+      out(tr('Own bot (nothing goes through third-party servers):'));
+      out(tr('  1. Create an application with a bot in the Discord developer portal: https://discord.com/developers/applications'));
+      out(tr('  2. Enter the token: works discord token (asks for it, or Get-Clipboard | works discord token)'));
+      out(tr('  3. Invite the bot with the link from step 2, then pick a channel: works discord channel'));
       return;
     }
-    out(`Discord-Bot works: ${cfg.channel_id ? 'eingerichtet' : 'Token hinterlegt, Kanal fehlt'} (${shared ? 'Gemeinsamer Bot' : 'Eigener Bot'})`);
-    out(shared ? `Bot: ${cfg.bot_name || '?'} über ${(() => { try { return d.serviceBase(cfg); } catch { return '?'; } })()}, Geräteschlüssel ${d.maskToken(key)} (nur auf diesem Rechner)` : `Bot: ${cfg.bot_name || '?'}, Token ${d.maskToken(token)} (nur auf diesem Rechner)`);
-    if (!cfg.channel_id) { out(`Nächster Schritt: einladen mit ${d.inviteUrl(cfg.app_id)}\nDanach Kanal wählen: works discord channel`); return; }
-    out(`Kanal: #${cfg.channel_name} auf ${cfg.guild_name}`);
+    out(tr('Discord bot works: {state} ({mode})', { state: cfg.channel_id ? tr('set up') : tr('token stored, channel missing'), mode: shared ? tr('Shared bot') : tr('Own bot') }));
+    out(shared ? tr('Bot: {name} via {base}, device key {key} (only on this computer)', { name: cfg.bot_name || '?', base: (() => { try { return d.serviceBase(cfg); } catch { return '?'; } })(), key: d.maskToken(key) }) : tr('Bot: {name}, token {token} (only on this computer)', { name: cfg.bot_name || '?', token: d.maskToken(token) }));
+    if (!cfg.channel_id) { out(tr('Next step: invite with {url}\nThen pick a channel: works discord channel', { url: d.inviteUrl(cfg.app_id) })); return; }
+    out(tr('Channel: #{channel} on {guild}', { channel: cfg.channel_name, guild: cfg.guild_name }));
     const info = d.botInfo();
-    out(info ? `Prozess: läuft (PID ${info.pid}, seit ${new Date(info.started).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })})` : `Prozess: gestoppt${cfg.autostart === false ? ', Autostart aus' : ', startet mit dem Board'}`);
+    out(info ? tr('Process: running (PID {pid}, since {time})', { pid: info.pid, time: new Date(info.started).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) }) : cfg.autostart === false ? tr('Process: stopped, autostart off') : tr('Process: stopped, starts with the board'));
     const evs = Object.entries(cfg.events);
-    out(`Ereignisse: ${evs.filter(([, v]) => v.on).length} von ${evs.length} an, mit Erwähnung: ${evs.filter(([, v]) => v.on && v.at).map(([k]) => k).join(', ') || 'keine'}`);
-    out(`Ruhezeit: ${cfg.quiet.on ? `${cfg.quiet.from} bis ${cfg.quiet.to}` : 'aus'}. Verzögerung: Freigabe ${cfg.delays.perm} s, fertig ${cfg.delays.idle} s`);
-    out(`Befehle und Knöpfe: ${cfg.commands !== false ? 'an' : 'aus'}`);
+    out(tr('Events: {on} of {n} on, with mention: {list}', { on: evs.filter(([, v]) => v.on).length, n: evs.length, list: evs.filter(([, v]) => v.on && v.at).map(([k]) => k).join(', ') || tr('none') }));
+    out(tr('Quiet hours: {quiet}. Delay: approval {perm} s, done {idle} s', { quiet: cfg.quiet.on ? tr('{from} to {to}', { from: cfg.quiet.from, to: cfg.quiet.to }) : tr('off'), perm: cfg.delays.perm, idle: cfg.delays.idle }));
+    out(tr('Commands and buttons: {state}', { state: cfg.commands !== false ? tr('on') : tr('off') }));
     const own = shared ? [] : Object.values(cfg.projects).filter((p) => p.channel_id);
-    if (own.length) out(`Eigener Kanal: ${own.length === 1 ? 'ein Projekt' : `${own.length} Projekte`} (${own.map((p) => `#${p.channel_name || p.channel_id}`).join(', ')})`);
+    if (own.length) out(tr('Own channel: {projects} ({list})', { projects: own.length === 1 ? tr('one project') : tr('{n} projects', { n: own.length }), list: own.map((p) => `#${p.channel_name || p.channel_id}`).join(', ') }));
     const waiting = d.readOutbox().length;
-    if (waiting) out(`Wartende Ereignisse: ${waiting}`);
+    if (waiting) out(tr('Waiting events: {n}', { n: waiting }));
     return;
   }
 
   if (sub === 'token') {
-    if (pos[1]) fail('Das Token nicht als Argument angeben, sonst steht es in der Shell-Historie. Über die Eingabe: works discord token (fragt danach) oder Get-Clipboard | works discord token');
+    if (pos[1]) fail(tr('Do not pass the token as an argument, it would end up in the shell history. Use the input: works discord token (asks for it) or Get-Clipboard | works discord token'));
     try { d.apiBase(); } catch (e) { fail(e.message); }
-    const t = await readHidden('Token des Bots einfügen (wird nicht angezeigt): ');
+    const t = await readHidden(tr('Paste the bot token (not shown): '));
     const r = await call(() => d.setToken(t));
-    out(`Token gültig: ${r.bot_name}${r.owner ? ', Besitzer erkannt (wird bei Erwähnungen angesprochen)' : ''}.`);
-    out('Gespeichert nur auf diesem Rechner, nicht im Projekt.');
-    out(`\nBot auf deinen Server einladen:\n${r.invite_url}\n\nDanach Kanal wählen: works discord channel`);
-    if (r.restarted) out('Laufender Bot mit dem neuen Token neu gestartet.');
+    out(r.owner ? tr('Token valid: {name}, owner recognized (addressed in mentions).', { name: r.bot_name }) : tr('Token valid: {name}.', { name: r.bot_name }));
+    out(tr('Saved only on this computer, not in the project.'));
+    out(tr('\nInvite the bot to your server:\n{url}\n\nThen pick a channel: works discord channel', { url: r.invite_url }));
+    if (r.restarted) out(tr('Running bot restarted with the new token.'));
     return;
   }
 
   if (sub === 'link') {
-    if (!String(pos[1] || '').trim()) fail('works discord link <Code>. Den Code gibt /works verbinden in Discord, im Kanal, in den works schreiben soll.');
+    if (!String(pos[1] || '').trim()) fail(tr('works discord link <code>. /works link in Discord gives you the code, in the channel works should write to.'));
     const j = await call(() => d.linkCode(pos[1]));
-    out(`Gekoppelt: #${j.channel_name} auf ${j.guild_name} über den gemeinsamen Bot ${j.bot_name}. Erwähnt wird, wer /works verbinden ausgeführt hat.`);
-    out('Der Geräteschlüssel liegt nur auf diesem Rechner. Der Bot startet mit dem Board, sofort mit works discord start.');
+    out(tr('Linked: #{channel} on {guild} via the shared bot {bot}. Whoever ran /works link gets mentioned.', { channel: j.channel_name, guild: j.guild_name, bot: j.bot_name }));
+    out(tr('The device key stays on this computer only. The bot starts with the board, right away with works discord start.'));
     return;
   }
 
   if (sub === 'unlink') {
-    if (!shared || !key) fail('Nicht mit dem gemeinsamen Bot gekoppelt.');
+    if (!shared || !key) fail(tr('Not linked with the shared bot.'));
     await d.disconnect();
-    out('Getrennt: Geräteschlüssel gelöscht, Bot gestoppt. Die Nachrichten in Discord bleiben stehen.');
+    out(tr('Disconnected: device key deleted, bot stopped. The messages in Discord stay.'));
     return;
   }
 
   // Kanalwahl (W-0038): live vom Bot, mit Schreibrecht; beim gemeinsamen Bot die Kanäle des gekoppelten Servers.
   if (sub === 'channel') {
-    if (!token && !key) fail('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.');
+    if (!token && !key) fail(tr('Discord bot is not set up. works discord shows the steps.'));
     const list = await call(() => d.channelsOf(cfg));
-    if (!list.guilds.length) { out(`works ist noch auf keinem Server. Einladen:\n${d.inviteUrl(cfg.app_id)}`); return; }
+    if (!list.guilds.length) { out(tr('works is not on any server yet. Invite it:\n{url}', { url: d.inviteUrl(cfg.app_id) })); return; }
     const chans = list.guilds.flatMap((g) => g.channels.map((c) => ({ ...c, guild: g })));
     if (!pos[1]) {
-      for (const g of list.guilds) out(`${g.name}: ${g.channels.map((c) => `#${c.name}${c.can ? '' : ` (${c.why})`}`).join(', ') || 'keine Textkanäle'}`);
-      out('\nWählen mit works discord channel <name>. Am besten ein eigener Kanal wie #works.');
+      for (const g of list.guilds) out(`${g.name}: ${g.channels.map((c) => `#${c.name}${c.can ? '' : ` (${c.why})`}`).join(', ') || tr('no text channels')}`);
+      out(tr('\nPick one with works discord channel <name>. Best a channel of its own like #works.'));
       return;
     }
     const want = String(pos[1]).replace(/^#/, '');
     const hits = chans.filter((c) => c.id === want || c.name === want);
-    if (!hits.length) fail(`Kanal ${want} nicht gefunden. Vorhanden: ${chans.map((c) => `#${c.name}`).join(', ')}`);
-    if (hits.length > 1) fail(`#${want} gibt es mehrfach. Bitte die Kanal-ID angeben: ${hits.map((h) => `${h.guild.name}: ${h.id}`).join(', ')}`);
+    if (!hits.length) fail(tr('Channel {name} not found. Available: {list}', { name: want, list: chans.map((c) => `#${c.name}`).join(', ') }));
+    if (hits.length > 1) fail(tr('#{name} exists more than once. Please give the channel ID: {list}', { name: want, list: hits.map((h) => `${h.guild.name}: ${h.id}`).join(', ') }));
     const c = await call(() => d.moveChannel(hits[0].id, list));
-    out(`Kanal: #${c.channel_name} auf ${c.guild_name}. ${c.running ? 'Der laufende Bot zieht das Dashboard gleich um.' : 'Der Bot startet mit dem Board, sofort mit works discord start.'}`);
+    out(c.running ? tr('Channel: #{channel} on {guild}. The running bot moves the dashboard right away.', { channel: c.channel_name, guild: c.guild_name }) : tr('Channel: #{channel} on {guild}. The bot starts with the board, right away with works discord start.', { channel: c.channel_name, guild: c.guild_name }));
     return;
   }
 
   if (sub === 'set') {
     const pairs = pos.slice(1);
-    if (!pairs.length) fail('works discord set schlüssel=wert ..., etwa delay.perm=60 quiet.on=aus privacy.costs=aus event.ci_red.at=an');
+    if (!pairs.length) fail(tr('works discord set key=value ..., e.g. delay.perm=60 quiet.on=off privacy.costs=off event.ci_red.at=on'));
     for (const p of pairs) {
       const i = p.indexOf('=');
-      if (i < 1) fail(`${p}: schlüssel=wert erwartet.`);
+      if (i < 1) fail(tr('{pair}: key=value expected.', { pair: p }));
       try { d.applySetting(cfg, p.slice(0, i), p.slice(i + 1)); } catch (e) { fail(e.message); }
     }
     await call(() => d.checkProjectChannels(cfg));
     d.saveDiscordConfig(cfg);
-    out(`Gespeichert: ${pairs.join(', ')}`);
+    out(tr('Saved: {list}', { list: pairs.join(', ') }));
     return;
   }
 
   if (sub === 'test') {
     const r = await call(() => d.sendTest(cfg));
-    out(`Testnachricht gesendet an #${r.channel_name}.`);
+    out(tr('Test message sent to #{channel}.', { channel: r.channel_name }));
     return;
   }
 
   if (sub === 'start' || sub === 'restart') {
-    if (!d.isConfigured(cfg)) fail('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.');
+    if (!d.isConfigured(cfg)) fail(tr('Discord bot is not set up. works discord shows the steps.'));
     if (sub === 'restart') await d.stopBot();
     const r = await d.ensureBot({ force: true });
-    if (r === 'läuft') { out(`Bot läuft schon (PID ${d.botInfo().pid}).`); return; }
+    if (r === 'läuft') { out(tr('Bot is already running (PID {pid}).', { pid: d.botInfo().pid })); return; }
     const until = Date.now() + 15000;
     while (Date.now() < until && !d.botInfo()) await new Promise((res) => setTimeout(res, 100));
     const info = d.botInfo();
     if (!info) {
       let last = '';
       try { last = fs.readFileSync(d.dfile('bot.log'), 'utf8').trim().split('\n').pop(); } catch { /* kein Log */ }
-      fail(`Bot startet nicht. ${last}`);
+      fail(tr('Bot does not start. {last}', { last }));
     }
-    out(`Bot gestartet (PID ${info.pid}). Protokoll: ${d.dfile('bot.log')}`);
+    out(tr('Bot started (PID {pid}). Log: {file}', { pid: info.pid, file: d.dfile('bot.log') }));
     return;
   }
 
-  if (sub === 'stop') { out(await d.stopBot() ? 'Bot gestoppt.' : 'Bot lief nicht.'); return; }
+  if (sub === 'stop') { out(await d.stopBot() ? tr('Bot stopped.') : tr('Bot was not running.')); return; }
 
   if (sub === 'emit') {
     let data = {};
-    try { data = flags.json && flags.json !== true ? JSON.parse(String(flags.json)) : {}; } catch { fail('--json ist kein gültiges JSON.'); }
+    try { data = flags.json && flags.json !== true ? JSON.parse(String(flags.json)) : {}; } catch { fail(tr('--json is not valid JSON.')); }
     d.emit(String(pos[1] || ''), data, findRoot() || '');
     return;
   }
@@ -3028,11 +3028,11 @@ async function cmdDiscord() {
 
   if (sub === 'disconnect') {
     await d.disconnect();
-    out(`${key ? 'Geräteschlüssel widerrufen und gelöscht' : 'Token gelöscht'}, Bot gestoppt. Die Nachrichten in Discord bleiben stehen.`);
+    out(key ? tr('Device key revoked and deleted, bot stopped. The messages in Discord stay.') : tr('Token deleted, bot stopped. The messages in Discord stay.'));
     return;
   }
 
-  fail(`Unbekannt: works discord ${sub}. Möglich: status, link, unlink, token, channel, set, test, start, stop, restart, disconnect`);
+  fail(tr('Unknown: works discord {sub}. Possible: {list}', { sub, list: 'status, link, unlink, token, channel, set, test, start, stop, restart, disconnect' }));
 }
 
 // ---------- Dispatcher ----------

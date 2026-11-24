@@ -75,7 +75,10 @@ function png(px, h) {
 }
 
 // projects: [{ name, done, wip, open, color }], days: [{ label, counts: [je Projekt] }] (älteste zuerst).
-export function dashboardPng({ projects = [], days = [] } = {}) {
+// labels: Überschriften in der Sprache des Dashboards (W-0041), ohne Angabe deutsch; more mit {n}.
+const LABELS = { progress: 'FORTSCHRITT', open: 'OFFEN', wip: 'IN ARBEIT', done: 'ERLEDIGT', more: '+{n} WEITERE', chart: 'ERLEDIGT · LETZTE 7 TAGE' };
+export function dashboardPng({ projects = [], days = [], labels = {} } = {}) {
+  const L = { ...LABELS, ...labels };
   const shown = projects.slice(0, MAX_ROWS);
   const more = projects.length - shown.length;
   const ROW = 28;
@@ -86,9 +89,9 @@ export function dashboardPng({ projects = [], days = [] } = {}) {
   const { px, rect, text } = raster(h);
 
   // Fortschritt: Name, Balken (erledigt, in Arbeit, offen), erledigt/gesamt. Legende rechts oben.
-  text(16, top, 'FORTSCHRITT', TEXT);
+  text(16, top, fit(L.progress, 24), TEXT);
   let lx = W - 16;
-  for (const [label, c] of [['OFFEN', OPEN], ['IN ARBEIT', WIP], ['ERLEDIGT', DONE]]) {
+  for (const [label, c] of [[fit(L.open, 12), OPEN], [fit(L.wip, 12), WIP], [fit(L.done, 12), DONE]]) {
     lx -= width(label); text(lx, top, label, MUTED); lx -= 16; rect(lx, top + 2, 10, 10, c); lx -= 18;
   }
   const barX = 200; const barW = 300;
@@ -106,10 +109,10 @@ export function dashboardPng({ projects = [], days = [] } = {}) {
     }
     text(barX + barW + 12, y, fit(`${p.done}/${total}`, 10), MUTED);
   });
-  if (more > 0) text(28, top + 30 + shown.length * ROW, fit(`+${more} WEITERE`, 20), MUTED);
+  if (more > 0) text(28, top + 30 + shown.length * ROW, fit(L.more.replace('{n}', more), 20), MUTED);
 
   // Erledigte Aufgaben der letzten Tage, gestapelt nach Projektfarbe.
-  text(16, chartTop, 'ERLEDIGT · LETZTE 7 TAGE', TEXT);
+  text(16, chartTop, fit(L.chart, 50), TEXT);
   const baseY = chartTop + 30 + CH;
   const max = Math.max(1, ...days.map((d) => (d.counts || []).reduce((s, n) => s + Math.max(0, n), 0)));
   const colW = Math.floor((W - 32) / 7);

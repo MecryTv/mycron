@@ -1,8 +1,10 @@
 // Discord REST und Gateway für den Bot works (W-0036). Ohne Abhängigkeiten: fetch und das globale WebSocket
 // (Node 22 oder neuer). Fehlermeldungen enthalten nie das Token.
 
+// net: Discord war nicht erreichbar (Grund: 'timeout' oder die Meldung von fetch); die Meldung für Nutzer baut
+// discord.mjs in der eingestellten Sprache (W-0041), diese Datei bleibt ohne Übersetzung.
 export class DiscordError extends Error {
-  constructor(message, { status = 0, code = 0, retry = false } = {}) { super(message); this.status = status; this.code = code; this.retry = retry; }
+  constructor(message, { status = 0, code = 0, retry = false, net } = {}) { super(message); this.status = status; this.code = code; this.retry = retry; this.net = net; }
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -45,7 +47,8 @@ export class Rest {
           signal: AbortSignal.timeout(this.timeoutMs),
         });
       } catch (e) {
-        throw new DiscordError(`Discord nicht erreichbar: ${e.name === 'TimeoutError' ? 'Zeitüberschreitung' : e.message}`, { retry: true });
+        const net = e.name === 'TimeoutError' ? 'timeout' : e.message;
+        throw new DiscordError(`Discord not reachable: ${net}`, { retry: true, net });
       }
       const remaining = res.headers.get('x-ratelimit-remaining');
       const resetAfter = Number(res.headers.get('x-ratelimit-reset-after'));
@@ -63,7 +66,7 @@ export class Rest {
       const msg = (data && data.message) || `HTTP ${res.status}`;
       throw new DiscordError(`Discord ${res.status}: ${msg}`, { status: res.status, code: data && data.code, retry: res.status >= 500 });
     }
-    throw new DiscordError('Discord: zu viele Anfragen, später erneut', { status: 429, retry: true });
+    throw new DiscordError('Discord: too many requests, try again later', { status: 429, retry: true });
   }
 
   get(route) { return this.req('GET', route); }

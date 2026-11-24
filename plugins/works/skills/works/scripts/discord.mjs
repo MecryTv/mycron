@@ -15,6 +15,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readJson, writeJson, rootIdOf } from './lib.mjs';
+import { tr, language } from './i18n.mjs';
 import { isAlive, stopProcess, newestCli, cliVersion } from './server-control.mjs';
 
 export const discordDir = () => path.join(os.homedir(), '.works', 'discord');
@@ -23,13 +24,20 @@ export const dfile = (name) => path.join(discordDir(), name);
 // Rechte für die Einladung: Kanal sehen, senden, Links einbetten, Verlauf lesen, anheften. Nicht mehr.
 export const INVITE_PERMISSIONS = String((1n << 10n) | (1n << 11n) | (1n << 14n) | (1n << 16n) | (1n << 51n));
 
-// Ereignisse: on = senden, at = mit Erwähnung (klingelt). Gruppen wie im Entwurf J2.
+// Ereignisse: on = senden, at = mit Erwähnung (klingelt). Gruppen wie im Entwurf J2, Namen für das Board in eventNames.
 export const EVENT_GROUPS = [
-  ['Claude braucht dich', [['perm', 'Freigabe wartet'], ['idle', 'Fertig, wartet auf dich'], ['question', 'Frage gestellt']]],
-  ['Ergebnisse', [['review', 'Im Review'], ['shipped', 'Ausgeliefert'], ['done', 'Erledigt ohne ship'], ['returned', 'Zurückgegeben']]],
-  ['CI', [['ci_red', 'Rot, Bug angelegt'], ['ci_green', 'Wieder grün']]],
-  ['Planung und Berichte', [['p1', 'Neue P1'], ['queue_empty', 'Warteschlange leer'], ['report_day', 'Feierabendbericht'], ['report_week', 'Wochenbericht']]],
+  ['need', ['perm', 'idle', 'question']],
+  ['results', ['review', 'shipped', 'done', 'returned']],
+  ['ci', ['ci_red', 'ci_green']],
+  ['plan', ['p1', 'queue_empty', 'report_day', 'report_week']],
 ];
+const eventNames = () => ({
+  need: tr('Claude needs you'), results: tr('Results'), ci: 'CI', plan: tr('Planning and reports'),
+  perm: tr('Approval waiting'), idle: tr('Done, waiting for you'), question: tr('Question asked'),
+  review: tr('In review'), shipped: tr('Shipped'), done: tr('Done without ship'), returned: tr('Returned'),
+  ci_red: tr('Red, bug created'), ci_green: tr('Green again'),
+  p1: tr('New P1'), queue_empty: tr('Queue empty'), report_day: tr('End-of-day report'), report_week: tr('Weekly report'),
+});
 const AT = new Set(['perm', 'idle', 'question']);
 const OFF = new Set(['report_day']);
 
@@ -43,7 +51,7 @@ export const DEFAULTS = {
   commands: true,
   // Je Projekt (rootId): enabled (Hinweise an oder aus), beim eigenen Bot channel_id und channel_name (W-0046).
   projects: {},
-  events: Object.fromEntries(EVENT_GROUPS.flatMap(([, list]) => list.map(([k]) => [k, { on: !OFF.has(k), at: AT.has(k) }]))),
+  events: Object.fromEntries(EVENT_GROUPS.flatMap(([, list]) => list.map((k) => [k, { on: !OFF.has(k), at: AT.has(k) }]))),
   quiet: { on: true, from: '22:00', to: '07:00' },
   privacy: { commands: false, costs: true, ci_error: true, titles: true },
   delays: { perm: 30, idle: 120 },
@@ -95,8 +103,8 @@ export function apiBase() {
   const o = process.env.WORKS_DISCORD_API;
   if (!o) return 'https://discord.com/api/v10';
   let u;
-  try { u = new URL(o); } catch { throw new Error('WORKS_DISCORD_API ist keine gültige Adresse.'); }
-  if (!LOOPBACK.includes(u.hostname) || u.protocol !== 'http:') throw new Error('WORKS_DISCORD_API darf nur auf diesen Rechner zeigen (http://127.0.0.1:...).');
+  try { u = new URL(o); } catch { throw new Error(tr('WORKS_DISCORD_API is not a valid address.')); }
+  if (!LOOPBACK.includes(u.hostname) || u.protocol !== 'http:') throw new Error(tr('WORKS_DISCORD_API may only point to this computer (http://127.0.0.1:...).'));
   return o.replace(/\/$/, '');
 }
 
@@ -105,10 +113,10 @@ export function apiBase() {
 export const DEFAULT_SERVICE = '';
 export function serviceBase(cfg = loadDiscordConfig()) {
   const o = process.env.WORKS_DISCORD_SERVICE || cfg.service || DEFAULT_SERVICE;
-  if (!o) throw new Error('Der gemeinsame Bot hat noch keine Adresse. Einstellen mit works discord set service=https://…');
+  if (!o) throw new Error(tr('The shared bot has no address yet. Set it with works discord set service=https://…'));
   let u;
-  try { u = new URL(o); } catch { throw new Error(`Adresse des gemeinsamen Bots ungültig: ${o}`); }
-  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && LOOPBACK.includes(u.hostname))) throw new Error('Der gemeinsame Bot braucht https (http nur auf diesem Rechner).');
+  try { u = new URL(o); } catch { throw new Error(tr('Invalid address of the shared bot: {url}', { url: o })); }
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && LOOPBACK.includes(u.hostname))) throw new Error(tr('The shared bot needs https (http only on this computer).'));
   return o.replace(/\/$/, '');
 }
 
@@ -212,7 +220,7 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export function applySetting(cfg, key, value) {
   const parts = key.split('.').map((p, i) => (i === 0 ? ALIAS[p] || p : p));
-  const bool = (v) => { if (/^(true|an|on|ja|1)$/i.test(v)) return true; if (/^(false|aus|off|nein|0)$/i.test(v)) return false; throw new Error(`${key}: an oder aus erwartet, nicht "${v}".`); };
+  const bool = (v) => { if (/^(true|an|on|ja|1)$/i.test(v)) return true; if (/^(false|aus|off|nein|0)$/i.test(v)) return false; throw new Error(tr('{key}: expected on or off, not "{v}".', { key, v })); };
   const [a, b, c] = parts;
   if (parts.length === 1 && ['autostart', 'auto_enroll', 'commands'].includes(a)) { cfg[a] = bool(value); return; }
   if (parts.length === 1 && a === 'service') {
@@ -222,17 +230,17 @@ export function applySetting(cfg, key, value) {
   }
   if (a === 'delays' && b in DEFAULTS.delays && parts.length === 2) {
     const n = Number(value);
-    if (!Number.isFinite(n) || n < 0 || n > 3600) throw new Error(`${key}: Sekunden von 0 bis 3600.`);
+    if (!Number.isFinite(n) || n < 0 || n > 3600) throw new Error(tr('{key}: seconds from 0 to 3600.', { key }));
     cfg.delays[b] = n; return;
   }
   if (a === 'quiet' && parts.length === 2) {
     if (b === 'on') { cfg.quiet.on = bool(value); return; }
-    if (b === 'from' || b === 'to') { if (!TIME.test(value)) throw new Error(`${key}: Uhrzeit als HH:MM.`); cfg.quiet[b] = value; return; }
+    if (b === 'from' || b === 'to') { if (!TIME.test(value)) throw new Error(tr('{key}: time as HH:MM.', { key })); cfg.quiet[b] = value; return; }
   }
   if (a === 'privacy' && b in DEFAULTS.privacy && parts.length === 2) { cfg.privacy[b] = bool(value); return; }
   if (a === 'cleanup' && b === 'hours' && parts.length === 2) {
     const n = Number(String(value).replace(',', '.'));
-    if (!Number.isFinite(n) || n < 0 || n > 720) throw new Error(`${key}: Stunden von 0 (nie löschen) bis 720.`);
+    if (!Number.isFinite(n) || n < 0 || n > 720) throw new Error(tr('{key}: hours from 0 (never delete) to 720.', { key }));
     cfg.cleanup.hours = n; return;
   }
   if (a === 'events' && b in DEFAULTS.events) {
@@ -245,14 +253,14 @@ export function applySetting(cfg, key, value) {
   // Schreibrecht prüft checkProjectChannels gegen die Liste vom Bot.
   if (a === 'project' && c === 'channel' && parts.length === 3 && /^[0-9a-f]{16}$/.test(b)) {
     const v = String(value).trim().replace(/^#/, '');
-    if (v && isShared(cfg)) throw new Error(`${key}: Kanal je Projekt gibt es nur beim eigenen Bot. Der gemeinsame schreibt in genau einen Kanal, den gekoppelten.`);
-    if (v && !/^\d{1,25}$/.test(v)) throw new Error(`${key}: Kanal-ID erwartet (works discord channel zeigt die Kanäle), leer für den Standardkanal.`);
+    if (v && isShared(cfg)) throw new Error(tr('{key}: a channel per project only exists with your own bot. The shared bot writes to exactly one channel, the linked one.', { key }));
+    if (v && !/^\d{1,25}$/.test(v)) throw new Error(tr('{key}: channel ID expected (works discord channel shows the channels), empty for the default channel.', { key }));
     const p = { ...(cfg.projects[b] || {}) };
     if (!v || v === cfg.channel_id) { delete p.channel_id; delete p.channel_name; } else if (p.channel_id !== v) Object.assign(p, { channel_id: v, channel_name: '' });
     cfg.projects[b] = p;
     return;
   }
-  throw new Error(`Unbekannte Einstellung ${key}. Möglich: autostart, auto_enroll, commands, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, cleanup.hours, event.<name>[.at], project.<id>, project.<id>.channel`);
+  throw new Error(tr('Unknown setting {key}. Possible: {list}', { key, list: 'autostart, auto_enroll, commands, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, cleanup.hours, event.<name>[.at], project.<id>, project.<id>.channel' }));
 }
 
 // ---------- Einrichtung, Kanalwahl und Stand: gemeinsam für CLI und Board (W-0038) ----------
@@ -260,10 +268,12 @@ export function applySetting(cfg, key, value) {
 
 const discordApi = () => import('./discord-api.mjs');
 
-// Discord-Fehler in Worte fassen: 401 Token oder Schlüssel abgelehnt, 410 Kopplung kaputt.
+// Discord-Fehler in Worte fassen: 401 Token oder Schlüssel abgelehnt, 410 Kopplung kaputt, nicht erreichbar, zu viele Anfragen.
 export function explain(e, shared) {
-  if (e.status === 401) return shared ? 'Der Dienst lehnt den Geräteschlüssel ab (getrennt?).' : 'Discord lehnt das Token ab.';
-  if (e.status === 410) return 'Kopplung kaputt (Bot entfernt, Rechte entzogen oder Kanal gelöscht). Neu koppeln mit /works verbinden.';
+  if (e.status === 401) return shared ? tr('The service rejects the device key (disconnected?).') : tr('Discord rejects the token.');
+  if (e.status === 410) return tr('Link broken (bot removed, permissions revoked or channel deleted). Link again with /works link.');
+  if (e.net !== undefined) return tr('Discord not reachable: {reason}', { reason: e.net === 'timeout' ? tr('timeout') : e.net });
+  if (e.status === 429 && e.retry) return tr('Discord: too many requests, try again later');
   return e.message;
 }
 
@@ -288,12 +298,12 @@ export async function revokeKey(cfg = loadDiscordConfig()) {
 // gilt nicht mehr. Andere Bot-Anwendung: deren alte Nachrichten kann der neue Bot nicht bearbeiten, also neu beginnen.
 export async function setToken(raw) {
   const t = String(raw || '').trim();
-  if (!t) throw new Error('Kein Token eingegeben.');
-  if (/\s/.test(t) || t.length < 20) throw new Error('Token ungültig: Das sieht nicht nach einem Bot-Token aus.');
+  if (!t) throw new Error(tr('No token entered.'));
+  if (/\s/.test(t) || t.length < 20) throw new Error(tr('Invalid token: that does not look like a bot token.'));
   const { Rest } = await discordApi();
   const rest = new Rest({ token: t, base: apiBase() });
   let me; let app;
-  try { me = await rest.get('/users/@me'); app = await rest.get('/oauth2/applications/@me'); } catch (e) { throw new Error(e.status === 401 ? 'Token ungültig: Discord lehnt es ab.' : `Discord nicht erreichbar: ${e.message}`); }
+  try { me = await rest.get('/users/@me'); app = await rest.get('/oauth2/applications/@me'); } catch (e) { throw new Error(e.status === 401 ? tr('Invalid token: Discord rejects it.') : e.net !== undefined ? explain(e, false) : tr('Discord not reachable: {reason}', { reason: e.message })); }
   const cfg = loadDiscordConfig();
   if (cfg.app_id && cfg.app_id !== app.id) { await stopBot(); try { fs.unlinkSync(dfile('state.json')); } catch { /* keiner */ } }
   if (isShared(cfg)) { await stopBot(); await revokeKey(cfg); Object.assign(cfg, { guild_id: '', guild_name: '', channel_id: '', channel_name: '' }); }
@@ -312,13 +322,13 @@ export async function setToken(raw) {
 // Code aus /works verbinden gegen einen Geräteschlüssel tauschen (gemeinsamer Bot).
 export async function linkCode(raw, device = os.hostname()) {
   const code = String(raw || '').trim();
-  if (!code) throw new Error('Kein Code eingegeben. Den Code gibt /works verbinden in Discord, im Kanal, in den works schreiben soll.');
+  if (!code) throw new Error(tr('No code entered. /works link in Discord gives you the code, in the channel works should write to.'));
   const cfg = loadDiscordConfig();
   const base = serviceBase(cfg);
   let r;
-  try { r = await fetch(`${base}/v1/link`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, device }), signal: AbortSignal.timeout(15000) }); } catch (e) { throw new Error(`Der gemeinsame Bot ist nicht erreichbar: ${e.message}`); }
+  try { r = await fetch(`${base}/v1/link`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, device }), signal: AbortSignal.timeout(15000) }); } catch (e) { throw new Error(tr('The shared bot is not reachable: {reason}', { reason: e.message })); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(r.status === 429 ? 'Zu viele falsche Codes, später erneut versuchen.' : `Kopplung fehlgeschlagen: ${j.message || `HTTP ${r.status}`}. In Discord mit /works verbinden einen neuen Code holen.`);
+  if (!r.ok) throw new Error(r.status === 429 ? tr('Too many wrong codes, try again later.') : tr('Linking failed: {reason}. Get a new code in Discord with /works link.', { reason: j.message || `HTTP ${r.status}` }));
   if (botInfo()) await stopBot();
   // Schon gekoppelt: den alten Schlüssel widerrufen, sonst bleibt er beim Dienst gültig.
   await revokeKey(cfg);
@@ -338,20 +348,21 @@ export async function disconnect() {
   return { key };
 }
 
-const MISSING = { view: 'kann den Kanal nicht sehen', send: 'darf nicht senden', embed: 'darf keine Links einbetten' };
+const MISSING = () => ({ view: tr('cannot see the channel'), send: tr('may not send'), embed: tr('may not embed links') });
 
 // Server und Textkanäle live vom Bot (Kanalwahl nach K). Eigener Bot: REST mit dem Token, alle Server. Gemeinsamer
 // Bot: der Dienst, nur der gekoppelte Server. why: warum der Bot in einem Kanal nicht schreiben darf.
 export async function channelsOf(cfg = loadDiscordConfig()) {
-  const withWhy = (list) => list.map((c) => ({ ...c, why: c.can ? '' : c.missing.map((k) => MISSING[k] || k).join(', ') }));
+  const why = MISSING();
+  const withWhy = (list) => list.map((c) => ({ ...c, why: c.can ? '' : c.missing.map((k) => why[k] || k).join(', ') }));
   if (isShared(cfg)) {
-    if (!loadKey()) throw new Error('Nicht mit dem gemeinsamen Bot gekoppelt.');
+    if (!loadKey()) throw new Error(tr('Not linked with the shared bot.'));
     let r;
-    try { r = await (await serviceRest(cfg)).get('/guild/channels'); } catch (e) { throw new Error(e.status === 404 ? 'Der gemeinsame Bot kennt die Kanalwahl noch nicht (ältere Version).' : explain(e, true)); }
+    try { r = await (await serviceRest(cfg)).get('/guild/channels'); } catch (e) { throw new Error(e.status === 404 ? tr('The shared bot does not know channel selection yet (older version).') : explain(e, true)); }
     return { mode: 'shared', channel_id: cfg.channel_id, guilds: [{ id: r.guild_id, name: r.guild_name || cfg.guild_name, channels: withWhy(r.channels || []) }] };
   }
   const token = loadToken();
-  if (!token) throw new Error('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.');
+  if (!token) throw new Error(tr('Discord bot is not set up. works discord shows the steps.'));
   const { Rest, guildChannels } = await discordApi();
   const rest = new Rest({ token, base: apiBase() });
   const get = (p) => rest.get(p);
@@ -360,14 +371,14 @@ export async function channelsOf(cfg = loadDiscordConfig()) {
     const out = [];
     for (const g of guilds.slice(0, 10)) out.push({ id: g.id, name: g.name, channels: withWhy(await guildChannels(get, g.id, me.id)) });
     return { mode: 'own', channel_id: cfg.channel_id, guilds: out };
-  } catch (e) { throw new Error(`Kanäle nicht lesbar: ${explain(e, false)}`); }
+  } catch (e) { throw new Error(tr('Channels not readable: {reason}', { reason: explain(e, false) })); }
 }
 
 // Kanal aus der Liste vom Bot, in den er schreiben darf; sonst ein Fehler mit Grund.
 function writable(list, cid) {
   const hit = list.guilds.flatMap((g) => g.channels.map((c) => ({ ...c, guild: g }))).find((c) => c.id === cid);
-  if (!hit) throw new Error(`Kanal ${cid} nicht gefunden. Liste neu laden oder works discord channel.`);
-  if (!hit.can) throw new Error(`#${hit.name}: Der Bot ${hit.why}. In Discord die Rechte des Kanals ändern oder einen anderen wählen.`);
+  if (!hit) throw new Error(tr('Channel {id} not found. Reload the list or use works discord channel.', { id: cid }));
+  if (!hit.can) throw new Error(tr('#{name}: the bot {why}. Change the channel permissions in Discord or pick another one.', { name: hit.name, why: hit.why }));
   return hit;
 }
 
@@ -385,7 +396,7 @@ export async function checkProjectChannels(cfg) {
 // löscht das alte (dashboards in discord-bot.mjs), ohne Neustart. list: schon gelesene Kanäle (channelsOf).
 export async function moveChannel(id, list = null) {
   const cid = String(id || '');
-  if (!/^\d{1,25}$/.test(cid)) throw new Error('Kein Kanal gewählt.');
+  if (!/^\d{1,25}$/.test(cid)) throw new Error(tr('No channel chosen.'));
   const cfg = loadDiscordConfig();
   const hit = writable(list || await channelsOf(cfg), cid);
   if (isShared(cfg) && cid !== cfg.channel_id) {
@@ -397,11 +408,13 @@ export async function moveChannel(id, list = null) {
 }
 
 export async function sendTest(cfg = loadDiscordConfig()) {
-  if (!isConfigured(cfg)) throw new Error('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.');
+  if (!isConfigured(cfg)) throw new Error(tr('Discord bot is not set up. works discord shows the steps.'));
   const cred = credential(cfg);
   const { Rest } = await discordApi();
   const rest = new Rest({ token: cred.secret, base: cred.base, scheme: cred.scheme });
-  try { await rest.post(`/channels/${cfg.channel_id}/messages`, { embeds: [{ title: 'Testnachricht von works', description: 'Wenn du das siehst, klappt die Verbindung.', color: 0x5865f2 }], flags: 4096, allowed_mentions: { parse: [] } }); } catch (e) { throw new Error(`Senden fehlgeschlagen: ${explain(e, cred.shared)}`); }
+  // Die Testnachricht steht im Kanal: globale Sprache wie alle Nachrichten des Bots (W-0041).
+  const lang = language(null);
+  try { await rest.post(`/channels/${cfg.channel_id}/messages`, { embeds: [{ title: tr('Test message from works', null, lang), description: tr('If you can see this, the connection works.', null, lang), color: 0x5865f2 }], flags: 4096, allowed_mentions: { parse: [] } }); } catch (e) { throw new Error(tr('Sending failed: {reason}', { reason: explain(e, cred.shared) })); }
   return { channel_name: cfg.channel_name };
 }
 
@@ -413,11 +426,13 @@ export async function boardState(root) {
   const shared = isShared(cfg);
   const secret = shared ? loadKey() : loadToken();
   const info = botInfo();
-  const [{ projectList }, { commands }] = await Promise.all([import('./hub.mjs'), import('./discord-ui.mjs')]);
+  const [{ projectList }, { commands, tr: trUi }] = await Promise.all([import('./hub.mjs'), import('./discord-ui.mjs')]);
   const here = rootIdOf(root);
   const list = projectList().map((p) => ({ rid: rootIdOf(p.path), name: p.name || path.basename(p.path) }));
   if (!list.some((p) => p.rid === here)) list.unshift({ rid: here, name: path.basename(root) });
   const dash = (readJson(dfile('state.json'), null) || {}).dash || {};
+  const names = eventNames();
+  const ui = trUi(language(root));
   let service = null;
   if (!secret || shared) {
     try { const base = serviceBase(cfg); const i = await serviceInfo(cfg); service = { base, reachable: !!i, invite_url: (i && i.invite_url) || '' }; } catch (e) { service = { base: '', error: e.message }; }
@@ -430,7 +445,7 @@ export async function boardState(root) {
     autostart: cfg.autostart !== false, auto_enroll: cfg.auto_enroll !== false, commands_on: cfg.commands !== false,
     invite_url: !shared && cfg.app_id ? inviteUrl(cfg.app_id) : (service && service.invite_url) || '',
     service,
-    events: EVENT_GROUPS.map(([group, items]) => ({ group, items: items.map(([key, label]) => ({ key, label, ...cfg.events[key] })) })),
+    events: EVENT_GROUPS.map(([group, items]) => ({ group: names[group], items: items.map((key) => ({ key, label: names[key], ...cfg.events[key] })) })),
     quiet: cfg.quiet, privacy: cfg.privacy, delays: cfg.delays, cleanup: cfg.cleanup,
     // channel_id und channel: eigener Kanal des Projekts, leer im Standardkanal.
     projects: list.map((p) => {
@@ -440,7 +455,8 @@ export async function boardState(root) {
       const mine = ch !== cfg.channel_id;
       return { ...p, here: p.rid === here, enabled: own.enabled !== undefined ? !!own.enabled : cfg.auto_enroll !== false, channel_id: mine ? ch : '', channel: mine ? `#${own.channel_name || ch}` : '', dash: d && d.message_id ? d.at || 1 : 0 };
     }),
-    commands: commands({ shared })[0].options.map((o) => ({ cmd: `/works ${(o.name_localizations && o.name_localizations.de) || o.name}`, text: o.description_localizations.de })),
+    // Befehle in der Sprache des Boards; Discord zeigt sie in der Sprache des Clients.
+    commands: commands({ shared })[0].options.map((o) => ({ cmd: `/works ${ui((o.name_localizations && o.name_localizations.de) || o.name, o.name)}`, text: ui(o.description_localizations.de, o.description) })),
     waiting: readOutbox().length,
   };
 }
@@ -458,16 +474,19 @@ export async function preview(root, { type = 'perm', draft = {} } = {}) {
   const where = { channel_id, channel: channel_id === cfg.channel_id ? cfg.channel_name : cfg.projects[rid].channel_name || '' };
   let snap;
   try { snap = bot.snapshotOf(root); } catch { snap = { name: path.basename(root), tasks: {}, queue: [] }; }
-  if (type === 'dashboard') return { ...bot.renderDashboard([{ rid, snap }], cfg, { interactive }), ring: false, why: 'Das Dashboard wird nur bearbeitet und klingelt nie.', ...where };
+  // Die Nachricht selbst wie im Kanal in der globalen Sprache, die Erklärungen in der des Boards (W-0041).
+  if (type === 'dashboard') return { ...bot.renderDashboard([{ rid, snap }], cfg, { interactive }), ring: false, why: tr('The dashboard is only edited and never rings.'), ...where };
+  const lang = language(null);
   const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
-  const sample = { perm: { tool: 'Bash', what: 'npm test', since: ago(3) }, idle: { since: ago(2) }, review: { crit: [7, 7], cost: '8,20 $' }, ci_red: { sha: '81fe2a0c4d', failed: 1, total: 3, job: 'test (windows)', error: 'AssertionError: expected 3 to be 4', bug: 'W-0011', url: 'https://github.com' } }[type];
-  if (!sample) throw new Error('Unbekanntes Ereignis für die Vorschau.');
-  const a = snap.active || { id: 'W-0001', title: 'Beispielaufgabe' };
+  const { fmtCost } = await import('./usage.mjs');
+  const sample = { perm: { tool: 'Bash', what: 'npm test', since: ago(3) }, idle: { since: ago(2) }, review: { crit: [7, 7], cost: fmtCost(8.2, 'USD', lang) }, ci_red: { sha: '81fe2a0c4d', failed: 1, total: 3, job: 'test (windows)', error: 'AssertionError: expected 3 to be 4', bug: 'W-0011', url: 'https://github.com' } }[type];
+  if (!sample) throw new Error(tr('Unknown event for the preview.'));
+  const a = snap.active || { id: 'W-0001', title: tr('Sample task', null, lang) };
   const body = bot.renderEvent({ type, project: snap.name, id: a.id, title: a.title, ...sample }, cfg, { owner: cfg.owner_id || '0', rid, interactive });
   const e = cfg.events[type];
   const ring = e.on && !(body.flags & 4096);
-  const why = !e.on ? 'Ist aus: works schickt dazu keine Nachricht.' : ring ? 'Klingelt, weil @ an ist. In der Ruhezeit käme es still.'
-    : e.at ? 'Gerade ist Ruhezeit: kommt still, ohne Hinweis auf dem Sperrbildschirm.' : 'Kommt still, weil @ aus ist. Kein Hinweis auf dem Sperrbildschirm.';
+  const why = !e.on ? tr('Off: works sends no message for this.') : ring ? tr('Rings because @ is on. During quiet hours it would arrive silently.')
+    : e.at ? tr('Quiet hours right now: arrives silently, without a notification on the lock screen.') : tr('Arrives silently because @ is off. No notification on the lock screen.');
   return { ...body, ring, why, ...where };
 }
 
@@ -486,8 +505,8 @@ export async function boardAction(root, b = {}) {
   if (op === 'disconnect') return disconnect();
   if (op === 'move') return moveChannel(b.channel_id);
   if (op === 'test') return sendTest();
-  if (op === 'start') { if (!isConfigured()) throw new Error('Discord-Bot ist nicht eingerichtet.'); return { started: await ensureBot({ force: true }) }; }
+  if (op === 'start') { if (!isConfigured()) throw new Error(tr('Discord bot is not set up.')); return { started: await ensureBot({ force: true }) }; }
   if (op === 'preview') return preview(root, b);
-  throw new Error(`Unbekannte Aktion ${op}.`);
+  throw new Error(tr('Unknown action {op}.', { op }));
 }
 

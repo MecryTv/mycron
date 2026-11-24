@@ -1467,7 +1467,7 @@
     box.innerHTML = (LIVE ? '<div id="estBox"></div>' : '') + '<div class="tl-scroll"><div class="tl" style="--weeks:' + weeks + ';min-width:calc(var(--lab) + ' + weeks + ' * 84px)">' +
       '<div class="tl-headrow"><div class="tl-corner">' + tr('Task') + '</div><div class="tl-weeks">' + weekHead + '</div></div>' +
       '<div class="tl-body"><div class="tl-grid" aria-hidden="true">' + Array.from({ length: weeks }, (_, i) => '<i' + (addDays(start, i * 7) === weekStart(now) ? ' class="cur"' : '') + '></i>').join('') + '</div>' +
-      '<div class="tl-today" style="left:calc(var(--lab) + (100% - var(--lab)) * ' + frac(now).toFixed(4) + ')" title="' + tr('Today') + '"></div>' +
+      '<div class="tl-today" style="left:calc(var(--lab) + (100% - var(--lab)) * ' + frac(now).toFixed(4) + ')" title="' + tr('Today') + '" data-today="' + esc(tr('today')) + '"></div>' +
       (groups.length ? groups.map(group).join('') : '<div class="tl-empty">' + tr('No tasks for these filters.') + '</div>') +
       '</div></div></div>' +
       '<div class="tl-legend"><span><i class="lg-today"></i>' + tr('today') + '</span><span><i class="lg-ms"></i>' + tr('Milestone target') + '</span><span><i class="lg-run"></i>' + tr('running or done') + '</span><span><i class="lg-plan"></i>' + tr('planned with due date') + '</span><span><i class="lg-est"></i>' + tr('estimated from effort') + '</span>' +
@@ -3449,11 +3449,11 @@
   // Einstellungen sammeln sich als Entwurf unter den Schlüsseln von works discord set; Speichern schickt ihn, die
   // Vorschau rechnet schon mit ihm. Token, Schlüssel und Code stehen nie im DOM, nur kurz im Eingabefeld.
 
-  const DC_TABS = [['verbindung', 'Verbindung'], ['projekte', 'Projekte'], ['ereignisse', 'Ereignisse'], ['befehle', 'Befehle'], ['datenschutz', 'Datenschutz']];
-  const DC_PV = [['perm', 'Freigabe wartet'], ['idle', 'Fertig, wartet auf dich'], ['review', 'Im Review'], ['ci_red', 'CI rot'], ['dashboard', 'Dashboard']];
-  const DC_HINT = { review: 'Mit Knöpfen Annehmen und Zurück an Claude', shipped: 'works ship als eine Nachricht, die ihre Schritte abhakt', ci_red: 'Mit erstem Fehler und Bug-ID' };
+  const DC_TABS = [['verbindung', tr('Connection')], ['projekte', tr('Projects')], ['ereignisse', tr('Events')], ['befehle', tr('Commands')], ['datenschutz', tr('Privacy')]];
+  const DC_PV = [['perm', tr('Approval waiting')], ['idle', tr('Done, waiting for you')], ['review', tr('In review')], ['ci_red', tr('CI red')], ['dashboard', 'Dashboard']];
+  const DC_HINT = { review: tr('With the buttons Accept and Back to Claude'), shipped: tr('works ship as one message that ticks off its steps'), ci_red: tr('With the first error and bug ID') };
   const onOff = (b) => (b ? 'an' : 'aus');
-  const dcAgo = (ms) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'gerade eben' : m < 60 ? 'vor ' + m + (m === 1 ? ' Minute' : ' Minuten') : m < 1440 ? 'vor ' + Math.round(m / 60) + ' h' : 'vor ' + Math.round(m / 1440) + ' Tagen'; };
+  const dcAgo = (ms) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? tr('just now') : m < 60 ? (m === 1 ? tr('{n} minute ago', { n: m }) : tr('{n} minutes ago', { n: m })) : m < 1440 ? tr('{n} h ago', { n: Math.round(m / 60) }) : tr('{n} days ago', { n: Math.round(m / 1440) }); };
 
   // Gespeicherter Stand unter den Schlüsseln von works discord set.
   function dcValues(s) {
@@ -3466,15 +3466,15 @@
 
   // Nachricht wie in Discord: Absender, Text mit Erwähnung, Einbettung mit Feldern, Knöpfe. Nur Text, nichts aus dem Netz.
   function dcMessage(m) {
-    const md = (t) => esc(t).replace(/\\([[\]])/g, '$1').replace(/&lt;t:(\d+):R&gt;/g, (x, n) => dcAgo(+n * 1000)).replace(/&lt;@\d+&gt;/g, '<span class="dc-men">@du</span>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+    const md = (t) => esc(t).replace(/\\([[\]])/g, '$1').replace(/&lt;t:(\d+):R&gt;/g, (x, n) => dcAgo(+n * 1000)).replace(/&lt;@\d+&gt;/g, '<span class="dc-men">' + esc(tr('@you')) + '</span>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
     const e = (m.embeds || [])[0] || {};
     const fields = (e.fields || []).map((f) => '<div' + (f.inline === false ? ' class="wide"' : '') + '><strong>' + md(f.name) + '</strong>' + md(f.value) + '</div>').join('');
     const comps = (m.components || []).flatMap((r) => r.components || []);
     return '<div class="dc-who"><i>w</i><b>works</b><em>APP</em></div>' + (m.content ? '<div class="dc-txt">' + md(m.content) + '</div>' : '') +
       '<div class="dc-emb" style="--c:#' + Number(e.color || 0x5865f2).toString(16).padStart(6, '0') + '">' + (e.author ? '<span class="dc-a">' + md(e.author.name) + '</span>' : '') + (e.title ? '<b>' + md(e.title) + '</b>' : '') +
-      (e.description ? '<div>' + md(e.description) + '</div>' : '') + (fields ? '<div class="dc-f">' + fields + '</div>' : '') + (e.image ? '<div class="dc-img">Bild: Fortschritt je Projekt, erledigt je Tag</div>' : '') +
+      (e.description ? '<div>' + md(e.description) + '</div>' : '') + (fields ? '<div class="dc-f">' + fields + '</div>' : '') + (e.image ? '<div class="dc-img">' + tr('Image: progress per project, done per day') + '</div>' : '') +
       (e.footer ? '<span class="dc-ft">' + md(e.footer.text) + '</span>' : '') + '</div>' +
-      (comps.length ? '<div class="dc-btns">' + comps.map((c) => (c.type === 3 ? '<span class="sel">' + esc(c.placeholder || 'Auswahl') + ' ▾</span>' : '<span class="s' + c.style + '">' + esc(c.label) + (c.style === 5 ? ' ↗' : '') + '</span>')).join('') + '</div>' : '');
+      (comps.length ? '<div class="dc-btns">' + comps.map((c) => (c.type === 3 ? '<span class="sel">' + esc(c.placeholder || tr('Selection')) + ' ▾</span>' : '<span class="s' + c.style + '">' + esc(c.label) + (c.style === 5 ? ' ↗' : '') + '</span>')).join('') + '</div>' : '');
   }
 
   async function openDiscord() {
@@ -3492,46 +3492,46 @@
     const link = (href, text) => '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + text + '</a>';
     const sw = (k, label, hint) => '<label class="switch small"><span><b>' + esc(label) + '</b>' + (hint ? '<small>' + esc(hint) + '</small>' : '') + '</span><input type="checkbox" data-k="' + k + '"' + (on(k) ? ' checked' : '') + '><i aria-hidden="true"></i></label>';
     const bare = (k, label) => '<label class="switch dc-bare"><input type="checkbox" data-k="' + k + '"' + (on(k) ? ' checked' : '') + ' aria-label="' + esc(label) + '"><i aria-hidden="true"></i></label>';
-    const at = (k, label) => '<button type="button" class="dc-at" data-k="' + k + '" aria-pressed="' + on(k) + '" aria-label="Erwähnen bei ' + esc(label) + '">@</button>';
+    const at = (k, label) => '<button type="button" class="dc-at" data-k="' + k + '" aria-pressed="' + on(k) + '" aria-label="' + esc(tr('Mention for {label}', { label })) + '">@</button>';
     const num = (k, label, unit, max) => '<label class="field"><span>' + esc(label) + '</span><div class="dc-numin"><input class="input" type="number" min="0" max="' + max + '" step="' + (k === 'cleanup.hours' ? 'any' : '1') + '" data-k="' + k + '" value="' + esc(val(k)) + '"><small>' + esc(unit) + '</small></div></label>';
     const step = (n, cls, title, body) => '<li class="dc-step ' + cls + '"><span class="dc-num" aria-hidden="true">' + n + '</span><div><h3>' + title + '</h3>' + body + '</div></li>';
-    const tokenBox = () => '<div class="dc-box"><div class="dc-pw"><input class="input" id="dcToken" type="password" autocomplete="off" spellcheck="false" aria-label="Bot-Token"><button type="button" class="btn small primary" id="dcTokenGo">Prüfen</button></div><p class="dc-hint">Wird nur auf diesem Rechner gespeichert und danach nur maskiert gezeigt.</p></div>';
-    const codeBox = () => '<div class="dc-box"><div class="dc-pw"><input class="input" id="dcCode" autocomplete="off" spellcheck="false" placeholder="ABCD-2345" aria-label="Code aus Discord"><button type="button" class="btn small primary" id="dcCodeGo">Koppeln</button></div><p class="dc-hint">Im Terminal geht es mit <code>works discord link &lt;Code&gt;</code>.</p></div>';
+    const tokenBox = () => '<div class="dc-box"><div class="dc-pw"><input class="input" id="dcToken" type="password" autocomplete="off" spellcheck="false" aria-label="' + esc(tr('Bot token')) + '"><button type="button" class="btn small primary" id="dcTokenGo">' + tr('Verify') + '</button></div><p class="dc-hint">' + tr('Stored only on this computer and shown only masked afterwards.') + '</p></div>';
+    const codeBox = () => '<div class="dc-box"><div class="dc-pw"><input class="input" id="dcCode" autocomplete="off" spellcheck="false" placeholder="ABCD-2345" aria-label="' + esc(tr('Code from Discord')) + '"><button type="button" class="btn small primary" id="dcCodeGo">' + tr('Pair') + '</button></div><p class="dc-hint">' + tr('In the terminal, use {cmd}.', { cmd: '<code>works discord link &lt;' + esc(tr('code')) + '&gt;</code>' }) + '</p></div>';
     const enabled = () => s.projects.filter((p) => on('project.' + p.rid)).length;
     const eventsOn = () => s.events.reduce((n, g) => n + g.items.filter((e) => on('event.' + e.key + '.on')).length, 0);
-    const sub = () => (s.ready ? [s.running ? 'online seit ' + timeOf(s.running.since) : 'gestoppt', s.mode === 'shared' ? 'Gemeinsamer Bot' : 'Eigener Bot', '#' + s.channel_name + ' auf ' + s.guild_name, enabled() + (enabled() === 1 ? ' Projekt' : ' Projekte')].join(' · ') : s.secret ? 'Kanal fehlt noch' : 'nicht eingerichtet');
+    const sub = () => (s.ready ? [s.running ? tr('online since {time}', { time: timeOf(s.running.since) }) : tr('stopped'), s.mode === 'shared' ? tr('Shared bot') : tr('Own bot'), tr('#{channel} on {guild}', { channel: s.channel_name, guild: s.guild_name }), enabled() === 1 ? tr('{n} project', { n: 1 }) : tr('{n} projects', { n: enabled() })].join(' · ') : s.secret ? tr('Channel still missing') : tr('not set up'));
 
     function stepsOwn() {
       const has = !!s.secret;
-      return '<p class="dc-lead">Vier Schritte, danach läuft der Bot für alle Projekte auf diesem Rechner. Geht auch im Terminal mit <code>works discord token</code>.</p><ol class="dc-steps">' +
-        step(has ? '✓' : 1, has ? 'done' : '', 'Bot anlegen', '<p>Im ' + link('https://discord.com/developers/applications', 'Discord-Entwicklerportal') + ' eine Anwendung mit Bot anlegen und das Token kopieren.</p>') +
-        step(has ? '✓' : 2, has ? 'done' : 'cur', 'Token eintragen', has ? '<div class="dc-res">Gültig: ' + esc(s.bot_name) + '</div>' : '<p>Token aus dem Portal einfügen, works prüft es sofort.</p>' + tokenBox()) +
-        step(3, has ? 'cur' : '', 'Auf deinen Server einladen', '<p>Der Link fragt nur die Rechte an, die works braucht.' + (s.invite_url ? ' ' + link(s.invite_url, 'Einladungslink öffnen') : '') + '</p><div class="dc-rights"><span>Kanal sehen</span><span>Nachrichten senden</span><span>Links einbetten</span><span>Anheften</span><span>Befehle</span></div>') +
-        step(4, '', 'Kanal wählen', '<p>Dort stehen das Dashboard und die Hinweise aller Projekte.' + (has ? ' Die Liste steht unten.' : '') + '</p>') + '</ol>';
+      return '<p class="dc-lead">' + tr('Four steps, then the bot runs for all projects on this computer. Also possible in the terminal with {cmd}.', { cmd: '<code>works discord token</code>' }) + '</p><ol class="dc-steps">' +
+        step(has ? '✓' : 1, has ? 'done' : '', tr('Create the bot'), '<p>' + tr('Create an application with a bot in the {portal} and copy the token.', { portal: link('https://discord.com/developers/applications', tr('Discord developer portal')) }) + '</p>') +
+        step(has ? '✓' : 2, has ? 'done' : 'cur', tr('Enter the token'), has ? '<div class="dc-res">' + tr('Valid: {name}', { name: esc(s.bot_name) }) + '</div>' : '<p>' + tr('Paste the token from the portal, works checks it right away.') + '</p>' + tokenBox()) +
+        step(3, has ? 'cur' : '', tr('Invite it to your server'), '<p>' + tr('The link only asks for the permissions works needs.') + (s.invite_url ? ' ' + link(s.invite_url, tr('Open the invite link')) : '') + '</p><div class="dc-rights"><span>' + tr('View channel') + '</span><span>' + tr('Send messages') + '</span><span>' + tr('Embed links') + '</span><span>' + tr('Pin') + '</span><span>' + tr('Commands') + '</span></div>') +
+        step(4, '', tr('Choose a channel'), '<p>' + tr('The dashboard and the notifications of all projects go there.') + (has ? ' ' + tr('The list is below.') : '') + '</p>') + '</ol>';
     }
 
     function stepsShared() {
       const sv = s.service || {};
-      return '<div class="alert info">Beim gemeinsamen Bot gehen die Nachrichten über den works-Dienst: Projektname, Aufgaben-IDs, Titel und Status, je nach Datenschutz. Der Dienst speichert keine Inhalte, nur welche Nachricht zu deinem Schlüssel gehört.</div><ol class="dc-steps">' +
-        step(1, 'cur', 'Bot einladen', sv.invite_url ? '<p>' + link(sv.invite_url, 'Einladungslink öffnen') + ', Server wählen und bestätigen.</p>'
-          : '<p>' + esc(sv.error || 'Der works-Dienst antwortet gerade nicht.') + '</p><div class="dc-pw"><input class="input" id="dcService" type="url" placeholder="https://…" value="' + esc(sv.base || '') + '" aria-label="Adresse des works-Dienstes"><button type="button" class="btn small" data-dc="service">Adresse speichern</button></div>') +
-        step(2, '', 'Im Kanal /works verbinden', '<p>In Discord im Kanal, in den works schreiben soll. Braucht das Recht „Server verwalten“. Der Bot antwortet nur dir mit einem Code.</p>') +
-        step(3, '', 'Code eintragen', codeBox()) + '</ol>';
+      return '<div class="alert info">' + tr('With the shared bot, messages go through the works service: project name, task IDs, titles and status, depending on privacy. The service stores no content, only which message belongs to your key.') + '</div><ol class="dc-steps">' +
+        step(1, 'cur', tr('Invite the bot'), sv.invite_url ? '<p>' + tr('{link}, choose a server and confirm.', { link: link(sv.invite_url, tr('Open the invite link')) }) + '</p>'
+          : '<p>' + esc(sv.error || tr('The works service is not responding right now.')) + '</p><div class="dc-pw"><input class="input" id="dcService" type="url" placeholder="https://…" value="' + esc(sv.base || '') + '" aria-label="' + esc(tr('Address of the works service')) + '"><button type="button" class="btn small" data-dc="service">' + tr('Save address') + '</button></div>') +
+        step(2, '', tr('Run /works link in the channel'), '<p>' + tr('In Discord, in the channel works should write to. Needs the “Manage Server” permission. The bot replies only to you with a code.') + '</p>') +
+        step(3, '', tr('Enter the code'), codeBox()) + '</ol>';
     }
 
     function pSetup() {
       const card = (k, title, items, tag) => '<button type="button" class="dc-card" data-dc-path="' + k + '" role="radio" aria-checked="' + (way === k) + '">' + (tag ? '<span class="dc-tag">' + tag + '</span>' : '') + '<b>' + title + '</b><ul>' + items.map((x) => '<li>' + x + '</li>').join('') + '</ul></button>';
-      return '<p class="dc-lead">Hinweise aufs Handy für alle Projekte auf diesem Rechner. Wie soll works schreiben?</p><div class="dc-choice" role="radiogroup" aria-label="Weg">' +
-        card('shared', 'Gemeinsamer Bot', ['Einladen und mit einem Code koppeln', 'Kein Token, nichts im Entwicklerportal', 'Läuft über den works-Dienst'], 'Empfohlen') +
-        card('own', 'Eigener Bot', ['Bot im Discord-Entwicklerportal anlegen', 'Token nur auf diesem Rechner', 'Nichts läuft über fremde Server']) + '</div>' + (way === 'shared' ? stepsShared() : stepsOwn());
+      return '<p class="dc-lead">' + tr('Notifications on your phone for all projects on this computer. How should works write?') + '</p><div class="dc-choice" role="radiogroup" aria-label="' + esc(tr('Method')) + '">' +
+        card('shared', tr('Shared bot'), [tr('Invite and pair with a code'), tr('No token, nothing in the developer portal'), tr('Runs through the works service')], tr('Recommended')) +
+        card('own', tr('Own bot'), [tr('Create a bot in the Discord developer portal'), tr('Token only on this computer'), tr('Nothing runs through third-party servers')]) + '</div>' + (way === 'shared' ? stepsShared() : stepsOwn());
     }
 
     // Kanalwahl nach K: Server und Textkanäle live vom Bot, nach Kategorie; ohne Schreibrecht ausgegraut mit Grund.
     function pChannels() {
       let body;
       if (chErr) body = '<p class="dc-bad">' + esc(chErr) + '</p>';
-      else if (!chans) body = '<p class="dc-hint">Kanäle werden live vom Bot gelesen …</p>';
-      else if (!chans.guilds.length) body = '<p class="dc-hint">works ist noch auf keinem Server. Erst einladen, dann die Liste neu laden.</p>';
+      else if (!chans) body = '<p class="dc-hint">' + tr('Reading channels live from the bot …') + '</p>';
+      else if (!chans.guilds.length) body = '<p class="dc-hint">' + tr('works is not on any server yet. Invite it first, then reload the list.') + '</p>';
       else {
         const g = chans.guilds.find((x) => x.id === guild) || chans.guilds[0];
         let cat = '';
@@ -3539,29 +3539,29 @@
           const head = c.category && c.category !== cat ? '<div class="dc-cat">' + esc(c.category) + '</div>' : '';
           cat = c.category;
           const cur = c.id === s.channel_id;
-          return head + '<label class="dc-ch' + (cur ? ' on' : '') + (c.can ? '' : ' off') + '"><input type="radio" name="dcch" value="' + esc(c.id) + '"' + ((pick || s.channel_id) === c.id ? ' checked' : '') + (c.can ? '' : ' disabled') + '><span>#' + esc(c.name) + '</span><small>' + (cur ? 'jetzt hier' : c.can ? 'kann schreiben' : esc(c.why)) + '</small></label>';
+          return head + '<label class="dc-ch' + (cur ? ' on' : '') + (c.can ? '' : ' off') + '"><input type="radio" name="dcch" value="' + esc(c.id) + '"' + ((pick || s.channel_id) === c.id ? ' checked' : '') + (c.can ? '' : ' disabled') + '><span>#' + esc(c.name) + '</span><small>' + (cur ? tr('here now') : c.can ? tr('can write') : esc(c.why)) + '</small></label>';
         }).join('');
-        body = (chans.guilds.length > 1 ? '<label class="field"><span>Server</span><select class="input" id="dcGuild">' + chans.guilds.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === g.id ? ' selected' : '') + '>' + esc(x.name) + ' (' + x.channels.length + ' Kanäle)</option>').join('') + '</select></label>' : '<p class="dc-hint">Server <b>' + esc(g.name) + '</b></p>') +
-          '<div class="dc-list" role="radiogroup" aria-label="Kanal">' + (rows || '<p class="dc-hint dc-pad">Keine Textkanäle.</p>') + '</div>';
+        body = (chans.guilds.length > 1 ? '<label class="field"><span>Server</span><select class="input" id="dcGuild">' + chans.guilds.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === g.id ? ' selected' : '') + '>' + esc(x.name) + ' (' + tr('{n} channels', { n: x.channels.length }) + ')</option>').join('') + '</select></label>' : '<p class="dc-hint">Server <b>' + esc(g.name) + '</b></p>') +
+          '<div class="dc-list" role="radiogroup" aria-label="' + esc(tr('Channel')) + '">' + (rows || '<p class="dc-hint dc-pad">' + tr('No text channels.') + '</p>') + '</div>';
       }
-      return '<section class="dc-sec"><h3>Kanal für Dashboard und Hinweise</h3>' + body +
-        '<p class="dc-hint">' + (s.mode === 'shared' ? 'Beim gemeinsamen Bot sind es die Kanäle des gekoppelten Servers.' : 'Fehlt ein Server? Bot mit dem Einladungslink einladen.') + ' Die Liste kommt live vom Bot.</p>' +
-        '<div class="row-btns">' + (s.mode !== 'shared' && s.invite_url ? '<a class="btn small" href="' + esc(s.invite_url) + '" target="_blank" rel="noopener">Bot einladen</a>' : '') + '<button type="button" class="btn small ghost" data-dc="reload">Liste neu laden</button><span class="spacer"></span><span class="dc-hint dc-target"></span><button type="button" class="btn small primary" id="dcMove" disabled>Hierher verschieben</button></div></section>';
+      return '<section class="dc-sec"><h3>' + tr('Channel for dashboard and notifications') + '</h3>' + body +
+        '<p class="dc-hint">' + (s.mode === 'shared' ? tr('With the shared bot, these are the channels of the paired server.') : tr('Server missing? Invite the bot with the invite link.')) + ' ' + tr('The list comes live from the bot.') + '</p>' +
+        '<div class="row-btns">' + (s.mode !== 'shared' && s.invite_url ? '<a class="btn small" href="' + esc(s.invite_url) + '" target="_blank" rel="noopener">' + tr('Invite the bot') + '</a>' : '') + '<button type="button" class="btn small ghost" data-dc="reload">' + tr('Reload list') + '</button><span class="spacer"></span><span class="dc-hint dc-target"></span><button type="button" class="btn small primary" id="dcMove" disabled>' + tr('Move here') + '</button></div></section>';
     }
 
     function pConn() {
       if (!s.secret) return pSetup();
       const shared = s.mode === 'shared';
-      return (s.ready ? '<div class="dc-conn' + (s.running ? '' : ' off') + '"><b>' + (s.running ? 'works ist online' : 'works ist gestoppt') + '</b><dl class="dc-kv">' +
-          '<dt>Server</dt><dd>' + esc(s.guild_name) + '</dd><dt>Kanal</dt><dd>#' + esc(s.channel_name) + '</dd>' +
-          '<dt>Weg</dt><dd>' + (shared ? 'Gemeinsamer Bot' + (s.service && s.service.base ? ' über ' + esc(s.service.base) : '') : 'Eigener Bot ' + esc(s.bot_name)) + '</dd>' +
-          '<dt>Läuft</dt><dd>' + (s.running ? 'auf diesem Rechner seit ' + esc(timeOf(s.running.since)) + ', für alle Projekte' : s.autostart ? 'startet mit dem Board oder einer Claude-Sitzung' : 'nicht, Autostart ist aus') + '</dd>' +
-          '<dt>Erwähnt wird</dt><dd>' + (shared ? 'wer /works verbinden ausgeführt hat' : s.owner ? 'der Besitzer der Bot-Anwendung, beim Einrichten erkannt' : 'niemand, der Besitzer wurde nicht erkannt') + '</dd></dl>' +
-          '<div class="row-btns"><button type="button" class="btn small" data-dc="test">Testnachricht</button>' + (s.running ? '' : '<button type="button" class="btn small ghost" data-dc="start">Bot starten</button>') + '</div></div>' : stepsOwn()) +
+      return (s.ready ? '<div class="dc-conn' + (s.running ? '' : ' off') + '"><b>' + (s.running ? tr('works is online') : tr('works is stopped')) + '</b><dl class="dc-kv">' +
+          '<dt>Server</dt><dd>' + esc(s.guild_name) + '</dd><dt>' + tr('Channel') + '</dt><dd>#' + esc(s.channel_name) + '</dd>' +
+          '<dt>' + tr('Method') + '</dt><dd>' + (shared ? tr('Shared bot') + (s.service && s.service.base ? ' ' + tr('via {url}', { url: esc(s.service.base) }) : '') : tr('Own bot {name}', { name: esc(s.bot_name) })) + '</dd>' +
+          '<dt>' + tr('Running') + '</dt><dd>' + (s.running ? tr('on this computer since {time}, for all projects', { time: esc(timeOf(s.running.since)) }) : s.autostart ? tr('starts with the board or a Claude session') : tr('no, autostart is off')) + '</dd>' +
+          '<dt>' + tr('Mentioned') + '</dt><dd>' + (shared ? tr('whoever ran /works link') : s.owner ? tr('the owner of the bot application, detected during setup') : tr('nobody, the owner was not detected')) + '</dd></dl>' +
+          '<div class="row-btns"><button type="button" class="btn small" data-dc="test">' + tr('Test message') + '</button>' + (s.running ? '' : '<button type="button" class="btn small ghost" data-dc="start">' + tr('Start bot') + '</button>') + '</div></div>' : stepsOwn()) +
         pChannels() +
-        '<div class="dc-token">' + (shared ? 'Geräteschlüssel' : 'Token') + ' <code>' + esc(s.secret) + '</code><span class="spacer"></span><button type="button" class="btn small ghost" data-dc="replace">' + (shared ? 'Neu koppeln' : 'Ersetzen') + '</button></div><div class="dc-replace" hidden>' + (shared ? codeBox() : tokenBox()) + '</div>' +
-        '<p class="dc-hint">' + (shared ? 'Der Schlüssel liegt nur auf diesem Rechner und darf nur in den gekoppelten Kanal schreiben.' : 'Das Token liegt nur auf diesem Rechner, lesbar nur für dich. Nie im Projekt, im Git oder in Logs.') + '</p>' +
-        '<div class="dc-danger"><div><b>Bot trennen</b><small>' + (shared ? 'Widerruft den Schlüssel beim Dienst' : 'Löscht das Token von diesem Rechner') + ' und beendet den Bot. Die Nachrichten bleiben in Discord stehen.</small></div><button type="button" class="btn small danger" data-dc="disconnect">Trennen</button></div>';
+        '<div class="dc-token">' + (shared ? tr('Device key') : 'Token') + ' <code>' + esc(s.secret) + '</code><span class="spacer"></span><button type="button" class="btn small ghost" data-dc="replace">' + (shared ? tr('Pair again') : tr('Replace')) + '</button></div><div class="dc-replace" hidden>' + (shared ? codeBox() : tokenBox()) + '</div>' +
+        '<p class="dc-hint">' + (shared ? tr('The key is stored only on this computer and may only write to the paired channel.') : tr('The token is stored only on this computer, readable only by you. Never in the project, in Git or in logs.')) + '</p>' +
+        '<div class="dc-danger"><div><b>' + tr('Disconnect bot') + '</b><small>' + (shared ? tr('Revokes the key at the service and stops the bot. The messages stay in Discord.') : tr('Deletes the token from this computer and stops the bot. The messages stay in Discord.')) + '</small></div><button type="button" class="btn small danger" data-dc="disconnect">' + tr('Disconnect') + '</button></div>';
     }
 
     // Kanal je Projekt (W-0046): beim eigenen Bot aus der Liste vom Bot, leer heißt Standardkanal. Der gemeinsame Bot
@@ -3569,8 +3569,8 @@
     function chanSel(p) {
       const k = 'project.' + p.rid + '.channel';
       const cur = val(k);
-      const attrs = ' class="input" data-k="' + k + '" aria-label="Kanal für ' + esc(p.name) + '"';
-      const std = '<option value="">#' + esc(s.channel_name || '–') + ' (Standard)</option>';
+      const attrs = ' class="input" data-k="' + k + '" aria-label="' + esc(tr('Channel for {name}', { name: p.name })) + '"';
+      const std = '<option value="">#' + esc(s.channel_name || '–') + ' (' + tr('default') + ')</option>';
       if (s.mode === 'shared') return '<select' + attrs + ' disabled>' + std + '</select>';
       const many = chans && chans.guilds.length > 1;
       const all = chans ? chans.guilds.flatMap((g) => g.channels.map((c) => ({ ...c, g: g.name }))).filter((c) => c.id !== s.channel_id) : [];
@@ -3578,45 +3578,45 @@
       if (cur && !all.some((c) => c.id === cur)) opts.unshift('<option value="' + esc(cur) + '" selected>' + esc(cur === p.channel_id ? p.channel : '#' + cur) + '</option>');
       return '<select' + attrs + '>' + std + opts.join('') + '</select>';
     }
-    const pProjects = () => '<div class="dc-tblwrap"><table class="dc-tbl"><thead><tr><th>Projekt</th><th>Kanal</th><th>Dashboard</th><th>An</th></tr></thead><tbody>' +
-      s.projects.map((p) => '<tr><td>' + esc(p.name) + (p.here ? '<small>dieses Projekt</small>' : '') + '</td><td>' + chanSel(p) + '</td><td>' + (p.dash ? 'angeheftet' + (p.dash > 1e12 ? '<small>' + dcAgo(p.dash) + ' bearbeitet</small>' : '') : 'noch keins') + '</td><td>' + bare('project.' + p.rid, 'Hinweise für ' + p.name) + '</td></tr>').join('') +
-      '</tbody></table></div>' + sw('auto_enroll', 'Neue Projekte automatisch anmelden', 'Erscheinen im Dashboard des Standardkanals, sobald ihr Board oder eine Claude-Sitzung läuft') +
-      '<p class="dc-hint">' + (s.mode === 'shared' ? 'Der gemeinsame Bot schreibt in genau einen Kanal, den gekoppelten. Einen Kanal je Projekt gibt es nur mit eigenem Bot. ' : chErr ? esc(chErr) + ' ' : '') +
-      'Ein Dashboard je Kanal für alle Projekte, die dorthin melden. Abgeschaltete Projekte fehlen dort und schicken keine Hinweise.</p>';
+    const pProjects = () => '<div class="dc-tblwrap"><table class="dc-tbl"><thead><tr><th>' + tr('Project') + '</th><th>' + tr('Channel') + '</th><th>Dashboard</th><th>' + tr('On') + '</th></tr></thead><tbody>' +
+      s.projects.map((p) => '<tr><td>' + esc(p.name) + (p.here ? '<small>' + tr('current project') + '</small>' : '') + '</td><td>' + chanSel(p) + '</td><td>' + (p.dash ? tr('pinned') + (p.dash > 1e12 ? '<small>' + tr('edited {ago}', { ago: dcAgo(p.dash) }) + '</small>' : '') : tr('none yet')) + '</td><td>' + bare('project.' + p.rid, tr('Notifications for {name}', { name: p.name })) + '</td></tr>').join('') +
+      '</tbody></table></div>' + sw('auto_enroll', tr('Enroll new projects automatically'), tr('They appear in the dashboard of the default channel as soon as their board or a Claude session runs')) +
+      '<p class="dc-hint">' + (s.mode === 'shared' ? tr('The shared bot writes to exactly one channel, the paired one. A channel per project is only available with your own bot.') + ' ' : chErr ? esc(chErr) + ' ' : '') +
+      tr('One dashboard per channel for all projects that report there. Projects that are switched off are missing there and send no notifications.') + '</p>';
 
     function pEvents() {
       const grp = (g) => {
         const n = g.items.filter((e) => on('event.' + e.key + '.on')).length;
-        return '<div class="dc-grp"><div class="dc-grp-h"><b>' + esc(g.group) + '</b><small>' + n + ' von ' + g.items.length + '</small><span class="spacer"></span><label class="switch dc-bare"><input type="checkbox" data-grp="' + esc(g.group) + '"' + (n === g.items.length ? ' checked' : '') + ' aria-label="Gruppe ' + esc(g.group) + '"><i aria-hidden="true"></i></label></div>' +
-          g.items.map((e) => '<div class="dc-row"><span><b>' + esc(e.label) + '</b>' + (e.key === 'perm' && !on('privacy.commands') ? '<small>Befehl ausgeblendet, siehe Datenschutz</small>' : DC_HINT[e.key] ? '<small>' + esc(DC_HINT[e.key]) + '</small>' : '') + '</span>' + at('event.' + e.key + '.at', e.label) + bare('event.' + e.key + '.on', e.label + ' senden') + '</div>').join('') + '</div>';
+        return '<div class="dc-grp"><div class="dc-grp-h"><b>' + esc(g.group) + '</b><small>' + tr('{n} of {total}', { n, total: g.items.length }) + '</small><span class="spacer"></span><label class="switch dc-bare"><input type="checkbox" data-grp="' + esc(g.group) + '"' + (n === g.items.length ? ' checked' : '') + ' aria-label="' + esc(tr('Group {name}', { name: g.group })) + '"><i aria-hidden="true"></i></label></div>' +
+          g.items.map((e) => '<div class="dc-row"><span><b>' + esc(e.label) + '</b>' + (e.key === 'perm' && !on('privacy.commands') ? '<small>' + tr('Command hidden, see Privacy') + '</small>' : DC_HINT[e.key] ? '<small>' + esc(DC_HINT[e.key]) + '</small>' : '') + '</span>' + at('event.' + e.key + '.at', e.label) + bare('event.' + e.key + '.on', tr('Send {label}', { label: e.label })) + '</div>').join('') + '</div>';
       };
-      return '<div class="dc-legend"><span><span class="dc-at" aria-pressed="true">@</span> klingelt mit Erwähnung</span><span><span class="dc-at" aria-pressed="false">@</span> kommt still</span></div>' + s.events.map(grp).join('') +
-        '<div class="dc-quiet"><span><b>Ruhezeit</b><small>Auch Erwähnungen kommen dann still, nichts geht verloren</small></span>' + bare('quiet.on', 'Ruhezeit') +
-        '<div class="dc-times">von <input class="input" type="time" data-k="quiet.from" value="' + esc(val('quiet.from')) + '" aria-label="Ruhezeit von"> bis <input class="input" type="time" data-k="quiet.to" value="' + esc(val('quiet.to')) + '" aria-label="Ruhezeit bis"></div></div>' +
-        '<div class="dc-nums">' + num('delay.perm', 'Freigabe melden nach', 'Sekunden', 3600) + num('delay.idle', 'Fertig melden nach', 'Sekunden', 3600) + num('cleanup.hours', 'Nachrichten löschen nach', 'Stunden, 0 nie', 720) + '</div>' +
-        '<p class="dc-hint">Die Verzögerung spart Hinweise, wenn du schneller warst. Das Dashboard bleibt stehen, offene Nachrichten erst nach ihrer Erledigung gelöscht.</p>';
+      return '<div class="dc-legend"><span><span class="dc-at" aria-pressed="true">@</span> ' + tr('rings with a mention') + '</span><span><span class="dc-at" aria-pressed="false">@</span> ' + tr('arrives silently') + '</span></div>' + s.events.map(grp).join('') +
+        '<div class="dc-quiet"><span><b>' + tr('Quiet hours') + '</b><small>' + tr('Mentions also arrive silently then, nothing gets lost') + '</small></span>' + bare('quiet.on', tr('Quiet hours')) +
+        '<div class="dc-times">' + tr('from') + ' <input class="input" type="time" data-k="quiet.from" value="' + esc(val('quiet.from')) + '" aria-label="' + esc(tr('Quiet hours from')) + '"> ' + tr('until') + ' <input class="input" type="time" data-k="quiet.to" value="' + esc(val('quiet.to')) + '" aria-label="' + esc(tr('Quiet hours until')) + '"></div></div>' +
+        '<div class="dc-nums">' + num('delay.perm', tr('Report approval after'), tr('seconds'), 3600) + num('delay.idle', tr('Report done after'), tr('seconds'), 3600) + num('cleanup.hours', tr('Delete messages after'), tr('hours, 0 never'), 720) + '</div>' +
+        '<p class="dc-hint">' + tr('The delay saves notifications when you were faster. The dashboard stays; open messages are deleted only once they are dealt with.') + '</p>';
     }
 
     // Schalter nach J2 (W-0046); ausgeschaltet wird die Liste blass (CSS über :has).
-    const pCmds = () => sw('commands', 'Befehle und Knöpfe erlauben', s.mode === 'shared' ? 'Nur du, als die Person, die /works verbinden ausgeführt hat. Die Antworten siehst nur du.' : 'Nur du, als Besitzer der Bot-Anwendung. Die Antworten siehst nur du.') +
-      '<div class="dc-cmdl">' + s.commands.map((c) => '<div><code>' + esc(c.cmd) + '</code><span>' + esc(c.text) + '</span></div>').join('') + '<div><code>Knöpfe</code><span>Annehmen, Zurück an Claude, Anweisung an Claude, Neue Aufgabe, Bug ansehen</span></div></div>' +
-      '<p class="dc-hint">Ausgeschaltet zeigt works keine Knöpfe am Dashboard und an neuen Nachrichten' + (s.mode === 'shared' ? ' und antwortet auf /works nur mit einem kurzen Hinweis' : ' und meldet /works auf dem Server ab') + '. Freigaben für Werkzeuge erteilst du weiter in Claude Code.</p>';
-    const pPrivacy = () => sw('privacy.commands', 'Befehle aus Freigaben zeigen', 'Können Pfade, Adressen oder Geheimnisse enthalten') + sw('privacy.costs', 'Kosten zeigen', 'Tageskosten im Dashboard, Kosten je Aufgabe im Review') +
-      sw('privacy.ci_error', 'Fehlerzeile bei roter CI zeigen', 'Erste Zeile des Fehlers aus dem Log') + sw('privacy.titles', 'Aufgabentitel zeigen', 'Aus: nur IDs, etwa für Server mit anderen Leuten') +
-      '<p class="dc-hint">Links gehen auf GitHub, nie auf das lokale Board. ' + (s.mode === 'shared' ? 'Der Geräteschlüssel' : 'Das Token') + ' steht nirgends außer auf diesem Rechner.</p>';
+    const pCmds = () => sw('commands', tr('Allow commands and buttons'), s.mode === 'shared' ? tr('Only you, as the person who ran /works link. Only you see the replies.') : tr('Only you, as the owner of the bot application. Only you see the replies.')) +
+      '<div class="dc-cmdl">' + s.commands.map((c) => '<div><code>' + esc(c.cmd) + '</code><span>' + esc(c.text) + '</span></div>').join('') + '<div><code>' + tr('Buttons') + '</code><span>' + tr('Accept, Back to Claude, Instruction to Claude, New task, View bug') + '</span></div></div>' +
+      '<p class="dc-hint">' + (s.mode === 'shared' ? tr('When off, works shows no buttons on the dashboard and on new messages and answers /works only with a short note. You still grant tool approvals in Claude Code.') : tr('When off, works shows no buttons on the dashboard and on new messages and unregisters /works on the server. You still grant tool approvals in Claude Code.')) + '</p>';
+    const pPrivacy = () => sw('privacy.commands', tr('Show commands from approvals'), tr('May contain paths, addresses or secrets')) + sw('privacy.costs', tr('Show costs'), tr('Daily costs in the dashboard, cost per task in review')) +
+      sw('privacy.ci_error', tr('Show the error line on red CI'), tr('First line of the error from the log')) + sw('privacy.titles', tr('Show task titles'), tr('Off: only IDs, e.g. for servers with other people')) +
+      '<p class="dc-hint">' + tr('Links go to GitHub, never to the local board.') + ' ' + (s.mode === 'shared' ? tr('The device key is stored nowhere except on this computer.') : tr('The token is stored nowhere except on this computer.')) + '</p>';
     const PANELS = { verbindung: pConn, projekte: pProjects, ereignisse: pEvents, befehle: pCmds, datenschutz: pPrivacy };
 
-    const badge = (k) => (k === 'projekte' ? enabled() : k === 'ereignisse' ? eventsOn() + ' an' : '');
+    const badge = (k) => (k === 'projekte' ? enabled() : k === 'ereignisse' ? tr('{n} on', { n: eventsOn() }) : '');
     const tabsHtml = () => DC_TABS.map(([k, l]) => '<button type="button" role="tab" data-dc-tab="' + k + '" aria-selected="' + (tab === k) + '"' + (!s.ready && k !== 'verbindung' ? ' aria-disabled="true"' : '') + '>' + l + (s.ready && badge(k) !== '' ? ' <span class="dc-n">' + badge(k) + '</span>' : '') + '</button>').join('');
     const n = () => Object.keys(draft).length;
     const footHtml = () => (s.ready
-      ? '<span class="dc-dirty"' + (n() ? '' : ' hidden') + '>' + n() + (n() === 1 ? ' Änderung' : ' Änderungen') + ' nicht gespeichert</span><span class="spacer"></span><button type="button" class="btn ghost" data-dc="discard"' + (n() ? '' : ' disabled') + '>Verwerfen</button><button class="btn primary" value="save"' + (n() ? '' : ' disabled') + '>Speichern</button>'
-      : '<span class="dc-hint">Die Einstellungen kannst du nach der Einrichtung ändern.</span><span class="spacer"></span><button class="btn ghost" value="cancel" formnovalidate>Später einrichten</button>');
-    const inner = () => '<div class="dc-head"><span class="dc-bot' + (s.running ? '' : ' off') + '" aria-hidden="true">w</span><div><h2>Discord-Bot works</h2><small>' + esc(sub()) + '</small></div><span class="spacer"></span><button class="btn small ghost" value="cancel" formnovalidate>Schließen</button></div>' +
-      '<div class="dc-tabs" role="tablist" aria-label="Bereiche">' + tabsHtml() + '</div>' +
+      ? '<span class="dc-dirty"' + (n() ? '' : ' hidden') + '>' + (n() === 1 ? tr('{n} change not saved', { n: 1 }) : tr('{n} changes not saved', { n: n() })) + '</span><span class="spacer"></span><button type="button" class="btn ghost" data-dc="discard"' + (n() ? '' : ' disabled') + '>' + tr('Discard') + '</button><button class="btn primary" value="save"' + (n() ? '' : ' disabled') + '>' + tr('Save') + '</button>'
+      : '<span class="dc-hint">' + tr('You can change the settings after setup.') + '</span><span class="spacer"></span><button class="btn ghost" value="cancel" formnovalidate>' + tr('Set up later') + '</button>');
+    const inner = () => '<div class="dc-head"><span class="dc-bot' + (s.running ? '' : ' off') + '" aria-hidden="true">w</span><div><h2>' + tr('works Discord bot') + '</h2><small>' + esc(sub()) + '</small></div><span class="spacer"></span><button class="btn small ghost" value="cancel" formnovalidate>' + tr('Close') + '</button></div>' +
+      '<div class="dc-tabs" role="tablist" aria-label="' + esc(tr('Sections')) + '">' + tabsHtml() + '</div>' +
       '<div class="dc-main" role="tabpanel">' + PANELS[tab]() + '</div>' +
-      '<aside class="dc-side" aria-label="Vorschau"><b>' + (s.ready ? 'Vorschau' : 'So sieht es danach aus') + '</b><label class="field"><span>Nachricht</span><select class="input" id="dcPv">' + DC_PV.map(([k, l]) => '<option value="' + k + '"' + (k === pvType ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
-        '<div class="dc-pv" id="dcPvBox"><p class="dc-hint">Lädt …</p></div><b>Auf dem Handy</b><div class="dc-lock" id="dcLock"></div><p class="dc-cap"></p></aside>' +
+      '<aside class="dc-side" aria-label="' + esc(tr('Preview')) + '"><b>' + (s.ready ? tr('Preview') : tr('This is how it will look')) + '</b><label class="field"><span>' + tr('Message') + '</span><select class="input" id="dcPv">' + DC_PV.map(([k, l]) => '<option value="' + k + '"' + (k === pvType ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></label>' +
+        '<div class="dc-pv" id="dcPvBox"><p class="dc-hint">' + tr('Loading …') + '</p></div><b>' + tr('On the phone') + '</b><div class="dc-lock" id="dcLock"></div><p class="dc-cap"></p></aside>' +
       '<p class="err dc-err" role="alert"></p><div class="dc-foot">' + footHtml() + '</div>';
 
     async function preview() {
@@ -3630,7 +3630,7 @@
       // Ein eben erst gewählter Kanal je Projekt hat noch keinen gespeicherten Namen: aus der Liste vom Bot.
       const ch = r.channel || ((chans ? chans.guilds.flatMap((g) => g.channels) : []).find((c) => c.id === r.channel_id) || {}).name || 'works';
       lock.className = 'dc-lock' + (r.ring ? '' : ' mute');
-      lock.innerHTML = r.ring ? '<i>w</i><b>works · #' + esc(ch) + '</b><span>' + esc(String(r.content || '').replace(/<@\d+>/g, '@du')) + '</span>' : '<b>Kein Hinweis</b><span>Die Nachricht erscheint nur im Kanal.</span>';
+      lock.innerHTML = r.ring ? '<i>w</i><b>works · #' + esc(ch) + '</b><span>' + esc(String(r.content || '').replace(/<@\d+>/g, tr('@you'))) + '</span>' : '<b>' + tr('No notification') + '</b><span>' + tr('The message only appears in the channel.') + '</span>';
       $('.dc-cap', root).textContent = r.why;
     }
     const schedule = () => { clearTimeout(pvTimer); pvTimer = setTimeout(preview, 150); };
@@ -3643,7 +3643,7 @@
       if (!b) return;
       const c = pick && pick !== s.channel_id && chans ? chans.guilds.flatMap((g) => g.channels).find((x) => x.id === pick) : null;
       b.disabled = !c || !c.can;
-      $('.dc-target', root).textContent = c ? 'Neuer Kanal: #' + c.name : '';
+      $('.dc-target', root).textContent = c ? tr('New channel: #{name}', { name: c.name }) : '';
     }
     const setK = (k, v) => { if (saved[k] === v) delete draft[k]; else draft[k] = v; refresh(); schedule(); };
     function syncGroups() {
@@ -3652,7 +3652,7 @@
         if (!box) continue;
         const cnt = g.items.filter((e) => on('event.' + e.key + '.on')).length;
         box.checked = cnt === g.items.length;
-        box.closest('.dc-grp-h').querySelector('small').textContent = cnt + ' von ' + g.items.length;
+        box.closest('.dc-grp-h').querySelector('small').textContent = tr('{n} of {total}', { n: cnt, total: g.items.length });
       }
     }
     async function reload() {
@@ -3681,7 +3681,7 @@
         chans = null;
         await reload();
         loadChannels();
-        ok(op === 'token' ? 'Token gültig: ' + r.bot_name + (r.channel ? '' : '. Jetzt einladen und einen Kanal wählen.') : 'Gekoppelt: #' + r.channel_name + ' auf ' + r.guild_name);
+        ok(op !== 'token' ? tr('Paired: #{channel} on {guild}', { channel: r.channel_name, guild: r.guild_name }) : r.channel ? tr('Token valid: {name}', { name: r.bot_name }) : tr('Token valid: {name}. Now invite it and choose a channel.', { name: r.bot_name }));
       });
     }
 
@@ -3690,7 +3690,7 @@
       s = await api('POST', 'api/discord', { op: 'set', values: draft });
       saved = dcValues(s); draft = {};
       renderAll();
-      ok('Gespeichert. Der Bot übernimmt es ohne Neustart.');
+      ok(tr('Saved. The bot picks it up without a restart.'));
       return undefined;
     }, (f) => {
       root = $('.dc', f);
@@ -3710,20 +3710,20 @@
             const r = await api('POST', 'api/discord', { op: 'move', channel_id: pick });
             pick = '';
             await reload();
-            ok(r.running ? 'Dashboard zieht nach #' + r.channel_name + ' um. Der Bot legt es dort an und löscht das alte.' : 'Kanal #' + r.channel_name + ' gespeichert.');
+            ok(r.running ? tr('Dashboard moves to #{channel}. The bot creates it there and deletes the old one.', { channel: r.channel_name }) : tr('Channel #{channel} saved.', { channel: r.channel_name }));
           });
         }
         const op = b.dataset.dc;
         if (op === 'discard') { draft = {}; renderAll(); return; }
         if (op === 'replace') { const x = $('.dc-replace', root); x.hidden = !x.hidden; return; }
         if (op === 'reload') { chans = null; renderMain(); loadChannels(); return; }
-        if (op === 'test') return busy(b, async () => { const r = await api('POST', 'api/discord', { op: 'test' }); ok('Testnachricht gesendet an #' + r.channel_name); });
+        if (op === 'test') return busy(b, async () => { const r = await api('POST', 'api/discord', { op: 'test' }); ok(tr('Test message sent to #{channel}', { channel: r.channel_name })); });
         if (op === 'start') return busy(b, async () => { await api('POST', 'api/discord', { op: 'start' }); await new Promise((r) => setTimeout(r, 1500)); await reload(); });
         if (op === 'service') return busy(b, async () => { await api('POST', 'api/discord', { op: 'set', values: { service: $('#dcService', root).value.trim() } }); await reload(); });
         // Trennen in zwei Klicks statt eines zweiten Dialogs.
         if (op === 'disconnect') {
-          if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Wirklich trennen'; return; }
-          return busy(b, async () => { await api('POST', 'api/discord', { op: 'disconnect' }); chans = null; way = 'shared'; await reload(); ok('Getrennt. Die Nachrichten in Discord bleiben stehen.'); });
+          if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = tr('Really disconnect'); return; }
+          return busy(b, async () => { await api('POST', 'api/discord', { op: 'disconnect' }); chans = null; way = 'shared'; await reload(); ok(tr('Disconnected. The messages in Discord stay.')); });
         }
       });
       root.addEventListener('change', (ev) => {
@@ -3804,7 +3804,7 @@
         (I18N.source === 'env' ? '<p class="sublabel">' + tr('WORKS_LANG is set in the environment and takes precedence over this setting.') + '</p>' : '') +
         '<label class="field"><span>' + tr('Language') + '</span><select id="langSel">' + langs.map((l) => '<option value="' + esc(l.code) + '"' + (l.code === I18N.lang ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('') + '</select></label>' +
         segCtl('langScope', [{ id: 'global', label: tr('For all projects') }, { id: 'project', label: tr('Only this project') }], I18N.source === 'project' ? 'project' : 'global') +
-        '<div class="row-btns"><button class="btn small primary" id="langApply">' + tr('Apply') + '</button></div></div></details>');
+        '<div class="row-btns"><button class="btn small primary" id="langApply">' + tr('Apply') + '</button>' + (I18N.source === 'project' ? '<button class="btn small ghost" id="langReset">' + tr('Follow the global language') + '</button>' : '') + '</div></div></details>');
     }
     return h.join('');
   }
@@ -3839,6 +3839,12 @@
       const scope = ($('input[name="langScope"]:checked', body) || {}).value || 'global';
       if (await run(() => api('POST', 'api/lang', { lang: $('#langSel', body).value, scope }))) location.reload();
       else la.disabled = false;
+    };
+    const lr = $('#langReset', body);
+    if (lr) lr.onclick = async () => {
+      lr.disabled = true;
+      if (await run(() => api('POST', 'api/lang', { lang: '', scope: 'project' }))) location.reload();
+      else lr.disabled = false;
     };
     const rn = $('#recRun', body); if (rn) rn.onclick = () => run(() => act('recurRun', {}), (x) => x.message);
     const rr = $('#recNew', body); if (rr) rr.onclick = () => editRule(null);
