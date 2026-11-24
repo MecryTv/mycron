@@ -3,13 +3,13 @@ id: W-0049
 title: "Hub als Einstieg: zweites Board startet nicht selbst, Port erst beim Klick im Hub"
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: M
 risk:
 created: 2026-11-24
 updated: 2026-11-24
 due:
-completed:
+completed: 2026-11-24
 milestone:
 branch: feature/w-0049-hub-als-einstieg-zweites
 tags: [board, hub]
@@ -63,9 +63,7 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-24 22:29
-
-Fertig: CLI (works.mjs showHub und Abzweig im Serve-Pfad), server-control startDetached mit --no-hub, serve.mjs op show, hub.mjs gestoppte Projekte und open, board.js Ereignis hub, hub.css, Katalog, Doku. Tests: Selbsttest mit Browser 57/57, ohne WebSocket 50/50.
+Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -86,3 +84,4 @@ Fertig: CLI (works.mjs showHub und Abzweig im Serve-Pfad), server-control startD
 - 2026-11-24: Akzeptanzkriterien: "Sitzungsstart, works start und works board --serve verhalten sich gleich; Claude bekommt die Adresse des Hubs genannt" abgehakt
 - 2026-11-24: Akzeptanzkriterien: "Selbsttest deckt beide Fälle ab, in beiden Sprachen (nach W-0041)" abgehakt
 - 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
