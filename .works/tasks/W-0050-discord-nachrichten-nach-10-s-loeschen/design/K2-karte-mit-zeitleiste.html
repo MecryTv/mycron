@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="de" data-v="K2">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Entwurf: eine Nachricht je Aufgabe (works)</title>
+<style>
+.ew-dc { --bg: #ffffff; --side: #f2f3f5; --text: #313338; --muted: #5c5e66; --embed: #f2f3f5; --line: #e3e5e8; --btn: #e3e5e8; --btn-t: #313338; --pop: #ffffff; --input: #ebedef; --sel: #e3e5e8; --link: #006ce7;
+  min-height: 100vh; background: var(--bg); color: var(--text); font: 15px/1.375 "gg sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif; }
+:root[data-theme="dark"] .ew-dc { --bg: #313338; --side: #2b2d31; --text: #dbdee1; --muted: #949ba4; --embed: #2b2d31; --line: #3f4147; --btn: #4e5058; --btn-t: #ffffff; --pop: #2b2d31; --input: #383a40; --sel: #1e1f22; --link: #00a8fc; }
+.ew-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); font-weight: 600; flex-wrap: wrap; }
+.ew-head span { color: var(--muted); font-weight: 400; font-size: 14px; }
+.ew-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; min-height: calc(100vh - 49px); }
+.ew-members { background: var(--side); border-left: 1px solid var(--line); padding: 16px 10px; }
+@media (max-width: 900px) { .ew-layout { grid-template-columns: minmax(0, 1fr); } .ew-members { border-left: 0; border-top: 1px solid var(--line); } }
+.ew-list { padding: 10px 0 24px; max-width: 760px; }
+.ew-msg { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0 16px; padding: 6px 16px; }
+.ew-av { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #e8743d, #5550d9); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+.ew-av.ew-u { background: #e8a33d; }
+.ew-who { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.ew-who b { font-weight: 600; }
+.ew-app { font-size: 10px; font-weight: 600; padding: 0 4px; border-radius: 3px; background: #5865f2; color: #fff; line-height: 15px; }
+.ew-time { font-size: 12px; color: var(--muted); }
+.ew-pin { font-size: 12px; color: var(--muted); padding: 2px 16px 4px 72px; }
+.ew-embed { margin-top: 4px; max-width: 540px; display: grid; gap: 8px; padding: 10px 14px 12px 12px; border-radius: 4px; background: var(--embed); border-left: 4px solid var(--c, #5865f2); font-size: 14px; }
+.ew-embed + .ew-embed { margin-top: 6px; }
+.ew-title { font-weight: 600; font-size: 15px; }
+.ew-author { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.ew-author i { width: 18px; height: 18px; border-radius: 50%; display: inline-block; background: linear-gradient(135deg, #e8743d, #5550d9); }
+.ew-foot { font-size: 12px; color: var(--muted); }
+.ew-ts { background: color-mix(in srgb, var(--muted) 22%, transparent); border-radius: 3px; padding: 0 3px; }
+.ew-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
+.ew-fields b { display: block; font-size: 13px; font-weight: 600; }
+.ew-fields span { font-size: 13.5px; }
+.ew-proj { display: grid; gap: 6px; }
+.ew-prow { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 2px 8px; font-size: 13.5px; }
+.ew-prow b { font-weight: 600; }
+.ew-prow small { grid-column: 2; color: var(--muted); font-size: 12.5px; }
+.ew-mono { font-family: ui-monospace, Consolas, monospace; letter-spacing: -.5px; font-size: 12.5px; }
+.ew-img { border-radius: 8px; overflow: hidden; background: #1e1f2a; padding: 14px 16px; display: grid; gap: 12px; color: #e9eaf2; font: 13px/1.3 "gg sans", "Noto Sans", Arial, sans-serif; }
+.ew-img h4 { margin: 0; font-size: 14px; letter-spacing: .02em; display: flex; justify-content: space-between; }
+.ew-img h4 span { color: #9aa0b8; font-weight: 500; }
+.ew-bar { display: grid; grid-template-columns: 110px minmax(0, 1fr) 64px; gap: 10px; align-items: center; }
+.ew-bar .t { height: 12px; border-radius: 6px; background: #343748; overflow: hidden; display: flex; }
+.ew-bar .t i { display: block; height: 100%; }
+.ew-bar em { font-style: normal; text-align: right; color: #c6c8d8; font-variant-numeric: tabular-nums; }
+.ew-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-items: end; height: 54px; }
+.ew-week i { display: block; border-radius: 4px 4px 2px 2px; background: #5865f2; }
+.ew-week span { font-size: 11px; color: #9aa0b8; text-align: center; }
+.ew-select { margin-top: 6px; max-width: 540px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 12px; border-radius: 4px; background: var(--sel); border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent); font-size: 14px; color: var(--muted); }
+.ew-select b { color: var(--text); font-weight: 500; }
+.ew-menu { max-width: 540px; margin-top: 2px; border-radius: 4px; background: var(--pop); box-shadow: 0 8px 24px rgba(0,0,0,.25); overflow: hidden; }
+.ew-opt { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 0 10px; padding: 8px 12px; font-size: 14px; }
+.ew-opt small { grid-column: 2; color: var(--muted); font-size: 12.5px; }
+.ew-opt.ew-on { background: color-mix(in srgb, var(--muted) 18%, transparent); }
+.ew-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; max-width: 540px; }
+.ew-b { font: 500 14px/1 inherit; height: 32px; padding: 0 14px; border-radius: 4px; border: 0; display: inline-flex; align-items: center; gap: 6px; background: var(--btn); color: var(--btn-t); }
+.ew-b.ew-p { background: #5865f2; color: #fff; } .ew-b.ew-ok { background: #248046; color: #fff; }
+.ew-eph { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.ew-sec { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; padding: 8px 16px 2px; }
+.ew-mh { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; padding: 4px 6px 8px; }
+.ew-mem { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 0 10px; padding: 6px; border-radius: 6px; align-items: center; }
+.ew-mem.ew-hl { background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.ew-mem .ew-av { width: 32px; height: 32px; font-size: 11px; position: relative; }
+.ew-mem .ew-av::after { content: ""; position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: #23a55a; box-shadow: 0 0 0 3px var(--side); }
+.ew-mem b { font-weight: 600; font-size: 14px; display: flex; gap: 6px; align-items: center; }
+.ew-mem small { font-size: 12px; color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ew-card { margin: 10px 6px; padding: 12px; border-radius: 8px; background: var(--pop); box-shadow: 0 4px 16px rgba(0,0,0,.18); font-size: 13px; display: grid; gap: 6px; }
+.ew-card b { font-size: 15px; }
+.ew-card small { color: var(--muted); }
+.ew-help { display: grid; gap: 4px; }
+.ew-help div { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 8px; font-size: 13.5px; }
+.ew-help code { font-size: 12.5px; background: color-mix(in srgb, var(--muted) 18%, transparent); padding: 0 4px; border-radius: 3px; }
+@media (max-width: 560px) { .ew-help div { grid-template-columns: minmax(0, 1fr); gap: 0; } .ew-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .ew-bar { grid-template-columns: 84px minmax(0, 1fr) 54px; } }
+
+/* Rahmen des Entwurfs, nicht Teil des Designs */
+.ew-frame { position: sticky; top: 0; z-index: 2147483000; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 16px; font: 13px/1.45 system-ui, sans-serif; background: #fff6cc; color: #3d3200; border-bottom: 1px dashed #a88a00; }
+:root[data-theme="dark"] .ew-frame { background: #2a2400; color: #f5e9a8; border-color: #8a7300; }
+.ew-frame b { font-weight: 600; }
+.ew-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid currentColor; border-radius: 9px; }
+.ew-seg button { font: inherit; color: inherit; background: none; border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.ew-seg button[aria-pressed="true"] { background: #3d3200; color: #fff6cc; }
+:root[data-theme="dark"] .ew-seg button[aria-pressed="true"] { background: #f5e9a8; color: #2a2400; }
+.ew-note { flex-basis: 100%; margin: 0; }
+.ew-note:empty { display: none; }
+:root[data-frame="0"] .ew-frame { display: none; }
+body { margin: 0; }
+</style>
+<style>
+.ew-stub { margin: 8px 16px 6px 72px; padding: 8px 12px; border-radius: 6px; background: var(--embed); font-size: 13.5px; color: var(--muted); border-left: 4px solid #8e8cf7; }
+.ew-stub b { color: var(--text, inherit); font-weight: 600; } .ew-stub span { float: right; font-size: 12px; opacity: .8; }
+.ew-ed { font-size: 11px; color: var(--muted); }
+.st { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; } .dot.o { background: #e8a33d; } .dot.g { background: #23a55a; } .dot.b { background: #5865f2; }
+.steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; padding: 6px 16px 18px 72px; }
+.steps > div > small { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); margin-bottom: 2px; }
+.steps .ew-embed { max-width: none; }
+.tl { display: grid; gap: 5px; font-size: 13.5px; }
+.tl div { display: grid; grid-template-columns: 40px 20px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.tl span { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.tl i { font-style: normal; width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--k); background: color-mix(in srgb, var(--k) 20%, transparent); align-self: center; }
+.tl p { margin: 0; overflow-wrap: anywhere; } .tl div:not(.now) p { color: var(--muted); }
+.ew-embed.one { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 14px; padding: 7px 12px 8px 10px; margin-top: 4px; align-items: baseline; }
+.ew-embed.one p { margin: 0; font-size: 14px; } .ew-embed.one em { font-style: normal; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
+.ew-embed.one > span { font-size: 13px; color: var(--muted); }
+.one-steps { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+@media (max-width: 560px) { .steps { grid-template-columns: minmax(0, 1fr); padding-left: 16px; } .ew-stub { margin-left: 16px; } .ew-stub span { float: none; display: block; } .ew-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<div class="ew-frame" role="region" aria-label="Entwurfsrahmen">
+  <b>Entwurf: eine Nachricht je Aufgabe (W-0050)</b>
+  <span class="ew-seg" id="ew-variants" role="group" aria-label="Variante"></span>
+  <span class="ew-seg" role="group" aria-label="Farbschema"><button type="button" data-ew-theme="light">Hell</button><button type="button" data-ew-theme="dark">Dunkel</button></span>
+  <p class="ew-note" id="ew-note"></p>
+</div>
+
+<!-- ===== K1 ===== -->
+<section data-ew-variant="K1" data-ew-note="K1 Kompakte Karte: Je Aufgabe genau eine Nachricht. Oben Projekt und Aufgabe, darunter eine Zeile mit dem aktuellen Zustand, drei kleine Felder (Schritte, Kriterien, Zeit). Farbe und Knöpfe wechseln mit dem Zustand. Was vorher war, steht im Verlauf.">
+<div class="ew-dc"><div class="ew-head"># works <span>Panel oben, darunter eine Karte je Aufgabe</span></div>
+<div class="ew-layout"><div class="ew-list">
+  <div class="ew-stub">📌 <b>works · 3 Projekte</b> · 2 warten auf dich · 1 arbeitet · heute 7 erledigt <span>angeheftetes Panel (P2)</span></div>
+  <div class="ew-msg"><div class="ew-av">W</div><div><div class="ew-who"><b>Works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 20:24</span><span class="ew-ed">(bearbeitet)</span></div>
+    <div class="ew-embed" style="--c:#e8a33d"><div class="ew-author"><i></i>mycron</div><div class="ew-title">W-0051 Discord-Panel ohne Testprojekte</div>
+      <div class="st"><span class="dot o"></span>Wartet auf deine Freigabe · Bash · seit 2 Min.</div>
+      <div class="ew-fields"><div><b>Schritte</b><span>3 von 5</span></div><div><b>Kriterien</b><span>2 von 5</span></div><div><b>Zeit</b><span>18 Min.</span></div></div>
+      <div class="ew-foot">Freigeben in Claude Code · eine Nachricht je Aufgabe</div></div></div></div>
+  <div class="ew-msg"><div class="ew-av">W</div><div><div class="ew-who"><b>Works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 20:31</span><span class="ew-ed">(bearbeitet)</span></div>
+    <div class="ew-embed" style="--c:#23a55a"><div class="ew-author"><i></i>RL Nexus</div><div class="ew-title">W-0149 Belohnung für Kurven</div>
+      <div class="st"><span class="dot g"></span>Im Review · alle Kriterien erfüllt</div>
+      <div class="ew-fields"><div><b>Schritte</b><span>6 von 6</span></div><div><b>Kriterien</b><span>4 von 4</span></div><div><b>Kosten</b><span>2,40 $</span></div></div>
+      <div class="ew-foot">Abnehmen hier, im Board oder mit works done</div></div>
+    <div class="ew-btns"><span class="ew-b ew-ok">Annehmen</span><span class="ew-b">Zurückgeben</span></div></div></div>
+  <div class="ew-sec">Dieselbe Nachricht im Lauf der Aufgabe, jedes Mal bearbeitet</div>
+  <div class="steps">
+    <div><small>Start</small><div class="ew-embed" style="--c:#5865f2"><div class="ew-author"><i></i>mycron</div><div class="ew-title">W-0051 Discord-Panel ohne Testprojekte</div><div class="st"><span class="dot b"></span>In Arbeit · Test zuerst</div><div class="ew-fields"><div><b>Schritte</b><span>1 von 5</span></div><div><b>Kriterien</b><span>0 von 5</span></div><div><b>Zeit</b><span>4 Min.</span></div></div></div></div>
+    <div><small>Frage</small><div class="ew-embed" style="--c:#e8a33d"><div class="ew-author"><i></i>mycron</div><div class="ew-title">W-0051 Discord-Panel ohne Testprojekte</div><div class="st"><span class="dot o"></span>Frage an dich: Gnadenfrist 60 s oder 5 Min.?</div><div class="ew-fields"><div><b>Schritte</b><span>2 von 5</span></div><div><b>Kriterien</b><span>0 von 5</span></div><div><b>Zeit</b><span>9 Min.</span></div></div></div></div>
+    <div><small>Review</small><div class="ew-embed" style="--c:#23a55a"><div class="ew-author"><i></i>mycron</div><div class="ew-title">W-0051 Discord-Panel ohne Testprojekte</div><div class="st"><span class="dot g"></span>Im Review · alle Kriterien erfüllt</div><div class="ew-fields"><div><b>Schritte</b><span>5 von 5</span></div><div><b>Kriterien</b><span>5 von 5</span></div><div><b>Kosten</b><span>3,10 $</span></div></div></div><div class="ew-btns"><span class="ew-b ew-ok">Annehmen</span><span class="ew-b">Zurückgeben</span></div></div>
+    <div><small>Fertig</small><div class="ew-embed" style="--c:#80848e"><div class="ew-author"><i></i>mycron</div><div class="ew-title">✓ W-0051 Discord-Panel ohne Testprojekte</div><div class="st">Erledigt · ausgeliefert 85ecc2a · CI grün</div><div class="ew-foot">41 Min. · 3,10 $ · verschwindet in 1 Std.</div></div></div>
+  </div>
+</div>
+<aside class="ew-members"><div class="ew-mh">Gegenüber heute</div>
+  <div class="ew-card"><b>Statt vieler Nachrichten</b><small>Freigabe, Frage, Review, Erledigt und Auslieferung waren bisher je eine Nachricht. Jetzt ist es eine Karte, die mitwächst.</small></div>
+  <div class="ew-card"><b>Ohne Aufgabe</b><small>CI ohne Aufgabe, Wochenbericht und Warteschlange leer bleiben einzelne Nachrichten.</small></div>
+</aside></div></div>
+</section>
+
+<!-- ===== K2 ===== -->
+<section data-ew-variant="K2" data-ew-note="K2 Karte mit Zeitleiste: Wie K1, aber die Karte zeigt die Schritte der Aufgabe als kurze Zeitleiste, das Neueste unten. Man sieht auf einen Blick, was schon passiert ist, ohne den Verlauf zu öffnen. Höchstens 6 Zeilen, ältere fasst die Karte zusammen.">
+<div class="ew-dc"><div class="ew-head"># works <span>Panel oben, darunter eine Karte je Aufgabe</span></div>
+<div class="ew-layout"><div class="ew-list">
+  <div class="ew-stub">📌 <b>works · 3 Projekte</b> · 2 warten auf dich · 1 arbeitet · heute 7 erledigt <span>angeheftetes Panel (P2)</span></div>
+  <div class="ew-msg"><div class="ew-av">W</div><div><div class="ew-who"><b>Works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 20:10</span><span class="ew-ed">(bearbeitet)</span></div>
+    <div class="ew-embed" style="--c:#23a55a"><div class="ew-author"><i></i>mycron</div><div class="ew-title">W-0051 Discord-Panel ohne Testprojekte</div>
+      <div class="tl">
+        <div><span>20:10</span><i style="--k:#5865f2">▶</i><p>Gestartet · Branch fix/w-0051</p></div>
+        <div><span>20:18</span><i style="--k:#e8a33d">?</i><p>Frage beantwortet · Gnadenfrist 60 s</p></div>
+        <div><span>20:24</span><i style="--k:#e8a33d">⏳</i><p>Freigabe Bash · 2 Min. gewartet</p></div>
+        <div><span>20:39</span><i style="--k:#23a55a">✓</i><p>Tests grün · 5 von 5 Schritten</p></div>
+        <div class="now"><span>20:41</span><i style="--k:#23a55a">●</i><p><b>Im Review</b> · Kriterien 5 von 5 · 3,10 $</p></div>
+      </div>
+      <div class="ew-foot">Abnehmen hier, im Board oder mit works done</div></div>
+    <div class="ew-btns"><span class="ew-b ew-ok">Annehmen</span><span class="ew-b">Zurückgeben</span></div></div></div>
+  <div class="ew-msg"><div class="ew-av">W</div><div><div class="ew-who"><b>Works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 19:02</span><span class="ew-ed">(bearbeitet)</span></div>
+    <div class="ew-embed" style="--c:#80848e"><div class="ew-author"><i></i>Trainingsplan</div><div class="ew-title">✓ W-0004 Wochenplan</div>
+      <div class="tl">
+        <div><span>19:02</span><i style="--k:#5865f2">▶</i><p>Gestartet</p></div>
+        <div><span>19:40</span><i style="--k:#23a55a">✓</i><p>Angenommen im Board</p></div>
+        <div class="now"><span>19:46</span><i style="--k:#5865f2">⬆</i><p><b>Ausgeliefert</b> · 4c1e09a · CI grün</p></div>
+      </div>
+      <div class="ew-foot">44 Min. · 1,20 $ · verschwindet in 12 Min.</div></div></div></div>
+</div>
+<aside class="ew-members"><div class="ew-mh">Gegenüber K1</div>
+  <div class="ew-card"><b>Mehr auf einen Blick</b><small>Die Zeitleiste ersetzt die Felder. Wer nur kurz in den Kanal schaut, sieht, was seit dem Start passiert ist.</small></div>
+  <div class="ew-card"><b>Etwas höher</b><small>Eine Karte wächst auf bis zu 6 Zeilen, ältere werden zu „+3 frühere Schritte“.</small></div>
+</aside></div></div>
+</section>
+
+<!-- ===== K3 ===== -->
+<section data-ew-variant="K3" data-ew-note="K3 Eine Zeile je Aufgabe: Die kompakteste Form. Jede Aufgabe ist eine schmale Karte mit einer Zeile: Ampel, Aufgabe, Projekt, Zustand, Schritte. Knöpfe nur, wenn du etwas tun kannst. Details über den Knopf Verlauf oder das Menü im Panel.">
+<div class="ew-dc"><div class="ew-head"># works <span>Panel oben, darunter eine Karte je Aufgabe</span></div>
+<div class="ew-layout"><div class="ew-list">
+  <div class="ew-stub">📌 <b>works · 3 Projekte</b> · 2 warten auf dich · 1 arbeitet · heute 7 erledigt <span>angeheftetes Panel (P2)</span></div>
+  <div class="ew-msg"><div class="ew-av">W</div><div><div class="ew-who"><b>Works</b><span class="ew-app">APP</span><span class="ew-time">Heute um 20:24</span><span class="ew-ed">(bearbeitet)</span></div>
+    <div class="ew-embed one" style="--c:#e8a33d"><p><b>W-0051</b> Discord-Panel ohne Testprojekte <em>mycron</em></p><span>⏳ wartet auf deine Freigabe · Bash · 3/5</span></div>
+    <div class="ew-embed one" style="--c:#23a55a"><p><b>W-0149</b> Belohnung für Kurven <em>RL Nexus</em></p><span>● im Review · Kriterien 4/4</span></div>
+    <div class="ew-btns"><span class="ew-b ew-ok">W-0149 annehmen</span><span class="ew-b">Zurückgeben</span></div>
+    <div class="ew-embed one" style="--c:#5865f2"><p><b>W-0004</b> Wochenplan <em>Trainingsplan</em></p><span>▶ in Arbeit · 2/5</span></div>
+    <div class="ew-embed one" style="--c:#80848e"><p><b>✓ W-0048</b> Status nach Resume <em>mycron</em></p><span>ausgeliefert · CI grün</span></div></div></div>
+  <div class="ew-sec">So ändert sich eine Zeile</div>
+  <div class="steps one-steps">
+    <div><small>Start</small><div class="ew-embed one" style="--c:#5865f2"><p><b>W-0051</b> Discord-Panel ohne Testprojekte</p><span>▶ in Arbeit · 1/5</span></div></div>
+    <div><small>Freigabe</small><div class="ew-embed one" style="--c:#e8a33d"><p><b>W-0051</b> Discord-Panel ohne Testprojekte</p><span>⏳ wartet auf deine Freigabe · Bash</span></div></div>
+    <div><small>Review</small><div class="ew-embed one" style="--c:#23a55a"><p><b>W-0051</b> Discord-Panel ohne Testprojekte</p><span>● im Review · Kriterien 5/5</span></div></div>
+    <div><small>Fertig</small><div class="ew-embed one" style="--c:#80848e"><p><b>✓ W-0051</b> Discord-Panel ohne Testprojekte</p><span>ausgeliefert 85ecc2a · CI grün</span></div></div>
+  </div>
+</div>
+<aside class="ew-members"><div class="ew-mh">Gegenüber K1</div>
+  <div class="ew-card"><b>Am kürzesten</b><small>Vier Aufgaben brauchen so wenig Platz wie eine Karte in K1. Hier im Bild als eine Nachricht gezeichnet, in Discord bleibt es eine Nachricht je Aufgabe.</small></div>
+  <div class="ew-card"><b>Weniger Details</b><small>Kriterien, Zeit und Kosten erst über Verlauf oder das Menü im Panel.</small></div>
+</aside></div></div>
+</section>
+
+<script>
+(() => {
+  const q = new URLSearchParams(location.search);
+  const root = document.documentElement;
+  const parts = [...document.querySelectorAll('[data-ew-variant]')];
+  let v = q.get('v') || root.dataset.v || (parts[0] && parts[0].dataset.ewVariant);
+  let theme = q.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  if (q.get('frame') === '0') root.dataset.frame = '0';
+  const seg = document.getElementById('ew-variants');
+  for (const p of parts) { const b = document.createElement('button'); b.type = 'button'; b.dataset.ewV = p.dataset.ewVariant; b.textContent = p.dataset.ewVariant; seg.append(b); }
+  function render() {
+    root.dataset.v = v; root.dataset.theme = theme;
+    for (const p of parts) p.style.display = p.dataset.ewVariant === v ? '' : 'none';
+    document.querySelectorAll('[data-ew-v]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ewV === v)));
+    document.querySelectorAll('[data-ew-theme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ewTheme === theme)));
+    const cur = parts.find((p) => p.dataset.ewVariant === v);
+    document.getElementById('ew-note').textContent = cur ? cur.dataset.ewNote || '' : '';
+  }
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-ew-v], [data-ew-theme]'); if (!b) return; if (b.dataset.ewV) v = b.dataset.ewV; else theme = b.dataset.ewTheme; render(); });
+  render();
+})();
+</script>
+</body>
+</html>

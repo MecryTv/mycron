@@ -72,6 +72,33 @@
       "source": "ui-ux-pro-max",
       "note": "Wie P1, Bild zusätzlich mit den letzten 24 Stunden je Projekt als Spur; Text knapper; Verlauf-Ansicht nach dem Klick",
       "at": "2026-11-24 20:56"
+    },
+    {
+      "name": "K1",
+      "title": "Kompakte Karte je Aufgabe",
+      "file": "K1-kompakte-karte-je-aufgabe.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Eine Nachricht je Aufgabe, bei jedem Schritt bearbeitet: Zustandszeile, Felder Schritte, Kriterien, Zeit; Farbe und Knöpfe nach Zustand",
+      "at": "2026-11-24 22:09"
+    },
+    {
+      "name": "K2",
+      "title": "Karte mit Zeitleiste",
+      "file": "K2-karte-mit-zeitleiste.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Wie K1, statt der Felder die Schritte der Aufgabe als Zeitleiste, höchstens 6 Zeilen",
+      "at": "2026-11-24 22:09"
+    },
+    {
+      "name": "K3",
+      "title": "Eine Zeile je Aufgabe",
+      "file": "K3-eine-zeile-je-aufgabe.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Kompakteste Form: eine Zeile mit Ampel, Aufgabe, Projekt, Zustand; Knöpfe nur bei Bedarf",
+      "at": "2026-11-24 22:09"
     }
   ],
   "brainstorm": [],

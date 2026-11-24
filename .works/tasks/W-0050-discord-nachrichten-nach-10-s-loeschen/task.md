@@ -85,3 +85,7 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 - 2026-11-24: Entwurf P2 „Panel weiterentwickelt mit 24-Stunden-Spuren“ angehängt
 - 2026-11-24: Entwurf P2 „Panel weiterentwickelt mit 24-Stunden-Spuren“ gewählt. Grund: Nutzer am 2026-11-24: P2 mit Spuren. Panel bleibt, Bild bekommt die letzten 24 Stunden je Projekt als Spur, Text knapper, Verlauf-Ansicht wie gezeigt
 - 2026-11-24: Nutzer wählt P2 (Panel mit 24-Stunden-Spuren); Akzeptanzkriterien für Panel-Text, Bild und Verlauf-Ansicht ergänzt
+- 2026-11-24: Nutzer am 2026-11-24, neuer Wunsch: Discord-Nachrichten länger als 10 s zeigen, aber kompakter: je Aufgabe nur eine Nachricht, die bei jedem Schritt bearbeitet wird, statt vieler einzelner. Erst Entwürfe zeigen. Panel P2 und Verlauf bleiben gewählt.
+- 2026-11-24: Entwurf K1 „Kompakte Karte je Aufgabe“ angehängt
+- 2026-11-24: Entwurf K2 „Karte mit Zeitleiste“ angehängt
+- 2026-11-24: Entwurf K3 „Eine Zeile je Aufgabe“ angehängt
