@@ -1677,9 +1677,11 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     g.start();
     try {
       await dwait(() => g.ready, 'Gateway bereit');
+      // Die Trennung selbst auslösen (wie nach op 7): Von außen ist das Fenster bis zur Fortsetzung auf schnellen
+      // Rechnern zu kurz, um es abzuwarten (W-0048). Ab der Trennung gilt die Verbindung nicht mehr als bereit.
       const resumes = fake.gateway.resumes;
-      fake.reconnect();
-      await dwait(() => !g.ready, 'Gateway trennt für die Fortsetzung');
+      g.reconnect(true);
+      expect(!g.ready, 'Gateway gilt während der Trennung als bereit');
       g.setStatus('während der Trennung geändert');
       await dwait(() => fake.gateway.resumes > resumes && g.ready, 'Gateway fortgesetzt');
       await dwait(() => /während der Trennung geändert/.test(JSON.stringify(fake.gateway.presence || {})), 'Status nach der Fortsetzung');
