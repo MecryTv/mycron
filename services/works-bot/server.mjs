@@ -15,6 +15,9 @@
 //   DELETE /v1/channels/:id/messages/:mid         delete a message created with this key (W-0044)
 //   GET  /v1/inbox?wait=s                         commands and clicks for this device (long poll, W-0037)
 //   POST /v1/interactions/:id/reply               answer one of them (the interaction token stays here)
+//   GET  /v1/guild/channels                       text channels of the linked server, can the bot post there (W-0038)
+//   POST /v1/link/channel {channel_id}            move the link to another channel of that server the bot can post in
+// After a move the device may still edit and delete its messages in the channels it left (old dashboard, cleanup).
 // Status 410 means: the link is broken (bot removed, rights taken away, channel deleted); link again with /works link.
 // No dependencies. Discord REST and gateway, commands, help and dialogs come from the works plugin
 // (discord-api.mjs, discord-ui.mjs).
@@ -23,7 +26,7 @@ import net from 'node:net';
 import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
-import { Rest, Gateway } from '../../plugins/works/skills/works/scripts/discord-api.mjs';
+import { Rest, Gateway, guildChannels } from '../../plugins/works/skills/works/scripts/discord-api.mjs';
 import { commands, helpMessage, modalFor, parseCid, MODAL, CID_RE, who, subOf, ephemeral, notOwner } from '../../plugins/works/skills/works/scripts/discord-ui.mjs';
 
 const env = process.env;
@@ -43,7 +46,7 @@ const ADMIN = 1n << 3n;
 const NEEDED = { 'Kanal sehen / View Channel': 1n << 10n, 'Nachrichten senden / Send Messages': 1n << 11n, 'Links einbetten / Embed Links': 1n << 14n };
 const INVITE_PERMISSIONS = String((1n << 10n) | (1n << 11n) | (1n << 14n) | (1n << 16n) | (1n << 51n));
 // Per key and minute. The local bot bundles status post edits (at most every 10 s per project).
-const LIMITS = { post: 30, patch: 120, pin: 10, del: 60, reply: 60 };
+const LIMITS = { post: 30, patch: 120, pin: 10, del: 60, reply: 60, channels: 10 };
 // A command or click waits this long for its device to fetch it, then this long for the answer (W-0037).
 const PICKUP = FAST ? 2000 : 10000;
 const ANSWER = FAST ? 20000 : 120000;
@@ -493,9 +496,33 @@ async function handle(req, res) {
     if (r.data && r.data.id) { answers.set(String(r.data.id), a.h); while (answers.size > 5000) answers.delete(answers.keys().next().value); }
     return send(res, 200, { ok: true });
   }
+  // Channel choice in the works board (W-0038): the channels of the linked server with the bot's rights, and moving
+  // the link. Failures here say nothing about the linked channel (soft), the link stays.
+  if ((req.method === 'GET' && p === '/v1/guild/channels') || (req.method === 'POST' && p === '/v1/link/channel')) {
+    const wait = limited(a.h, 'channels');
+    if (wait) return err(res, 429, 'You are being rate limited.', { retry_after: wait });
+    const body = req.method === 'POST' ? await readBody(req) : {};
+    const r = await forward(res, a, () => guildChannels((route) => rest.get(route), a.link.guild_id, me.id), { soft: true });
+    if (!r.ok) return undefined;
+    const here = { guild_id: a.link.guild_id, guild_name: a.link.guild_name };
+    if (req.method === 'GET') return send(res, 200, { ...here, channel_id: a.link.channel_id, channels: r.data });
+    const id = String(body.channel_id || '');
+    const c = r.data.find((x) => x.id === id);
+    if (!c) return err(res, 404, 'Unknown channel on the linked server', { code: 10003 });
+    if (!c.can) return err(res, 403, `The bot cannot post in #${c.name} (missing: ${c.missing.join(', ')})`, { code: 50013, missing: c.missing });
+    if (id !== a.link.channel_id) {
+      a.link.old_channels = [a.link.channel_id, ...(a.link.old_channels || [])].filter((x, i, all) => x !== id && all.indexOf(x) === i).slice(0, 5);
+      Object.assign(a.link, { channel_id: id, channel_name: c.name });
+      saveNow();
+      log(`device moved to another channel in guild ${a.link.guild_id}`);
+    }
+    return send(res, 200, { ...here, channel_id: id, channel_name: c.name });
+  }
   if ((m = p.match(/^\/v1\/channels\/(\d+)\/messages(?:\/(pins\/)?(\d+))?$/))) {
     const [, cid, pin, mid] = m;
-    if (cid !== a.link.channel_id) return err(res, 403, 'Missing Access', { code: 50001 });
+    // In channels the link moved away from, own messages may still be edited and deleted (W-0038).
+    const left = mid && !pin && ['PATCH', 'DELETE'].includes(req.method) && (a.link.old_channels || []).includes(cid);
+    if (cid !== a.link.channel_id && !left) return err(res, 403, 'Missing Access', { code: 50001 });
     if (mid && (!Object.hasOwn(store.messages, mid) || store.messages[mid].h !== a.h)) return err(res, 403, 'Cannot edit a message of another device', { code: 50005 });
     const kind = req.method === 'POST' && !mid ? 'post' : req.method === 'PATCH' && mid && !pin ? 'patch' : req.method === 'PUT' && mid && pin ? 'pin' : req.method === 'DELETE' && mid && !pin ? 'del' : '';
     if (!kind) return err(res, 404, 'Not found');
@@ -512,7 +539,7 @@ async function handle(req, res) {
     }
     if (kind === 'patch') {
       const files = filesOf(body);
-      const r = await forward(res, a, () => rest.patch(`/channels/${cid}/messages/${mid}`, sanitize(body, a.link, false), files));
+      const r = await forward(res, a, () => rest.patch(`/channels/${cid}/messages/${mid}`, sanitize(body, a.link, false), files), { soft: left });
       if (!r.ok) return undefined;
       own(a.h, mid); // edited messages stay owned (the dashboard lives for months)
       save();
@@ -520,7 +547,7 @@ async function handle(req, res) {
     }
     if (kind === 'del') {
       // Already gone at Discord counts as deleted.
-      const r = await forward(res, a, () => rest.del(`/channels/${cid}/messages/${mid}`).catch((e) => { if (e.status === 404) return null; throw e; }));
+      const r = await forward(res, a, () => rest.del(`/channels/${cid}/messages/${mid}`).catch((e) => { if (e.status === 404) return null; throw e; }), { soft: left });
       if (!r.ok) return undefined;
       delete store.messages[mid];
       a.link.mids = (a.link.mids || []).filter((x) => x !== mid);
