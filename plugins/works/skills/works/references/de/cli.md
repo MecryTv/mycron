@@ -177,7 +177,7 @@ Ein Bot je Rechner für alle Projekte. Alles liegt in `~/.works/discord`, nie im
 | `import <datei> [--format ..] [--map feld=Spalte,..] [--sheet ..] [--json] [--all]` | Vorschau mit Duplikaten, siehe import.md |
 | `import <sicherung.json> [--apply] [--mode merge\|restore] [--only 1,4]` | works-Sicherung aus `export --json`: Vorschau mit neu, geändert, gleich, nur hier. `--apply` führt zusammen (neue Aufgaben mit freien IDs, gewählte geänderte übernehmen), `--mode=restore` ersetzt den Stand und sichert ihn vorher in `.works/backups/`. Beides mit `undo` rückgängig |
 | `import <datei> --apply [--only 1,4] [--skip 3] [--status geplant] [--tags ..] [--include-done] [--keep-dups] [--include-archived]` | Anlegen |
-| `selftest [--browser] [--keep] [--verbose] [--only <text>]` | Prüft CLI, Hooks, Import, Dateien, Parallelarbeit, Server und API in einem Wegwerfprojekt. Exit 1 bei Fehlern. `--only` führt nur Schritte aus, deren Name den Text enthält (für eigenständige Schritte wie `works ship`) |
+| `selftest [--browser] [--keep] [--verbose] [--only <text>]` | Prüft CLI, Hooks, Import, Dateien, Parallelarbeit, Server und API in einem Wegwerfprojekt. Exit 1 bei Fehlern. `--only` führt nur Schritte aus, deren Name den Text enthält (für eigenständige Schritte wie `works ship`); mehrere Teile mit `\|` getrennt, etwa `--only "init, new\|Discord"` |
 
 Im Worktree einer parallelen Aufgabe (erkennbar an `.works.link`) arbeitet das CLI auf der `.works` des Hauptprojekts. `start` ändert dort die aktive Aufgabe nicht, `done` ist gesperrt.
 

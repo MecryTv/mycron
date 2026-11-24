@@ -72,7 +72,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const has = (text, part, what) => expect(String(text).includes(part), `${what || 'Ausgabe'} enthält nicht "${part}": ${String(text).slice(0, 300)}`);
   const step = async (name, fn) => {
-    if (only && !name.includes(only)) return;
+    if (only && !only.split('|').some((o) => name.includes(o))) return;
     const t0 = Date.now();
     try { await fn(); results.push({ name, ok: true }); log(`ok      ${name}${verbose ? ` (${Date.now() - t0} ms)` : ''}`); }
     catch (e) {
@@ -1877,6 +1877,39 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
     } finally {
       await wa(['discord', 'set', 'cleanup.hours=24'], { extraEnv: denv, ok: false });
+      await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+    }
+  });
+
+  // W-0051: Das Panel zeigt nur Projekte, deren Ordner .works/config.json hat. Fehlt der Ordner oder steht das Projekt
+  // nicht mehr in projects.json, fällt es nach einer Gnadenfrist (im Testtakt 2 s) auch aus state.json. Ein Projekt,
+  // das nur kurz nicht lesbar ist (Branch-Wechsel), bleibt.
+  await step('Discord: Panel nur mit Projekten, die .works haben (W-0051)', async () => {
+    const mk = (name) => { const p = path.join(base, name); fs.mkdirSync(p, { recursive: true }); w(['init'], { cwd: p }); return p; };
+    const gone = mk('weg-ordner'); const unreg = mk('weg-liste');
+    const regFile = path.join(home, '.works', 'projects.json');
+    const inDash = (name) => { const d = dashOf('projekt'); return !!d && (d.e.description || '').includes(`**${name}**`); };
+    const inState = (name) => { try { return Object.values(JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')).projects || {}).some((p) => p.name === name || (p.snap && p.snap.name === name)); } catch { return true; } };
+    await wa(['discord', 'start'], { extraEnv: denv, ok: false });
+    try {
+      await dwait(() => inDash('weg-ordner') && inDash('weg-liste'), 'beide Testprojekte im Panel');
+      // Kurz unlesbar: config.json fehlt eine Sekunde, das Projekt bleibt in Panel und state.json.
+      const cf = path.join(gone, '.works', 'config.json');
+      fs.renameSync(cf, `${cf}.weg`);
+      await new Promise((r) => setTimeout(r, 1000));
+      expect(inDash('weg-ordner') && inState('weg-ordner'), 'kurz unlesbares Projekt sofort entfernt');
+      fs.renameSync(`${cf}.weg`, cf);
+      await new Promise((r) => setTimeout(r, 2500));
+      expect(inDash('weg-ordner'), 'wieder lesbares Projekt entfernt');
+      // Ordner gelöscht, Projekt aus projects.json entfernt: beide verschwinden aus Panel und state.json.
+      fs.rmSync(gone, { recursive: true, force: true });
+      const reg = JSON.parse(fs.readFileSync(regFile, 'utf8'));
+      fs.writeFileSync(regFile, JSON.stringify({ projects: reg.projects.filter((p) => path.basename(p.path) !== 'weg-liste') }, null, 2));
+      await dwait(() => !inDash('weg-ordner') && !inDash('weg-liste'), 'Panel ohne gelöschte Projekte');
+      await dwait(() => !inState('weg-ordner') && !inState('weg-liste'), 'state.json ohne gelöschte Projekte');
+      expect(inDash('projekt'), 'vorhandenes Projekt fehlt im Panel');
+    } finally {
+      fs.rmSync(unreg, { recursive: true, force: true });
       await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
     }
   });
