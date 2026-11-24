@@ -54,7 +54,7 @@ Rest aus Entwurf J2 (W-0038), Entscheidung des Nutzers am 2026-11-24: als eigene
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
 
 ## Designentscheidungen
-<!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
+Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
 ![Vorher: Reiter Befehle ohne Schalter (Stand W-0038)](assets/2026-11-24-vorher-reiter-befehle-ohne-schalter-vorher.png)
@@ -102,3 +102,6 @@ Fertig im Branch feature/w-0046-discord-dialog-schalter (5 Commits, nicht gemerg
 - 2026-11-24: Asset hinzugefügt: assets/2026-11-24-nachher-reiter-befehle-mit-schalter-nachher.png (nachher)
 - 2026-11-24: Asset hinzugefügt: assets/2026-11-24-nachher-reiter-projekte-mit-kanal-je-nachher.png (nachher)
 - 2026-11-24: Geprüft von der Hauptsitzung: Diff, Dienst-Test, Selbsttest 14/14 mit Browser und 12/12 ohne WebSocket, Responsive-Check im eingebauten Browser (375, 768, 1440 ohne Überlauf). Code-Audit: nichts gefunden.
+- 2026-11-24: Parallele Arbeit beendet
+- 2026-11-24: decisions.md angelegt
+- 2026-11-24: Entscheidung E1 dokumentiert: Schalter Befehle und Knöpfe, Kanal je Projekt
