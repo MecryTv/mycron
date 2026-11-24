@@ -3,7 +3,7 @@ id: W-0041
 title: Alles auf Englisch, Sprache umschaltbar
 type: feature
 priority: P2
-status: backlog
+status: in-arbeit
 effort: XL
 risk:
 created: 2026-11-23
@@ -11,7 +11,7 @@ updated: 2026-11-24
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0041-alles-auf-englisch-sprache
 tags: []
 blocked_by: []
 blocks: []
@@ -37,16 +37,16 @@ Wunsch des Nutzers am 2026-11-23: Die Skills und alle Infos auf Englisch umschre
 ## Akzeptanzkriterien
 - [ ] CLI, Board, Hub und Discord-Nachrichten sind standardmäßig englisch
 - [ ] Die Sprache lässt sich jederzeit umstellen (mindestens Deutsch und Englisch)
-- [ ] SKILL.md und references aller vier Plugins sind englisch
+- [x] SKILL.md und references aller vier Plugins sind englisch
 - [ ] Claude antwortet in der eingestellten Sprache
 - [ ] Selbsttest und Plugin-Tests laufen in beiden Sprachen grün
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
 Phasen, je Phase: Test zuerst, umsetzen, Selbsttest der Bereiche grün, committen, `works handoff` mit Stand und nächstem Schritt. Wird der Kontext knapp, nach einer abgeschlossenen Phase aufhören und berichten; eine neue Sitzung macht mit der Übergabe weiter.
-- [ ] Phase 1, Kern: scripts/i18n.mjs mit `language(root)` (Reihenfolge: Umgebung WORKS_LANG, dann `language` in .works/config.json des Projekts, dann `language` in ~/.works/settings.json, sonst `en`) und `t(text, vars)` nach gettext-Art: Quelltexte englisch im Code, Katalog scripts/i18n/de.json (englischer Text → deutscher Text, Platzhalter {name}), fehlende Einträge fallen auf Englisch zurück; weitere Sprachen = weitere JSON-Datei. CLI `works lang` (zeigen), `works lang de` (global), `works lang de --project`, `works lang --reset --project`. Test, dass jeder Katalogeintrag dieselben Platzhalter hat wie sein Quelltext.
-- [ ] Phase 2, Doku: SKILL.md und references aller vier Plugins (works, workday, ci-watch, mockups) auf Englisch; die bisherigen deutschen Fassungen als zweite Fassung behalten: SKILL.de.md und references/de/ (Inhalt gleich halten). SKILL.md sagt oben: Ist die Sprache Deutsch (`works lang`), SKILL.de.md und references/de/ lesen und auf Deutsch antworten. Skill-Beschreibungen (frontmatter description) englisch.
-- [ ] Phase 3, Aufgabenformat: Vorlagen (references/templates, works new) mit Überschriften in der eingestellten Sprache; der Parser (getSection und Verwandte in lib.mjs) kennt beide Sprachen über eine Alias-Tabelle (Beschreibung/Description, Akzeptanzkriterien/Acceptance criteria, Umsetzungsplan/Implementation plan, …), bestehende deutsche Aufgaben bleiben gültig. Status- und Prioritätswerte bleiben als Daten unverändert (in-arbeit, erledigt …), nur die Anzeige wird übersetzt; englische Eingaben (in-progress, done …) als Alias annehmen.
+- [x] Phase 1, Kern: scripts/i18n.mjs mit `language(root)` (Reihenfolge: Umgebung WORKS_LANG, dann `language` in .works/config.json des Projekts, dann `language` in ~/.works/settings.json, sonst `en`) und `t(text, vars)` nach gettext-Art: Quelltexte englisch im Code, Katalog scripts/i18n/de.json (englischer Text → deutscher Text, Platzhalter {name}), fehlende Einträge fallen auf Englisch zurück; weitere Sprachen = weitere JSON-Datei. CLI `works lang` (zeigen), `works lang de` (global), `works lang de --project`, `works lang --reset --project`. Test, dass jeder Katalogeintrag dieselben Platzhalter hat wie sein Quelltext.
+- [x] Phase 2, Doku: SKILL.md und references aller vier Plugins (works, workday, ci-watch, mockups) auf Englisch; die bisherigen deutschen Fassungen als zweite Fassung behalten: SKILL.de.md und references/de/ (Inhalt gleich halten). SKILL.md sagt oben: Ist die Sprache Deutsch (`works lang`), SKILL.de.md und references/de/ lesen und auf Deutsch antworten. Skill-Beschreibungen (frontmatter description) englisch.
+- [x] Phase 3, Aufgabenformat: Vorlagen (references/templates, works new) mit Überschriften in der eingestellten Sprache; der Parser (getSection und Verwandte in lib.mjs) kennt beide Sprachen über eine Alias-Tabelle (Beschreibung/Description, Akzeptanzkriterien/Acceptance criteria, Umsetzungsplan/Implementation plan, …), bestehende deutsche Aufgaben bleiben gültig. Status- und Prioritätswerte bleiben als Daten unverändert (in-arbeit, erledigt …), nur die Anzeige wird übersetzt; englische Eingaben (in-progress, done …) als Alias annehmen.
 - [ ] Phase 4, CLI und Hooks: alle Ausgaben von works.mjs und den Modulen außer den Discord- und Board-Dateien über t(); Hooks geben Claude die Sprache mit (SessionStart: „Language: de, answer in German, German docs in SKILL.de.md and references/de/“). Selbsttest bekommt WORKS_LANG=de in seiner Umgebung, damit die bestehenden deutschen Prüfungen gelten, plus ein Schritt, der die englische Standardausgabe wichtiger Befehle prüft.
 - [ ] Phase 5, Board und Hub (erst nach dem Merge von W-0038 in main, siehe Hinweise): board.js, hub, template über einen Katalog vom Server (gleiche de.json), Sprachwahl im Board (global oder für dieses Projekt).
 - [ ] Phase 6, Discord (erst nach dem Merge von W-0038): Texte in discord-bot.mjs, discord.mjs, discord-ui.mjs über t() mit der globalen Sprache; Antworten auf Befehle und Knöpfe folgen weiter der Sprache des Discord-Clients. Dienst services/works-bot bleibt englisch mit deutscher Übersetzung wie bisher.
@@ -85,3 +85,11 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: Aufgabe angelegt
 - 2026-11-24: decisions.md angelegt
 - 2026-11-24: Entscheidung E1 dokumentiert: Doku in zwei Fassungen, Sprache global mit Ausnahme je Projekt
+- 2026-11-24: Parallel gestartet im Worktree W-0041-alles-auf-englisch (Status: backlog → in-arbeit)
+- 2026-11-24: Umsetzungsplan: "Phase 1, Kern: scripts/i18n.mjs mit `language(root)` (Reihenfolge: Umgebung WORKS_LANG, dann `language` in .works/config.json des Projekts, dann `language` in ~/.works/settings.json, sonst `en`) und `t(text, vars)` nach gettext-Art: Quelltexte englisch im Code, Katalog scripts/i18n/de.json (englischer Text → deutscher Text, Platzhalter {name}), fehlende Einträge fallen auf Englisch zurück; weitere Sprachen = weitere JSON-Datei. CLI `works lang` (zeigen), `works lang de` (global), `works lang de --project`, `works lang --reset --project`. Test, dass jeder Katalogeintrag dieselben Platzhalter hat wie sein Quelltext." abgehakt
+- 2026-11-24: Phase 1 fertig: scripts/i18n.mjs, i18n/de.json, works lang (global, --project, --reset), Selbsttest-Schritt Sprache
+- 2026-11-24: Umsetzungsplan: "Phase 2, Doku: SKILL.md und references aller vier Plugins (works, workday, ci-watch, mockups) auf Englisch; die bisherigen deutschen Fassungen als zweite Fassung behalten: SKILL.de.md und references/de/ (Inhalt gleich halten). SKILL.md sagt oben: Ist die Sprache Deutsch (`works lang`), SKILL.de.md und references/de/ lesen und auf Deutsch antworten. Skill-Beschreibungen (frontmatter description) englisch." abgehakt
+- 2026-11-24: Akzeptanzkriterien: "SKILL.md und references aller vier Plugins sind englisch" abgehakt
+- 2026-11-24: Phase 2 fertig: SKILL.md und references aller vier Plugins englisch, deutsche Fassung als SKILL.de.md und references/de/, Beschreibungen in plugin.json und marketplace.json englisch
+- 2026-11-24: Umsetzungsplan: "Phase 3, Aufgabenformat: Vorlagen (references/templates, works new) mit Überschriften in der eingestellten Sprache; der Parser (getSection und Verwandte in lib.mjs) kennt beide Sprachen über eine Alias-Tabelle (Beschreibung/Description, Akzeptanzkriterien/Acceptance criteria, Umsetzungsplan/Implementation plan, …), bestehende deutsche Aufgaben bleiben gültig. Status- und Prioritätswerte bleiben als Daten unverändert (in-arbeit, erledigt …), nur die Anzeige wird übersetzt; englische Eingaben (in-progress, done …) als Alias annehmen." abgehakt
+- 2026-11-24: Phase 3 fertig: Vorlagen in beiden Sprachen, Abschnitts-Aliase in lib.mjs, englische Werte für status/risk/kind; Selbsttest 41/41 grün mit WORKS_LANG=de

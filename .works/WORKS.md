@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-24 15:20 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-24 16:23 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 0 | 0 | 0 | 0 | 43 | 0 |
+| 2 | 0 | 1 | 1 | 0 | 0 | 43 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 2 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 3 · P3 Mittel: 1 · P4 Niedrig: 0
+
+## Aktive Aufgabe
+
+[W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) Board: Einstellungen für den Discord-Bot (Review), letzte Übergabe 2026-11-24 16:07
 
 ## Kritisch (P1)
 
@@ -16,14 +20,17 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | Review | M |  |  |  |
+| [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | In Arbeit | XL |  |  |  |
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | Backlog | M |  |  |  |
-| [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | Backlog | XL |  |  |  |
+| [W-0047](tasks/W-0047-status-des-bots-geht-nach-einer-gateway/task.md) | Status des Bots geht nach einer Gateway-Fortsetzung verloren | Bug | P2 Hoch | Backlog | S |  |  |  |
+| [W-0046](tasks/W-0046-discord-dialog-schalter-befehle-und/task.md) | Discord-Dialog: Schalter Befehle und Knöpfe, Kanal je Projekt | Feature | P3 Mittel | Backlog | S |  |  |  |
 
 ## Zuletzt erledigt
 

@@ -19,6 +19,37 @@ Angelegt am 2026-11-23. Diese Datei hält fest, was entschieden wurde, warum, un
   - I Seitenleiste: nicht gewählt
 - Konsequenzen:
 
+### E2: Schreibrecht im Kanal lokal berechnet
+- Datum: 2026-11-24
+- Quelle: Agent
+- Kontext:
+- Entscheidung: works rechnet das Recht des Bots wie Discord aus Rollen und Overwrites (sehen, senden, Links einbetten), eine Funktion in discord-api.mjs für Plugin und Dienst. Ausgegraute Kanäle tragen den Grund.
+- Begründung: Discord liefert das effektive Recht je Kanal nicht über REST; mit einer gemeinsamen Funktion sagen Board, CLI und Dienst dasselbe.
+- Verworfene Alternativen:
+  - Ausprobieren mit einer Testnachricht: hinterlässt Nachrichten und braucht je Kanal einen Aufruf
+- Konsequenzen:
+
+### E3: Umzug der Kopplung beim gemeinsamen Bot
+- Datum: 2026-11-24
+- Quelle: Agent
+- Kontext:
+- Entscheidung: POST /v1/link/channel zieht die Kopplung in einen anderen Kanal desselben Servers, nur wenn der Bot dort schreiben darf. In den bis zu fünf verlassenen Kanälen darf das Gerät nur eigene Nachrichten bearbeiten und löschen, nichts Neues schreiben.
+- Begründung: Sonst bliebe das alte Dashboard stehen, weil der Dienst Löschen außerhalb des gekoppelten Kanals ablehnte.
+- Verworfene Alternativen:
+  - Neu koppeln mit /works verbinden: der Nutzer wollte die Wahl im Board
+  - Dienst löscht das alte Dashboard selbst: er weiß nicht
+  - welche Nachricht das Dashboard ist
+- Konsequenzen:
+
+### E4: Token, Code und Trennen nur am Rechner
+- Datum: 2026-11-24
+- Quelle: Agent
+- Kontext:
+- Entscheidung: /api/discord nur mit Besitzer-Level edit; token, link und disconnect zusätzlich nur bei lokalen Anfragen. Antworten enthalten Token und Schlüssel nur maskiert.
+- Begründung: Über einen geteilten Bearbeitungslink ginge das Token unverschlüsselt durchs Netz.
+- Verworfene Alternativen:
+- Konsequenzen:
+
 ## UI und UX
 <!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
 
