@@ -50,7 +50,7 @@ Phasen, je Phase: Test zuerst, umsetzen, Selbsttest der Bereiche grün, committe
 - [x] Phase 4, CLI und Hooks: alle Ausgaben von works.mjs und den Modulen außer den Discord- und Board-Dateien über t(); Hooks geben Claude die Sprache mit (SessionStart: „Language: de, answer in German, German docs in SKILL.de.md and references/de/“). Selbsttest bekommt WORKS_LANG=de in seiner Umgebung, damit die bestehenden deutschen Prüfungen gelten, plus ein Schritt, der die englische Standardausgabe wichtiger Befehle prüft.
 - [ ] Phase 5, Board und Hub (erst nach dem Merge von W-0038 in main, siehe Hinweise): board.js, hub, template über einen Katalog vom Server (gleiche de.json), Sprachwahl im Board (global oder für dieses Projekt).
 - [ ] Phase 6, Discord (erst nach dem Merge von W-0038): Texte in discord-bot.mjs, discord.mjs, discord-ui.mjs über t() mit der globalen Sprache; Antworten auf Befehle und Knöpfe folgen weiter der Sprache des Discord-Clients. Dienst services/works-bot bleibt englisch mit deutscher Übersetzung wie bisher.
-- [ ] Phase 7, Plugins workday, ci-watch, mockups: Skript-Ausgaben ebenso; Selbsttest und Plugin-Tests in beiden Sprachen grün (einmal WORKS_LANG=de, einmal en für die englischen Prüfungen).
+- [x] Phase 7, Plugins workday, ci-watch, mockups: Skript-Ausgaben ebenso; Selbsttest und Plugin-Tests in beiden Sprachen grün (einmal WORKS_LANG=de, einmal en für die englischen Prüfungen).
 
 Hinweise für die Umsetzung:
 - W-0038 (Discord-Einstellungen im Board) läuft gleichzeitig in einem anderen Worktree und ändert board.js, board.css, serve.mjs, api.mjs, discord*.mjs, die Discord-Teile von works.mjs (cmdDiscord) und selftest.mjs. Diese Stellen in Phase 1 bis 4 nicht anfassen. Vor Phase 5 meldet die Hauptsitzung, dass W-0038 in main ist; dann `git merge main` in diesem Branch, Konflikte lösen, weiter.
@@ -76,10 +76,19 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
 
 ## Offene Fragen
-<!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
+- [ ] Bestehende Projekte haben durch das alte works init "language": "de" in .works/config.json. Das zählt jetzt als Projekt-Einstellung und hat Vorrang vor der globalen Sprache (works lang zeigt das an, works lang --reset --project entfernt es). So lassen oder alte Einträge bei der Migration entfernen, damit nur die globale Einstellung gilt?
+- [ ] Sollen die README.md der Plugins und des Repos auch englisch werden (mit README.de.md), oder bleiben sie deutsch? Sie gehörten nicht zum Plan.
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Stand: 2026-11-24 16:56
+
+Stand: Phasen 1, 2, 3, 4 und 7 fertig und committet (Branch feature/w-0041-alles-auf-englisch-sprache, Commits 1310ec0, e3c2b18, cdee542, fa07623, ea34a8b). Selbsttest 42/42 grün mit WORKS_LANG=de (mit und ohne WebSocket), inklusive neuer Schritte 'Sprache: works lang, Vorrang, Katalog', 'Sprache: Aufgabenformat', 'Sprache: englische Standardausgabe'. Plugin-Tests ci-watch und mockups grün in beiden Sprachen.
+
+Aufbau: scripts/i18n.mjs mit tr() (heißt tr, weil t im Code die Aufgabe ist), Katalog scripts/i18n/de.json (gut 1000 Einträge, englisch → deutsch). Abschnitts-Aliase in lib.mjs (SECTION_NAMES, sectionTitle, bodyLang); Werte-Aliase normValue (status/risk/kind). Vorlagen englisch in references/templates, deutsch in references/de/templates. ci-watch und mockups haben wortgleiche Kopien von i18n.mjs plus eigenes de.json (Test prüft Gleichheit).
+
+Nächster Schritt (nach Nachricht der Hauptsitzung): git merge main (W-0038), dann Phase 5 und 6.
+Phase 5 zuerst: api.mjs erkennt neue Aufgaben nur an 'Angelegt:' (Zeilen ~349, ~614 → (?:Created|Angelegt)), promote an 'als (\S+?):' (~480 → (?:als|as)), Asset-Zeilen 'Beschreibung:/Art:/Hinzugefügt:' (~165-168, englisch Description/Kind/Added), SKIP_IN_DETAIL und Zeile ~444 mit deutschen Abschnittsnamen (sectionKey nutzen), Wissensbereich 'Allgemein' (~940, CLI nutzt jetzt tr('General')), Texte ~1024. Bis dahin ist services/works-bot/test.mjs rot ('Neue Aufgaben-ID nicht erkannt'), weil der Test ohne WORKS_LANG englisch läuft. board.js: DoD-Trennung /^(Prüfung |Automatische Prüfungen)/ (~636) braucht 'Check '/'Automatic checks', 'Allgemein' (~3250), dazu alle Texte über Katalog vom Server und Sprachwahl. hub.mjs, template.html, export.mjs-HTML, Discord-Dateien (Phase 6). fmtCost/fmtTokens formatieren auf Englisch anders (hub, discord-bot nutzen sie).
+Sonst offen: selftest.mjs gibt seine eigenen Zeilen (FEHLER, 'x von y Prüfungen bestanden') weiter deutsch aus; einige Datumsformate bleiben de-DE (cmdTime, inbox, ci-watch Rate-Limit); Demo-Inhalte deutsch; Status review erst nach Phase 6 setzen.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -96,3 +105,6 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-24: Umsetzungsplan: "Phase 4, CLI und Hooks: alle Ausgaben von works.mjs und den Modulen außer den Discord- und Board-Dateien über t(); Hooks geben Claude die Sprache mit (SessionStart: „Language: de, answer in German, German docs in SKILL.de.md and references/de/“). Selbsttest bekommt WORKS_LANG=de in seiner Umgebung, damit die bestehenden deutschen Prüfungen gelten, plus ein Schritt, der die englische Standardausgabe wichtiger Befehle prüft." abgehakt
 - 2026-11-24: Akzeptanzkriterien: "Claude antwortet in der eingestellten Sprache" abgehakt
 - 2026-11-24: Phase 4 fertig: CLI, Module und Hooks über tr(), Selbsttest 42/42 grün (WORKS_LANG=de, mit und ohne WebSocket). works-bot-Test rot, weil api.mjs nur 'Angelegt:' erkennt (Phase 5)
+- 2026-11-24: Umsetzungsplan: "Phase 7, Plugins workday, ci-watch, mockups: Skript-Ausgaben ebenso; Selbsttest und Plugin-Tests in beiden Sprachen grün (einmal WORKS_LANG=de, einmal en für die englischen Prüfungen)." abgehakt
+- 2026-11-24: Phase 7 fertig: ci-watch und mockups über tr() mit eigenem Katalog, Plugin-Tests in beiden Sprachen grün; Selbsttest 42/42 grün
+- 2026-11-24: Übergabe aktualisiert

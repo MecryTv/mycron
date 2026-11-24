@@ -1,6 +1,6 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-24 16:51 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-24 16:56 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
@@ -10,6 +10,10 @@
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 1 · P4 Niedrig: 0
 
+## Aktive Aufgabe
+
+[W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) Alles auf Englisch, Sprache umschaltbar (In Arbeit), letzte Übergabe 2026-11-24 16:56
+
 ## Kritisch (P1)
 
 _Keine Einträge._
@@ -18,13 +22,19 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | In Arbeit | XL |  |  |  |
+| [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | In Arbeit | XL |  |  | 2 offene Fragen |
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
 | [W-0046](tasks/W-0046-discord-dialog-schalter-befehle-und/task.md) | Discord-Dialog: Schalter Befehle und Knöpfe, Kanal je Projekt | Feature | P3 Mittel | Backlog | S |  |  |  |
+
+## Offene Fragen
+
+- [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) Alles auf Englisch, Sprache umschaltbar
+  - Bestehende Projekte haben durch das alte works init "language": "de" in .works/config.json. Das zählt jetzt als Projekt-Einstellung und hat Vorrang vor der globalen Sprache (works lang zeigt das an, works lang --reset --project entfernt es). So lassen oder alte Einträge bei der Migration entfernen, damit nur die globale Einstellung gilt?
+  - Sollen die README.md der Plugins und des Repos auch englisch werden (mit README.de.md), oder bleiben sie deutsch? Sie gehörten nicht zum Plan.
 
 ## Zuletzt erledigt
 

@@ -41,7 +41,14 @@ Rest aus Entwurf J2 (W-0038), Entscheidung des Nutzers am 2026-11-24: als eigene
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] 
+- [ ] Entwurf J2 aus W-0038 lesen (.works/tasks/W-0038-board-einstellungen-fuer-den-discord-bot/design/J2-j-verbessert.html): wo der Schalter „Befehle und Knöpfe erlauben“ und die Kanalwahl je Projekt stehen; Aussehen danach, Stil wie der bestehende Dialog Discord-Bot in board.js
+- [ ] Test zuerst (Selbsttest gegen discord-fake.mjs, API und Browser-Schritt): Schalter aus → keine Knöpfe und kein Auswahlmenü am Dashboard und an neuen Nachrichten, eigener Bot meldet /works für den Server ab (PUT mit leerer Liste), wieder an → registriert; Kanal je Projekt beim eigenen Bot → das Projekt steht im Dashboard seines Kanals, im alten nicht mehr; gemeinsamer Bot → Kanalwahl je Projekt gesperrt mit Hinweis
+- [ ] Einstellung `commands` (Standard an) in discord.mjs (DEFAULTS, normalizeConfig, applySetting, `works discord set commands=an|aus`); Kanal je Projekt als `project.<id>.channel=<Kanal-ID>` (projects[rid].channel_id, channelFor nutzt es schon), nur beim eigenen Bot
+- [ ] Bot: interactive je Durchgang aus der Konfiguration (ohne Neustart); beim Ausschalten Befehle für den Server abmelden; beim gemeinsamen Bot beantwortet das Gerät Befehle bei ausgeschaltetem Schalter mit einem kurzen Hinweis
+- [ ] Dialog: Schalter im Reiter Befehle, Kanalwahl je Projekt im Reiter Projekte (Liste aus /api/discord/channels)
+- [ ] Nebensache aus dem Audit von W-0038: Handy-Vorschau nennt nach dem Verschieben den neuen Kanal
+- [ ] Doku: integrations.md, board.md, cli.md
+- [ ] Selbsttest grün mit und ohne WebSocket, Browser-Schritte, services/works-bot/test.mjs
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
