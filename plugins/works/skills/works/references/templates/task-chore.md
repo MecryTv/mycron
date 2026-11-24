@@ -1,21 +1,21 @@
 # {{title}}
 
-## Beschreibung
-<!-- Was ist zu tun und warum? -->
+## Description
+<!-- What needs to be done, and why? -->
 
-## Checkliste
+## Checklist
 - [ ] 
 
-## Akzeptanzkriterien
+## Acceptance criteria
 - [ ] 
 
-## Betroffene Dateien
+## Affected files
 
 ## Assets
 
-## Offene Fragen
+## Open questions
 
-## Übergabe
+## Handoff
 
-## Verlauf
-- {{date}}: Aufgabe angelegt
+## History
+- {{date}}: Task created

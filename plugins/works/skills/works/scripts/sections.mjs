@@ -1,8 +1,10 @@
 // Abschnitte einer task.md an den Aufgabentyp anpassen: bei Typwechsel und als Reparatur für ältere Aufgaben.
+// Namen im Code sind die deutschen Schlüssel; in der Datei steht die Überschrift in der Sprache der Aufgabe (W-0041).
 import {
   parseFrontmatter, readTemplate, getSection, setSection, stripComments, today, addHistory,
-  loadTasks, saveTask, TYPES,
+  loadTasks, saveTask, TYPES, sectionKey, sectionRegex, sectionTitle, bodyLang,
 } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 // Hauptabschnitt mit der Beschreibung je Typ.
 export const GOAL_SECTION = {
@@ -14,38 +16,37 @@ const DESCRIPTION_SOURCES = ['Ziel', 'Zusammenfassung', 'Beschreibung', 'Forschu
 const NEVER_ADD = ['Verlauf', 'Assets', 'Offene Fragen', 'Übergabe'];
 const SECTION_RE = /(?:^|\n)## ([^\n]+)\n([\s\S]*?)(?=\n## |$)/g;
 
-function templateSections(type) {
-  const tpl = parseFrontmatter(readTemplate(`task-${type}.md`)).body;
+function templateSections(type, lang) {
+  const tpl = parseFrontmatter(readTemplate(`task-${type}.md`, lang)).body;
   const out = [];
   let m;
   SECTION_RE.lastIndex = 0;
-  while ((m = SECTION_RE.exec(tpl))) out.push({ name: m[1].trim(), content: m[2] });
+  while ((m = SECTION_RE.exec(tpl))) out.push({ name: sectionKey(m[1].trim()), content: m[2] });
   return out;
 }
 
 export function insertBefore(body, block) {
   for (const anchor of ['Assets', 'Offene Fragen', 'Übergabe', 'Verlauf']) {
-    const i = body.search(new RegExp(`\\n## ${anchor}[ \\t]*\\n`));
-    if (i !== -1) return `${body.slice(0, i)}\n${block}${body.slice(i)}`;
+    const m = body.match(sectionRegex(anchor));
+    if (m && m[1]) return `${body.slice(0, m.index)}\n${block}${body.slice(m.index)}`;
   }
   return `${body.replace(/\s+$/, '')}\n\n${block}`;
 }
 
 // Fügt einen neuen Abschnitt direkt hinter einem vorhandenen ein, sonst wie insertBefore.
 export function insertAfter(body, after, block) {
-  const h = after.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = body.match(new RegExp(`(^|\\n)## ${h}[ \\t]*\\n[\\s\\S]*?(?=\\n## |$)`));
+  const m = body.match(sectionRegex(after));
   if (!m) return insertBefore(body, block);
   const end = m.index + m[0].length;
   return `${body.slice(0, end).replace(/\s+$/, '')}\n\n${block}${body.slice(end)}`;
 }
 
 export function removeSection(body, name) {
-  const h = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return body.replace(new RegExp(`\\n## ${h}[ \\t]*\\n[\\s\\S]*?(?=\\n## |$)`), '');
+  return body.replace(sectionRegex(name), (all, pre) => (pre ? '' : all));
 }
 
 const filled = (body, name) => stripComments(getSection(body, name) || '').trim();
+const title = (body, key) => sectionTitle(key, body);
 
 // Ergänzt fehlende Abschnitte der Vorlage von type und holt die Beschreibung in den Hauptabschnitt.
 // preferFrom: Abschnitt, aus dem zuerst übernommen wird (etwa der Hauptabschnitt des alten Typs).
@@ -53,13 +54,13 @@ const filled = (body, name) => stripComments(getSection(body, name) || '').trim(
 // damit die Beschreibung nicht doppelt erscheint.
 export function conformToType(t, type, { preferFrom = null } = {}) {
   if (!TYPES.includes(type)) return { added: [], moved: null };
-  const tpl = templateSections(type);
+  const tpl = templateSections(type, bodyLang(t._body));
   const tplNames = tpl.map((s) => s.name);
   const added = [];
   for (const s of tpl) {
     if (NEVER_ADD.includes(s.name) || getSection(t._body, s.name) !== null) continue;
-    t._body = insertBefore(t._body, `## ${s.name}\n${s.content.replace(/\{\{date\}\}/g, today()).replace(/\s+$/, '')}\n`);
-    added.push(s.name);
+    t._body = insertBefore(t._body, `## ${title(t._body, s.name)}\n${s.content.replace(/\{\{date\}\}/g, today()).replace(/\s+$/, '')}\n`);
+    added.push(title(t._body, s.name));
   }
   const goal = GOAL_SECTION[type];
   let moved = null;
@@ -70,7 +71,7 @@ export function conformToType(t, type, { preferFrom = null } = {}) {
     if (from) {
       t._body = setSection(t._body, goal, filled(t._body, from));
       if (!tplNames.includes(from)) t._body = removeSection(t._body, from);
-      moved = from;
+      moved = title(t._body, from);
     }
   }
   return { added, moved };
@@ -80,9 +81,9 @@ export function conformToType(t, type, { preferFrom = null } = {}) {
 export function adaptToType(t, oldType, newType) {
   const { added, moved } = conformToType(t, newType, { preferFrom: GOAL_SECTION[oldType] });
   const parts = [];
-  if (added.length) parts.push(`Abschnitte ergänzt (${added.join(', ')})`);
-  if (moved) parts.push(`Beschreibung aus ${moved} nach ${GOAL_SECTION[newType]} übernommen`);
-  if (parts.length) addHistory(t, `Typwechsel ${oldType} → ${newType}: ${parts.join(', ')}`);
+  if (added.length) parts.push(tr('sections added ({list})', { list: added.join(', ') }));
+  if (moved) parts.push(tr('description moved from {from} to {to}', { from: moved, to: title(t._body, GOAL_SECTION[newType]) }));
+  if (parts.length) addHistory(t, tr('Type change {from} → {to}: {parts}', { from: oldType, to: newType, parts: parts.join(', ') }));
 }
 
 // Repariert Aufgaben, deren Beschreibung nicht im Hauptabschnitt ihres Typs steht oder denen Vorlagenabschnitte fehlen.
@@ -95,11 +96,11 @@ export function repairTasks(root, { dryRun = false } = {}) {
     const { added, moved } = conformToType(t, t.type);
     if (t._body === before) continue;
     const parts = [];
-    if (moved) parts.push(`Beschreibung aus ${moved} nach ${GOAL_SECTION[t.type]} übernommen`);
-    if (added.length) parts.push(`fehlende Abschnitte ergänzt (${added.join(', ')})`);
+    if (moved) parts.push(tr('description moved from {from} to {to}', { from: moved, to: title(t._body, GOAL_SECTION[t.type]) }));
+    if (added.length) parts.push(tr('missing sections added ({list})', { list: added.join(', ') }));
     fixed.push({ id: t.id, title: t.title, moved, added });
     if (dryRun) { t._body = before; continue; }
-    addHistory(t, `Reparatur: ${parts.join(', ')}`);
+    addHistory(t, tr('Repair: {parts}', { parts: parts.join(', ') }));
     saveTask(t, { touch: false });
   }
   return fixed;

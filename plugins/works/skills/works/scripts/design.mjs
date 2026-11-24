@@ -3,7 +3,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readText, exists, readJson, writeJson, slugify, stripComments, today, nowStamp } from './lib.mjs';
+import { readText, exists, readJson, writeJson, slugify, stripComments, today, nowStamp, sectionRegex, sectionTitle } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 const IMAGE = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
 const ALLOWED = [...IMAGE, '.html', '.htm', '.md', '.pdf'];
@@ -112,9 +113,10 @@ export function chooseVariant(task, name, reason = '') {
   const line = `\n- ${today()}: Variante ${name} „${v.title}“ gewählt${reason ? `, Grund: ${reason}` : ''}. Datei: design/${v.file}${d.variants.length > 1 ? `. Nicht gewählt: ${d.variants.filter((x) => x.name !== name).map((x) => `${x.name} ${x.title}`).join(', ')}` : ''}\n`;
   if (exists(dec)) {
     let s = readText(dec);
-    if (!/^## Gewählter Entwurf/m.test(s)) s = s.replace(/\s*$/, '\n\n## Gewählter Entwurf\n');
-    fs.writeFileSync(dec, s.replace(/(## Gewählter Entwurf\n)/, `$1${line}`));
-  } else fs.writeFileSync(dec, `# Entscheidungen ${task.id}\n\n## Gewählter Entwurf\n${line}`);
+    const re = sectionRegex('Gewählter Entwurf');
+    if (!re.test(s)) s = s.replace(/\s*$/, `\n\n## ${sectionTitle('Gewählter Entwurf', s)}\n`);
+    fs.writeFileSync(dec, s.replace(re, (all, pre, name, body) => `${pre}## ${name}\n${line}${body}`));
+  } else fs.writeFileSync(dec, `# ${tr('Decisions')} ${task.id}\n\n## ${sectionTitle('Gewählter Entwurf')}\n${line}`);
   return { design: d, variant: v };
 }
 

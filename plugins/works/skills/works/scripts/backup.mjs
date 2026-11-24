@@ -3,7 +3,7 @@
 // die works später dazubekommt. Nur wenn sich ID oder Verweise ändern, wird der Kopf der task.md neu geschrieben.
 import fs from 'node:fs';
 import path from 'node:path';
-import { worksDir, loadConfig, loadTasks, readText, readJson, writeJson, exists, formatId, idNumber, slugify, parseFrontmatter, serializeFrontmatter } from './lib.mjs';
+import { worksDir, loadConfig, loadTasks, readText, readJson, writeJson, exists, formatId, idNumber, slugify, parseFrontmatter, serializeFrontmatter, sectionRegex } from './lib.mjs';
 
 export const FORMAT = 'works-board';
 const VERSION = 1;
@@ -31,15 +31,16 @@ function walk(dir, rel = '') {
 
 // Verlauf und Übergabe leeren, die Überschriften bleiben.
 function stripHistory(text) {
-  return text.replace(/(^|\n)(## (?:Verlauf|Übergabe)[ \t]*\n)[\s\S]*?(?=\n## |$)/g, '$1$2');
+  for (const h of ['Verlauf', 'Übergabe']) text = text.replace(sectionRegex(h, 'g'), (all, pre, name) => `${pre}## ${name}\n`);
+  return text;
 }
 
 // Kommt eine Aufgabe aus einem Export ohne Verlauf, behält sie beim Zusammenführen Verlauf und Übergabe des Boards.
 function keepLocalHistory(theirs, local) {
   let out = theirs;
   for (const h of ['Verlauf', 'Übergabe']) {
-    const m = local.match(new RegExp(`(?:^|\\n)## ${h}[ \\t]*\\n([\\s\\S]*?)(?=\\n## |$)`));
-    if (m) out = out.replace(new RegExp(`((?:^|\\n)## ${h}[ \\t]*\\n)[\\s\\S]*?(?=\\n## |$)`), (x, head) => head + m[1]);
+    const m = local.match(sectionRegex(h));
+    if (m) out = out.replace(sectionRegex(h), (x, pre, name) => `${pre}## ${name}\n${m[3]}`);
   }
   return out;
 }

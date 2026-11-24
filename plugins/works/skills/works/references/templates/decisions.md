@@ -1,53 +1,53 @@
-# Designentscheidungen: {{id}} {{title}}
+# Design decisions: {{id}} {{title}}
 
-Angelegt am {{date}}. Diese Datei hält fest, was entschieden wurde, warum, und welche Alternativen verworfen wurden.
+Created on {{date}}. This file records what was decided, why, and which alternatives were rejected.
 
-## Quellen
-<!-- Brainstorm-Dokumente, UI UX Pro Max Ausgaben, externe Referenzen. Pflege über `works attach-doc`. -->
+## Sources
+<!-- Brainstorm documents, UI UX Pro Max output, external references. Maintained via `works attach-doc`. -->
 
-## Brainstorm-Zusammenfassung
-<!-- Kernaussagen aus dem Brainstorming in eigenen Worten: Problemverständnis, betrachtete Ansätze, Ergebnis. -->
+## Brainstorm summary
+<!-- Key points from the brainstorming in your own words: understanding of the problem, approaches considered, outcome. -->
 
-## Entscheidungen
-<!-- Pro Entscheidung ein Block. Neue Blöcke mit `works decisions <ID> --add "Titel" ...` oder von Hand im gleichen Format:
+## Decisions
+<!-- One block per decision. Add new blocks with `works decisions <ID> --add "Title" ...` or by hand in the same format:
 
-### E1: Titel
-- Datum:
-- Quelle: Brainstorm | UI UX Pro Max | Gespräch | Analyse
-- Kontext:
-- Entscheidung:
-- Begründung:
-- Verworfene Alternativen:
-  - Alternative: Grund
-- Konsequenzen:
+### E1: Title
+- Date:
+- Source: Brainstorm | UI UX Pro Max | Conversation | Analysis
+- Context:
+- Decision:
+- Rationale:
+- Rejected alternatives:
+  - Alternative: reason
+- Consequences:
 -->
 
-## UI und UX
-<!-- Nur bei Oberflächen. Leere Unterabschnitte dürfen bleiben. -->
+## UI and UX
+<!-- Only for user interfaces. Empty subsections may stay. -->
 
-### Stil
-<!-- Gewählte Stilrichtung, Stimmung, Begründung. -->
+### Style
+<!-- Chosen style direction, mood, rationale. -->
 
-### Farbpalette
-| Rolle | Wert | Verwendung |
+### Color palette
+| Role | Value | Usage |
 |---|---|---|
-| Primär | | |
-| Hintergrund | | |
+| Primary | | |
+| Background | | |
 | Text | | |
-| Akzent | | |
-| Fehler | | |
+| Accent | | |
+| Error | | |
 
-### Typografie
-<!-- Schriftfamilien, Größenskala, Zeilenhöhen, Gewichte. -->
+### Typography
+<!-- Font families, size scale, line heights, weights. -->
 
-### Layout und Abstände
-<!-- Raster, Breakpoints, Abstandsskala. -->
+### Layout and spacing
+<!-- Grid, breakpoints, spacing scale. -->
 
-### Komponenten
-<!-- Verwendete oder neue Komponenten und ihre Zustände. -->
+### Components
+<!-- Components used or added, and their states. -->
 
-### Barrierefreiheit
-<!-- Kontraste, Fokuszustände, Tastaturbedienung, Screenreader. -->
+### Accessibility
+<!-- Contrast, focus states, keyboard navigation, screen readers. -->
 
-### Verworfene Varianten
-<!-- Was wurde gezeigt oder erwogen und warum nicht genommen? -->
+### Rejected variants
+<!-- What was shown or considered, and why was it not chosen? -->

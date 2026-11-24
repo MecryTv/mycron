@@ -1,31 +1,31 @@
 # {{title}}
 
-## Abkürzung
-<!-- Was wurde bewusst vereinfacht oder provisorisch gelöst? Wo genau? -->
+## Shortcut taken
+<!-- What was deliberately simplified or solved provisionally? Where exactly? -->
 
-## Grund
-<!-- Warum wurde die Abkürzung genommen (Zeitdruck, fehlendes Wissen, Prototyp)? -->
+## Reason
+<!-- Why was the shortcut taken (time pressure, missing knowledge, prototype)? -->
 
-## Folgekosten und Risiko
-<!-- Was kostet es, wenn es so bleibt? Wartung, Performance, Sicherheit, Erweiterbarkeit. -->
+## Follow-up costs and risk
+<!-- What does it cost if it stays this way? Maintenance, performance, security, extensibility. -->
 
-## Auslöser
-<!-- Ab wann muss es angegangen werden? Zum Beispiel vor dem Release, ab 1000 Nutzern, bevor Feature X kommt. -->
+## Trigger
+<!-- When does it have to be addressed? For example before the release, at 1000 users, before feature X lands. -->
 
-## Rückzahlung
-<!-- Wie sieht die saubere Lösung aus? -->
+## Repayment
+<!-- What does the clean solution look like? -->
 
-## Akzeptanzkriterien
-- [ ] Provisorische Lösung ist ersetzt
+## Acceptance criteria
+- [ ] The provisional solution is replaced
 - [ ] 
 
-## Betroffene Dateien
+## Affected files
 
 ## Assets
 
-## Offene Fragen
+## Open questions
 
-## Übergabe
+## Handoff
 
-## Verlauf
-- {{date}}: Aufgabe angelegt
+## History
+- {{date}}: Task created

@@ -1,4 +1,4 @@
-# Ideen
+# Ideas
 
-Lose Gedanken, die noch keine Aufgabe sind. Neue Einträge mit `works idea "Text"`, Übernahme mit `works promote I-001`.
+Loose thoughts that are not tasks yet. Add new entries with `works idea "text"`, turn one into a task with `works promote I-001`.
 

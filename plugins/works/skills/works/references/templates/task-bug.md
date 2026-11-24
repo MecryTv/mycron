@@ -1,41 +1,41 @@
 # {{title}}
 
-## Zusammenfassung
-<!-- Ein Satz: Was geht kaputt, wo, mit welcher Auswirkung? -->
+## Summary
+<!-- One sentence: what breaks, where, and with what impact? -->
 
-## Reproduktion
-<!-- Nummerierte Schritte, die den Fehler zuverlässig auslösen. Häufigkeit angeben (immer, manchmal, einmalig). -->
+## Reproduction
+<!-- Numbered steps that reliably trigger the bug. State how often it happens (always, sometimes, once). -->
 1. 
 
-## Erwartetes Verhalten
+## Expected behavior
 
-## Tatsächliches Verhalten
+## Actual behavior
 
-## Umgebung
-<!-- Version, Branch, Betriebssystem, Browser, Node-Version, Konfiguration. -->
+## Environment
+<!-- Version, branch, operating system, browser, Node version, configuration. -->
 
-## Logs und Fehlermeldungen
-<!-- Stacktraces und Logs als Codeblock. Bei langen Logs nur den relevanten Ausschnitt. -->
+## Logs and error messages
+<!-- Stack traces and logs as a code block. For long logs, only the relevant excerpt. -->
 
-## Ursache
-<!-- Nach der Analyse ausfüllen: Root Cause, nicht nur das Symptom. -->
+## Root cause
+<!-- Fill in after the analysis: the root cause, not just the symptom. -->
 
-## Lösung
-<!-- Was wurde geändert und warum genau so? -->
+## Solution
+<!-- What was changed, and why exactly this way? -->
 
-## Akzeptanzkriterien
-- [ ] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
-- [ ] Regressionstest deckt den Fall ab oder der Verzicht ist begründet
+## Acceptance criteria
+- [ ] The bug can no longer be triggered with the reproduction steps
+- [ ] A regression test covers the case, or skipping it is justified
 - [ ] 
 
-## Betroffene Dateien
+## Affected files
 
 ## Assets
-<!-- Screenshots des Fehlers mit --kind fehler, nach dem Fix mit --kind nachher. -->
+<!-- Screenshots of the bug with --kind error, after the fix with --kind after. -->
 
-## Offene Fragen
+## Open questions
 
-## Übergabe
+## Handoff
 
-## Verlauf
-- {{date}}: Aufgabe angelegt
+## History
+- {{date}}: Task created

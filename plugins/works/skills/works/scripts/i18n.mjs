@@ -57,12 +57,13 @@ export function catalog(lang) {
 
 const fill = (s, vars) => (vars ? s.replace(/\{(\w+)\}/g, (all, k) => (k in vars ? String(vars[k]) : all)) : s);
 
-// t('Created: {id}', { id }) → "Angelegt: W-0001" bei Deutsch.
-export function t(text, vars, lang) {
+// tr('Created: {id}', { id }) → "Angelegt: W-0001" bei Deutsch. Heißt tr statt t, weil t im Code meist eine Aufgabe ist.
+export function tr(text, vars, lang) {
   const l = lang || (current = current || language());
   const s = catalog(l)[text];
   return fill(typeof s === 'string' && s ? s : text, vars);
 }
+export const t = tr;
 
 // Ein Text in allen Sprachen, für Parser, die alte und neue Dateien lesen (etwa Verlaufseinträge).
 export function variants(text) {

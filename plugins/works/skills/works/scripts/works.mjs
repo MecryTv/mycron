@@ -17,7 +17,7 @@ import { readText,
   getSection, setSection, appendToSection, stripComments, checkboxes, hasContent, imageLinks,
   loadTasks, loadTask, findTask, saveTask, addHistory, relFromWorks, isBlocked, openBlockers,
   isOverdue, openQuestions, sortTasks, readTemplate, fillTemplate, parseArgs, listFlag,
-  queueOf, pruneQueue, laneLink,
+  queueOf, pruneQueue, laneLink, normValue, sectionTitle, sectionKey,
 } from './lib.mjs';
 import { tasksForFile, filesForTask } from './files.mjs';
 import { parseImport, FORMATS } from './import.mjs';
@@ -49,7 +49,7 @@ import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
 import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion, lastPort, OWN_CLI } from './server-control.mjs';
 import { BOARD_VIEWS, loadPlaywright, takeShots, boardPrepare } from './shot.mjs';
-import { t, languages, languageSource, setLanguage, normLang, settingsFile, LANGUAGE_NAMES } from './i18n.mjs';
+import { tr, languages, languageSource, setLanguage, normLang, settingsFile, LANGUAGE_NAMES, variants } from './i18n.mjs';
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
 const ASSET_KINDS = ['ist', 'vorher', 'nachher', 'referenz', 'mockup', 'skizze', 'fehler', 'diagramm'];
@@ -115,10 +115,11 @@ function createTask(root, config, opts) {
   validateEnum('type', type, TYPES);
   const priority = normPriority(opts.priority) || 'P3';
   validateEnum('priority', priority, PRIORITIES);
-  const status = opts.status || 'backlog';
+  const status = normValue('status', opts.status) || 'backlog';
   validateEnum('status', status, STATUSES);
   validateEnum('effort', opts.effort, EFFORTS);
-  validateEnum('risk', opts.risk, RISKS);
+  const risk = normValue('risk', opts.risk);
+  validateEnum('risk', risk, RISKS);
   if (!opts.title || opts.title === true) fail('Titel fehlt (--title "...").');
 
   const existing = loadTasks(root);
@@ -137,7 +138,7 @@ function createTask(root, config, opts) {
   const { body } = parseFrontmatter(tpl);
   const data = {
     id, title: String(opts.title), type, priority, status,
-    effort: opts.effort || null, risk: opts.risk || null,
+    effort: opts.effort || null, risk: risk || null,
     created: today(), updated: today(), due: opts.due || null, completed: null,
     milestone: opts.milestone || null, branch: null,
     tags: listFlag(opts.tags), blocked_by: listFlag(opts['blocked-by']).map((x) => normalizeId(config, x)),
@@ -148,7 +149,7 @@ function createTask(root, config, opts) {
   };
   let filled = fillTemplate(body, { id, title: data.title, date: today() });
   // Wer die Aufgabe angelegt hat, steht auch im ersten Verlaufseintrag (das Board erkennt so eigene Änderungen).
-  if (process.env.WORKS_ACTOR) filled = filled.replace(/^(- \d{4}-\d{2}-\d{2}: Aufgabe angelegt)$/m, `$1 [${process.env.WORKS_ACTOR}]`);
+  if (process.env.WORKS_ACTOR) filled = filled.replace(new RegExp(`^(- \\d{4}-\\d{2}-\\d{2}: (?:${variants('Task created').join('|')}))$`, 'm'), `$1 [${process.env.WORKS_ACTOR}]`);
   fs.writeFileSync(path.join(dir, 'task.md'), serializeFrontmatter(data) + '\n' + filled.replace(/^\n+/, ''));
 
   const task = loadTask(dir);
@@ -167,7 +168,7 @@ function createTask(root, config, opts) {
   const descText = textOpt('description');
   const mainText = goalName === 'Beschreibung' ? [goalText, descText].filter(Boolean).join('\n\n') : goalText;
   if (mainText) task._body = setSection(task._body, goalName, mainText);
-  if (descText && goalName !== 'Beschreibung') task._body = insertAfter(task._body, goalName, `## Beschreibung\n${descText}\n`);
+  if (descText && goalName !== 'Beschreibung') task._body = insertAfter(task._body, goalName, `## ${sectionTitle('Beschreibung', task._body)}\n${descText}\n`);
   const criteria = (Array.isArray(opts.criteriaList) ? opts.criteriaList.join('\n') : textOpt('criteria')).split('\n').map((s) => s.replace(/^\s*[-*]\s*(\[ \]\s*)?/, '').trim()).filter(Boolean);
   if (criteria.length) {
     const sec = stripComments(getSection(task._body, 'Akzeptanzkriterien') || '').split('\n').filter((l) => l.trim() && !/^\s*[-*]\s+\[ \]\s*$/.test(l));
@@ -218,7 +219,7 @@ function cmdList() {
   let list = loadTasks(root, { archive: !!flags.all || !!flags.archived });
   const byId = byIdMap(loadTasks(root));
   if (!flags.all && !flags.status) list = list.filter((t) => OPEN_STATUSES.includes(t.status));
-  if (flags.status) { const s = listFlag(flags.status); list = list.filter((t) => s.includes(t.status)); }
+  if (flags.status) { const s = listFlag(flags.status).map((x) => normValue('status', x)); list = list.filter((t) => s.includes(t.status)); }
   if (flags.priority) { const p = listFlag(flags.priority).map(normPriority); list = list.filter((t) => p.includes(t.priority)); }
   if (flags.type) { const ty = listFlag(flags.type); list = list.filter((t) => ty.includes(t.type)); }
   if (flags.tag) { const tg = listFlag(flags.tag); list = list.filter((t) => tg.some((x) => (t.tags || []).includes(x))); }
@@ -309,7 +310,7 @@ function cmdSet() {
     const eq = pair.indexOf('=');
     if (eq === -1) fail(`Ungültige Angabe "${pair}", erwartet feld=wert.`);
     const key = pair.slice(0, eq).trim().replace(/-/g, '_');
-    const value = pair.slice(eq + 1).trim();
+    const value = normValue(key, pair.slice(eq + 1).trim());
     if (key === 'status' && value === 'erledigt' && !flags.force) fail('Zum Abschließen `works done` verwenden, damit die Definition of Done geprüft wird.');
     if (key === 'status' && value === 'verworfen' && !flags.reason) fail('Verwerfen braucht eine Begründung (--reason "...") oder `works drop`.');
     const old = applyField(t, key, value, config);
@@ -424,7 +425,7 @@ function printContext(root, t) {
   if (t.branch) out(`Branch: ${t.branch}`);
   for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Abkürzung', 'Beschreibung', 'Kontext und Problem', 'Akzeptanzkriterien', 'Umsetzungsplan', 'Checkliste', 'Übergabe', 'Offene Fragen']) {
     const c = getSection(t._body, s);
-    if (hasContent(c)) out(`\n## ${s}\n${stripComments(c).trim()}`);
+    if (hasContent(c)) out(`\n## ${sectionTitle(s, t._body)}\n${stripComments(c).trim()}`);
   }
   const dec = path.join(t._dir, 'decisions.md');
   if (exists(dec)) out(`\nDesignentscheidungen: ${dec}`);
@@ -526,7 +527,7 @@ function cmdSection() {
   const t = findTask(root, config, pos.shift());
   const name = pos.shift();
   if (!name) fail('Abschnittsname fehlt. Aufruf: works section <ID> "Ziel" --text "..." | --file pfad');
-  if (['Verlauf', 'Assets'].includes(name)) fail(`Der Abschnitt ${name} wird nur über das CLI gepflegt.`);
+  if (['Verlauf', 'Assets'].includes(sectionKey(name))) fail(`Der Abschnitt ${name} wird nur über das CLI gepflegt.`);
   let text = flags.text;
   if (flags.file) text = readText(String(flags.file));
   if (text === undefined || text === true) {
@@ -536,7 +537,7 @@ function cmdSection() {
   }
   const clean = String(text).replace(/\r\n/g, '\n').trim();
   if (getSection(t._body, name) === null && flags.after && flags.after !== true) {
-    t._body = insertAfter(t._body, String(flags.after), `## ${name}\n${clean}\n`);
+    t._body = insertAfter(t._body, String(flags.after), `## ${sectionTitle(name, t._body)}\n${clean}\n`);
   } else {
     t._body = setSection(t._body, name, clean);
   }
@@ -717,7 +718,7 @@ function cmdReopen() {
   const t = findTask(root, config, pos[0]);
   if (!flags.reason) fail('Wiedereröffnen braucht eine Begründung (--reason "...").');
   if (OPEN_STATUSES.includes(t.status)) fail(`${t.id} ist bereits offen.`);
-  const status = flags.status || 'backlog';
+  const status = normValue('status', flags.status) || 'backlog';
   validateEnum('status', status, OPEN_STATUSES);
   if (t._archived) {
     const target = path.join(worksDir(root), 'tasks', path.basename(t._dir));
@@ -1228,7 +1229,7 @@ async function cmdAsset() {
     if (exists(inInbox)) src = inInbox; else fail(`Datei nicht gefunden: ${src}`);
   }
   const fromInbox = path.resolve(src).startsWith(path.join(worksDir(root), 'inbox'));
-  const kind = flags.kind && flags.kind !== true ? String(flags.kind) : null;
+  const kind = flags.kind && flags.kind !== true ? normValue('kind', String(flags.kind)) : null;
   if (kind && !ASSET_KINDS.includes(kind)) warn(`Unübliche Art "${kind}". Üblich: ${ASSET_KINDS.join(', ')}`);
   const desc = flags.desc && flags.desc !== true ? String(flags.desc) : '';
   if (!desc) warn('Ohne --desc fehlt die Textbeschreibung. Spätere Sessions müssen das Bild dann laden.');
@@ -1578,7 +1579,7 @@ function cmdGhExport() {
   const parts = [];
   for (const s of ['Ziel', 'Zusammenfassung', 'Kontext und Problem', 'Akzeptanzkriterien']) {
     const c = getSection(t._body, s);
-    if (hasContent(c)) parts.push(`## ${s}\n${stripComments(c).trim()}`);
+    if (hasContent(c)) parts.push(`## ${sectionTitle(s, t._body)}\n${stripComments(c).trim()}`);
   }
   parts.push(`_Verwaltet in .works als ${t.id}, Priorität ${t.priority} ${PRIO_LABEL[t.priority]}._`);
   const args = ['issue', 'create', '--title', `[${t.id}] ${t.title}`, '--body', parts.join('\n\n')];
@@ -2521,7 +2522,7 @@ async function cmdShot() {
   await stopStarted();
   for (const s of shots) out(`${s.problems.length ? 'PROBLEM' : 'ok     '} ${s.theme} ${s.width}  ${s.file}${s.problems.length ? `  ${s.problems.join(' | ')}` : ''}`);
   if (asset) {
-    const kind = flags.kind && flags.kind !== true ? String(flags.kind) : 'nachher';
+    const kind = flags.kind && flags.kind !== true ? normValue('kind', String(flags.kind)) : 'nachher';
     const desc = flags.desc && flags.desc !== true ? String(flags.desc) : `Screenshot ${name}`;
     for (const s of shots) {
       // Name mit Schema und Breite: Daran findet die Abnahme das passende Nachher-Bild (W-0030).
@@ -2663,7 +2664,7 @@ function cmdImport() {
   const extraTags = listFlag(flags.tags);
   const created = [];
   for (const c of pick) {
-    let status = c.status || (flags.status && flags.status !== true ? String(flags.status) : 'backlog');
+    let status = normValue('status', c.status || (flags.status && flags.status !== true ? String(flags.status) : 'backlog'));
     const was = status;
     if (['in-arbeit', 'review'].includes(status)) status = 'geplant';
     const desc = c.description || '';
@@ -2809,17 +2810,17 @@ function cmdVersion() {
 function cmdLang() {
   const root = findRoot();
   const configFile = root && path.join(worksDir(root), 'config.json');
-  if (flags.project && !root) fail(t('No .works folder found. Run `works init` in the project root first.'));
+  if (flags.project && !root) fail(tr('No .works folder found. Run `works init` in the project root first.'));
   const where = (src) => ({
-    env: t('from the environment variable WORKS_LANG'),
-    project: t('for this project in {file}', { file: configFile }),
-    global: t('globally in {file}', { file: settingsFile() }),
-    default: t('default'),
+    env: tr('from the environment variable WORKS_LANG'),
+    project: tr('for this project in {file}', { file: configFile }),
+    global: tr('globally in {file}', { file: settingsFile() }),
+    default: tr('default'),
   })[src.source];
   const name = (l) => LANGUAGE_NAMES[l] || l;
   if (pos[0] || flags.reset) {
     const lang = flags.reset ? null : normLang(pos[0]);
-    if (lang && !languages().includes(lang)) fail(t('Unknown language "{lang}". Available: {list}', { lang: pos[0], list: languages().join(', ') }));
+    if (lang && !languages().includes(lang)) fail(tr('Unknown language "{lang}". Available: {list}', { lang: pos[0], list: languages().join(', ') }));
     const file = flags.project ? configFile : settingsFile();
     const data = readJson(file, {}) || {};
     if (lang) data.language = lang; else delete data.language;
@@ -2827,11 +2828,11 @@ function cmdLang() {
     setLanguage(null);
   }
   const src = languageSource(root);
-  out(t('Language: {name} ({lang}), {where}', { name: name(src.lang), lang: src.lang, where: where(src) }));
-  if (pos[0] && !flags.project && src.source !== 'global') out(t('Note: {where} takes precedence ({lang}). Remove it with `works lang --reset --project`.', { where: where(src), lang: src.lang }));
+  out(tr('Language: {name} ({lang}), {where}', { name: name(src.lang), lang: src.lang, where: where(src) }));
+  if (pos[0] && !flags.project && src.source !== 'global') out(tr('Note: {where} takes precedence ({lang}). Remove it with `works lang --reset --project`.', { where: where(src), lang: src.lang }));
   if (!pos[0] && !flags.reset) {
-    out(t('Available: {list}', { list: languages().map((l) => `${l} (${name(l)})`).join(', ') }));
-    out(t('Change: works lang <code> (global), works lang <code> --project, works lang --reset [--project]'));
+    out(tr('Available: {list}', { list: languages().map((l) => `${l} (${name(l)})`).join(', ') }));
+    out(tr('Change: works lang <code> (global), works lang <code> --project, works lang --reset [--project]'));
   }
 }
 

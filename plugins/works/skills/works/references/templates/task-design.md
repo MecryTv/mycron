@@ -1,40 +1,40 @@
 # {{title}}
 
-## Ziel
-<!-- Welches Gestaltungsproblem wird gelöst? -->
+## Goal
+<!-- Which design problem does this solve? -->
 
-## Zielgruppe und Kontext
-<!-- Wer nutzt die Oberfläche, auf welchen Geräten, in welcher Situation? -->
+## Audience and context
+<!-- Who uses the interface, on which devices, in which situation? -->
 
-## Referenzen
-<!-- Bestehende Seiten, Vorbilder, Markenvorgaben. Bilder über `works asset --kind referenz`. -->
+## References
+<!-- Existing pages, role models, brand guidelines. Images via `works asset --kind reference`. -->
 
-## Varianten
-<!-- Untersuchte Richtungen. Ausführliche Begründungen in decisions.md. -->
+## Variants
+<!-- Directions explored. Detailed rationale goes in decisions.md. -->
 
-## Gewählte Lösung
-<!-- Kurzbeschreibung des Ergebnisses. -->
+## Chosen solution
+<!-- Short description of the result. -->
 
-## Akzeptanzkriterien
-- [ ] Darstellung ist auf Mobil, Tablet und Desktop korrekt
-- [ ] Kontraste erfüllen WCAG AA
-- [ ] Bedienung per Tastatur ist möglich
+## Acceptance criteria
+- [ ] Renders correctly on mobile, tablet and desktop
+- [ ] Contrast meets WCAG AA
+- [ ] Can be operated by keyboard
 - [ ] 
 
-## Umsetzungsplan
+## Implementation plan
 - [ ] 
 
-## Betroffene Dateien
+## Affected files
 
-## Designentscheidungen
-<!-- Kurzfassung. Details in decisions.md. -->
+## Design decisions
+<!-- Short version. Details in decisions.md. -->
 
 ## Assets
-<!-- Ist-Zustand mit --kind ist oder vorher, Ergebnis mit --kind nachher. -->
+<!-- Current state with --kind current or before, result with --kind after. -->
 
-## Offene Fragen
+## Open questions
 
-## Übergabe
+## Handoff
 
-## Verlauf
-- {{date}}: Aufgabe angelegt
+## History
+- {{date}}: Task created

@@ -48,7 +48,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const home = path.join(base, 'home');
   fs.mkdirSync(proj, { recursive: true }); fs.mkdirSync(home, { recursive: true });
   // WORKS_DRY_OPEN: --open meldet nur, was es öffnen würde. Der Selbsttest öffnet nie einen Browser.
-  const env = { ...process.env, HOME: home, USERPROFILE: home, WORKS_ACTOR: '', WORKS_DRY_OPEN: '1',GIT_AUTHOR_NAME: 'works', GIT_AUTHOR_EMAIL: 'works@test', GIT_COMMITTER_NAME: 'works', GIT_COMMITTER_EMAIL: 'works@test' };
+  // WORKS_LANG=de: Die Prüfungen erwarten deutsche Ausgaben; die englische Standardausgabe prüft ein eigener Schritt (W-0041).
+  const env = { ...process.env, HOME: home, USERPROFILE: home, WORKS_ACTOR: '', WORKS_DRY_OPEN: '1', WORKS_LANG: 'de', GIT_AUTHOR_NAME: 'works', GIT_AUTHOR_EMAIL: 'works@test', GIT_COMMITTER_NAME: 'works', GIT_COMMITTER_EMAIL: 'works@test' };
   const results = [];
   const hasGit = spawnSync('git', ['--version'], { encoding: 'utf8' }).status === 0;
 
@@ -149,13 +150,75 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const missing = [];
     for (const f of files) {
       const src = fs.readFileSync(f, 'utf8');
-      if (!/import \{[^}]*\bt\b[^}]*\} from '[./]*(scripts\/)?i18n\.mjs'/.test(src)) continue;
-      for (const m of src.matchAll(/\bt\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.)*)`)\s*[,)]/g)) {
+      if (!/import \{[^}]*\btr?\b[^}]*\} from '[./]*(scripts\/)?i18n\.mjs'/.test(src)) continue;
+      for (const m of src.matchAll(/\btr?\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.)*)`)\s*[,)]/g)) {
         const key = unesc(m[1] ?? m[2] ?? m[3]);
         if (!(key in de)) missing.push(`${path.basename(f)}: ${key.slice(0, 80)}`);
       }
     }
     expect(!missing.length, `${missing.length} Texte ohne deutsche Übersetzung:\n${missing.slice(0, 15).join('\n')}`);
+  });
+
+  // W-0041: Überschriften in der Sprache der Aufgabe, deutsche Aufgaben bleiben gültig, englische Werte als Alias.
+  await step('Sprache: Aufgabenformat englisch und deutsch, Aliase', () => {
+    const p = path.join(base, 'sprache');
+    fs.mkdirSync(p, { recursive: true });
+    const en = (args, o = {}) => w(args, { cwd: p, extraEnv: { WORKS_LANG: 'en' }, ...o });
+    const de = (args, o = {}) => w(args, { cwd: p, extraEnv: { WORKS_LANG: 'de' }, ...o });
+    en(['init']);
+    en(['new', '--type=bug', '--title=Crash on start', '--description=App crashes', '--criteria=No crash', '--risk=high']);
+    de(['new', '--type=feature', '--title=Alte Aufgabe', '--description=Deutsch', '--criteria=Geht']);
+    const file = (id) => fs.readdirSync(path.join(p, '.works', 'tasks')).filter((d) => d.startsWith(id)).map((d) => path.join(p, '.works', 'tasks', d, 'task.md'))[0];
+    const read = (id) => fs.readFileSync(file(id), 'utf8');
+    let a = read('W-0001');
+    for (const h of ['## Summary', '## Acceptance criteria', '- [ ] No crash', '## Handoff', '## History', 'Task created', 'risk: hoch']) has(a, h, 'englische Aufgabe');
+    expect(!/## (Zusammenfassung|Verlauf|Akzeptanzkriterien)/.test(a), 'englische Aufgabe mit deutschen Überschriften');
+    has(read('W-0002'), '## Akzeptanzkriterien', 'deutsche Aufgabe');
+    en(['set', 'W-0001', 'status=in-progress']);
+    en(['check', 'W-0001', '3']);
+    en(['handoff', 'W-0001', '--text', 'Next: fix it']);
+    en(['question', 'W-0001', 'Which device?']);
+    en(['set', 'W-0001', 'type=feature']);
+    a = read('W-0001');
+    for (const h of ['status: in-arbeit', '- [x] No crash', '## Open questions\n', 'Which device?', '## Goal']) has(a, h, 'englische Aufgabe nach Änderungen');
+    expect(/## Handoff\n[^#]*Next: fix it/.test(a), 'Übergabe nicht im Abschnitt Handoff');
+    expect(!/## (Übergabe|Offene Fragen|Ziel|Verlauf)\n/.test(a), `englische Aufgabe bekommt deutsche Abschnitte: ${a.slice(0, 600)}`);
+    // Deutsche Aufgabe unter Englisch: bestehende Abschnitte werden gefunden, nichts doppelt.
+    en(['set', 'W-0002', 'status=planned']);
+    en(['handoff', 'W-0002', '--text', 'Weiter']);
+    en(['log', 'W-0002', 'Eintrag']);
+    const b = read('W-0002');
+    for (const h of ['status: geplant', 'Eintrag']) has(b, h, 'deutsche Aufgabe unter Englisch');
+    expect(/## Übergabe\n[^#]*Weiter/.test(b), 'Übergabe nicht im Abschnitt Übergabe');
+    expect(!/## (Handoff|History)\n/.test(b), 'deutsche Aufgabe bekommt englische Abschnitte');
+    has(en(['show', 'W-0002', '--section', 'Acceptance criteria']).out, 'Geht', 'show --section mit englischem Namen');
+    has(de(['show', 'W-0001', '--section', 'Akzeptanzkriterien']).out, 'No crash', 'show --section mit deutschem Namen');
+    en(['set', 'W-0001', 'status=done', '--force']);
+    has(read('W-0001'), 'status: erledigt');
+  });
+
+  // W-0041: Ohne Einstellung spricht das CLI Englisch; keine deutschen Reste in wichtigen Befehlen.
+  await step('Sprache: englische Standardausgabe wichtiger Befehle', () => {
+    const p = path.join(base, 'english');
+    fs.mkdirSync(p, { recursive: true });
+    const en = (args, o = {}) => w(args, { cwd: p, extraEnv: { WORKS_LANG: '' }, ...o });
+    const german = /\b(Aufgabe|Fehler|Hinweis|Nächste|Datei|angelegt|aktualisiert|gespeichert|Übergabe|keine|nicht|und|für|mit)\b/;
+    const plain = (s) => expect(!german.test(s), `Deutsch in englischer Ausgabe: ${(s.match(german) || [])[0]} in ${s.slice(0, 400)}`);
+    plain(en(['init']).out);
+    const created = en(['new', '--type=feature', '--title=Export', '--description=Export as JSON', '--criteria=Works']).out;
+    has(created, 'Created: W-0001 Export'); has(created, 'File: '); plain(created);
+    const set = en(['set', 'W-0001', 'priority=P1']).out;
+    has(set, 'W-0001 updated: '); plain(set);
+    plain(en(['start', 'W-0001']).out);
+    has(en(['handoff', 'W-0001', '--text', 'Next step']).out, 'Handoff for W-0001 saved.');
+    for (const args of [['list'], ['show', 'W-0001'], ['status'], ['next'], ['dod', 'W-0001'], ['help'], ['queue'], ['doctor']]) plain(en(args, { ok: false }).out);
+    has(en(['help']).out, 'works: task management in .works/');
+    const bad = en(['nope'], { ok: false });
+    has(bad.err, 'Error: Unknown command "nope"'); plain(bad.err);
+    const hook = spawnSync(process.execPath, [path.join(HOOKS, 'session-start.mjs')], { cwd: p, env: { ...env, WORKS_LANG: '' }, encoding: 'utf8', input: '{}', timeout: 20000 });
+    has(hook.stdout, 'Language: en', 'SessionStart nennt die Sprache'); plain(hook.stdout);
+    const hookDe = spawnSync(process.execPath, [path.join(HOOKS, 'session-start.mjs')], { cwd: p, env, encoding: 'utf8', input: '{}', timeout: 20000 });
+    has(hookDe.stdout, 'Language: de, answer in German, German docs in SKILL.de.md and references/de/', 'SessionStart mit Deutsch');
   });
 
   await step('Bearbeiten: set, item, check, link, question, log, comment', () => {

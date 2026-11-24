@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { tr, language } from './i18n.mjs';
 
 // Kennung eines Projekts (W-0029): Hash des echten Pfads. Steht in data.json, ohne den Pfad preiszugeben.
 export function rootIdOf(dir) {
@@ -14,23 +15,38 @@ export function rootIdOf(dir) {
 
 export const SKILL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const TEMPLATE_DIR = path.join(SKILL_DIR, 'references', 'templates');
+// Vorlagen je Sprache: Englisch in references/templates, sonst references/<sprache>/templates.
+export const templateDir = (lang = language(findRoot())) => {
+  const dir = path.join(SKILL_DIR, 'references', lang, 'templates');
+  return lang !== 'en' && exists(dir) ? dir : TEMPLATE_DIR;
+};
 
+// Gespeicherte Werte bleiben deutsch (Daten), angezeigt wird die Übersetzung. Die Getter übersetzen bei jedem Zugriff,
+// so zeigen auch Board und JSON (Object.entries, JSON.stringify) die eingestellte Sprache.
+const translated = (map) => Object.defineProperties({}, Object.fromEntries(Object.entries(map).map(([k, v]) => [k, { get: () => tr(v), enumerable: true }])));
 export const STATUSES = ['backlog', 'geplant', 'in-arbeit', 'review', 'erledigt', 'verworfen'];
 export const OPEN_STATUSES = ['backlog', 'geplant', 'in-arbeit', 'review'];
 export const CLOSED_STATUSES = ['erledigt', 'verworfen'];
-export const STATUS_LABEL = {
-  backlog: 'Backlog', geplant: 'Geplant', 'in-arbeit': 'In Arbeit',
-  review: 'Review', erledigt: 'Erledigt', verworfen: 'Verworfen',
-};
+export const STATUS_LABEL = translated({
+  backlog: 'Backlog', geplant: 'Planned', 'in-arbeit': 'In progress',
+  review: 'Review', erledigt: 'Done', verworfen: 'Dropped',
+});
 export const PRIORITIES = ['P1', 'P2', 'P3', 'P4'];
-export const PRIO_LABEL = { P1: 'Kritisch', P2: 'Hoch', P3: 'Mittel', P4: 'Niedrig' };
+export const PRIO_LABEL = translated({ P1: 'Critical', P2: 'High', P3: 'Medium', P4: 'Low' });
 export const TYPES = ['feature', 'bug', 'refactor', 'spike', 'chore', 'design', 'debt'];
-export const TYPE_LABEL = {
+export const TYPE_LABEL = translated({
   feature: 'Feature', bug: 'Bug', refactor: 'Refactoring', spike: 'Spike',
-  chore: 'Chore', design: 'Design', debt: 'Techn. Schuld',
-};
+  chore: 'Chore', design: 'Design', debt: 'Tech debt',
+});
 export const EFFORTS = ['S', 'M', 'L', 'XL'];
 export const RISKS = ['niedrig', 'mittel', 'hoch'];
+// Englische Eingaben für die gespeicherten Werte (W-0041): status=done speichert erledigt.
+export const VALUE_ALIAS = {
+  status: { planned: 'geplant', 'in-progress': 'in-arbeit', done: 'erledigt', dropped: 'verworfen' },
+  risk: { low: 'niedrig', medium: 'mittel', high: 'hoch' },
+  kind: { current: 'ist', before: 'vorher', after: 'nachher', reference: 'referenz', sketch: 'skizze', error: 'fehler', diagram: 'diagramm' },
+};
+export const normValue = (field, v) => (typeof v === 'string' && (VALUE_ALIAS[field] || {})[v.toLowerCase()]) || v;
 export const BRANCH_PREFIX = {
   feature: 'feature', bug: 'fix', refactor: 'refactor', spike: 'chore',
   chore: 'chore', design: 'feature', debt: 'refactor',
@@ -52,18 +68,18 @@ export const DEFAULT_CONFIG = {
   milestones: [],
   dod: {
     global: [
-      'Build und Tests laufen ohne Fehler',
-      'code-audit Skill wurde für die Änderungen ausgeführt',
-      'Verlauf ist aktuell und Designentscheidungen sind dokumentiert',
+      'Build and tests pass without errors',
+      'code-audit skill was run for the changes',
+      'History is up to date and design decisions are documented',
     ],
     by_type: {
-      bug: ['Regressionstest vorhanden oder Verzicht begründet'],
-      refactor: ['Verhalten nach außen unverändert'],
-      spike: ['Folgeaufgaben sind angelegt'],
-      debt: ['Schuld ist vollständig getilgt oder die verbleibenden Folgekosten sind dokumentiert'],
+      bug: ['Regression test exists or skipping it is justified'],
+      refactor: ['Externally visible behavior is unchanged'],
+      spike: ['Follow-up tasks are created'],
+      debt: ['Debt is fully repaid or the remaining follow-up costs are documented'],
     },
     by_tag: {
-      ui: ['responsive-website-check wurde ausgeführt'],
+      ui: ['responsive-website-check was run'],
     },
     commands: [],
   },
@@ -150,16 +166,16 @@ export function slugify(text, max = 40) {
   s = s.normalize('NFKD').replace(/[̀-ͯ]/g, '');
   s = s.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   if (s.length > max) s = s.slice(0, max).replace(/-[^-]*$/, '') || s.slice(0, max);
-  return s || 'aufgabe';
+  return s || 'task';
 }
 
 export function fail(msg, code = 1) {
-  process.stderr.write(`Fehler: ${msg}\n`);
+  process.stderr.write(tr('Error: {msg}', { msg }) + '\n');
   process.exit(code);
 }
 
 export function warn(msg) {
-  process.stderr.write(`Hinweis: ${msg}\n`);
+  process.stderr.write(tr('Note: {msg}', { msg }) + '\n');
 }
 
 // windowsHide: Ohne das öffnet Windows für jeden Aufruf aus einem Prozess ohne Konsole
@@ -171,10 +187,10 @@ export function run(cmd, args, opts = {}) {
 
 // Seite oder Datei im Standardbrowser öffnen. WORKS_DRY_OPEN meldet nur, was geöffnet würde (Selbsttest).
 export function openInBrowser(target) {
-  if (process.env.WORKS_DRY_OPEN) return `Im Browser geöffnet (Probelauf): ${target}`;
+  if (process.env.WORKS_DRY_OPEN) return tr('Opened in browser (dry run): {target}', { target });
   const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
   run(opener, [target], { detached: true, stdio: 'ignore', windowsHide: false });
-  return `Im Browser geöffnet: ${target}`;
+  return tr('Opened in browser: {target}', { target });
 }
 
 export function exists(p) {
@@ -237,7 +253,7 @@ export function findRoot(start = process.cwd()) {
 
 export function requireRoot() {
   const root = findRoot();
-  if (!root) fail('Kein .works Ordner gefunden. Zuerst `works init` im Projektwurzelverzeichnis ausführen.');
+  if (!root) fail(tr('No .works folder found. Run `works init` in the project root first.'));
   return root;
 }
 
@@ -357,25 +373,78 @@ export function serializeFrontmatter(data) {
 
 // ---------- Markdown Abschnitte ----------
 
-function sectionRegex(heading) {
-  const h = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(^|\\n)## ${h}[ \\t]*\\n([\\s\\S]*?)(?=\\n## |$)`);
+// Abschnitte (W-0041): Im Code heißen sie deutsch (Schlüssel), in der Datei wie in der Sprache der Aufgabe.
+// Deutsche und englische Aufgaben bleiben so beide gültig. Eine weitere Sprache bekommt hier eine Spalte.
+export const SECTION_NAMES = {
+  en: {
+    Ziel: 'Goal', Beschreibung: 'Description', 'Kontext und Problem': 'Context and problem', Nutzerperspektive: 'User perspective',
+    Akzeptanzkriterien: 'Acceptance criteria', Umsetzungsplan: 'Implementation plan', 'Betroffene Dateien': 'Affected files',
+    Designentscheidungen: 'Design decisions', 'Offene Fragen': 'Open questions', Übergabe: 'Handoff', Verlauf: 'History',
+    Herkunft: 'Origin', Zusammenfassung: 'Summary', Reproduktion: 'Reproduction', 'Erwartetes Verhalten': 'Expected behavior',
+    'Tatsächliches Verhalten': 'Actual behavior', Umgebung: 'Environment', 'Logs und Fehlermeldungen': 'Logs and error messages',
+    Ursache: 'Root cause', Lösung: 'Solution', Checkliste: 'Checklist', Abkürzung: 'Shortcut taken', Grund: 'Reason',
+    'Folgekosten und Risiko': 'Follow-up costs and risk', Auslöser: 'Trigger', Rückzahlung: 'Repayment',
+    'Zielgruppe und Kontext': 'Audience and context', Referenzen: 'References', Varianten: 'Variants', 'Gewählte Lösung': 'Chosen solution',
+    'Ist-Zustand': 'Current state', Zielarchitektur: 'Target architecture', Risiken: 'Risks', Forschungsfrage: 'Research question',
+    Zeitlimit: 'Timebox', Hypothesen: 'Hypotheses', Vorgehen: 'Approach', Ergebnisse: 'Results', Empfehlung: 'Recommendation',
+    Folgeaufgaben: 'Follow-up tasks', Quellen: 'Sources', 'Brainstorm-Zusammenfassung': 'Brainstorm summary', Entscheidungen: 'Decisions',
+    'UI und UX': 'UI and UX', Kontext: 'Context', 'Gewählter Entwurf': 'Chosen design', Fehlerbild: 'Error description',
+  },
+};
+const HEADING_LANG = new Map();
+for (const [lang, names] of Object.entries(SECTION_NAMES)) {
+  for (const [k, v] of Object.entries(names)) if (k !== v) { HEADING_LANG.set(k, 'de'); HEADING_LANG.set(v, lang); }
+}
+
+// Schlüssel zu einer Überschrift in beliebiger Sprache ("Acceptance criteria" → "Akzeptanzkriterien").
+export function sectionKey(name) {
+  for (const names of Object.values(SECTION_NAMES)) for (const [k, v] of Object.entries(names)) if (v === name) return k;
+  return name;
+}
+export function sectionVariants(heading) {
+  const key = sectionKey(heading);
+  return [...new Set([key, heading, ...Object.values(SECTION_NAMES).map((n) => n[key]).filter(Boolean)])];
+}
+
+// Sprache einer task.md nach ihren Überschriften; ohne bekannte Überschrift die eingestellte Sprache.
+export function bodyLang(body) {
+  const score = {};
+  for (const m of String(body || '').matchAll(/^## (.+?)[ \t]*$/gm)) {
+    const l = HEADING_LANG.get(m[1]);
+    if (l) score[l] = (score[l] || 0) + 1;
+  }
+  const best = Object.entries(score).sort((a, b) => b[1] - a[1])[0];
+  return best ? best[0] : language(findRoot());
+}
+
+// Überschrift für einen Abschnitt in der Sprache dieser Aufgabe.
+export function sectionTitle(heading, body = '') {
+  const key = sectionKey(heading);
+  const lang = bodyLang(body);
+  return lang === 'de' ? key : ((SECTION_NAMES[lang] || {})[key] || heading);
+}
+
+// Gruppen: 1 davor, 2 Überschrift wie in der Datei, 3 Inhalt.
+export function sectionRegex(heading, flags = '') {
+  const alt = sectionVariants(heading).map((h) => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  return new RegExp(`(^|\\n)## (${alt})[ \\t]*\\n([\\s\\S]*?)(?=\\n## |$)`, flags);
 }
 
 export function getSection(body, heading) {
   const m = body.match(sectionRegex(heading));
-  return m ? m[2] : null;
+  return m ? m[3] : null;
 }
 
 export function setSection(body, heading, content) {
   const re = sectionRegex(heading);
-  const block = `## ${heading}\n${content.replace(/\s+$/, '')}\n`;
+  const text = `${content.replace(/\s+$/, '')}\n`;
   if (re.test(body)) {
-    return body.replace(re, (all, pre) => `${pre}${block}`);
+    return body.replace(re, (all, pre, name) => `${pre}## ${name}\n${text}`);
   }
+  const block = `## ${sectionTitle(heading, body)}\n${text}`;
   // vor "Verlauf" einfügen, falls vorhanden, sonst anhängen
-  const verlauf = body.match(/\n## Verlauf[ \t]*\n/);
-  if (verlauf && heading !== 'Verlauf') {
+  const verlauf = sectionKey(heading) === 'Verlauf' ? null : body.match(sectionRegex('Verlauf'));
+  if (verlauf && verlauf[1]) {
     const idx = verlauf.index;
     return `${body.slice(0, idx)}\n${block}${body.slice(idx)}`;
   }
@@ -470,7 +539,7 @@ export function findTask(root, config, idInput) {
   const id = normalizeId(config, idInput);
   const tasks = loadTasks(root);
   const t = tasks.find((x) => x.id === id) || tasks.find((x) => path.basename(x._dir).startsWith(id + '-'));
-  if (!t) fail(`Aufgabe ${id} nicht gefunden.`);
+  if (!t) fail(tr('Task {id} not found.', { id }));
   return t;
 }
 
@@ -537,8 +606,9 @@ export function sortTasks(list) {
     || idNumber(a.id) - idNumber(b.id));
 }
 
-export function readTemplate(name) {
-  return readText(path.join(TEMPLATE_DIR, name));
+// Vorlage in der eingestellten Sprache oder in lang (etwa der Sprache einer vorhandenen Aufgabe).
+export function readTemplate(name, lang) {
+  return readText(path.join(templateDir(lang), name));
 }
 
 export function fillTemplate(text, vars) {
