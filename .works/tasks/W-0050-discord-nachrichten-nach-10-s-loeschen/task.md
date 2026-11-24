@@ -89,3 +89,7 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 - 2026-11-24: Entwurf K1 „Kompakte Karte je Aufgabe“ angehängt
 - 2026-11-24: Entwurf K2 „Karte mit Zeitleiste“ angehängt
 - 2026-11-24: Entwurf K3 „Eine Zeile je Aufgabe“ angehängt
+- 2026-11-24: Nutzer zu K1 bis K3: Nachrichten gern mit Bildern, wenn das besser aussieht; für die Gestaltung gern Fable 5.2 nutzen. Bildvarianten folgen.
+- 2026-11-24: Entwurf I1 „Karte mit Vorschaubild“ angehängt
+- 2026-11-24: Entwurf I2 „Karte mit Phasenstreifen“ angehängt
+- 2026-11-24: Entwurf I3 „Karte mit Zeitachse“ angehängt

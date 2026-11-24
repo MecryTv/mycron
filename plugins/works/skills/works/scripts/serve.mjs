@@ -319,8 +319,10 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         if (!isLocal(req)) throw new ApiError(403, tr('This only works directly on the computer the board runs on.'));
         let body;
         try { body = JSON.parse((await readBody(req, 8192)).toString('utf8')); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, tr('Invalid JSON.')); }
-        const r = hubAction(body && body.op, body && body.path);
-        return json(res, r.status, r.error ? { error: r.error } : { ok: true });
+        // W-0049: works board in einem anderen Projekt schickt die offenen Tabs dieses Boards zum Hub.
+        if (body && body.op === 'show') { for (const t of localTabs) t.write('event: hub\ndata: 1\n\n'); return json(res, 200, { ok: true, tabs: localTabs.size }); }
+        const r = await hubAction(body && body.op, body && body.path);
+        return json(res, r.status, r.error ? { error: r.error } : { ok: true, ...(r.url ? { url: r.url } : {}) });
       }
       if (p === '/api/action') {
         if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: tr('JSON expected.') });

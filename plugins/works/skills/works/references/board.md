@@ -210,19 +210,22 @@ Before every change from the board, works backs up the affected files in `.works
 
 ## All projects
 
-The hub shows all running boards of the projects registered in `~/.works/projects.json` (at init, at session start and when a board starts). Every running board serves it under `/hub`, `works hub` shows the same page on port 4740.
+The hub shows all running boards of the projects registered in `~/.works/projects.json` (at init, at session start and when a board starts), and below them the stopped projects with "Open board". Every running board serves it under `/hub`, `works hub` shows the same page on port 4740.
 
 - Header: totals across the running boards (open tasks, P1, pending approvals, review, usage today in money and tokens).
+- Stopped projects (W-0049) as narrow rows: name, path, last opened, "Open board". The button starts the board on a free port (its last one first) and shows it in the same tab.
 - Running boards as large cards: live line (Claude is working, waiting for approval, in progress), open, in progress, review, P1, overdue, progress (sprint or overall), next up, usage today, running since and port, CI from the GitHub sync, whether the version is current.
 - Buttons: Open (in the same tab), In new tab, Restart, Stop.
 - The page fetches its content again every 5 seconds. When a board ends, it disappears from the list.
 - Notifications for pending approvals: below the header, a bar asks once whether the hub should notify (Turn on, Not now). After that only the bell "Notifications on/off" is shown there. If Claude is waiting for an approval in a project and the hub tab is in the background, a browser notification with project and command appears, exactly once per approval; a click opens the board. What is already waiting when the page loads is not reported. The choice is stored in the browser (`works-hub-notify`).
 
-Automatic behavior: with only one board running, there is no hub. The board page asks `/boards` every 5 seconds. When one running board becomes two, the open tab switches to `/hub`. If only one board is left in the hub, the hub closes and the tab shows that board; if the board serving the hub ends, the tab switches to the remaining one after about 15 seconds without a response. A board opened from the hub (`?from=hub`) stays open. At the top left it then shows `← Hub (N boards)` as long as at least two are running.
+Hub as the entry point (W-0049): if a board of another project is already running, `works board --serve` (also with `--detach` and at session start) starts no second server but prints the address of that board's hub; there "Open board" starts this project. With `--open`, an open works tab switches to the hub, otherwise the hub opens in a new tab. `--port`, `--restart`, `--takeover`, `--share` and `--no-hub` start the board directly as before.
+
+Automatic behavior: with only one board running, the hub only shows up when it is called (to reach the stopped projects). The board page asks `/boards` every 5 seconds. When one running board becomes two, the open tab switches to `/hub`. If the hub goes from two or more running boards down to one, it closes and the tab shows that board; if the board serving the hub ends, the tab switches to the remaining one after about 15 seconds without a response. A board opened from the hub (`?from=hub`) stays open. At the top left it then shows `← Hub (N boards)` as long as at least two are running.
 
 Orphaned tabs: if a board ends and another project starts on its port, the old tab reconnects but doesn't silently show the other board. Every page knows its project (`meta.rootId`, a hash of the path). If it doesn't match, a bar appears at the top saying "<project> is no longer running here" with "Start <project>", "To hub" and "View <other project>"; the last state stays grayed out and locked. The tab closes its connection and doesn't count as open at the other board (so `--open` opens its own tab there). When its own board runs again, it switches there on its own. For this, `/boards` returns, next to the running boards, the registered projects with path and the token, local only.
 
-`/boards`, `/hub` and the buttons (`POST /api/hub` with token) only work directly on the machine, not via shared links. The buttons run `works board --serve --detach`, `--stop` or `--restart` in the project folder. `works hub --list` prints the projects as text.
+`/boards`, `/hub` and the buttons (`POST /api/hub` with token) only work directly on the machine, not via shared links. The buttons run `works board --serve --detach --no-hub`, `--stop` or `--restart` in the project folder; "Open board" waits until the board runs and returns its address. `works hub --list` prints the projects as text.
 
 ## Important for Claude
 

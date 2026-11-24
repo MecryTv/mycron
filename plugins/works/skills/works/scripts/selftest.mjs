@@ -1113,9 +1113,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       // Stoppen und Starten über den Hub. Der neue Start nimmt den Standardport, deshalb zuletzt und ohne Tab-Zählung.
       expect((await act({ op: 'stop', path: other })).ok, 'Stoppen über den Hub');
       await waitFor(async () => (await boards()).length === 1, 'zweites Board stoppt');
-      // W-0032: Gestoppte Boards verschwinden aus dem Hub, eine Gestoppt-Liste gibt es nicht mehr.
+      // W-0049: Gestoppte Projekte stehen im Hub unter „Gestoppte Projekte“ mit Öffnen, ohne Board-Karte.
       const solo = await (await get('/hub?part=1')).text();
-      expect(!solo.includes('zweites') && !solo.includes('Gestoppt') && !solo.includes('Projekt hinzufügen'), `Hub zeigt gestoppte Boards: ${solo.slice(0, 200)}`);
+      expect(solo.includes('Gestoppte Projekte') && /data-op="open"[^>]*data-name="zweites"/.test(solo) && (solo.match(/data-board-url=/g) || []).length === 1 && !solo.includes('Projekt hinzufügen'), `Hub ohne gestopptes Projekt: ${solo.slice(0, 300)}`);
       expect((await act({ op: 'start', path: other })).ok, 'Starten über den Hub');
       await waitFor(async () => (await boards()).length === 2, 'zweites Board startet');
       // works hub zeigt dieselbe Seite.
@@ -1128,6 +1128,50 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     } finally {
       if (tab) tab.kill();
       if (hubProc) hubProc.kill();
+      w(['board', '--stop'], { ok: false });
+      w(['board', '--stop'], { cwd: other, ok: false });
+    }
+  });
+
+  // W-0049: Läuft schon ein Board, startet works board --serve in einem anderen Projekt keinen zweiten Server, sondern
+  // nennt den Hub des laufenden Boards; mit --open wechselt ein offener works-Tab dorthin, ohne Tab öffnet sich der Hub.
+  // Öffnen im Hub startet ein gestopptes Projekt auf einem freien Port und liefert die Adresse; --no-hub startet direkt.
+  await step('Hub als Einstieg: zweites Board startet nicht selbst, Öffnen im Hub startet es (W-0049)', async () => {
+    if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
+    if (!fs.existsSync(path.join(other, '.works', 'config.json'))) { fs.mkdirSync(other, { recursive: true }); w(['init'], { cwd: other }); }
+    const ctrl = new AbortController();
+    try {
+      const a = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`]).out);
+      const get = (u, opt) => fetch(`http://127.0.0.1:${a}${u}`, opt);
+      const second = w(['board', '--serve', '--detach'], { cwd: other }).out;
+      has(second, `http://127.0.0.1:${a}/hub`, 'zweites Board nennt den Hub');
+      expect(!fs.existsSync(path.join(other, '.works', 'server.json')), `zweites Board doch gestartet: ${second}`);
+      // Ohne offenen Tab öffnet --open den Hub im Browser.
+      expect(/Im Browser geöffnet[^\n]*http:\/\/127\.0\.0\.1:\d+\/hub/.test(w(['board', '--serve', '--detach', '--open'], { cwd: other }).out), '--open ohne Tab öffnet nicht den Hub');
+      // Mit offenem Tab am laufenden Board wechselt dieser zum Hub (Ereignis hub an seine Tabs).
+      const ev = await get('/events', { signal: ctrl.signal });
+      const reader = ev.body.getReader();
+      let got = '';
+      const heard = (async () => { try { while (!got.includes('event: hub')) { const { value, done } = await reader.read(); if (done) return; got += Buffer.from(value).toString(); } } catch { /* abgebrochen */ } })();
+      await waitFor(async () => (await (await get('/tabs')).json()).tabs === 1, 'Tab am laufenden Board');
+      has(w(['board', '--serve', '--detach', '--open'], { cwd: other }).out, 'wechselt zum Hub', '--open mit offenem Tab');
+      await Promise.race([heard, new Promise((r) => setTimeout(r, 5000))]);
+      expect(got.includes('event: hub'), `Tab bekam kein Signal zum Hub: ${got.slice(-200)}`);
+      // Der Hub zeigt das gestoppte Projekt; Öffnen startet es auf einem freien Port und liefert die Adresse.
+      const html = await (await get('/hub')).text();
+      const token = (html.match(/"token":"([a-f0-9]{20,})"/) || [])[1];
+      has(html, 'Gestoppte Projekte', 'Hub mit gestoppten Projekten');
+      const open = async () => (await get('/api/hub', { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'open', path: other }) })).json();
+      const r1 = await open();
+      const b = portOf(r1.url);
+      expect(b && b !== a && fs.existsSync(path.join(other, '.works', 'server.json')), `Öffnen hat kein Board gestartet: ${JSON.stringify(r1)}`);
+      const r2 = await open();
+      expect(r2.url === r1.url, `Öffnen eines laufenden Boards startet neu: ${JSON.stringify(r2)}`);
+      // --no-hub startet direkt, auch wenn ein anderes Board läuft.
+      w(['board', '--stop'], { cwd: other });
+      has(w(['board', '--serve', '--detach', '--no-hub'], { cwd: other }).out, 'Live-Board läuft', '--no-hub');
+    } finally {
+      ctrl.abort();
       w(['board', '--stop'], { ok: false });
       w(['board', '--stop'], { cwd: other, ok: false });
     }

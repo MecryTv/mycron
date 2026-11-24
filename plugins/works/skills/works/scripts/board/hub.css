@@ -63,3 +63,8 @@
 .hub-ask-acts { display: flex; gap: 8px; }
 .hub-bell-ico { width: 15px; height: 15px; flex: none; }
 .hub-bell[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+/* W-0049: gestoppte Projekte als schmale Zeilen mit Board öffnen */
+.hub-off { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.hub-off li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+.hub-off .hub-path { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-off .btn { margin-left: auto; }

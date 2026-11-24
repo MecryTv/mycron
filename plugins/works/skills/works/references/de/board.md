@@ -210,19 +210,22 @@ Vor jeder Änderung aus dem Board sichert works die betroffenen Dateien in `.wor
 
 ## Alle Projekte
 
-Der Hub zeigt alle laufenden Boards der Projekte, die in `~/.works/projects.json` angemeldet sind (beim Init, beim Sitzungsstart und beim Start eines Boards). Jedes laufende Board liefert ihn unter `/hub`, `works hub` zeigt dieselbe Seite auf Port 4740.
+Der Hub zeigt alle laufenden Boards der Projekte, die in `~/.works/projects.json` angemeldet sind (beim Init, beim Sitzungsstart und beim Start eines Boards), und darunter die gestoppten Projekte mit „Board öffnen“. Jedes laufende Board liefert ihn unter `/hub`, `works hub` zeigt dieselbe Seite auf Port 4740.
 
 - Kopf: Summen über die laufenden Boards (offene Aufgaben, P1, wartende Freigaben, Review, Verbrauch heute in Geld und Tokens).
+- Gestoppte Projekte (W-0049) als schmale Zeilen: Name, Pfad, zuletzt geöffnet, „Board öffnen“. Der Knopf startet das Board auf einem freien Port (zuerst seinem letzten) und zeigt es im selben Tab.
 - Laufende Boards als große Karten: Live-Zeile (Claude arbeitet, wartet auf Freigabe, in Arbeit), offen, in Arbeit, Review, P1, überfällig, Fortschritt (Sprint oder gesamt), als Nächstes, Verbrauch heute, läuft seit und Port, CI aus dem GitHub-Abgleich, ob die Version aktuell ist.
 - Knöpfe: Öffnen (im selben Tab), In neuem Tab, Neu starten, Stoppen.
 - Die Seite holt ihren Inhalt alle 5 Sekunden neu. Endet ein Board, verschwindet es dabei aus der Liste.
 - Hinweise bei wartender Freigabe: Unter dem Kopf fragt eine Leiste einmal, ob der Hub benachrichtigen soll (Einschalten, Nicht jetzt). Danach steht dort nur die Glocke „Hinweise an/aus“. Wartet Claude in einem Projekt auf eine Freigabe und liegt der Hub-Tab im Hintergrund, kommt ein Browser-Hinweis mit Projekt und Befehl, je Freigabe genau einmal; ein Klick öffnet das Board. Was beim Laden schon wartet, meldet er nicht. Die Wahl steht im Browser (`works-hub-notify`).
 
-Automatik: Läuft nur ein Board, gibt es keinen Hub. Die Board-Seite fragt alle 5 Sekunden `/boards`. Wird aus einem laufenden Board zwei, wechselt der offene Tab zu `/hub`. Bleibt im Hub nur noch ein Board übrig, schließt er sich und der Tab zeigt dieses Board; endet das Board, das den Hub ausliefert, wechselt der Tab nach etwa 15 Sekunden ohne Antwort zum verbliebenen. Ein Board, das aus dem Hub geöffnet wurde (`?from=hub`), bleibt offen. Oben links steht dann `← Hub (N Boards)`, solange mindestens zwei laufen.
+Automatik: Läuft nur ein Board, erscheint der Hub nur, wenn man ihn aufruft. Die Board-Seite fragt alle 5 Sekunden `/boards`. Wird aus einem laufenden Board zwei, wechselt der offene Tab zu `/hub`. Sinkt die Zahl der laufenden Boards im Hub von zwei oder mehr auf eins, schließt er sich und der Tab zeigt dieses Board; endet das Board, das den Hub ausliefert, wechselt der Tab nach etwa 15 Sekunden ohne Antwort zum verbliebenen. Ein Board, das aus dem Hub geöffnet wurde (`?from=hub`), bleibt offen. Oben links steht dann `← Hub (N Boards)`, solange mindestens zwei laufen.
 
 Verwaiste Tabs: Endet ein Board und startet auf seinem Port ein anderes Projekt, verbindet sich der alte Tab zwar neu, zeigt aber nicht still das fremde Board. Jede Seite kennt ihr Projekt (`meta.rootId`, ein Hash des Pfads). Passt es nicht, erscheint oben die Leiste „<Projekt> läuft hier nicht mehr“ mit „<Projekt> starten“, „Zum Hub“ und „<anderes Projekt> ansehen“; der letzte Stand bleibt ausgegraut und gesperrt. Der Tab schließt seine Verbindung und zählt beim fremden Board nicht als offen (`--open` öffnet dort also einen eigenen Tab). Läuft das eigene Board wieder, wechselt er von selbst dorthin. `/boards` liefert dafür neben den laufenden Boards die angemeldeten Projekte mit Pfad und das Token, nur lokal.
 
-`/boards`, `/hub` und die Knöpfe (`POST /api/hub` mit Token) gehen nur direkt am Rechner, nicht über geteilte Links. Die Knöpfe rufen im Projektordner `works board --serve --detach`, `--stop` oder `--restart` auf. `works hub --list` gibt die Projekte als Text aus.
+Hub als Einstieg (W-0049): Läuft schon das Board eines anderen Projekts, startet `works board --serve` (auch mit `--detach` und beim Sitzungsstart) keinen zweiten Server, sondern nennt die Adresse des Hubs dieses Boards; dort startet „Board öffnen“ das Projekt. Mit `--open` wechselt ein offener works-Tab zum Hub, sonst öffnet sich der Hub in einem neuen Tab. `--port`, `--restart`, `--takeover`, `--share` und `--no-hub` starten das Board wie bisher direkt. Läuft nur ein Board, erscheint der Hub nur, wenn man ihn aufruft (für die gestoppten Projekte); er schließt sich erst, wenn aus zwei oder mehr laufenden Boards eins wird.
+
+`/boards`, `/hub` und die Knöpfe (`POST /api/hub` mit Token) gehen nur direkt am Rechner, nicht über geteilte Links. Die Knöpfe rufen im Projektordner `works board --serve --detach --no-hub`, `--stop` oder `--restart` auf; „Board öffnen“ wartet, bis das Board läuft, und liefert seine Adresse. `works hub --list` gibt die Projekte als Text aus.
 
 ## Für Claude wichtig
 

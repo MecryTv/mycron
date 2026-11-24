@@ -99,6 +99,33 @@
       "source": "ui-ux-pro-max",
       "note": "Kompakteste Form: eine Zeile mit Ampel, Aufgabe, Projekt, Zustand; Knöpfe nur bei Bedarf",
       "at": "2026-11-24 22:09"
+    },
+    {
+      "name": "I1",
+      "title": "Karte mit Vorschaubild",
+      "file": "I1-karte-mit-vorschaubild.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Text wie K1, oben rechts ein 80x80-Bild mit Zustandsfarbe, Schritten (3/5, ? bei Frage, OK am Ende) und einem Segment je Schritt",
+      "at": "2026-11-24 22:19"
+    },
+    {
+      "name": "I2",
+      "title": "Karte mit Phasenstreifen",
+      "file": "I2-karte-mit-phasenstreifen.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Kurzer Text, darunter ein Bild: Phasen START bis FERTIG mit aktueller Phase hervorgehoben, Schritte, Kriterien, Minuten",
+      "at": "2026-11-24 22:19"
+    },
+    {
+      "name": "I3",
+      "title": "Karte mit Zeitachse",
+      "file": "I3-karte-mit-zeitachse.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Kurzer Text, darunter ein Bild mit der Zeitachse der Aufgabe: Ereignisse als farbige Quadrate, Wartezeiten als Strich, rechts Minuten, Schritte, Kriterien",
+      "at": "2026-11-24 22:19"
     }
   ],
   "brainstorm": [],
