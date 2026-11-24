@@ -75,7 +75,17 @@ Hinweise für die Umsetzung:
 Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Vorher: Werkzeuge im Board ohne Einstellungen für den Discord-Bot, nur Webhook f](assets/2026-11-24-vorher-werkzeuge-im-board-ohne-vorher.jpg)
+Beschreibung: Vorher: Werkzeuge im Board ohne Einstellungen für den Discord-Bot, nur Webhook für den Wochenbericht
+Art: vorher · Hinzugefügt: 2026-11-24
+
+![Nachher: Dialog Discord-Bot nach J2, Reiter Verbindung mit Kanalwahl nach K und ](assets/2026-11-24-nachher-dialog-discord-bot-nach-j2-nachher.png)
+Beschreibung: Nachher: Dialog Discord-Bot nach J2, Reiter Verbindung mit Kanalwahl nach K und Vorschau
+Art: nachher · Hinzugefügt: 2026-11-24
+
+![Nachher auf dem Handy: Reiter Befehle, Vorschau darunter](assets/2026-11-24-nachher-auf-dem-handy-reiter-befehle-nachher.png)
+Beschreibung: Nachher auf dem Handy: Reiter Befehle, Vorschau darunter
+Art: nachher · Hinzugefügt: 2026-11-24
 
 ## Offene Fragen
 - [x] Entwurf J2 zeigt zwei Dinge, für die es noch keine Einstellung gibt: den Schalter „Befehle und Knöpfe erlauben“ und je Projekt eine Kanalwahl (eigener Kanal). Beides fehlt im Dialog; der eigene Kanal wird nur angezeigt, wenn er in config.json steht. Je Projekt einen Kanal ginge nur beim eigenen Bot, der gemeinsame schreibt in genau einen Kanal. Sollen beide als eigene Aufgabe nachgezogen werden, oder reicht es so? Antwort: Nutzer am 2026-11-24: als eigene Aufgabe mit P3 nachziehen (angelegt).
@@ -123,3 +133,8 @@ Fertig im Branch feature/w-0038-board-einstellungen-fuer-den (4 Commits). Dialog
 - 2026-11-24: Status: in-arbeit → review (Grund: Agent fertig)
 - 2026-11-24: Übergabe aktualisiert
 - 2026-11-24: Frage 1 geklärt: Nutzer am 2026-11-24: als eigene Aufgabe mit P3 nachziehen (angelegt).
+- 2026-11-24: Parallele Arbeit beendet
+- 2026-11-24: Asset hinzugefügt: assets/2026-11-24-vorher-werkzeuge-im-board-ohne-vorher.jpg (vorher)
+- 2026-11-24: Asset hinzugefügt: assets/2026-11-24-nachher-dialog-discord-bot-nach-j2-nachher.png (nachher)
+- 2026-11-24: Asset hinzugefügt: assets/2026-11-24-nachher-auf-dem-handy-reiter-befehle-nachher.png (nachher)
+- 2026-11-24: Responsive-Check im eingebauten Browser (Ausweichlösung statt Chrome-Erweiterung) auf einem Board aus dem Branch mit Test-Home: Handy 375, Tablet 768, Desktop 1440 ohne waagerechten Überlauf, keine Konsolenfehler. Code-Audit: Board-API und Dienst-Routen in Ordnung; Nebensache: Handy-Vorschau nennt nach dem Verschieben noch den alten Kanal.
