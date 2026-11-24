@@ -124,4 +124,6 @@ export function modalFor(customId, locale) {
 
 // Antwort nur für den Aufrufer, ohne Erwähnungen.
 export const ephemeral = (data) => ({ ...data, flags: 64, allowed_mentions: { parse: [] } });
+// Schalter Befehle und Knöpfe aus (W-0046): Antwort auf Befehle und alte Knöpfe.
+export const commandsOff = (locale) => ephemeral({ embeds: [{ color: 0x80848e, title: tr(locale)('Befehle und Knöpfe sind ausgeschaltet', 'Commands and buttons are switched off'), description: tr(locale)('Einschalten im Board unter Werkzeuge · Discord-Bot, Reiter Befehle, oder mit `works discord set commands=an`.', 'Switch them on in the board under Tools · Discord bot, tab Commands, or with `works discord set commands=on`.') }] });
 export const notOwner = (locale) => ephemeral({ embeds: [{ color: 0x80848e, title: tr(locale)('Nicht für dich', 'Not for you'), description: tr(locale)('works hört nur auf die Person, die es eingerichtet hat. Du kannst die Nachrichten lesen, aber nichts auslösen.', 'works only listens to the person who set it up. You can read the messages but not trigger anything.') }] });
