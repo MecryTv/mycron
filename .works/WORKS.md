@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-24 16:42 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-24 16:47 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 1 | 0 | 1 | 0 | 0 | 0 | 45 | 0 |
+| 2 | 0 | 1 | 0 | 0 | 0 | 45 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 1 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 2 · P3 Mittel: 1 · P4 Niedrig: 0
 
 ## Kritisch (P1)
 
@@ -24,6 +24,7 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
+| [W-0048](tasks/W-0048-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest mit Browser, Selbsttest | Bug | P2 Hoch | Backlog |  |  |  |  |
 | [W-0046](tasks/W-0046-discord-dialog-schalter-befehle-und/task.md) | Discord-Dialog: Schalter Befehle und Knöpfe, Kanal je Projekt | Feature | P3 Mittel | Backlog | S |  |  |  |
 
 ## Zuletzt erledigt
