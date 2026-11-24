@@ -3,13 +3,13 @@ id: W-0048
 title: "CI rot: works Selbsttest, Schritt Selbsttest mit Browser, Selbsttest"
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort:
 risk:
 created: 2026-11-24
 updated: 2026-11-24
 due:
-completed:
+completed: 2026-11-24
 milestone:
 branch: fix/w-0048-ci-rot-works-selbsttest
 tags: []
@@ -78,9 +78,7 @@ reconnect setzt ready sofort auf false, damit setStatus den Status für RESUMED 
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-24 16:50
-
-Behoben: Gateway gilt ab der Trennung als nicht bereit; Test löst die Trennung selbst aus. Schritt 3x grün, Discord-Schritte 11/11 mit und ohne WebSocket, Dienst-Test grün. Code-Audit: kleine Änderung, nichts gefunden.
+Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -89,3 +87,4 @@ Behoben: Gateway gilt ab der Trennung als nicht bereit; Test löst die Trennung 
 - 2026-11-24: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
 - 2026-11-24: Akzeptanzkriterien: "Der Schritt hängt an keinem Zeitfenster mehr und läuft lokal mehrmals hintereinander grün" abgehakt
 - 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
