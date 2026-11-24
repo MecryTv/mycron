@@ -18,8 +18,20 @@ export class Rest {
 
   static routeKey(method, route) { return `${method} ${route.replace(/\/messages\/\d+/, '/messages/:id').replace(/\/pins\/\d+/, '/pins/:id')}`; }
 
-  async req(method, route, body) {
+  // files: [{ name, type, data }] (W-0044). Zu Discord als multipart (payload_json und files[n]); zum gemeinsamen
+  // Bot (Bearer) als JSON mit base64, der Dienst baut daraus multipart.
+  encode(body, files) {
+    if (!files || !files.length) return { type: 'application/json', payload: body === undefined ? undefined : JSON.stringify(body) };
+    if (this.scheme === 'Bearer') return { type: 'application/json', payload: JSON.stringify({ ...(body || {}), files: files.map((f) => ({ name: f.name, type: f.type || 'application/octet-stream', data: Buffer.from(f.data).toString('base64') })) }) };
+    const fd = new FormData();
+    fd.append('payload_json', JSON.stringify(body || {}));
+    files.forEach((f, i) => fd.append(`files[${i}]`, new Blob([f.data], { type: f.type || 'application/octet-stream' }), f.name));
+    return { type: '', payload: fd };
+  }
+
+  async req(method, route, body, files) {
     const key = Rest.routeKey(method, route);
+    const { type, payload } = this.encode(body, files);
     for (let attempt = 0; attempt < 6; attempt++) {
       const wait = (this.blocked.get(key) || 0) - Date.now();
       if (wait > 0) await sleep(Math.min(wait, 60000));
@@ -27,8 +39,9 @@ export class Rest {
       try {
         res = await fetch(this.base + route, {
           method,
-          headers: { Authorization: `${this.scheme} ${this.token}`, 'Content-Type': 'application/json', 'User-Agent': 'DiscordBot (https://github.com, 1) works' },
-          body: body === undefined ? undefined : JSON.stringify(body),
+          // Bei multipart setzt fetch den Content-Type mit der Grenze selbst.
+          headers: { Authorization: `${this.scheme} ${this.token}`, ...(type ? { 'Content-Type': type } : {}), 'User-Agent': 'DiscordBot (https://github.com, 1) works' },
+          body: payload,
           signal: AbortSignal.timeout(this.timeoutMs),
         });
       } catch (e) {
@@ -54,10 +67,14 @@ export class Rest {
   }
 
   get(route) { return this.req('GET', route); }
-  post(route, body) { return this.req('POST', route, body); }
-  patch(route, body) { return this.req('PATCH', route, body); }
+  post(route, body, files) { return this.req('POST', route, body, files); }
+  patch(route, body, files) { return this.req('PATCH', route, body, files); }
   put(route, body) { return this.req('PUT', route, body); }
+  del(route) { return this.req('DELETE', route); }
 }
+
+// Status des Bots in der Mitgliederliste (W-0044): ein eigener Status, ohne Text nur online.
+export const presenceOf = (text) => ({ status: 'online', since: null, afk: false, activities: text ? [{ type: 4, name: 'Custom Status', state: String(text).slice(0, 128) }] : [] });
 
 export const hasWebSocket = () => typeof globalThis.WebSocket === 'function';
 
@@ -66,8 +83,9 @@ export const hasWebSocket = () => typeof globalThis.WebSocket === 'function';
 const FATAL = new Set([4004, 4010, 4011, 4012, 4013, 4014]);
 
 export class Gateway {
-  constructor({ token, url, intents = 1, log = () => {}, onFatal = () => {}, onDispatch = () => {} }) {
+  constructor({ token, url, intents = 1, log = () => {}, onFatal = () => {}, onDispatch = () => {}, status = '' }) {
     Object.assign(this, { token, url, intents, log, onFatal, onDispatch });
+    this.presence = presenceOf(status);
     this.seq = null; this.session = null; this.resumeUrl = null;
     this.stopped = false; this.backoff = 1000; this.ws = null; this.hb = null; this.acked = true;
     this.ready = false;
@@ -102,7 +120,7 @@ export class Gateway {
       // schlagen und das fehlende Ack als tote Verbindung deuten.
       this.hbStart = setTimeout(() => { this.beat(); this.hb = setInterval(() => this.beat(), iv); }, Math.floor(iv * Math.random()));
       if (resuming) this.send(6, { token: this.token, session_id: this.session, seq: this.seq });
-      else this.send(2, { token: this.token, intents: this.intents, properties: { os: process.platform, browser: 'works', device: 'works' }, presence: { status: 'online', since: null, activities: [], afk: false } });
+      else this.send(2, { token: this.token, intents: this.intents, properties: { os: process.platform, browser: 'works', device: 'works' }, presence: this.presence });
     } else if (p.op === 11) this.acked = true;
     else if (p.op === 1) this.beat(true);
     else if (p.op === 7) this.reconnect(true);
@@ -115,6 +133,12 @@ export class Gateway {
   }
 
   stopBeat() { clearTimeout(this.hbStart); clearInterval(this.hb); }
+
+  // Neuer Status; ohne Verbindung geht er beim nächsten Identify mit.
+  setStatus(text) {
+    this.presence = presenceOf(text);
+    if (this.ready) this.send(3, this.presence);
+  }
 
   beat(force = false) {
     if (!force && !this.acked) { this.log('Gateway antwortet nicht, neu verbinden'); this.reconnect(true); return; }

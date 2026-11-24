@@ -1,8 +1,9 @@
 // Bot-Prozess works (W-0036): einer je Rechner, für alle angemeldeten Projekte.
 // Ereignisse entstehen aus dem Stand der Projekte (Aufgaben, Warteschlange, Live-Aktivität), damit Hooks
 // nichts zusätzlich tun müssen; ship, CI-Wächter und Berichte legen Ereignisse in die outbox (discord.mjs).
-// Nachrichten nach Entwurf F2: Felder, Erledigtes wird nachträglich bearbeitet, nur Erwähnungen klingeln,
-// je Projekt ein angehefteter Statuspost, der gebündelt bearbeitet wird.
+// Nachrichten nach Entwurf F2: Felder, Erledigtes wird nachträglich bearbeitet, nur Erwähnungen klingeln.
+// Dauerhaft im Kanal steht nur das Dashboard nach D3 (W-0044), eines je Kanal für alle Projekte; alles andere
+// löscht der Bot nach der Frist (cleanup.hours), offene Nachrichten erst nach ihrer Erledigung.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -15,12 +16,15 @@ import { runningVersion, OWN_CLI, isAlive } from './server-control.mjs';
 import { dfile, discordDir, loadDiscordConfig, normalizeConfig, credential, readOutbox } from './discord.mjs';
 import { Rest, Gateway, hasWebSocket } from './discord-api.mjs';
 import { tr, who, subOf, parseCid, cid, MODAL, modalFor, modalValues, helpMessage, ephemeral, notOwner, commands } from './discord-ui.mjs';
+import { dashboardPng } from './discord-image.mjs';
 
 export { normalizeConfig };
 
 const FAST = process.env.WORKS_DISCORD_FAST === '1';
 const TICK = FAST ? 100 : 2000;
 const STATUS_MIN = FAST ? 300 : 10000;
+const IMAGE_MIN = FAST ? 1000 : 300000; // Bild höchstens alle 5 Minuten neu zeichnen
+const PRESENCE_MIN = FAST ? 200 : 20000;
 const RETRY = FAST ? 200 : 15000;
 const SILENT = 4096;
 const COLOR = { need: 0xe8a33d, done: 0x23a55a, red: 0xf23f43, run: 0x5865f2, gone: 0x80848e, status: 0x8e8cf7 };
@@ -107,6 +111,71 @@ export function renderStatus(s, cfg, now = new Date()) {
   };
 }
 
+// ---------- Dashboard nach D3 (W-0044) ----------
+
+// Ampel und Satz zu einem Projekt: wartet auf dich (Freigabe oder fertig), arbeitet, ruhig.
+export function stateOf(s, cfg, t) {
+  const a = s.active;
+  const aL = a ? `${a.id}${cfg.privacy.titles && a.title ? ` ${cut(a.title, 60)}` : ''}` : '';
+  if (s.perm) return ['🟠', t('wartet auf deine Freigabe', 'waits for your approval')];
+  if (s.busy) return ['🟢', a ? t(`arbeitet an ${aL}`, `working on ${aL}`) : t('arbeitet', 'working')];
+  if (s.idleSince) return ['🟠', t('ist fertig und wartet auf dich', 'is done and waits for you')];
+  return ['⚪', a ? t(`in Arbeit: ${aL}`, `in progress: ${aL}`) : t('keine Aufgabe in Arbeit', 'no task in progress')];
+}
+
+export function projectLineOf(s, ci, cfg, t) {
+  const [dot, text] = stateOf(s, cfg, t);
+  const p = s.progress;
+  const prog = p && p.total ? ` · ${p.done}/${p.total}` : '';
+  return `${dot} **${cut(s.name, 80)}** ${text}${prog}${ci && !ci.ok ? ' · 🔴 CI' : ''}`;
+}
+
+const WEEKDAY = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'];
+
+// Daten für das Bild: Fortschritt je Projekt und erledigt je Tag, gestapelt nach Projekt.
+export function dashImageData(list) {
+  const days = (list[0] && list[0].snap.doneDays) || [];
+  return {
+    projects: list.map((p) => {
+      const g = p.snap.progress || {};
+      const done = g.done || 0; const wip = g.wip || 0;
+      return { name: p.snap.name, done, wip, open: Math.max(0, (g.total || 0) - done - wip), color: colorOf(p.snap.name) };
+    }),
+    days: days.map(([d], i) => ({ label: WEEKDAY[new Date(`${d}T12:00:00`).getDay()], counts: list.map((p) => ((p.snap.doneDays || [])[i] || [])[1] || 0) })),
+  };
+}
+
+const button = (style, lbl, custom_id) => ({ type: 2, style, label: lbl, custom_id });
+
+// list: [{ rid, snap }]. interactive: Auswahlmenü und Knöpfe nur, wenn Klicks ankommen.
+export function renderDashboard(list, cfg, { ci = {}, interactive = false, now = new Date() } = {}) {
+  const t = tr('de');
+  const waiting = list.filter((p) => p.snap.perm || (!p.snap.busy && p.snap.idleSince)).map((p) => cut(p.snap.name, 60));
+  const done = list.reduce((s, p) => s + ((p.snap.today && p.snap.today.done) || 0), 0);
+  const costs = list.map((p) => p.snap.today && p.snap.today.cost).filter(Boolean);
+  const next = list.flatMap((p) => (p.snap.queue || []).slice(0, 1).map((q) => `${cut(label(cfg, q.id, q.title), 100)} · ${cut(p.snap.name, 40)}`)).slice(0, 3);
+  const options = list.slice(0, 25).map((p) => ({ label: cut(p.snap.name, 100), value: p.rid, description: cut(stateOf(p.snap, cfg, t)[1], 100) }));
+  return {
+    embeds: [fit({
+      title: `works · ${list.length} ${list.length === 1 ? 'Projekt' : 'Projekte'}`,
+      color: COLOR.status,
+      description: trimTo(list.map((p) => projectLineOf(p.snap, ci[p.rid], cfg, t)).join('\n') || 'Noch kein Projekt.', 4000),
+      fields: [
+        field('Heute', `${done} erledigt${cfg.privacy.costs && costs.length ? ` · ${costs.join(' + ')}` : ''}`),
+        field('Wartet auf dich', waiting.join(', ') || 'nichts'),
+        field('Als Nächstes', next.join('\n') || 'nichts eingeplant', false),
+      ],
+      image: { url: 'attachment://works.png' },
+      footer: { text: `Bild höchstens alle 5 Minuten neu${interactive ? ' · Details nur für dich über das Menü' : ''}` },
+      timestamp: now.toISOString(),
+    })],
+    components: interactive ? [
+      ...(options.length ? [{ type: 1, components: [{ type: 3, custom_id: 'w:proj::', placeholder: 'Projekt wählen · Details nur für dich', options }] }] : []),
+      { type: 1, components: [button(2, 'Warteschlange', 'w:queue::'), button(1, 'Anweisung an Claude', 'w:ins::'), button(2, 'Neue Aufgabe', 'w:new::'), button(2, 'Hilfe', 'w:help::')] },
+    ] : [],
+  };
+}
+
 const SHIP_STEP = {
   merge: () => 'in main gemergt',
   push: (x) => `gepusht${x.sha ? ` · ${sha7(x.sha)}` : ''}`,
@@ -139,6 +208,7 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date(), rid = '', i
       if (acts) actions = act(1, 'Anweisung an Claude', cid('ins', rid, ev.id));
       break;
     case 'question':
+      if (!open) { e = { color: COLOR.gone, title: `✓ Frage zu ${ev.id} beantwortet` }; break; }
       text = `${p}: Frage zu ${ev.id}`;
       e = { color: COLOR.need, title: `Frage zu ${ev.id}`, description: cfg.privacy.titles ? cutBlock(ev.text, 1500) : 'Frage im Board ansehen' };
       break;
@@ -261,6 +331,9 @@ function tasksPart(root) {
   const nextList = queued.length ? queued : sortTasks(live.filter(waiting));
   const counted = all.filter((t) => t.status !== 'verworfen');
   const day = today();
+  // Für das Bild im Dashboard (W-0044): erledigt je Tag der letzten sieben Tage, älteste zuerst.
+  const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return iso(d); });
   return {
     config,
     snap: {
@@ -269,7 +342,8 @@ function tasksPart(root) {
       active: active ? { id: active.id, title: active.title, crit: crit(active) } : null,
       queueIds,
       queue: nextList.slice(0, 2).map((t) => ({ id: t.id, title: t.title })),
-      progress: { done: counted.filter((t) => t.status === 'erledigt').length, total: counted.length },
+      progress: { done: counted.filter((t) => t.status === 'erledigt').length, wip: live.filter((t) => ['in-arbeit', 'review'].includes(t.status)).length, total: counted.length },
+      doneDays: days.map((d) => [d, all.filter((t) => t.completed === d).length]),
     },
     doneToday: all.filter((t) => t.completed === day).length,
   };
@@ -311,7 +385,7 @@ function commitUrl(root, sha) {
 
 // ---------- Bot ----------
 
-const emptyState = () => ({ projects: {}, msgs: {}, queue: [], open: {}, ships: {}, ci: {}, frozen: {}, sent: {} });
+const emptyState = () => ({ projects: {}, msgs: {}, queue: [], open: {}, ships: {}, ci: {}, frozen: {}, sent: {}, dash: {} });
 const DAY = 86400000;
 
 export class Bot {
@@ -326,7 +400,10 @@ export class Bot {
     this.snapAt = new Map();
     this.caches = new Map();
     this.snapJson = new Map();
-    this.forceStatus = new Set(Object.keys(this.state.projects));
+    // Bild je Kanal (nur im Speicher: nach einem Neustart wird es neu gezeichnet und das Dashboard einmal bearbeitet,
+    // so fällt auch ein gelöschtes Dashboard auf). setStatus: Status des Bots, nur mit Gateway.
+    this.images = new Map();
+    this.setStatus = null; this.statusText = null; this.statusAt = 0;
     this.retryAt = 0;
     this.dirty = false;
     this.restored = false;
@@ -428,6 +505,8 @@ export class Bot {
     if (!snap) return false;
     if (type === 'perm') return (snap.perms || (snap.perm ? [{ slot: 'main', ...snap.perm }] : [])).some((p) => p.slot === (data.slot || 'main') && p.since === data.since);
     if (type === 'idle') return !snap.busy && snap.idleSince === data.since;
+    // Frage: offen, solange die Aufgabe noch mindestens so viele offene Fragen hat wie beim Stellen.
+    if (type === 'question') { const t = snap.tasks && snap.tasks[data.id]; return !!t && t.q > 0 && t.q >= (data.q || 1); }
     return false;
   }
 
@@ -462,7 +541,10 @@ export class Bot {
         if (accepted) { this.once(rid, `done:${t.id}`); this.addRecent(rid, `${t.id} angenommen`); }
         else if (OPEN_STATUSES.includes(t.status)) this.event(rid, 'returned', base, cfg);
       } else if (o.status !== 'erledigt' && t.status === 'erledigt' && !this.shipping(rid, t.id) && this.once(rid, `done:${t.id}`)) this.event(rid, 'done', base, cfg);
-      if (t.q > o.q && this.once(rid, `question:${t.id}:${String(t.lastQ).slice(0, 80)}`)) this.event(rid, 'question', { ...base, text: t.lastQ }, cfg);
+      if (t.q > o.q && this.once(rid, `question:${t.id}:${String(t.lastQ).slice(0, 80)}`)) {
+        const r = this.event(rid, 'question', { ...base, text: t.lastQ, q: t.q }, cfg);
+        if (r) this.state.open[`question:${rid}:${t.id}`] = { ...r, rid };
+      }
       if (o.priority !== 'P1' && t.priority === 'P1' && OPEN_STATUSES.includes(t.status) && this.once(rid, `p1:${t.id}`)) this.event(rid, 'p1', base, cfg);
     }
     if (prev.queueIds.length && !next.queueIds.length) this.event(rid, 'queue_empty', {}, cfg);
@@ -505,7 +587,7 @@ export class Bot {
   resolve(rid, snap, cfg) {
     for (const [slot, tm] of this.timers) if (tm.rid === rid && !this.stillTrue(tm.type, tm.data, snap)) this.timers.delete(slot);
     for (const [slot, op] of Object.entries(this.state.open)) {
-      if (op.rid !== rid || !['perm', 'idle'].includes(op.ev.type) || this.stillTrue(op.ev.type, op.ev, snap)) continue;
+      if (op.rid !== rid || !['perm', 'idle', 'question'].includes(op.ev.type) || this.stillTrue(op.ev.type, op.ev, snap)) continue;
       this.upsert(op.key, { ...op.ev, state: 'resolved', until: new Date().toISOString() }, rid, cfg);
       delete this.state.open[slot];
       this.dirty = true;
@@ -558,13 +640,17 @@ export class Bot {
     while (this.state.queue.length && Date.now() >= this.retryAt) {
       const op = this.state.queue[0];
       const known = this.state.msgs[op.key];
+      // done: seit wann die Nachricht erledigt ist (ab da läuft die Frist zum Löschen); 0, solange sie auf dich wartet.
+      const waits = (!op.ev.state || op.ev.state === 'open') && ['perm', 'idle', 'question', 'review'].includes(op.ev.type);
       try {
         const body = renderEvent(op.ev, cfg, { owner: cfg.owner_id, rid: op.rid, interactive: this.interactive });
-        if (known) await this.rest.patch(`/channels/${known.channel_id}/messages/${known.message_id}`, { content: body.content, embeds: body.embeds, components: body.components, allowed_mentions: body.allowed_mentions });
-        else {
+        if (known) {
+          await this.rest.patch(`/channels/${known.channel_id}/messages/${known.message_id}`, { content: body.content, embeds: body.embeds, components: body.components, allowed_mentions: body.allowed_mentions });
+          known.done = waits ? 0 : known.done || Date.now();
+        } else {
           const ch = op.channel_id || this.channelFor(op.rid, cfg);
           const m = await this.rest.post(`/channels/${ch}/messages`, body);
-          this.state.msgs[op.key] = { channel_id: ch, message_id: m.id, at: new Date().toISOString() };
+          this.state.msgs[op.key] = { channel_id: ch, message_id: m.id, at: new Date().toISOString(), done: waits ? 0 : Date.now() };
         }
       } catch (e) {
         if (e.retry) { this.retryAt = Date.now() + RETRY; this.log(e.message); return; }
@@ -580,45 +666,122 @@ export class Bot {
     }
   }
 
-  async statusposts(cfg) {
+  // Eine Nachricht löschen; weg (404) oder nicht mehr unsere (403) zählt als gelöscht. false: später noch einmal.
+  async remove(channel, message) {
+    try { await this.rest.del(`/channels/${channel}/messages/${message}`); } catch (e) {
+      if (e.retry) { this.retryAt = Date.now() + RETRY; this.log(e.message); return false; }
+      if (e.status === 401 || e.status === 410) throw e;
+      if (e.status !== 404 && e.status !== 403) this.log(`Nachricht nicht gelöscht: ${e.message}`);
+    }
+    return true;
+  }
+
+  // Dashboard nach D3 (W-0044): eine angeheftete Nachricht je Kanal für alle Projekte, die dorthin melden. Gebündelt
+  // bearbeitet (höchstens alle 10 s), das Bild höchstens alle 5 Minuten neu gezeichnet und bei jeder Bearbeitung mit
+  // hochgeladen. 404 (gelöscht) oder 403 (nicht mehr bearbeitbar): neu anlegen.
+  async dashboards(cfg) {
+    // Statusposts je Projekt von vor W-0044 und Dashboards in Kanälen ohne Projekte (Kanal gewechselt) löschen.
+    for (const pr of Object.values(this.state.projects)) {
+      if (!pr.status) continue;
+      if (pr.status.message_id && !await this.remove(pr.status.channel_id, pr.status.message_id)) return;
+      delete pr.status; this.dirty = true;
+    }
+    const byCh = new Map();
     for (const [rid, pr] of Object.entries(this.state.projects)) {
-      if (Date.now() < this.retryAt) return;
       if (!pr.snap || !pr.root || !this.enrolled(rid, cfg)) continue;
-      const body = renderStatus({ ...pr.snap, recent: pr.recent, ci: this.state.ci[rid] || null }, cfg);
-      const hash = crypto.createHash('sha1').update(JSON.stringify({ ...body.embeds[0], timestamp: 0 })).digest('hex');
       const ch = this.channelFor(rid, cfg);
-      const s = pr.status || {};
-      if (s.hash === hash && s.channel_id === ch && !this.forceStatus.has(rid)) continue;
-      if (Date.now() - (s.at || 0) < STATUS_MIN) continue;
+      if (!byCh.has(ch)) byCh.set(ch, []);
+      byCh.get(ch).push({ rid, ...pr });
+    }
+    for (const [ch, d] of Object.entries(this.state.dash)) {
+      if (byCh.has(ch)) continue;
+      if (d.message_id && !await this.remove(ch, d.message_id)) return;
+      delete this.state.dash[ch]; this.images.delete(ch); this.dirty = true;
+    }
+    const sha = (x) => crypto.createHash('sha1').update(JSON.stringify(x)).digest('hex');
+    for (const [ch, list] of byCh) {
+      if (Date.now() < this.retryAt) return;
+      list.sort((a, b) => a.snap.name.localeCompare(b.snap.name));
+      const d = this.state.dash[ch] || {};
+      const body = renderDashboard(list, cfg, { ci: this.state.ci, interactive: this.interactive });
+      const hash = sha({ ...body.embeds[0], timestamp: 0, c: body.components });
+      const data = dashImageData(list);
+      const imgHash = sha(data);
+      const img = this.images.get(ch);
+      const draw = !img || (img.hash !== imgHash && Date.now() - img.at >= IMAGE_MIN);
+      if (d.message_id && d.hash === hash && !draw) continue;
+      if (Date.now() - (d.at || 0) < STATUS_MIN) continue;
+      if (draw) this.images.set(ch, { hash: imgHash, at: Date.now(), png: dashboardPng(data) });
+      const files = [{ name: 'works.png', type: 'image/png', data: this.images.get(ch).png }];
+      const attachments = [{ id: 0, filename: 'works.png' }];
       try {
         let ok = false;
-        // 404 gelöscht, 403 nicht mehr bearbeitbar (anderer Bot nach Tokenwechsel, kein Zugriff): neu anlegen.
-        if (s.message_id && s.channel_id === ch) {
-          try { await this.rest.patch(`/channels/${ch}/messages/${s.message_id}`, { embeds: body.embeds }); ok = true; } catch (e) { if (e.status !== 404 && e.status !== 403) throw e; }
+        if (d.message_id) {
+          try { await this.rest.patch(`/channels/${ch}/messages/${d.message_id}`, { embeds: body.embeds, components: body.components, attachments }, files); ok = true; } catch (e) { if (e.status !== 404 && e.status !== 403) throw e; }
         }
         if (!ok) {
-          const m = await this.rest.post(`/channels/${ch}/messages`, { ...body, flags: SILENT, allowed_mentions: { parse: [] } });
-          s.message_id = m.id; s.channel_id = ch;
+          const m = await this.rest.post(`/channels/${ch}/messages`, { ...body, attachments, flags: SILENT, allowed_mentions: { parse: [] } }, files);
+          d.message_id = m.id;
           try { await this.rest.put(`/channels/${ch}/messages/pins/${m.id}`); } catch (e) {
             if (e.retry) throw e;
             if (!this.warned.has(`pin:${ch}`)) { this.warned.add(`pin:${ch}`); this.log(`Anheften in Kanal ${ch} nicht möglich (${e.message}). Fehlt das Recht „Nachrichten anheften“?`); }
           }
         }
-        pr.status = { ...s, hash, at: Date.now() };
-        this.forceStatus.delete(rid);
+        this.state.dash[ch] = { ...d, hash, at: Date.now() };
         this.dirty = true;
       } catch (e) {
         if (e.retry) { this.retryAt = Date.now() + RETRY; this.log(e.message); return; }
         if (e.status === 401 || e.status === 410) throw e;
-        pr.status = { ...s, at: Date.now() };
-        if (!this.warned.has(`st:${rid}`)) { this.warned.add(`st:${rid}`); this.log(`Statuspost ${pr.name}: ${e.message}`); }
+        this.state.dash[ch] = { ...d, at: Date.now() };
+        if (!this.warned.has(`dash:${ch}`)) { this.warned.add(`dash:${ch}`); this.log(`Dashboard in Kanal ${ch}: ${e.message}`); }
       }
     }
   }
 
-  prune() {
+  // Aufräumen (W-0044): Nachrichten nach der Frist löschen, gezählt ab ihrer Erledigung; wartende bleiben. Höchstens
+  // fünf je Durchgang, damit Discord nicht bremst. Einträge von vor W-0044 haben kein done: erledigt ab dem Senden.
+  async cleanup(cfg) {
+    const hours = Number(cfg.cleanup && cfg.cleanup.hours) || 0;
+    if (hours <= 0) return;
+    const limit = Date.now() - hours * 3600000;
+    const busy = new Set([...this.state.queue.map((q) => q.key), ...Object.values(this.state.open).map((o) => o.key)]);
+    let n = 0;
+    for (const [k, v] of Object.entries(this.state.msgs)) {
+      if (n >= 5 || Date.now() < this.retryAt) return;
+      const done = v.done === undefined ? Date.parse(v.at) : v.done;
+      if (!done || done > limit || busy.has(k)) continue;
+      n++;
+      if (!await this.remove(v.channel_id, v.message_id)) return;
+      delete this.state.msgs[k];
+      this.dirty = true;
+    }
+  }
+
+  // Status des Bots (eigener Bot): das Wichtigste über alle Projekte, höchstens alle 20 s neu.
+  statusLine(cfg) {
+    const all = this.liveProjects(cfg);
+    const perm = all.find((p) => p.snap.perm);
+    if (perm) return `${perm.snap.name} wartet auf deine Freigabe`;
+    const idle = all.find((p) => !p.snap.busy && p.snap.idleSince);
+    if (idle) return `${idle.snap.name} wartet auf dich`;
+    const busy = all.find((p) => p.snap.busy && p.snap.active);
+    if (busy) return `arbeitet an ${busy.snap.active.id} (${busy.snap.name})`;
+    return `${all.length} ${all.length === 1 ? 'Projekt' : 'Projekte'} im Blick`;
+  }
+
+  updateStatus(cfg) {
+    if (!this.setStatus) return;
+    const text = trimTo(this.statusLine(cfg), 128);
+    if (text === this.statusText || Date.now() - this.statusAt < PRESENCE_MIN) return;
+    this.statusText = text; this.statusAt = Date.now();
+    this.setStatus(text);
+  }
+
+  prune(cfg) {
     const now = Date.now();
-    for (const [k, v] of Object.entries(this.state.msgs)) if (Date.parse(v.at) < now - 7 * DAY && !Object.values(this.state.open).some((o) => o.key === k)) delete this.state.msgs[k];
+    // Gemerkte Nachrichten bleiben, bis das Aufräumen sie gelöscht hat (spätestens Frist plus eine Woche).
+    const keep = Math.max(7 * DAY, ((Number(cfg && cfg.cleanup && cfg.cleanup.hours) || 0) * 3600000) + 7 * DAY);
+    for (const [k, v] of Object.entries(this.state.msgs)) if (Date.parse(v.at) < now - keep && !Object.values(this.state.open).some((o) => o.key === k)) delete this.state.msgs[k];
     for (const [k, v] of Object.entries(this.state.ships)) if (Date.parse(v.ended || v.started) < now - DAY) delete this.state.ships[k];
     for (const m of Object.values(this.state.sent)) for (const [k, t] of Object.entries(m)) if (now - t > DAY) delete m[k];
   }
@@ -643,8 +806,10 @@ export class Bot {
     if (this.dirty) this.save();
     for (const f of done) { try { fs.unlinkSync(f); } catch { /* schon weg */ } }
     await this.flush(cfg);
-    await this.statusposts(cfg);
-    if (this.dirty) { this.prune(); this.save(); }
+    await this.dashboards(cfg);
+    await this.cleanup(cfg);
+    this.updateStatus(cfg);
+    if (this.dirty) { this.prune(cfg); this.save(); }
   }
 
   // ---------- Befehle und Knöpfe (W-0037) ----------
@@ -670,13 +835,15 @@ export class Bot {
 
   // Projekt zu einem Knopf (rid) oder Befehl (Name, Anfang reicht). Ohne Angabe nur, wenn es genau eines gibt.
   // Liest den Stand vorher frisch ein: Eine Aufgabe, die gerade angelegt wurde, soll schon in der Antwort stehen.
-  pick(cfg, t, { rid = '', name = '' } = {}) {
+  // active: ohne Angabe bei mehreren Projekten das, in dem Claude gerade arbeitet oder wartet (Knöpfe des Dashboards).
+  pick(cfg, t, { rid = '', name = '', active = false } = {}) {
     const all = this.liveProjects(cfg);
     const names = all.map((x) => x.name).join(', ');
     const n = name.toLowerCase();
+    const live = all.filter((x) => x.snap.active && (x.snap.busy || x.snap.perm || x.snap.idleSince));
     const p = rid ? all.find((x) => x.rid === rid)
       : name ? all.find((x) => x.name.toLowerCase() === n) || all.find((x) => x.name.toLowerCase().startsWith(n))
-        : all.length === 1 ? all[0] : null;
+        : all.length === 1 ? all[0] : active && live.length === 1 ? live[0] : null;
     if (!p) {
       if (rid) throw new Error(t('Das Projekt ist nicht mehr da oder schickt keine Hinweise mehr.', 'The project is gone or no longer sends notifications.'));
       if (!all.length) throw new Error(t('works kennt noch kein Projekt. Öffne ein Projekt mit works, dann geht es los.', 'works does not know any project yet. Open a project with works first.'));
@@ -686,22 +853,24 @@ export class Bot {
     return { rid: p.rid, ...this.state.projects[p.rid] };
   }
 
-  projectLine(pr, cfg, t) {
-    const s = pr.snap;
-    const a = s.active;
-    const aL = a ? `${a.id}${cfg.privacy.titles && a.title ? ` ${cut(a.title, 60)}` : ''}` : '';
-    const [dot, text] = s.perm ? ['🟠', t('wartet auf deine Freigabe', 'waits for your approval')]
-      : s.busy ? ['🟢', a ? t(`arbeitet an ${aL}`, `working on ${aL}`) : t('arbeitet', 'working')]
-        : s.idleSince ? ['🟠', t('ist fertig und wartet auf dich', 'is done and waits for you')]
-          : ['⚪', a ? t(`in Arbeit: ${aL}`, `in progress: ${aL}`) : t('keine Aufgabe in Arbeit', 'no task in progress')];
-    const ci = this.state.ci[pr.rid];
-    const prog = s.progress && s.progress.total ? ` · ${s.progress.done}/${s.progress.total}` : '';
-    return `${dot} **${cut(s.name, 80)}** ${text}${prog}${ci && !ci.ok ? ' · 🔴 CI' : ''}`;
-  }
-
   overview(cfg, t) {
     const all = this.liveProjects(cfg);
-    return { embeds: [{ color: COLOR.status, title: t(`works · ${all.length} ${all.length === 1 ? 'Projekt' : 'Projekte'}`, `works · ${all.length} ${all.length === 1 ? 'project' : 'projects'}`), description: trimTo(all.map((p) => this.projectLine(p, cfg, t)).join('\n') || t('Noch kein Projekt bekannt.', 'No project known yet.'), 4000) }] };
+    return { embeds: [{ color: COLOR.status, title: t(`works · ${all.length} ${all.length === 1 ? 'Projekt' : 'Projekte'}`, `works · ${all.length} ${all.length === 1 ? 'project' : 'projects'}`), description: trimTo(all.map((p) => projectLineOf(p.snap, this.state.ci[p.rid], cfg, t)).join('\n') || t('Noch kein Projekt bekannt.', 'No project known yet.'), 4000) }] };
+  }
+
+  // Details zu einem Projekt aus dem Auswahlmenü des Dashboards, mit Knöpfen für Aufgaben und eine Anweisung.
+  detail(pr, cfg, t) {
+    const body = renderStatus({ ...pr.snap, recent: pr.recent, ci: this.state.ci[pr.rid] || null }, cfg);
+    const btns = [...act(2, t('Aufgaben', 'Tasks'), cid('tasks', pr.rid, '')), ...act(1, t('Anweisung an Claude', 'Instruction for Claude'), cid('ins', pr.rid, (pr.snap.active && pr.snap.active.id) || ''))];
+    return { ...body, components: btns.length ? [{ type: 1, components: btns }] : [] };
+  }
+
+  queueView(cfg, t) {
+    const lines = this.liveProjects(cfg).flatMap((p) => (p.snap.queueIds || []).slice(0, 10).map((id, n) => {
+      const x = p.snap.tasks[id];
+      return `${n + 1}. **${id}**${cfg.privacy.titles && x && x.title ? ` ${cut(x.title, 80)}` : ''} · ${cut(p.snap.name, 40)}`;
+    }));
+    return { embeds: [{ color: COLOR.run, title: t('Warteschlange', 'Queue'), description: trimTo(lines.join('\n') || t('Nichts eingereiht. Im Board unter Warteschlange festlegen, was Claude der Reihe nach abarbeitet.', 'Nothing queued. Set it in the board under Queue.'), 4000) }] };
   }
 
   taskList(pr, cfg, t) {
@@ -749,7 +918,11 @@ export class Bot {
     }
     const p = parseCid(i.data && i.data.custom_id);
     if (!p) throw new Error(t('Unbekannter Knopf.', 'Unknown button.'));
-    const pr = this.pick(cfg, t, { rid: p.rid });
+    if (i.type === 3 && p.act === 'queue') return this.queueView(cfg, t);
+    if (i.type === 3 && p.act === 'proj') return this.detail(this.pick(cfg, t, { rid: String((i.data.values || [])[0] || '') || '-' }), cfg, t);
+    // Knöpfe des Dashboards tragen kein Projekt: das aus dem Dialog, sonst das einzige oder das, in dem Claude gerade ist.
+    const pr = this.pick(cfg, t, p.rid ? { rid: p.rid } : { name: i.type === 5 ? modalValues(i.data).project || '' : '', active: true });
+    if (i.type === 3 && p.act === 'tasks') return this.taskList(pr, cfg, t);
     if (i.type === 3 && p.act === 'acc') {
       const cur = pr.snap.tasks[p.id];
       if (!cur || cur.status !== 'review') throw new Error(t(`${p.id} ist nicht mehr im Review${cur ? ` (${cur.status})` : ''}.`, `${p.id} is no longer in review${cur ? ` (${cur.status})` : ''}.`));
@@ -779,7 +952,7 @@ export class Bot {
       if (!cfg.owner_id || who(i) !== cfg.owner_id) return await io.reply(notOwner(i.locale));
       const p = i.type === 3 ? parseCid(i.data && i.data.custom_id) : null;
       if (p && MODAL.has(p.act)) return await io.modal(modalFor(i.data.custom_id, i.locale));
-      if (i.type === 2 && subOf(i).sub === 'help') return await io.reply(helpMessage({ locale: i.locale, shared: this.shared }));
+      if ((i.type === 2 && subOf(i).sub === 'help') || (p && p.act === 'help')) return await io.reply(helpMessage({ locale: i.locale, shared: this.shared }));
       await io.defer();
       let data;
       try { data = await this.act(i, cfg, t); } catch (e) {
@@ -924,6 +1097,7 @@ export async function runBot() {
           token: cred.secret, url: g.url, log,
           onFatal: (code) => { fatal = code === 4004 ? 'Token ungültig' : `Gateway-Code ${code}`; },
           onDispatch: (type, d) => { if (type === 'INTERACTION_CREATE' && d) bot.onInteraction(d, bot.ownIo(d)); },
+          status: bot.statusText || '',
         });
         gw.start();
       } catch (e) { log(`Gateway nicht erreichbar (${e.message}), Nachrichten gehen trotzdem.`); }
@@ -931,6 +1105,8 @@ export async function runBot() {
     // Schreibende Aktionen aus Discord laufen über die Board-API; der Verlauf zeigt sie mit [Discord].
     process.env.WORKS_API_ACTOR = 'Discord';
     const bot = new Bot({ rest, log, shared: cred.shared, interactive: cred.shared || hasWebSocket() });
+    // Status des Bots (W-0044) nur beim eigenen Bot: Der gemeinsame ist einer für alle.
+    if (!cred.shared && hasWebSocket()) bot.setStatus = (text) => { if (gw) gw.setStatus(text); };
     // Gemeinsamer Bot: Befehle und Klicks holt das Gerät beim Dienst ab (es hat kein Gateway). Der Dienst hält die
     // Anfrage offen, bis etwas kommt; ein Dienst ohne Inbox (ältere Version) wird nur selten gefragt.
     if (cred.shared) {

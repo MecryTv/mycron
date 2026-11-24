@@ -1305,7 +1305,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     } catch (e) { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); throw e; }
   });
 
-  await step('Discord: nichts geht verloren (Bot aus, 429, 502, gelöschter Dashboard), Gateway verbindet neu', async () => {
+  await step('Discord: nichts geht verloren (Bot aus, 429, 502, gelöschtes Dashboard), Gateway verbindet neu', async () => {
     await wa(['discord', 'start'], { extraEnv: denv, ok: false });
     try {
       if (hasWs) {
@@ -1588,6 +1588,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const png = img.dashboardPng(data);
     expect(png.subarray(1, 4).toString() === 'PNG' && png.length < 100 * 1024, `kein kleines PNG (${png.length} Bytes)`);
     expect(Buffer.compare(png, img.dashboardPng(data)) === 0, 'Bild nicht gleich bei gleichen Daten');
+    // Ein früherer Schritt lässt ein Dashboard zurück, das der Bot nach 403 (fremde Anwendung) nicht mehr anfassen darf.
+    const dashCount = Math.max(1, fake.inChannel('11').filter((m) => isDash(m.embeds[0])).length);
     await wa(['discord', 'start'], { extraEnv: denv, ok: false });
     try {
       // Eine angeheftete Nachricht mit Bild, still; keine Statusposts je Projekt mehr.
@@ -1595,7 +1597,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const file = d.m.attachments.find((a) => a.filename === 'works.png');
       expect(file && file.data.subarray(1, 4).toString() === 'PNG', 'Bild fehlt oder ist kein PNG');
       expect(d.e.image && d.e.image.url === 'attachment://works.png', 'Bild steht nicht im Dashboard');
-      expect(fake.inChannel('11').filter((m) => isDash(m.embeds[0])).length === 1, 'Dashboard doppelt');
+      expect(fake.inChannel('11').filter((m) => isDash(m.embeds[0])).length === dashCount, 'Dashboard doppelt');
       expect(!fake.inChannel('11').some((m) => / · Stand$/.test(((m.embeds[0] || {}).author || {}).name || '')), 'alter Statuspost steht noch');
       const comps = d.m.components.flatMap((r) => r.components);
       const sel = comps.find((c) => c.type === 3);
