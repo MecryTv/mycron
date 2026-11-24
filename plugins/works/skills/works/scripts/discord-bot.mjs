@@ -131,15 +131,17 @@ export function projectLineOf(s, ci, cfg, t) {
 }
 
 const WEEKDAY = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'];
+// Projektfarben im Bild der Reihe nach, damit sich keine zwei gleichen; ohne Grün (das steht für erledigt).
+const IMAGE_COLORS = [0x8e8cf7, 0xe8a33d, 0x3aa7a3, 0xd16ba5, 0x5aa9e6, 0xf08a4b, 0xc9b458];
 
 // Daten für das Bild: Fortschritt je Projekt und erledigt je Tag, gestapelt nach Projekt.
 export function dashImageData(list) {
   const days = (list[0] && list[0].snap.doneDays) || [];
   return {
-    projects: list.map((p) => {
+    projects: list.map((p, i) => {
       const g = p.snap.progress || {};
       const done = g.done || 0; const wip = g.wip || 0;
-      return { name: p.snap.name, done, wip, open: Math.max(0, (g.total || 0) - done - wip), color: colorOf(p.snap.name) };
+      return { name: p.snap.name, done, wip, open: Math.max(0, (g.total || 0) - done - wip), color: IMAGE_COLORS[i % IMAGE_COLORS.length] };
     }),
     days: days.map(([d], i) => ({ label: WEEKDAY[new Date(`${d}T12:00:00`).getDay()], counts: list.map((p) => ((p.snap.doneDays || [])[i] || [])[1] || 0) })),
   };

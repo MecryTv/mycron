@@ -154,8 +154,8 @@ Ein Bot je Rechner für alle Projekte. Alles liegt in `~/.works/discord`, nie im
 | `discord link <Code>` | Mit dem gemeinsamen Bot koppeln. Den Code gibt `/works verbinden` in Discord, im Kanal, in den works schreiben soll |
 | `discord unlink` | Kopplung lösen: Schlüssel beim Dienst widerrufen und lokal löschen, Bot stoppen |
 | `discord token` | Token prüfen und speichern. Liest von der Eingabe (versteckt) oder aus einer Pipe, nie als Argument: `Get-Clipboard \| works discord token`. Gibt den Einladungslink aus |
-| `discord channel [name\|id]` | Textkanäle der Server zeigen oder den Kanal für die Statusposts wählen |
-| `discord set k=v ..` | `service` (Adresse des gemeinsamen Bots, nur https), `autostart`, `auto_enroll`, `delay.perm`, `delay.idle` (Sekunden), `quiet.on`, `quiet.from`, `quiet.to` (HH:MM), `privacy.commands\|costs\|ci_error\|titles`, `event.<name>` und `event.<name>.at` (Erwähnung) |
+| `discord channel [name\|id]` | Textkanäle der Server zeigen oder den Kanal für Dashboard und Hinweise wählen |
+| `discord set k=v ..` | `service` (Adresse des gemeinsamen Bots, nur https), `autostart`, `auto_enroll`, `delay.perm`, `delay.idle` (Sekunden), `quiet.on`, `quiet.from`, `quiet.to` (HH:MM), `privacy.commands\|costs\|ci_error\|titles`, `cleanup.hours` (Nachrichten außer dem Dashboard nach so vielen Stunden löschen, Standard 24, 0 nie), `event.<name>` und `event.<name>.at` (Erwähnung) |
 | `discord test` | Testnachricht in den Kanal |
 | `discord start\|stop\|restart` | Bot-Prozess; startet sonst mit dem Board und beim Sitzungsstart |
 | `discord emit <ship\|ci\|report> --json '{..}'` | Ereignis in die outbox legen (für ship, ci-watch, Berichte). Ohne Einrichtung passiert nichts |

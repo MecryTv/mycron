@@ -7,7 +7,7 @@ status: in-arbeit
 effort: L
 risk:
 created: 2026-11-23
-updated: 2026-11-23
+updated: 2026-11-24
 due:
 completed:
 milestone:
@@ -47,14 +47,14 @@ Wunsch des Nutzers am 2026-11-23: Der Kanal soll sauber bleiben. Dauerhaft steht
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] Bild nach D3 als PNG (discord-image.mjs): Raster, Pixelschrift, PNG über zlib
-- [ ] Hochladen: Rest mit Dateien (multipart, beim Dienst als base64 in JSON), Löschen eigener Nachrichten; Fake liest multipart, kennt DELETE
-- [ ] Dashboard je Kanal statt Statuspost je Projekt: Zeilen mit Ampel, Bild, Auswahlmenü, Knöpfe; alte Statusposts löschen
-- [ ] Knöpfe des Dashboards: Projekt wählen (Details nur für dich), Warteschlange, Anweisung, Neue Aufgabe, Hilfe
-- [ ] Status des Bots (eigener Bot über das Gateway, gemeinsamer Bot fest „/works help“)
-- [ ] Aufräumen: Frist 24 h (cleanup.hours), offene erst nach Erledigung, Fragen werden als beantwortet markiert
-- [ ] Dienst: Bild durchreichen, eigene Nachrichten löschen
-- [ ] Tests (Selbsttest, Dienst-Test) auf das Dashboard umstellen, Doku
+- [x] Bild nach D3 als PNG (discord-image.mjs): Raster, Pixelschrift, PNG über zlib
+- [x] Hochladen: Rest mit Dateien (multipart, beim Dienst als base64 in JSON), Löschen eigener Nachrichten; Fake liest multipart, kennt DELETE
+- [x] Dashboard je Kanal statt Statuspost je Projekt: Zeilen mit Ampel, Bild, Auswahlmenü, Knöpfe; alte Statusposts löschen
+- [x] Knöpfe des Dashboards: Projekt wählen (Details nur für dich), Warteschlange, Anweisung, Neue Aufgabe, Hilfe
+- [x] Status des Bots (eigener Bot über das Gateway, gemeinsamer Bot fest „/works help“)
+- [x] Aufräumen: Frist 24 h (cleanup.hours), offene erst nach Erledigung, Fragen werden als beantwortet markiert
+- [x] Dienst: Bild durchreichen, eigene Nachrichten löschen
+- [x] Tests (Selbsttest, Dienst-Test) auf das Dashboard umstellen, Doku
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -73,7 +73,9 @@ Wunsch des Nutzers am 2026-11-23: Der Kanal soll sauber bleiben. Dauerhaft steht
 - Aufräumen nur über die eigenen gemerkten Nachrichten; ein Durchsuchen des Kanalverlaufs entfällt (alle Nachrichten des Bots sind gemerkt).
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Dashboard-Bild nach D3 aus den echten Projekten (mycron, RL Nexus, Trainingsplan](assets/2026-11-24-dashboard-bild-nach-d3-aus-den-echten-nachher.png)
+Beschreibung: Dashboard-Bild nach D3 aus den echten Projekten (mycron, RL Nexus, Trainingsplan): Fortschritt je Projekt, erledigte Aufgaben der letzten 7 Tage gestapelt nach Projektfarbe
+Art: nachher · Hinzugefügt: 2026-11-24
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
@@ -95,3 +97,16 @@ Branch feature/w-0044-discord-dashboard, uncommittet: discord-image.mjs (neu), d
 - 2026-11-23: Beziehung: blocked-by W-0037
 - 2026-11-23: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-23: Übergabe aktualisiert
+- 2026-11-23: Zwischenstand committet (60a2d49): discord-image.mjs, discord-fake.mjs, selftest.mjs; nichts mehr uncommittet, nicht gepusht
+- 2026-11-24: Asset hinzugefügt: assets/2026-11-24-dashboard-bild-nach-d3-aus-den-echten-nachher.png (nachher)
+- 2026-11-24: Entscheidung E1 dokumentiert: Bild bei jeder Bearbeitung hochladen, höchstens alle 5 Minuten neu zeichnen
+- 2026-11-24: Entscheidung E2 dokumentiert: Pixelschrift nur in Großbuchstaben, Farben der Reihe nach
+- 2026-11-24: Entscheidung E3 dokumentiert: Aufräumen über gemerkte Nachrichten, Status nur beim eigenen Bot
+- 2026-11-24: Umsetzungsplan: "Bild nach D3 als PNG (discord-image.mjs): Raster, Pixelschrift, PNG über zlib" abgehakt
+- 2026-11-24: Umsetzungsplan: "Hochladen: Rest mit Dateien (multipart, beim Dienst als base64 in JSON), Löschen eigener Nachrichten; Fake liest multipart, kennt DELETE" abgehakt
+- 2026-11-24: Umsetzungsplan: "Dashboard je Kanal statt Statuspost je Projekt: Zeilen mit Ampel, Bild, Auswahlmenü, Knöpfe; alte Statusposts löschen" abgehakt
+- 2026-11-24: Umsetzungsplan: "Knöpfe des Dashboards: Projekt wählen (Details nur für dich), Warteschlange, Anweisung, Neue Aufgabe, Hilfe" abgehakt
+- 2026-11-24: Umsetzungsplan: "Status des Bots (eigener Bot über das Gateway, gemeinsamer Bot fest „/works help“)" abgehakt
+- 2026-11-24: Umsetzungsplan: "Aufräumen: Frist 24 h (cleanup.hours), offene erst nach Erledigung, Fragen werden als beantwortet markiert" abgehakt
+- 2026-11-24: Umsetzungsplan: "Dienst: Bild durchreichen, eigene Nachrichten löschen" abgehakt
+- 2026-11-24: Umsetzungsplan: "Tests (Selbsttest, Dienst-Test) auf das Dashboard umstellen, Doku" abgehakt
