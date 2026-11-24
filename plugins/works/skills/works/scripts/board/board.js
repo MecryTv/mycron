@@ -4115,6 +4115,8 @@
       reload().then(() => { if (!orphan && langChanged(meta)) location.reload(); });
     });
     es.addEventListener('restart', () => { first = true; setLive(true, tr('New version starting')); });
+    // W-0049: works board in einem anderen Projekt zeigt den Hub statt eines zweiten Boards; dieser Tab wechselt dorthin.
+    es.addEventListener('hub', () => { if (EDIT) location.href = '/hub'; });
     es.onopen = () => { if ($('#live').classList.contains('off')) setLive(true, 'Live'); };
     es.onerror = () => setLive(false, tr('Disconnected, retrying'));
     ensureMeta().then(() => { if (detail) renderDetail(); }).catch(() => {});

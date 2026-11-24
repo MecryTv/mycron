@@ -92,6 +92,11 @@ export function hubInfos() {
   return infos.filter((i) => i.server).sort((a, b) => (b.p1.length - a.p1.length) || String(b.last).localeCompare(String(a.last)));
 }
 
+// W-0049: Projekte mit .works ohne laufendes Board, zuletzt geöffnete zuerst. Nur aus der Anmeldung, ohne Aufgaben zu laden.
+export function stoppedProjects() {
+  return projectList().filter((p) => !readServer(p.path)).sort((a, b) => String(b.seen || '').localeCompare(String(a.seen || '')));
+}
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Alter eines Zeitpunkts als Art und Zahl, daraus "vor 5 min" (ago) oder "seit 5 min" (since) in der Sprache (W-0041).
 const age = (iso) => {
@@ -153,7 +158,7 @@ const BELL_ICON = '<svg class="hub-bell-ico" viewBox="0 0 24 24" fill="none" str
 const THEME_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" style="width:15px;height:15px"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>';
 
 // Inhalt der Seite (Kopf und Liste). Wird alle 5 s neu geholt.
-export function hubBody(infos, { self = '' } = {}) {
+export function hubBody(infos, { self = '', stopped = [] } = {}) {
   const on = infos.filter((i) => i.server);
   const sum = (f) => infos.reduce((a, i) => a + f(i), 0);
   const cost = sum((i) => (i.usage ? i.usage.cost : 0));
@@ -170,6 +175,8 @@ export function hubBody(infos, { self = '' } = {}) {
 <main class="hub-wrap">
 <div class="hub-sec"><h2>${tr('Running boards')}</h2><span class="hub-m">${on.length}</span></div>
 ${on.length ? `<div class="hub-cards">${on.map((i) => boardCard(i, self)).join('')}</div>` : `<p class="hub-m">${tr('No board is running right now.')}</p>`}
+${stopped.length ? `<div class="hub-sec"><h2>${tr('Stopped projects')}</h2><span class="hub-m">${stopped.length}</span></div>
+<ul class="hub-off">${stopped.map((p) => `<li><span class="hub-dot"></span><b>${esc(p.name)}</b><span class="hub-m hub-path">${esc(p.path.replace(os.homedir(), '~'))}</span><span class="hub-m">${p.seen ? tr('last opened {ago}', { ago: ago(p.seen) }) : ''}</span><button class="btn small" type="button" data-op="open" data-name="${esc(p.name)}" data-path="${esc(p.path)}">${tr('Open board')}</button></li>`).join('')}</ul>` : ''}
 <div style="height:28px"></div>
 </main>`;
 }
@@ -223,13 +230,16 @@ const HUB_JS = `(() => {
   }
   notifyUi();
   newPerms(true);
-  // W-0032: Läuft nur noch ein Board, schließt sich der Hub und der Tab zeigt dieses Board. Ist der Server dieser
-  // Seite selbst weg (drei Abfragen ohne Antwort, etwa 15 s, damit ein kurzer Neustart nicht wegspringt), zum
+  // W-0032: Läuft nur noch ein Board, schließt sich der Hub und der Tab zeigt dieses Board. Nur beim Übergang von zwei
+  // oder mehr auf eins (W-0049): Wer den Hub mit einem Board aufruft, will die gestoppten Projekte sehen. Ist der Server
+  // dieser Seite selbst weg (drei Abfragen ohne Antwort, etwa 15 s, damit ein kurzer Neustart nicht wegspringt), zum
   // einzigen anderen bekannten Board. Gehen wieder zwei auf, schaltet die Board-Seite zurück zum Hub.
   let failures = 0;
+  let running = null;
   function followSingle() {
     const cards = root.querySelectorAll('[data-board-url]');
-    if (cards.length === 1) location.href = cards[0].dataset.boardUrl;
+    if (running !== null && running >= 2 && cards.length === 1) { location.href = cards[0].dataset.boardUrl; return; }
+    running = cards.length;
   }
   function serverGone() {
     if (++failures < 3) return;
@@ -269,11 +279,17 @@ const HUB_JS = `(() => {
     let dir = b.dataset.path;
     if (b.dataset.op === 'stop' && !confirm(tr('Stop the board of {name}?', { name: b.dataset.name }))) return;
     b.disabled = true;
+    // W-0049: Öffnen startet ein gestopptes Board (freier Port, der zuletzt genutzte zuerst) und zeigt es im selben Tab.
+    const label = b.textContent;
+    if (b.dataset.op === 'open') b.textContent = tr('Starting …');
     try {
       const r = await fetch('/api/hub', { method: 'POST', headers: { 'X-Works-Token': H.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: b.dataset.op, path: dir }) });
       if (r.status === 403) { location.reload(); return; }
-      if (!r.ok) alert((await r.json().catch(() => ({}))).error || tr('That did not work.'));
+      const res = await r.json().catch(() => ({}));
+      if (!r.ok) alert(res.error || tr('That did not work.'));
+      else if (b.dataset.op === 'open' && res.url) { location.href = res.url + '?from=hub'; return; }
     } catch (err) { alert(tr('No connection to the board.')); }
+    b.textContent = label;
     b.disabled = false;
     setTimeout(refresh, 1500); setTimeout(refresh, 4000);
   });
@@ -287,24 +303,32 @@ const HUB_KEYS = [...HUB_JS.matchAll(/\btr\('((?:[^'\\]|\\.)*)'/g)].map((m) => m
 export function hubHtml({ token, self = '', part = false, partUrl = '/?part=1', events = false, root } = {}) {
   const lang = language(root);
   setLanguage(lang);
-  const body = hubBody(hubInfos(), { self });
+  const body = hubBody(hubInfos(), { self, stopped: stoppedProjects() });
   if (part) return body;
   const boot = JSON.stringify({ token, part: partUrl, events, t: Object.fromEntries(HUB_KEYS.map((k) => [k, tr(k)]).filter(([k, v]) => k !== v)) }).replace(/</g, '\\u003c');
   return `<!doctype html><html lang="${esc(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><title>works Hub</title><style>${boardCss()}${HUB_CSS}</style></head>
 <body><div class="hub-page" id="hub">${body}</div><script>window.HUB = ${boot};${HUB_JS}</script></body></html>`;
 }
 
-// Knöpfe im Hub: Board starten, stoppen, neu starten, Projekt hinzufügen. Nur für angemeldete Projekte.
-// Läuft über das CLI im Projektordner, wie works board von Hand. Gibt { status, error? } zurück.
-export function hubAction(op, dir) {
-  if (!['start', 'stop', 'restart'].includes(op)) return { status: 400, error: tr('Unknown action.') };
+// Knöpfe im Hub: Board starten, öffnen, stoppen, neu starten. Nur für angemeldete Projekte.
+// Läuft über das CLI im Projektordner, wie works board von Hand; --no-hub, weil hier ausdrücklich gestartet wird
+// (W-0049). open wartet, bis das Board läuft, und gibt seine Adresse zurück. Gibt { status, error?, url? } zurück.
+export async function hubAction(op, dir) {
+  if (!['start', 'open', 'stop', 'restart'].includes(op)) return { status: 400, error: tr('Unknown action.') };
   const real = (x) => { try { return fs.realpathSync(String(x || '')); } catch { return null; } };
   const target = real(dir);
   const p = target && projectList().find((x) => real(x.path) === target);
   if (!p) return { status: 400, error: tr('Unknown project.') };
-  const args = { start: ['board', '--serve', '--detach'], stop: ['board', '--stop'], restart: ['board', '--restart'] }[op];
+  if (op === 'open' && readServer(p.path)) return { status: 200, url: boardUrl(readServer(p.path)) };
+  const args = { start: ['board', '--serve', '--detach', '--no-hub'], open: ['board', '--serve', '--detach', '--no-hub'], stop: ['board', '--stop'], restart: ['board', '--restart'] }[op];
   spawn(process.execPath, [newestCli(), ...args], { cwd: p.path, detached: true, windowsHide: true, stdio: 'ignore', env: { ...process.env, WORKS_ACTOR: '' } }).unref();
-  return { status: 200 };
+  if (op !== 'open') return { status: 200 };
+  for (const until = Date.now() + 12000; Date.now() < until;) {
+    await new Promise((r) => setTimeout(r, 200));
+    const s = readServer(p.path);
+    if (s) return { status: 200, url: boardUrl(s) };
+  }
+  return { status: 504, error: tr('The board of {name} did not start. Details in .works/server.log in the project.', { name: p.name }) };
 }
 
 export function serveHub({ port = 4740 } = {}) {
@@ -320,12 +344,12 @@ export function serveHub({ port = 4740 } = {}) {
       if (req.headers['x-works-token'] !== token || (origin && origin !== `http://${req.headers.host}`)) { res.writeHead(403, { ...head, 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: tr('Access denied.') })); }
       let body = '';
       req.on('data', (c) => { body += c; if (body.length > 4000) req.destroy(); });
-      req.on('end', () => {
+      req.on('end', async () => {
         let q = {};
         try { q = JSON.parse(body); } catch { /* leer */ }
-        const r = hubAction(q.op, q.path);
+        const r = await hubAction(q.op, q.path);
         res.writeHead(r.status, { ...head, 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(r.error ? { error: r.error } : { ok: true }));
+        res.end(JSON.stringify(r.error ? { error: r.error } : { ok: true, ...(r.url ? { url: r.url } : {}) }));
       });
       return;
     }

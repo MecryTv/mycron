@@ -921,6 +921,20 @@ async function openBoardOnce(info, wait = 0) {
       : openInBrowser(serverUrl(info)));
 }
 
+// W-0049: Ein offener works-Tab eines laufenden Boards wechselt zum Hub (Ereignis hub über die API mit dem lokalen
+// Token aus /boards); ohne offenen Tab öffnet sich der Hub im Browser.
+async function showHub(hubUrl) {
+  for (const b of runningBoards()) {
+    if (!await boardTabs(b)) continue;
+    try {
+      const { token } = await (await fetch(`http://127.0.0.1:${b.port}/boards`, { signal: AbortSignal.timeout(1500) })).json();
+      const r = await fetch(`http://127.0.0.1:${b.port}/api/hub`, { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'show' }), signal: AbortSignal.timeout(1500) });
+      if (r.ok) { out(tr('The open works tab switches to the hub.')); return; }
+    } catch { /* nächstes Board */ }
+  }
+  out(openInBrowser(hubUrl));
+}
+
 function printShare(root, info) {
   if (!info || !['0.0.0.0', '::'].includes(info.host)) return;
   const links = shareLinks(root, info.port);
@@ -987,6 +1001,21 @@ async function cmdBoard() {
     const hostChanged = info && info.host && info.host !== host;
     // Ohne --port: der Port des laufenden Servers, sonst der zuletzt genutzte (W-0031), sonst 4747. Nur --port ist fest.
     let port = parseInt(flags.port || (info && info.port) || (legacy[0] && legacy[0].port) || lastPort(root) || 4747, 10);
+    // W-0049: Läuft schon das Board eines anderen Projekts, hier keinen zweiten Server starten, sondern dessen Hub
+    // zeigen; dort startet „Öffnen“ dieses Board. Wer ausdrücklich startet (--port, --restart, --takeover, --share,
+    // --no-hub), bekommt es wie bisher.
+    if (!info && !legacy.length && !flags.port && !flags.restart && !flags.takeover && !flags.share && !flags['no-hub']) {
+      const here = fs.realpathSync(root);
+      const other = runningBoards().find((b) => { try { return fs.realpathSync(b.path) !== here; } catch { return false; } });
+      if (other) {
+        registerProject(root);
+        const hubUrl = `${other.url}hub`;
+        out(tr('Another works board is already running, so none starts here. Hub with all projects: {url}', { url: hubUrl }));
+        out(tr('Open this project there with "Open board", or start it anyway: works board --serve --detach --no-hub'));
+        if (flags.open) await showHub(hubUrl);
+        return;
+      }
+    }
     // Läuft schon ein aktueller Server, keinen zweiten starten.
     if (info && info.version === current && !flags.restart && !flags.takeover && !hostChanged) {
       out(tr('Live board already running: {url}', { url: serverUrl(info) }));

@@ -182,7 +182,8 @@ export async function stopProcess(pid, timeoutMs = 10000) {
 export function startDetached(root, { cli = newestCli(), port = 4747, host = '127.0.0.1', takeover = true } = {}) {
   ensureGitignore(root, ['server.json', 'server-last.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'steps.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json']);
   const log = fs.openSync(path.join(worksDir(root), 'server.log'), 'a');
-  const args = [cli, 'board', '--serve', ...(port ? [`--port=${port}`] : []), `--host=${host}`];
+  // --no-hub: Ob hier ein Board starten soll, hat der Aufrufer schon entschieden (W-0049).
+  const args = [cli, 'board', '--serve', '--no-hub', ...(port ? [`--port=${port}`] : []), `--host=${host}`];
   if (takeover) args.push('--takeover');
   const child = spawn(process.execPath, args, { cwd: root, detached: true, windowsHide: true, stdio: ['ignore', log, log], env: { ...process.env, WORKS_ACTOR: '' } });
   child.unref();

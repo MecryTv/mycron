@@ -41,7 +41,7 @@ Status, risk and asset kind accept English input: `planned`, `in-progress`, `don
 | `status` | Short overview as at session start |
 | `index` | Regenerate WORKS.md |
 | `board [--open]` | Generate `.works/board.html` and optionally open it in the browser. From then on the file is regenerated after every change |
-| `board --serve [--detach] [--port 4747] [--host 127.0.0.1] [--open]` | Live board on a local server, in the background with `--detach`. If an up-to-date server is already running, only its URL is printed; an outdated one is replaced. Without `--port` it uses its last port (otherwise 4747); if that is taken, the next free one. `--open` only opens a tab if no works tab is open yet, including one of another project. See board.md |
+| `board --serve [--detach] [--port 4747] [--host 127.0.0.1] [--open]` | Live board on a local server, in the background with `--detach`. If an up-to-date server is already running, only its URL is printed; an outdated one is replaced. Without `--port` it uses its last port (otherwise 4747); if that is taken, the next free one. `--open` only opens a tab if no works tab is open yet, including one of another project. If another project's board is already running, no second one starts: the output names that board's hub, where "Open board" starts this one (W-0049); `--no-hub` starts it anyway. See board.md |
 | `board --status` / `--restart` / `--stop` | Query the server, restart it with the current version, or stop it |
 | `board --restart --share` / `--private` | Share on the local network (read link with key) or go back to local only |
 | `share [--owner] [--rotate]` | Show sharing links, with `--owner` also the edit link, with `--rotate` new keys |
