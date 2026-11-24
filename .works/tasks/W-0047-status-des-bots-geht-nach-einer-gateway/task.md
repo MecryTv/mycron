@@ -3,7 +3,7 @@ id: W-0047
 title: Status des Bots geht nach einer Gateway-Fortsetzung verloren
 type: bug
 priority: P2
-status: backlog
+status: in-arbeit
 effort: S
 risk:
 created: 2026-11-24
@@ -11,7 +11,7 @@ updated: 2026-11-24
 due:
 completed:
 milestone:
-branch:
+branch: fix/w-0047-status-des-bots-geht-nach
 tags: [discord]
 blocked_by: []
 blocks: []
@@ -24,17 +24,22 @@ incomplete: false
 
 ## Zusammenfassung
 <!-- Ein Satz: Was geht kaputt, wo, mit welcher Auswirkung? -->
+Ändert sich der Status des Bots, während das Gateway neu verbindet, kommt er nach einer Fortsetzung (Resume) nie bei Discord an.
 
 ## Beschreibung
-Gefunden bei der Prüfung von W-0038 am 2026-11-24: Der Selbsttest-Schritt zu W-0044
+Gefunden bei der Prüfung von W-0038 am 2026-11-24: Der Selbsttest-Schritt zu W-0044 (Status des Bots bei einer Freigabe) lief einmal in die Zeit. Vermutete Ursache: Gateway.setStatus schickt den neuen Status nur, wenn die Verbindung bereit ist; sonst merkt er ihn sich für das nächste Identify. Verbindet der Bot per Resume neu (kein Identify), geht der geänderte Status verloren, bis er sich wieder ändert. Im Selbsttest löst das blockierende w() (spawnSync) solche Neuverbindungen aus; beim echten Discord passiert es bei jedem kurzen Abbruch. (Text beim Anlegen an den Anführungszeichen abgeschnitten, hier vollständig.)
 
 ## Reproduktion
 <!-- Nummerierte Schritte, die den Fehler zuverlässig auslösen. Häufigkeit angeben (immer, manchmal, einmalig). -->
-1. 
+1. Gateway verbinden, Discord verlangt eine Neuverbindung (op 7).
+2. Während der Trennung setStatus aufrufen.
+3. Nach RESUMED steht bei Discord weiter der alte Status. Immer.
 
 ## Erwartetes Verhalten
+Der neue Status kommt nach der Fortsetzung an.
 
 ## Tatsächliches Verhalten
+Er geht verloren, bis sich der Status das nächste Mal ändert.
 
 ## Umgebung
 <!-- Version, Branch, Betriebssystem, Browser, Node-Version, Konfiguration. -->
@@ -44,16 +49,20 @@ Gefunden bei der Prüfung von W-0038 am 2026-11-24: Der Selbsttest-Schritt zu W-
 
 ## Ursache
 <!-- Nach der Analyse ausfüllen: Root Cause, nicht nur das Symptom. -->
+Bestätigt mit dem Test: Gateway.setStatus sendet op 3 nur bei bereiter Verbindung und verlässt sich sonst auf das nächste Identify. Eine Fortsetzung schickt aber kein Identify, sondern nur Resume.
 
 ## Lösung
 <!-- Was wurde geändert und warum genau so? -->
+setStatus merkt sich bei getrennter Verbindung, dass der Status noch aussteht; bei RESUMED sendet handle() ihn nach, bei READY ist er mit dem Identify schon unterwegs. Regressionstest: Selbsttest-Schritt „Status des Bots übersteht eine Gateway-Fortsetzung (W-0047)“.
 
 ## Akzeptanzkriterien
-- [ ] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
-- [ ] Regressionstest deckt den Fall ab oder der Verzicht ist begründet
-- [ ] Ein während der Trennung geänderter Status wird nach RESUMED gesendet
+- [x] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
+- [x] Regressionstest deckt den Fall ab oder der Verzicht ist begründet
+- [x] Ein während der Trennung geänderter Status wird nach RESUMED gesendet
 
 ## Betroffene Dateien
+- plugins/works/skills/works/scripts/discord-api.mjs: Gateway.setStatus und RESUMED
+- plugins/works/skills/works/scripts/selftest.mjs: neuer Schritt
 
 ## Assets
 <!-- Screenshots des Fehlers mit --kind fehler, nach dem Fix mit --kind nachher. -->
@@ -61,6 +70,14 @@ Gefunden bei der Prüfung von W-0038 am 2026-11-24: Der Selbsttest-Schritt zu W-
 ## Offene Fragen
 
 ## Übergabe
+Stand: 2026-11-24 16:41
+
+Behoben: Gateway sendet einen während der Trennung geänderten Status nach RESUMED. Regressionstest im Selbsttest, Discord-Schritte 11/11 mit und ohne WebSocket. Code-Audit: kleine Änderung, nichts gefunden.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
+- 2026-11-24: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-24: Akzeptanzkriterien: "Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Ein während der Trennung geänderter Status wird nach RESUMED gesendet" abgehakt
+- 2026-11-24: Übergabe aktualisiert

@@ -26,7 +26,7 @@ incomplete: false
 <!-- Was ist nach Abschluss anders? Ein bis drei Sätze, aus Sicht des Ergebnisses formuliert. -->
 
 ## Beschreibung
-Rest aus Entwurf J2 (W-0038), Entscheidung des Nutzers am 2026-11-24: als eigene Aufgabe mit P3 nachziehen. Der Dialog Discord-Bot im Board zeigt nach J2 einen Schalter
+Rest aus Entwurf J2 (W-0038), Entscheidung des Nutzers am 2026-11-24: als eigene Aufgabe mit P3 nachziehen. Der Dialog Discord-Bot im Board zeigt nach J2 einen Schalter (Befehle und Knöpfe erlauben) und je Projekt eine Kanalwahl; für beides gibt es noch keine Einstellung. Kanal je Projekt geht nur beim eigenen Bot (der gemeinsame schreibt in genau einen Kanal). Beides als Einstellung in ~/.works/discord/config.json, im Dialog nach J2 und in works discord set; ohne Befehle und Knöpfe registriert der Bot /works nicht und zeigt keine Knöpfe. Dazu aus dem Code-Audit von W-0038 (Nebensache): Die Handy-Vorschau im Dialog nennt nach dem Verschieben noch den alten Kanal. (Text beim Anlegen an den Anführungszeichen abgeschnitten, hier vollständig.)
 
 ## Kontext und Problem
 <!-- Warum ist das nötig? Aktueller Zustand, Auslöser, Einschränkungen. -->

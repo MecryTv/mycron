@@ -1668,6 +1668,24 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  await step('Discord: Status des Bots übersteht eine Gateway-Fortsetzung (W-0047)', async () => {
+    if (!hasWs) return;
+    // Ein Status, der sich ändert, während das Gateway neu verbindet, muss nach RESUMED nachkommen (kein Identify).
+    await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+    const { Gateway } = await import(pathToFileURL(path.join(HERE, 'discord-api.mjs')).href);
+    const g = new Gateway({ token: DTOKEN, url: `${fake.url.replace('http', 'ws')}/gateway`, status: 'alt' });
+    g.start();
+    try {
+      await dwait(() => g.ready, 'Gateway bereit');
+      const resumes = fake.gateway.resumes;
+      fake.reconnect();
+      await dwait(() => !g.ready, 'Gateway trennt für die Fortsetzung');
+      g.setStatus('während der Trennung geändert');
+      await dwait(() => fake.gateway.resumes > resumes && g.ready, 'Gateway fortgesetzt');
+      await dwait(() => /während der Trennung geändert/.test(JSON.stringify(fake.gateway.presence || {})), 'Status nach der Fortsetzung');
+    } finally { g.stop(); }
+  });
+
   await step('Discord: Start mit Board und Sitzung nur mit Einrichtung, Nachrichten passen in die Grenzen', async () => {
     const bot = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
     const { embedProblems } = await import(fromUrl);
