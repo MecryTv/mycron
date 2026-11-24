@@ -1588,6 +1588,22 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const png = img.dashboardPng(data);
     expect(png.subarray(1, 4).toString() === 'PNG' && png.length < 100 * 1024, `kein kleines PNG (${png.length} Bytes)`);
     expect(Buffer.compare(png, img.dashboardPng(data)) === 0, 'Bild nicht gleich bei gleichen Daten');
+    // Ohne Prozess: Aufräumen löscht eine Nachricht je Durchgang (der gemeinsame Bot erlaubt 60 in der Minute),
+    // der Status nennt das zuletzt wartende Projekt, die Zeile nennt bei einer Freigabe die Aufgabe.
+    const botM = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
+    const uiM = await import(pathToFileURL(path.join(HERE, 'discord-ui.mjs')).href);
+    let dels = 0;
+    const b = new botM.Bot({ rest: { del: async () => { dels++; } }, log: () => {} });
+    const old = new Date(Date.now() - 3 * 86400000).toISOString();
+    b.state.msgs = { a: { channel_id: '11', message_id: '1', at: old, done: 1 }, b: { channel_id: '11', message_id: '2', at: old, done: 1 }, c: { channel_id: '11', message_id: '3', at: old, done: 1 } };
+    b.state.queue = []; b.state.open = {};
+    await b.cleanup(botM.normalizeConfig({}));
+    expect(dels === 1, `${dels} Löschungen in einem Durchgang`);
+    const snapOf = (name, since) => ({ root: 'x', name, snap: { name, tasks: {}, perm: { since, tool: 'Bash' }, perms: [], busy: true, active: { id: 'W-9', title: 'Probe' } } });
+    b.state.projects = { r1: snapOf('alt', '2026-01-01T10:00:00.000Z'), r2: snapOf('neu', '2026-06-01T10:00:00.000Z') };
+    expect(b.statusLine(botM.normalizeConfig({})) === 'neu wartet auf deine Freigabe', `Status: ${b.statusLine(botM.normalizeConfig({}))}`);
+    expect(botM.stateOf(b.state.projects.r1.snap, botM.normalizeConfig({}), (de) => de)[1].includes('W-9'), 'Freigabe ohne Aufgabe');
+    expect(uiM.modalFor('w:ins::', 'de').components.length === 2 && uiM.modalFor('w:ins:0123456789abcdef:W-1', 'de').components.length === 1, 'Dialog Anweisung ohne Projektfeld');
     // Ein früherer Schritt lässt ein Dashboard zurück, das der Bot nach 403 (fremde Anwendung) nicht mehr anfassen darf.
     const dashCount = Math.max(1, fake.inChannel('11').filter((m) => isDash(m.embeds[0])).length);
     await wa(['discord', 'start'], { extraEnv: denv, ok: false });

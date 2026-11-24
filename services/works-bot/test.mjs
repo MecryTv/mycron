@@ -194,12 +194,27 @@ try {
   const btn = await api('POST', '/v1/channels/11/messages', { content: 'b', components: [{ type: 1, components: [{ type: 2, style: 3, label: 'ok', custom_id: 'w:acc::W-1' }] }] }, key88);
   const cid88 = fake.interact({ type: 3, customId: 'w:acc::W-1', messageId: btn.body.id, user: '88' });
   await wait(() => fake.callbacks.get(cid88), 'deferred click for the second device');
-  const got = (await api('GET', '/v1/inbox', null, key88)).body.interactions.map((x) => x.id);
+  const got = (await api('GET', '/v1/inbox?wait=2', null, key88)).body.interactions.map((x) => x.id);
   assert.deepEqual(got, [cid88]);
   assert.deepEqual((await api('GET', '/v1/inbox', null, key88)).body.interactions.map((x) => x.id), [cid88], 'lost delivery not repeated');
   assert.deepEqual((await api('GET', `/v1/inbox?ack=${cid88}`, null, key88)).body.interactions, [], 'acknowledged request delivered again');
   assert.equal((await api('POST', `/v1/interactions/${cid88}/reply`, { content: 'erledigt' }, key88)).status, 200);
   assert.equal((await api('DELETE', '/v1/link', null, key88)).status, 200);
+  // Answers to clicks (only visible to the clicker) must not push channel messages out of the device's memory
+  // (cap 6 here): the channel message stays deletable for the cleanup.
+  const keyE = await linkKey({ user: '4242' });
+  const keepMsg = await api('POST', '/v1/channels/11/messages', { content: 'bleibt löschbar' }, keyE);
+  const withBtn = await api('POST', '/v1/channels/11/messages', { content: 'k', components: [{ type: 1, components: [{ type: 2, style: 1, label: 'ok', custom_id: 'w:queue::' }] }] }, keyE);
+  assert.equal(withBtn.status, 200, JSON.stringify(withBtn.body));
+  for (let n = 0; n < 7; n++) {
+    const iid = fake.interact({ type: 3, customId: 'w:queue::', messageId: withBtn.body.id });
+    await wait(() => fake.callbacks.get(iid), 'deferred click');
+    assert.deepEqual((await api('GET', '/v1/inbox?wait=2', null, keyE)).body.interactions.map((x) => x.id), [iid], JSON.stringify(fake.callbacks.get(iid)));
+    await api('GET', `/v1/inbox?ack=${iid}`, null, keyE);
+    assert.equal((await api('POST', `/v1/interactions/${iid}/reply`, { content: `antwort ${n}` }, keyE)).status, 200);
+  }
+  assert.equal((await api('DELETE', `/v1/channels/11/messages/${keepMsg.body.id}`, null, keyE)).status, 204, 'channel message pushed out by answers');
+  assert.equal((await api('DELETE', '/v1/link', null, keyE)).status, 200);
   // Device off: the service says so instead of leaving Discord waiting.
   await wa(['discord', 'stop']);
   a = await ask({ sub: 'tasks' }, 'answer for a device that is off');

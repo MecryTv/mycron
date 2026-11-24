@@ -165,6 +165,9 @@ const inbox = new Map();    // key hash -> interactions for the device
 const inflight = new Map(); // key hash -> interactions sent, not yet acknowledged
 const waiting = new Map();  // key hash -> { res, timer } of the open long poll
 const pending = new Map();  // interaction id -> { token, h, de, delivered, timer }
+// Answers to clicks are messages of their own, visible only to the clicker; clicks on their buttons go back to the
+// device that answered. Kept apart from the channel messages and only in memory, so they never push those out.
+const answers = new Map();  // message id of an answer -> key hash
 
 const editOriginal = (token, data) => discord(() => rest.patch(`/webhooks/${app.id}/${token}/messages/@original`, data));
 
@@ -257,7 +260,7 @@ async function onInteraction(i) {
   if (i.type !== 2) {
     // Buttons and dialogs belong to the device that wrote the message.
     const mid = i.message && i.message.id;
-    const h = mid && Object.hasOwn(store.messages, mid) ? store.messages[mid].h : '';
+    const h = !mid ? '' : Object.hasOwn(store.messages, mid) ? store.messages[mid].h : answers.get(mid) || '';
     const link = h && store.links[h];
     if (!link || link.broken) return reply({ title: t('Nicht mehr gekoppelt', 'No longer linked'), description: t('Das Gerät, das diese Nachricht geschrieben hat, ist nicht mehr gekoppelt.', 'The device that wrote this message is no longer linked.') });
     return forward(h, link);
@@ -487,7 +490,7 @@ async function handle(req, res) {
     const r = await forward(res, a, () => rest.patch(`/webhooks/${app.id}/${pe.token}/messages/@original`, sanitize(body, a.link, false)), { soft: true });
     if (!r.ok) return undefined;
     // The answer is a message of its own: clicks on its buttons go back to this device.
-    if (r.data && r.data.id) { own(a.h, String(r.data.id)); save(); }
+    if (r.data && r.data.id) { answers.set(String(r.data.id), a.h); while (answers.size > 5000) answers.delete(answers.keys().next().value); }
     return send(res, 200, { ok: true });
   }
   if ((m = p.match(/^\/v1\/channels\/(\d+)\/messages(?:\/(pins\/)?(\d+))?$/))) {

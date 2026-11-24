@@ -117,9 +117,10 @@ export function renderStatus(s, cfg, now = new Date()) {
 export function stateOf(s, cfg, t) {
   const a = s.active;
   const aL = a ? `${a.id}${cfg.privacy.titles && a.title ? ` ${cut(a.title, 60)}` : ''}` : '';
-  if (s.perm) return ['🟠', t('wartet auf deine Freigabe', 'waits for your approval')];
+  const on = aL ? ` · ${aL}` : '';
+  if (s.perm) return ['🟠', t(`wartet auf deine Freigabe${on}`, `waits for your approval${on}`)];
   if (s.busy) return ['🟢', a ? t(`arbeitet an ${aL}`, `working on ${aL}`) : t('arbeitet', 'working')];
-  if (s.idleSince) return ['🟠', t('ist fertig und wartet auf dich', 'is done and waits for you')];
+  if (s.idleSince) return ['🟠', t(`ist fertig und wartet auf dich${on}`, `is done and waits for you${on}`)];
   return ['⚪', a ? t(`in Arbeit: ${aL}`, `in progress: ${aL}`) : t('keine Aufgabe in Arbeit', 'no task in progress')];
 }
 
@@ -740,8 +741,9 @@ export class Bot {
     }
   }
 
-  // Aufräumen (W-0044): Nachrichten nach der Frist löschen, gezählt ab ihrer Erledigung; wartende bleiben. Höchstens
-  // fünf je Durchgang, damit Discord nicht bremst. Einträge von vor W-0044 haben kein done: erledigt ab dem Senden.
+  // Aufräumen (W-0044): Nachrichten nach der Frist löschen, gezählt ab ihrer Erledigung; wartende bleiben. Eine je
+  // Durchgang (30 in der Minute): Der gemeinsame Bot erlaubt 60, und nach einer langen Pause laufen viele Fristen
+  // gleichzeitig ab. Einträge von vor W-0044 haben kein done: erledigt ab dem Senden.
   async cleanup(cfg) {
     const hours = Number(cfg.cleanup && cfg.cleanup.hours) || 0;
     if (hours <= 0) return;
@@ -749,7 +751,7 @@ export class Bot {
     const busy = new Set([...this.state.queue.map((q) => q.key), ...Object.values(this.state.open).map((o) => o.key)]);
     let n = 0;
     for (const [k, v] of Object.entries(this.state.msgs)) {
-      if (n >= 5 || Date.now() < this.retryAt) return;
+      if (n >= 1 || Date.now() < this.retryAt) return;
       const done = v.done === undefined ? Date.parse(v.at) : v.done;
       if (!done || done > limit || busy.has(k)) continue;
       n++;
@@ -759,14 +761,15 @@ export class Bot {
     }
   }
 
-  // Status des Bots (eigener Bot): das Wichtigste über alle Projekte, höchstens alle 20 s neu.
+  // Status des Bots (eigener Bot): das Wichtigste über alle Projekte, je Art das jüngste; höchstens alle 20 s neu.
   statusLine(cfg) {
     const all = this.liveProjects(cfg);
-    const perm = all.find((p) => p.snap.perm);
+    const newest = (list, at) => list.sort((x, y) => String(at(y)).localeCompare(String(at(x))))[0];
+    const perm = newest(all.filter((p) => p.snap.perm), (p) => p.snap.perm.since);
     if (perm) return `${perm.snap.name} wartet auf deine Freigabe`;
-    const idle = all.find((p) => !p.snap.busy && p.snap.idleSince);
+    const idle = newest(all.filter((p) => !p.snap.busy && p.snap.idleSince), (p) => p.snap.idleSince);
     if (idle) return `${idle.snap.name} wartet auf dich`;
-    const busy = all.find((p) => p.snap.busy && p.snap.active);
+    const busy = newest(all.filter((p) => p.snap.busy && p.snap.active), (p) => p.snap.since);
     if (busy) return `arbeitet an ${busy.snap.active.id} (${busy.snap.name})`;
     return `${all.length} ${all.length === 1 ? 'Projekt' : 'Projekte'} im Blick`;
   }
@@ -849,7 +852,9 @@ export class Bot {
     if (!p) {
       if (rid) throw new Error(t('Das Projekt ist nicht mehr da oder schickt keine Hinweise mehr.', 'The project is gone or no longer sends notifications.'));
       if (!all.length) throw new Error(t('works kennt noch kein Projekt. Öffne ein Projekt mit works, dann geht es los.', 'works does not know any project yet. Open a project with works first.'));
-      throw new Error(name ? t(`Kein Projekt „${cut(name, 60)}“. Da sind: ${names}`, `No project “${cut(name, 60)}”. Known: ${names}`) : t(`Mehrere Projekte, bitte mit project angeben: ${names}`, `Several projects, please name one with project: ${names}`));
+      if (name) throw new Error(t(`Kein Projekt „${cut(name, 60)}“. Da sind: ${names}`, `No project “${cut(name, 60)}”. Known: ${names}`));
+      throw new Error(active ? t(`Mehrere Projekte. Gib das Projekt im Dialog an oder wähle es im Menü „Projekt wählen“: ${names}`, `Several projects. Name it in the dialog or pick it in the menu: ${names}`)
+        : t(`Mehrere Projekte, bitte mit project angeben: ${names}`, `Several projects, please name one with project: ${names}`));
     }
     this.scanProject(p.root, p.rid, cfg);
     return { rid: p.rid, ...this.state.projects[p.rid] };
