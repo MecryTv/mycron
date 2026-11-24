@@ -1732,6 +1732,16 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const botPid = () => { try { return JSON.parse(fs.readFileSync(path.join(ddir, 'bot.pid'), 'utf8')).pid; } catch { return 0; } };
 
   await step('Discord: Einstellungen im Board über die API, Kanal live wählen, Dashboard ohne Neustart verschieben (W-0038)', async () => {
+    // Rechte wie bei Discord: Rollen-Overwrite schlägt @everyone, Mitglied schlägt Rolle, Administrator darf alles.
+    const { permissionsIn, WRITE } = await import(pathToFileURL(path.join(HERE, 'discord-api.mjs')).href);
+    const send = String(WRITE.send);
+    const gd = { id: 'g', owner_id: 'o', roles: [{ id: 'g', permissions: String(WRITE.view | WRITE.send) }, { id: 'r', permissions: '0' }, { id: 'adm', permissions: String(1n << 3n) }] };
+    const can = (member, ow) => !!(permissionsIn(gd, member, { permission_overwrites: ow }) & WRITE.send);
+    const noEvery = { id: 'g', type: 0, allow: '0', deny: send };
+    expect(!can({ id: 'b', roles: [] }, [noEvery]), '@everyone-Verbot greift nicht');
+    expect(can({ id: 'b', roles: ['r'] }, [noEvery, { id: 'r', type: 0, allow: send, deny: '0' }]), 'Rollen-Overwrite greift nicht');
+    expect(!can({ id: 'b', roles: ['r'] }, [{ id: 'r', type: 0, allow: send, deny: '0' }, { id: 'b', type: 1, allow: '0', deny: send }]), 'Overwrite des Mitglieds greift nicht');
+    expect(can({ id: 'b', roles: ['adm'] }, [noEvery]) && can({ id: 'o', roles: [] }, [noEvery]), 'Administrator oder Besitzer gesperrt');
     const { url, call } = await boardFor();
     try {
       expect((await fetch(url + '/api/discord')).status === 403, '/api/discord ohne Token');
@@ -1804,6 +1814,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const { url, call } = await boardFor();
       try {
         if (!(await call('GET', '/api/discord')).ready) { await call('POST', '/api/discord', { op: 'token', token: DTOKEN }); await call('POST', '/api/discord', { op: 'move', channel_id: '11' }); }
+        // Ohne Ruhezeit, sonst klingelt die Vorschau nachts nie.
+        await call('POST', '/api/discord', { op: 'set', values: { 'quiet.on': 'aus' } });
         const p = await br.newPage({ viewport: { width: 1280, height: 900 } });
         const errs = [];
         p.on('pageerror', (e) => errs.push(e.message));
@@ -1812,7 +1824,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
           expect(!leak, `Token im DOM (${what})`);
         };
         const open = async () => {
-          await p.goto(url + '/'); await p.waitForSelector('.card');
+          await p.goto(url + '/'); await p.waitForSelector('#btnTools');
           await p.click('#btnTools'); await p.waitForSelector('#btnDiscord');
           await p.click('#btnDiscord'); await p.waitForSelector('dialog[open] .dc');
         };
