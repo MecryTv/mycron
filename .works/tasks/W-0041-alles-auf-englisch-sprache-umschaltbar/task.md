@@ -3,7 +3,7 @@ id: W-0041
 title: Alles auf Englisch, Sprache umschaltbar
 type: feature
 priority: P2
-status: in-arbeit
+status: review
 effort: XL
 risk:
 created: 2026-11-23
@@ -35,11 +35,11 @@ Wunsch des Nutzers am 2026-11-23: Die Skills und alle Infos auf Englisch umschre
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] CLI, Board, Hub und Discord-Nachrichten sind standardmäßig englisch
+- [x] CLI, Board, Hub und Discord-Nachrichten sind standardmäßig englisch
 - [x] Die Sprache lässt sich jederzeit umstellen (mindestens Deutsch und Englisch)
 - [x] SKILL.md und references aller vier Plugins sind englisch
 - [x] Claude antwortet in der eingestellten Sprache
-- [ ] Selbsttest und Plugin-Tests laufen in beiden Sprachen grün
+- [x] Selbsttest und Plugin-Tests laufen in beiden Sprachen grün
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
@@ -48,8 +48,8 @@ Phasen, je Phase: Test zuerst, umsetzen, Selbsttest der Bereiche grün, committe
 - [x] Phase 2, Doku: SKILL.md und references aller vier Plugins (works, workday, ci-watch, mockups) auf Englisch; die bisherigen deutschen Fassungen als zweite Fassung behalten: SKILL.de.md und references/de/ (Inhalt gleich halten). SKILL.md sagt oben: Ist die Sprache Deutsch (`works lang`), SKILL.de.md und references/de/ lesen und auf Deutsch antworten. Skill-Beschreibungen (frontmatter description) englisch.
 - [x] Phase 3, Aufgabenformat: Vorlagen (references/templates, works new) mit Überschriften in der eingestellten Sprache; der Parser (getSection und Verwandte in lib.mjs) kennt beide Sprachen über eine Alias-Tabelle (Beschreibung/Description, Akzeptanzkriterien/Acceptance criteria, Umsetzungsplan/Implementation plan, …), bestehende deutsche Aufgaben bleiben gültig. Status- und Prioritätswerte bleiben als Daten unverändert (in-arbeit, erledigt …), nur die Anzeige wird übersetzt; englische Eingaben (in-progress, done …) als Alias annehmen.
 - [x] Phase 4, CLI und Hooks: alle Ausgaben von works.mjs und den Modulen außer den Discord- und Board-Dateien über t(); Hooks geben Claude die Sprache mit (SessionStart: „Language: de, answer in German, German docs in SKILL.de.md and references/de/“). Selbsttest bekommt WORKS_LANG=de in seiner Umgebung, damit die bestehenden deutschen Prüfungen gelten, plus ein Schritt, der die englische Standardausgabe wichtiger Befehle prüft.
-- [ ] Phase 5, Board und Hub (erst nach dem Merge von W-0038 in main, siehe Hinweise): board.js, hub, template über einen Katalog vom Server (gleiche de.json), Sprachwahl im Board (global oder für dieses Projekt).
-- [ ] Phase 6, Discord (erst nach dem Merge von W-0038): Texte in discord-bot.mjs, discord.mjs, discord-ui.mjs über t() mit der globalen Sprache; Antworten auf Befehle und Knöpfe folgen weiter der Sprache des Discord-Clients. Dienst services/works-bot bleibt englisch mit deutscher Übersetzung wie bisher.
+- [x] Phase 5, Board und Hub (erst nach dem Merge von W-0038 in main, siehe Hinweise): board.js, hub, template über einen Katalog vom Server (gleiche de.json), Sprachwahl im Board (global oder für dieses Projekt).
+- [x] Phase 6, Discord (erst nach dem Merge von W-0038): Texte in discord-bot.mjs, discord.mjs, discord-ui.mjs über t() mit der globalen Sprache; Antworten auf Befehle und Knöpfe folgen weiter der Sprache des Discord-Clients. Dienst services/works-bot bleibt englisch mit deutscher Übersetzung wie bisher.
 - [x] Phase 7, Plugins workday, ci-watch, mockups: Skript-Ausgaben ebenso; Selbsttest und Plugin-Tests in beiden Sprachen grün (einmal WORKS_LANG=de, einmal en für die englischen Prüfungen).
 
 Hinweise für die Umsetzung:
@@ -80,14 +80,13 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - [x] Sollen die README.md der Plugins und des Repos auch englisch werden (mit README.de.md), oder bleiben sie deutsch? Sie gehörten nicht zum Plan. Antwort: Nutzer am 2026-11-24: Ja, README.md englisch mit README.de.md daneben (Plugins und Repo).
 
 ## Übergabe
-Stand: 2026-11-24 19:55
+Stand: 2026-11-24 20:46
 
-Stand: Phasen 1–4 und 7 fertig, dazu Merge von main (W-0038), Migration für altes language aus works init (Kennzeichen language-1), READMEs englisch mit README.de.md und Phase 5 ohne den Discord-Dialog. Letzte Commits: 0a70bf4 (Merge), 092b688 (Migration, READMEs), c808801 (Board, Hub, Export, API, Sprachwahl). Selbsttest 45/45 grün mit WORKS_LANG=de, mit und ohne WebSocket; services/works-bot/test.mjs, ci-watch- und mockups-Tests grün.
+Stand: alle sieben Phasen fertig und committet im Branch feature/w-0041-alles-auf-englisch-sprache (zuletzt 441d39a Merge von main mit W-0046, d1d3aa2 Discord und Dialog). Alle Kriterien und Planpunkte abgehakt. Tests unter der Sperre grün: Selbsttest mit Browser 54/54 (WORKS_LANG=de plus englische Schritte, NODE_PATH auf das Playwright im npx-Cache), ohne WebSocket 47/47, services/works-bot/test.mjs, ci-watch und mockups.
 
-Board: Katalog kommt mit den Boot-Daten (i18n: lang, source, languages, catalog nur mit Board-Texten), meta.lang in den Daten, Neuladen bei Sprachwechsel; Werkzeuge haben die Sprachwahl (global oder nur dieses Projekt) über POST /api/lang. template.html nutzt {{t:…}}, hub.mjs hat einen eigenen kleinen Katalog in window.HUB.t.
+Aufbau: scripts/i18n.mjs (tr, language, Migration language-1), Katalog scripts/i18n/de.json; Vorlagen und Doku englisch mit deutscher Fassung (SKILL.de.md, references/de/, README.de.md); Abschnitts- und Werte-Aliase in lib.mjs; Board bekommt seinen Katalog mit den Boot-Daten, Sprachwahl in den Werkzeugen (global, nur dieses Projekt, zurücksetzen); Discord: Kanalnachrichten in der globalen Sprache, Antworten in der Sprache des Clients, discord-ui.mjs ohne i18n-Import (Dienst), useCatalog für weitere Sprachen; ci-watch und mockups mit wortgleicher i18n.mjs-Kopie und eigenem Katalog.
 
-Nächster Schritt (nach Nachricht der Hauptsitzung, wenn W-0046 in main ist): git merge main, dann den Dialog Discord-Bot in board.js (Bereich ab '// ---------- Discord-Bot (W-0038)') und board.css übersetzen und Phase 6: discord-bot.mjs, discord.mjs, discord-ui.mjs, discord-api.mjs über tr() mit der globalen Sprache, Antworten auf Befehle und Knöpfe weiter in der Sprache des Discord-Clients (fmtTokens/fmtCost haben dafür einen lang-Parameter). Discord-Teile von serve.mjs, api.mjs und works.mjs (cmdDiscord) ebenso. Der Discord-Bot ruft runActionWithUndo in einem langlebigen Prozess: dort vor Aktionen setLanguage(language(root)) bzw. die Client-Sprache setzen. Danach Kriterien 1 und 5 prüfen, Umsetzungsplan Punkt 5 und 6 abhaken, Status review.
-Bekannte Kleinigkeiten: selftest.mjs gibt eigene Zeilen deutsch aus; einige Datumsformate de-DE im CLI (cmdTime, inbox); Demo-Inhalte deutsch; die Sprachwahl im Board hat kein Zurücksetzen der Projekt-Sprache (geht mit works lang --reset --project).
+Offen für die Hauptsitzung: Branch nach main mergen, danach die Sprache des Nutzers mit works lang de global auf Deutsch stellen. Bekannte Grenzen: eine Sprache je Bot-Prozess (zwei gleichzeitige Discord-Antworten in verschiedenen Sprachen können sich mischen, im Code als ponytail markiert); bot.log und die Zeilen des Selbsttests bleiben teils deutsch; einige Datumsformate im CLI de-DE; Demo-Inhalte deutsch; Discord-Paare mit eingesetzten Werten bleiben in einer dritten Sprache englisch.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -115,3 +114,10 @@ Bekannte Kleinigkeiten: selftest.mjs gibt eigene Zeilen deutsch aus; einige Datu
 - 2026-11-24: Beziehung: W-0049 blocked-by
 - 2026-11-24: Beziehung: W-0050 blocked-by
 - 2026-11-24: Beziehung: W-0051 blocked-by
+- 2026-11-24: Akzeptanzkriterien: "CLI, Board, Hub und Discord-Nachrichten sind standardmäßig englisch" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Selbsttest und Plugin-Tests laufen in beiden Sprachen grün" abgehakt
+- 2026-11-24: Umsetzungsplan: "Phase 5, Board und Hub (erst nach dem Merge von W-0038 in main, siehe Hinweise): board.js, hub, template über einen Katalog vom Server (gleiche de.json), Sprachwahl im Board (global oder für dieses Projekt)." abgehakt
+- 2026-11-24: Umsetzungsplan: "Phase 6, Discord (erst nach dem Merge von W-0038): Texte in discord-bot.mjs, discord.mjs, discord-ui.mjs über t() mit der globalen Sprache; Antworten auf Befehle und Knöpfe folgen weiter der Sprache des Discord-Clients. Dienst services/works-bot bleibt englisch mit deutscher Übersetzung wie bisher." abgehakt
+- 2026-11-24: Phase 6 fertig: Discord-Nachrichten in der globalen Sprache, Antworten in der Sprache des Clients, Dialog Discord-Bot übersetzt, Projekt-Sprache im Board zurücksetzbar. Selbsttest mit Browser 54/54, ohne WebSocket 47/47, works-bot-, ci-watch- und mockups-Tests grün
+- 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Status: in-arbeit → review (Grund: Agent fertig)

@@ -54,7 +54,7 @@ Wunsch des Nutzers am 2026-11-24, Verhalten von ihm bestätigt (Skizze: Projekt 
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
 
 ## Designentscheidungen
-<!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
+Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
@@ -68,3 +68,5 @@ Wunsch des Nutzers am 2026-11-24, Verhalten von ihm bestätigt (Skizze: Projekt 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
 - 2026-11-24: Beziehung: blocked-by W-0041
+- 2026-11-24: decisions.md angelegt
+- 2026-11-24: Entscheidung E1 dokumentiert: Hub springt bei einem laufenden Board zurück wie bisher

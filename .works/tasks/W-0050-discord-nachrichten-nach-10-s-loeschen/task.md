@@ -68,3 +68,7 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 - 2026-11-24: Entwurf V1 „Liste, neueste zuerst“ angehängt
 - 2026-11-24: Entwurf V2 „Nach Tagen, Eintrag aufklappen“ angehängt
 - 2026-11-24: Entwurf V3 „Filter nach Art“ angehängt
+- 2026-11-24: Nutzer am 2026-11-24 zu V1 bis V3: bitte besser machen, gern auch mit Bild-Design
+- 2026-11-24: Entwurf B1 „Zeitstrahl als Bild“ angehängt
+- 2026-11-24: Entwurf B2 „Karten wie im Kanal“ angehängt
+- 2026-11-24: Entwurf B3 „Tagesbild und Liste“ angehängt
