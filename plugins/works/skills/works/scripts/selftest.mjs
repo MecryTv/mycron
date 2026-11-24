@@ -122,6 +122,42 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     has(w(['show', 'W-0001']).out, 'Export als JSON');
   });
 
+  // W-0041: Sprache global, je Projekt und über WORKS_LANG; Katalog vollständig und mit gleichen Platzhaltern.
+  await step('Sprache: works lang, Vorrang, Katalog', async () => {
+    const wl = (args, o = {}) => w(args, { ...o, extraEnv: { WORKS_LANG: '', ...(o.env || {}) } });
+    const settings = path.join(home, '.works', 'settings.json');
+    const cfgFile = path.join(proj, '.works', 'config.json');
+    if (!fs.existsSync(cfgFile)) w(['init']);
+    expect(!('language' in JSON.parse(fs.readFileSync(cfgFile, 'utf8'))), 'works init schreibt language in config.json');
+    has(wl(['lang']).out, 'Language: English (en), default');
+    has(wl(['lang', 'de']).out, 'Sprache: Deutsch (de), global');
+    expect(JSON.parse(fs.readFileSync(settings, 'utf8')).language === 'de', 'settings.json ohne language');
+    has(wl(['lang', 'en', '--project']).out, 'Language: English (en), for this project');
+    expect(JSON.parse(fs.readFileSync(cfgFile, 'utf8')).language === 'en', 'config.json ohne language');
+    has(wl(['lang', 'de']).out, 'takes precedence', 'Hinweis auf Vorrang des Projekts');
+    has(wl(['lang'], { env: { WORKS_LANG: 'de-DE' } }).out, 'Sprache: Deutsch (de), aus der Umgebungsvariable WORKS_LANG');
+    has(wl(['lang', '--reset', '--project']).out, 'Sprache: Deutsch (de), global');
+    expect(!('language' in JSON.parse(fs.readFileSync(cfgFile, 'utf8'))), 'language bleibt in config.json');
+    has(wl(['lang', '--reset']).out, 'Language: English (en), default');
+    expect(wl(['lang', 'xx'], { ok: false }).code !== 0, 'unbekannte Sprache wird angenommen');
+    const { placeholders } = await import(pathToFileURL(path.join(HERE, 'i18n.mjs')).href);
+    const de = JSON.parse(fs.readFileSync(path.join(HERE, 'i18n', 'de.json'), 'utf8'));
+    for (const [en, tr] of Object.entries(de)) expect(placeholders(en).join() === placeholders(tr).join(), `de.json: Platzhalter verschieden in "${en}"`);
+    // Jeder feste Text in t('...') hat eine deutsche Übersetzung.
+    const unesc = (s) => s.replace(/\\(.)/g, (a, c) => ({ n: '\n', t: '\t' })[c] || c);
+    const files = [...fs.readdirSync(HERE).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HERE, f)), ...fs.readdirSync(HOOKS).filter((f) => f.endsWith('.mjs')).map((f) => path.join(HOOKS, f))];
+    const missing = [];
+    for (const f of files) {
+      const src = fs.readFileSync(f, 'utf8');
+      if (!/import \{[^}]*\bt\b[^}]*\} from '[./]*(scripts\/)?i18n\.mjs'/.test(src)) continue;
+      for (const m of src.matchAll(/\bt\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.)*)`)\s*[,)]/g)) {
+        const key = unesc(m[1] ?? m[2] ?? m[3]);
+        if (!(key in de)) missing.push(`${path.basename(f)}: ${key.slice(0, 80)}`);
+      }
+    }
+    expect(!missing.length, `${missing.length} Texte ohne deutsche Übersetzung:\n${missing.slice(0, 15).join('\n')}`);
+  });
+
   await step('Bearbeiten: set, item, check, link, question, log, comment', () => {
     w(['set', 'W-0003', 'priority=P4']);
     w(['item', 'W-0001', '--section=Umsetzungsplan', '--text=Format festlegen']);

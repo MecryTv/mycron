@@ -49,7 +49,6 @@ export const DEFAULT_CONFIG = {
   id_digits: 4,
   next_id: 1,
   next_idea_id: 1,
-  language: 'de',
   milestones: [],
   dod: {
     global: [

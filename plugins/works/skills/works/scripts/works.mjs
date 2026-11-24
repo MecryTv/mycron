@@ -49,6 +49,7 @@ import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
 import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion, lastPort, OWN_CLI } from './server-control.mjs';
 import { BOARD_VIEWS, loadPlaywright, takeShots, boardPrepare } from './shot.mjs';
+import { t, languages, languageSource, setLanguage, normLang, settingsFile, LANGUAGE_NAMES } from './i18n.mjs';
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
 const ASSET_KINDS = ['ist', 'vorher', 'nachher', 'referenz', 'mockup', 'skizze', 'fehler', 'diagramm'];
@@ -2802,6 +2803,38 @@ function cmdVersion() {
   out(`Node ${process.version}`);
 }
 
+// ---------- Sprache (W-0041) ----------
+
+// works lang [code] [--project] [--reset]: zeigen oder global (~/.works/settings.json) bzw. für das Projekt setzen.
+function cmdLang() {
+  const root = findRoot();
+  const configFile = root && path.join(worksDir(root), 'config.json');
+  if (flags.project && !root) fail(t('No .works folder found. Run `works init` in the project root first.'));
+  const where = (src) => ({
+    env: t('from the environment variable WORKS_LANG'),
+    project: t('for this project in {file}', { file: configFile }),
+    global: t('globally in {file}', { file: settingsFile() }),
+    default: t('default'),
+  })[src.source];
+  const name = (l) => LANGUAGE_NAMES[l] || l;
+  if (pos[0] || flags.reset) {
+    const lang = flags.reset ? null : normLang(pos[0]);
+    if (lang && !languages().includes(lang)) fail(t('Unknown language "{lang}". Available: {list}', { lang: pos[0], list: languages().join(', ') }));
+    const file = flags.project ? configFile : settingsFile();
+    const data = readJson(file, {}) || {};
+    if (lang) data.language = lang; else delete data.language;
+    writeJson(file, data);
+    setLanguage(null);
+  }
+  const src = languageSource(root);
+  out(t('Language: {name} ({lang}), {where}', { name: name(src.lang), lang: src.lang, where: where(src) }));
+  if (pos[0] && !flags.project && src.source !== 'global') out(t('Note: {where} takes precedence ({lang}). Remove it with `works lang --reset --project`.', { where: where(src), lang: src.lang }));
+  if (!pos[0] && !flags.reset) {
+    out(t('Available: {list}', { list: languages().map((l) => `${l} (${name(l)})`).join(', ') }));
+    out(t('Change: works lang <code> (global), works lang <code> --project, works lang --reset [--project]'));
+  }
+}
+
 async function cmdSelftest() {
   const { selftest } = await import('./selftest.mjs');
   const r = await selftest({ keep: !!flags.keep, browser: !!flags.browser, verbose: !!flags.verbose, only: flags.only && flags.only !== true ? String(flags.only) : '' });
@@ -3060,6 +3093,7 @@ const commands = {
   design: cmdDesign, instruct: cmdInstruct, know: cmdKnow, wissen: cmdKnow, recur: cmdRecur, hub: cmdHub,
   github: cmdGithub, gh: cmdGithub, ical: cmdIcal, undo: cmdUndo, discord: cmdDiscord,
   file: cmdFile, files: cmdFiles, parallel: cmdParallel, par: cmdParallel, import: cmdImport, shot: cmdShot, selftest: cmdSelftest, 'install-cli': cmdInstallCli, version: cmdVersion, '--version': cmdVersion,
+  lang: cmdLang, language: cmdLang,
 };
 
 const fn = commands[cmd];

@@ -1,0 +1,12 @@
+{
+  "No .works folder found. Run `works init` in the project root first.": "Kein .works Ordner gefunden. Zuerst `works init` im Projektwurzelverzeichnis ausführen.",
+  "from the environment variable WORKS_LANG": "aus der Umgebungsvariable WORKS_LANG",
+  "for this project in {file}": "für dieses Projekt in {file}",
+  "globally in {file}": "global in {file}",
+  "default": "Standard",
+  "Unknown language \"{lang}\". Available: {list}": "Unbekannte Sprache \"{lang}\". Verfügbar: {list}",
+  "Language: {name} ({lang}), {where}": "Sprache: {name} ({lang}), {where}",
+  "Note: {where} takes precedence ({lang}). Remove it with `works lang --reset --project`.": "Hinweis: {where} hat Vorrang ({lang}). Entfernen mit `works lang --reset --project`.",
+  "Available: {list}": "Verfügbar: {list}",
+  "Change: works lang <code> (global), works lang <code> --project, works lang --reset [--project]": "Ändern: works lang <code> (global), works lang <code> --project, works lang --reset [--project]"
+}
