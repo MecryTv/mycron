@@ -35,7 +35,7 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Je Aufgabe genau eine Nachricht (Karte nach Entwurf I3, verbessert), die bei jedem Schritt bearbeitet wird: Start, Frage, Freigabe, fertig und wartet, Review, zurückgegeben, erledigt, Auslieferung (Wunsch des Nutzers vom 2026-11-24, ersetzt „nach 10 s löschen“)
+- [ ] Je Aufgabe genau eine Nachricht (Karte nach Entwurf I3), die bei jedem Schritt bearbeitet wird: Start, Frage, Freigabe, fertig und wartet, Review, zurückgegeben, erledigt, Auslieferung (Wunsch des Nutzers vom 2026-11-24, ersetzt „nach 10 s löschen“)
 - [ ] Braucht die Karte den Nutzer (Freigabe, Frage, Review, fertig und wartet), kommt sie als neue Nachricht nach unten, damit Discord benachrichtigt; die alte Fassung wird gelöscht
 - [ ] Karten bleiben, solange die Aufgabe offen ist, und verschwinden nach der Frist ab Erledigung; Nachrichten ohne Aufgabe nach der Frist ab Senden
 - [ ] Knopf Verlauf im Discord-Panel (der angehefteten Dashboard-Nachricht nach D3, neben Warteschlange, Anweisung an Claude, Neue Aufgabe, Hilfe) und /works verlauf zeigen die letzten Nachrichten nur dem Aufrufer, nach Projekt filterbar
@@ -50,7 +50,7 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
 - [ ] Frist in Sekunden: cleanup.seconds (Standard 3600, 0 nie) statt cleanup.hours in discord.mjs (DEFAULTS, normalizeConfig, works discord set, Liste der Schlüssel), Bot cleanup() und prune(), Board-Dialog (Feld in Sekunden), Tests zuerst
 - [ ] Karte je Aufgabe: Ereignisse mit Aufgaben-ID (neues Ereignis start beim Wechsel auf in Arbeit, perm, idle mit Aufgabe, question, review, returned, done, ship, p1) laufen in upsert() in eine Karte card:<rid>:<id> mit Einträgen je ursprünglichem Schlüssel; Zustand aus dem jüngsten offenen Eintrag; neue wartende Einträge senden die Karte neu (alte löschen, Erwähnung wie bisher je Ereignis); Knöpfe Annehmen und Zurückgeben im Review wie bisher
-- [ ] Kartenbild nach I3 verbessert (Entwurf I4 in design/): Status-Quadrat links, Zeitachse der Aufgabe rechts, Bild nur bei Ereignissen neu, Minuten im Footer
+- [ ] Kartenbild nach Entwurf I3 (der Nutzer fand I4 schlechter): Zeitachse der Aufgabe mit Uhrzeiten, rechts Minuten, Schritte, Kriterien, Legende; Bild bei Ereignissen neu, sonst höchstens alle 5 Minuten
 - [ ] Verlauf speichern: jede gesendete oder bearbeitete Nachricht als Eintrag (Schlüssel, Projekt, Art, Zeit, Ereignis) in state.history, neueste Fassung je Schlüssel, höchstens 7 Tage und 300 Einträge, übersteht Neustart
 - [ ] Verlauf zeigen: Knopf Verlauf (w:hist) im Dashboard und /works verlauf (history) mit Option project, nur für den Aufrufer; Liste mit Symbol je Art, Projekt, Text, relativer Zeit; Auswahl „Eintrag ansehen“ holt die Nachricht mit allen Feldern; Auswahl Projekt und Zeitraum (24 Std., 3 Tage, 7 Tage), Knopf Ältere; custom_ids passen zu CID_RE (Dienst des gemeinsamen Bots)
 - [ ] Panel-Text nach P2: Zusammenfassung oben, Zeile je Projekt mit Ampel, Zustand, Werkzeug bei Freigabe und Aufgabe, Feld Als Nächstes; Kosten in der Zusammenfassung nur mit privacy.costs
