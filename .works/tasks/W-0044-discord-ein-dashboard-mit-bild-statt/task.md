@@ -3,13 +3,13 @@ id: W-0044
 title: "Discord: ein Dashboard mit Bild statt Statuspost je Projekt, Status des Bots"
 type: feature
 priority: P2
-status: in-arbeit
+status: erledigt
 effort: L
 risk:
 created: 2026-11-23
 updated: 2026-11-24
 due:
-completed:
+completed: 2026-11-24
 milestone:
 branch: feature/w-0044-discord-ein-dashboard-mit
 tags: [discord, design]
@@ -81,9 +81,7 @@ Art: nachher · Hinzugefügt: 2026-11-24
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-24 14:54
-
-Fertig umgesetzt: Dashboard nach D3 je Kanal (Zeilen mit Ampel, Felder, selbst gezeichnetes PNG, Auswahlmenü, Knöpfe Warteschlange, Anweisung, Neue Aufgabe, Hilfe), alte Statusposts werden gelöscht, Status des Bots (eigener Bot; gemeinsamer zeigt /works help), Aufräumen nach cleanup.hours (Standard 24, offene erst nach Erledigung, Fragen werden grau). Dienst: Bild als base64, Löschen eigener Nachrichten, Antworten auf Klicks getrennt gemerkt. Audit-Funde alle behoben. Discord-Schritte und Dienst-Test grün; voller Selbsttest läuft. Danach: works ship W-0044.
+Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -115,3 +113,4 @@ Fertig umgesetzt: Dashboard nach D3 je Kanal (Zeilen mit Ampel, Felder, selbst g
 - 2026-11-24: Akzeptanzkriterien: "Löschen geht beim eigenen und beim gemeinsamen Bot, nur eigene Nachrichten, nichts geht beim Neustart verloren" abgehakt
 - 2026-11-24: Akzeptanzkriterien: "Discord-Grenzen eingehalten, Tests ohne echtes Discord" abgehakt
 - 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
