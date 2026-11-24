@@ -3,13 +3,13 @@ id: W-0046
 title: "Discord-Dialog: Schalter Befehle und Knöpfe, Kanal je Projekt"
 type: feature
 priority: P3
-status: review
+status: erledigt
 effort: S
 risk:
 created: 2026-11-24
 updated: 2026-11-24
 due:
-completed:
+completed: 2026-11-24
 milestone:
 branch: feature/w-0046-discord-dialog-schalter
 tags: [discord, board, ui]
@@ -73,9 +73,7 @@ Art: nachher · Hinzugefügt: 2026-11-24
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-24 17:47
-
-Fertig im Branch feature/w-0046-discord-dialog-schalter (5 Commits, nicht gemergt). Umgesetzt: Einstellung commands (Standard an) in config.json, works discord set und Reiter Befehle; der Bot liest sie je Durchgang: aus = keine Knöpfe und kein Auswahlmenü am Dashboard und an neuen Nachrichten, eigener Bot meldet /works ab (PUT mit leerer Liste, auch ohne Gateway), Befehle und alte Knöpfe bekommen einen kurzen Hinweis (beim gemeinsamen Bot antwortet das Gerät). Kanal je Projekt als project.<id>.channel=<Kanal-ID> nur beim eigenen Bot, geprüft auf Kanal und Schreibrecht; im Reiter Projekte als Auswahl aus /api/discord/channels, beim gemeinsamen Bot gesperrt mit Hinweis; channelOf ignoriert eigene Kanäle beim gemeinsamen Bot. Handy-Vorschau nennt den Kanal des Projekts. Die Nebensache aus dem Audit von W-0038 (alter Kanal nach dem Verschieben) ließ sich im Dialog nicht nachstellen; der Browser-Schritt hält jetzt fest, dass nach dem Verschieben der neue Kanal steht. Tests: Selbsttest 49/49 mit und ohne WebSocket (mit Browser), services/works-bot/test.mjs grün. Offen: Merge; ältere Nachrichten behalten ihre Knöpfe nach dem Ausschalten (so gewollt, nur Dashboard und neue Nachrichten); beim Serverwechsel bleibt /works auf dem alten Server registriert (wie vorher).
+Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -105,3 +103,4 @@ Fertig im Branch feature/w-0046-discord-dialog-schalter (5 Commits, nicht gemerg
 - 2026-11-24: Parallele Arbeit beendet
 - 2026-11-24: decisions.md angelegt
 - 2026-11-24: Entscheidung E1 dokumentiert: Schalter Befehle und Knöpfe, Kanal je Projekt
+- 2026-11-24: Abgeschlossen (Status: review → erledigt), DoD bestätigt
