@@ -3,7 +3,7 @@ id: W-0050
 title: "Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard"
 type: feature
 priority: P2
-status: backlog
+status: in-arbeit
 effort: M
 risk:
 created: 2026-11-24
@@ -11,7 +11,7 @@ updated: 2026-11-24
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0050-discord-nachrichten-nach-10-s
 tags: [discord]
 blocked_by: [W-0041]
 blocks: []
@@ -97,3 +97,6 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 - 2026-11-24: Entwurf I2 „Karte mit Phasenstreifen“ angehängt
 - 2026-11-24: Entwurf I3 „Karte mit Zeitachse“ angehängt
 - 2026-11-24: Entwurf I3 „Karte mit Zeitachse“ gewählt. Grund: Nutzer am 2026-11-24: „L3 verbessert“, gemeint ist I3 (Karte mit Zeitachse) in verbesserter Fassung: auf dem Handy lesbar, Bild nur bei Ereignissen neu
+- 2026-11-24: Parallel gestartet im Worktree W-0050-discord-nachrichten (Status: backlog → in-arbeit)
+- 2026-11-24: Entwurf I4 „Zeitachse verbessert“ angehängt
+- 2026-11-24: Entwurf I4 „Zeitachse verbessert“ gewählt. Grund: Verbesserte Fassung von I3 nach dem Wunsch des Nutzers „I3 verbessert“ vom 2026-11-24

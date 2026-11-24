@@ -1,12 +1,12 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-24 22:37 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-24 22:38 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 3 | 0 | 0 | 0 | 0 | 0 | 50 | 0 |
+| 2 | 0 | 1 | 0 | 0 | 0 | 50 | 0 |
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 2 · P3 Mittel: 0 · P4 Niedrig: 1
 
@@ -16,13 +16,14 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0050](tasks/W-0050-discord-nachrichten-nach-10-s-loeschen/task.md) | Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard | Feature | P2 Hoch | In Arbeit | M |  |  |  |
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0050](tasks/W-0050-discord-nachrichten-nach-10-s-loeschen/task.md) | Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard | Feature | P2 Hoch | Backlog | M |  |  |  |
 | [W-0053](tasks/W-0053-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest mit Browser, Selbsttest | Bug | P2 Hoch | Backlog |  |  |  |  |
 | [W-0052](tasks/W-0052-works-checks-record-ohne-namen-traegt/task.md) | works checks record ohne Namen trägt Prüfung undefined ein | Bug | P4 Niedrig | Backlog | S |  |  |  |
 
