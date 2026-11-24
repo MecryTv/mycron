@@ -162,12 +162,13 @@ export function liveUsage(root, config) {
   return data;
 }
 
-export function fmtTokens(n) {
-  if (n >= 1e6) { const [a, b] = (n / 1e6).toFixed(1).split('.'); return tr('{a}.{b} M', { a, b }); }
+// lang: Sprache der Ausgabe, ohne Angabe die eingestellte (Discord nutzt die Sprache des Clients).
+export function fmtTokens(n, lang) {
+  if (n >= 1e6) { const [a, b] = (n / 1e6).toFixed(1).split('.'); return tr('{a}.{b} M', { a, b }, lang); }
   if (n >= 1e3) return `${Math.round(n / 1e3)} k`;
   return String(n);
 }
-export function fmtCost(v, cur = 'USD') {
+export function fmtCost(v, cur = 'USD', lang) {
   const [a, b] = (v < 0.1 && v > 0 ? v.toFixed(3) : v.toFixed(2)).split('.');
-  return cur === 'USD' ? tr('${a}.{b}', { a, b }) : tr('{a}.{b} {cur}', { a, b, cur });
+  return cur === 'USD' ? tr('${a}.{b}', { a, b }, lang) : tr('{a}.{b} {cur}', { a, b, cur }, lang);
 }

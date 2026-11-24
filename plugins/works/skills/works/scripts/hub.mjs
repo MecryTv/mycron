@@ -15,6 +15,7 @@ import { loadActivity } from './live.mjs';
 import { liveUsage, fmtTokens, fmtCost } from './usage.mjs';
 import { syncState } from './ghsync.mjs';
 import { boardCss } from './board.mjs';
+import { tr, language, setLanguage } from './i18n.mjs';
 
 const HUB_CSS = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'board', 'hub.css'), 'utf8');
 
@@ -92,46 +93,59 @@ export function hubInfos() {
 }
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const ago = (iso) => {
-  if (!iso) return 'nie';
+// Alter eines Zeitpunkts als Art und Zahl, daraus "vor 5 min" (ago) oder "seit 5 min" (since) in der Sprache (W-0041).
+const age = (iso) => {
+  if (!iso) return { k: 'never' };
   const ms = Date.now() - Date.parse(iso);
-  if (!/T/.test(iso) || Number.isNaN(ms)) { const d = Math.round((new Date(today() + 'T00:00:00') - new Date(String(iso).slice(0, 10) + 'T00:00:00')) / 86400000); return d <= 0 ? 'heute' : d === 1 ? 'gestern' : `vor ${d} Tagen`; }
+  if (!/T/.test(iso) || Number.isNaN(ms)) { const d = Math.round((new Date(today() + 'T00:00:00') - new Date(String(iso).slice(0, 10) + 'T00:00:00')) / 86400000); return d <= 0 ? { k: 'today' } : d === 1 ? { k: 'yesterday' } : { k: 'days', n: d }; }
   const m = Math.round(ms / 60000);
-  return m < 1 ? 'gerade eben' : m < 60 ? `vor ${m} min` : m < 1440 ? `vor ${Math.round(m / 60)} h` : `vor ${Math.round(m / 1440)} Tagen`;
+  return m < 1 ? { k: 'now' } : m < 60 ? { k: 'min', n: m } : m < 1440 ? { k: 'h', n: Math.round(m / 60) } : { k: 'days', n: Math.round(m / 1440) };
+};
+const ago = (iso) => {
+  const a = age(iso);
+  return { never: () => tr('never'), today: () => tr('today'), yesterday: () => tr('yesterday'), now: () => tr('just now'), min: () => tr('{n} min ago', a), h: () => tr('{n} h ago', a), days: () => tr('{n} days ago', a) }[a.k]();
+};
+const since = (iso) => {
+  const a = age(iso);
+  return ({ min: () => tr('for {n} min', a), h: () => tr('for {n} h', a), days: () => tr('for {n} days', a) }[a.k] || (() => ''))();
 };
 const hhmm = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 const pct = (done, total) => (total ? Math.round(done / total * 100) : 0);
 
 function liveLine(i) {
   if (i.perm) {
-    const since = ago(i.perm.permSince || i.perm.at);
-    return `<div class="hub-live hub-warnbg"><span class="hub-dot hub-perm"></span><span>Wartet ${since.startsWith('vor ') ? `${since.replace('vor ', 'seit ')} ` : ''}auf deine Freigabe: ${esc(i.perm.what || i.perm.verb)}</span></div>`;
+    const s = since(i.perm.permSince || i.perm.at);
+    const what = esc(i.perm.what || i.perm.verb);
+    return `<div class="hub-live hub-warnbg"><span class="hub-dot hub-perm"></span><span>${s ? tr('Waiting for your approval {since}: {what}', { since: s, what }) : tr('Waiting for your approval: {what}', { what })}</span></div>`;
   }
-  if (i.busy) return `<div class="hub-live"><span class="hub-dot hub-work"></span><span>Claude arbeitet${i.busy.task ? ` an ${esc(i.busy.task)}` : ''}: ${esc(i.busy.verb)} ${esc(i.busy.what)}</span></div>`;
-  if (i.working.length) return `<div class="hub-live"><span class="hub-dot hub-work"></span><span>In Arbeit: ${esc(i.working.map((t) => `${t.id} ${t.title}`).join(', '))}</span></div>`;
-  if (i.review) return `<div class="hub-live"><span class="hub-dot"></span><span>${i.review} ${i.review === 1 ? 'Aufgabe wartet' : 'Aufgaben warten'} auf deine Abnahme</span></div>`;
-  return '<div class="hub-live"><span class="hub-dot"></span><span>Gerade nichts in Arbeit</span></div>';
+  if (i.busy) {
+    const v = { task: esc(i.busy.task), verb: esc(i.busy.verb), what: esc(i.busy.what) };
+    return `<div class="hub-live"><span class="hub-dot hub-work"></span><span>${i.busy.task ? tr('Claude is working on {task}: {verb} {what}', v) : tr('Claude is working: {verb} {what}', v)}</span></div>`;
+  }
+  if (i.working.length) return `<div class="hub-live"><span class="hub-dot hub-work"></span><span>${tr('In progress: {list}', { list: esc(i.working.map((t) => `${t.id} ${t.title}`).join(', ')) })}</span></div>`;
+  if (i.review) return `<div class="hub-live"><span class="hub-dot"></span><span>${i.review === 1 ? tr('1 task is waiting for your acceptance review') : tr('{n} tasks are waiting for your acceptance review', { n: i.review })}</span></div>`;
+  return `<div class="hub-live"><span class="hub-dot"></span><span>${tr('Nothing in progress right now')}</span></div>`;
 }
 
 function boardCard(i, self) {
   const url = boardUrl(i.server);
   const st = i.sprint && i.sprint.stats;
-  const [label, done, total, color] = st ? [`Sprint ${i.sprint.id} bis ${i.sprint.end}`, st.done, st.planned, ';--c:var(--accent)'] : ['Fortschritt gesamt', i.progress.done, i.progress.total, ''];
+  const [label, done, total, color] = st ? [tr('Sprint {id} until {end}', { id: i.sprint.id, end: i.sprint.end }), st.done, st.planned, ';--c:var(--accent)'] : [tr('Overall progress'), i.progress.done, i.progress.total, ''];
   const stat = (n, l, hot) => `<div class="hub-stat${hot && n ? ' hub-hot' : ''}"><b>${n}</b><span>${l}</span></div>`;
-  const ci = { ok: '<span class="hub-chip hub-ok">CI grün</span>', fail: '<span class="hub-chip hub-red">CI rot</span>', pending: '<span class="hub-chip">CI läuft</span>' }[i.ci] || '';
+  const ci = { ok: `<span class="hub-chip hub-ok">${tr('CI green')}</span>`, fail: `<span class="hub-chip hub-red">${tr('CI red')}</span>`, pending: `<span class="hub-chip">${tr('CI running')}</span>` }[i.ci] || '';
   const isSelf = self && i.path === self;
   // Wartende Freigabe mit Kennung (Projekt und Zeitpunkt): Der Browser meldet jede genau einmal (W-0028).
   const perm = i.perm ? ` data-perm="${esc(`${rootIdOf(i.path)}:${i.perm.permSince || i.perm.at}`)}" data-perm-name="${esc(i.name)}" data-perm-what="${esc(i.perm.what || i.perm.verb)}" data-url="${esc(url)}?from=hub"` : '';
   return `<article class="hub-bc" data-board-url="${esc(url)}"${isSelf ? ' data-self' : ''}${perm}>
 <header><span class="hub-dot hub-on"></span><h3>${esc(i.name)}</h3><span class="hub-m hub-path">${esc(i.path.replace(os.homedir(), '~'))}</span>
-<span class="hub-chips">${isSelf ? '<span class="hub-chip">dieses Board</span>' : ''}${ci}${i.outdated ? '<span class="hub-chip hub-old">Version veraltet</span>' : '<span class="hub-chip">Version aktuell</span>'}</span></header>
+<span class="hub-chips">${isSelf ? `<span class="hub-chip">${tr('this board')}</span>` : ''}${ci}${i.outdated ? `<span class="hub-chip hub-old">${tr('Version outdated')}</span>` : `<span class="hub-chip">${tr('Version current')}</span>`}</span></header>
 ${liveLine(i)}
-<div class="hub-stats">${stat(i.open, 'offen')}${stat(i.working.length, 'in Arbeit')}${stat(i.review, 'Review')}${stat(i.p1.length, 'P1', true)}${stat(i.overdue, 'überfällig', true)}</div>
+<div class="hub-stats">${stat(i.open, tr('open'))}${stat(i.working.length, tr('in progress'))}${stat(i.review, tr('Review'))}${stat(i.p1.length, 'P1', true)}${stat(i.overdue, tr('overdue'), true)}</div>
 <div class="hub-cols">
-<div class="hub-prog"><div class="hub-pl"><span>${esc(label)}</span><span>${done} von ${total}</span></div><div class="hub-track"><i style="width:${pct(done, total)}%${color}"></i></div></div>
-<dl class="hub-kv"><dt>Als Nächstes</dt><dd>${i.next ? esc(`${i.next.id} ${i.next.title}`) : '–'}</dd><dt>Verbrauch heute</dt><dd>${i.usage && i.usage.tokens ? esc(`${fmtTokens(i.usage.tokens)} · ${fmtCost(i.usage.cost, i.usage.currency)}`) : '–'}</dd><dt>Läuft seit</dt><dd>${hhmm(i.server.started)} · Port ${i.server.port}</dd></dl>
+<div class="hub-prog"><div class="hub-pl"><span>${esc(label)}</span><span>${tr('{done} of {total}', { done, total })}</span></div><div class="hub-track"><i style="width:${pct(done, total)}%${color}"></i></div></div>
+<dl class="hub-kv"><dt>${tr('Next up')}</dt><dd>${i.next ? esc(`${i.next.id} ${i.next.title}`) : '–'}</dd><dt>${tr('Usage today')}</dt><dd>${i.usage && i.usage.tokens ? esc(`${fmtTokens(i.usage.tokens)} · ${fmtCost(i.usage.cost, i.usage.currency)}`) : '–'}</dd><dt>${tr('Running since')}</dt><dd>${hhmm(i.server.started)} · Port ${i.server.port}</dd></dl>
 </div>
-<div class="hub-acts"><a class="btn small primary" href="${esc(url)}?from=hub">Öffnen</a><a class="btn small" href="${esc(url)}" target="_blank" rel="noopener">In neuem Tab</a><button class="btn small" type="button" data-op="restart" data-path="${esc(i.path)}" data-name="${esc(i.name)}">Neu starten</button>${isSelf ? '' : `<button class="btn small ghost danger" type="button" data-op="stop" data-path="${esc(i.path)}" data-name="${esc(i.name)}">Stoppen</button>`}<span class="hub-m">geändert ${ago(i.last)}</span></div>
+<div class="hub-acts"><a class="btn small primary" href="${esc(url)}?from=hub">${tr('Open board')}</a><a class="btn small" href="${esc(url)}" target="_blank" rel="noopener">${tr('In a new tab')}</a><button class="btn small" type="button" data-op="restart" data-path="${esc(i.path)}" data-name="${esc(i.name)}">${tr('Restart')}</button>${isSelf ? '' : `<button class="btn small ghost danger" type="button" data-op="stop" data-path="${esc(i.path)}" data-name="${esc(i.name)}">${tr('Stop')}</button>`}<span class="hub-m">${tr('changed {ago}', { ago: ago(i.last) })}</span></div>
 </article>`;
 }
 
@@ -148,14 +162,14 @@ export function hubBody(infos, { self = '' } = {}) {
   const perms = sum((i) => (i.perm ? 1 : 0));
   const kpi = (n, l, cls = '') => `<div class="hub-kpi${cls}"><b>${esc(n)}</b><span>${esc(l)}</span></div>`;
   return `<header class="hub-hd"><div class="hub-wrap">
-<div class="hub-hdtop"><h1 class="hub-mark"><i>w</i>works <small>HUB</small></h1><span class="hub-m">${on.length === 1 ? '1 Board läuft' : `${on.length} Boards laufen`} · aktualisiert ${hhmm(new Date().toISOString())}</span>
-<span class="hub-right"><button class="btn small hub-bell" type="button" data-notify aria-pressed="false" hidden>${BELL_ICON}<span>Hinweise aus</span></button><button class="btn small icon" type="button" data-theme-toggle aria-label="Farbschema wechseln" title="Farbschema wechseln">${THEME_ICON}</button></span></div>
-<div class="hub-ask" id="hubAsk" role="region" aria-label="Hinweise einschalten" hidden>${BELL_ICON}<p>Benachrichtigen, wenn Claude in einem Projekt auf deine Freigabe wartet?<small>Der Browser fragt dann einmal nach der Erlaubnis. Der Hinweis kommt nur, wenn dieser Tab im Hintergrund liegt.</small></p><span class="hub-ask-acts"><button class="btn small primary" type="button" data-notify-on>Einschalten</button><button class="btn small ghost" type="button" data-notify-later>Nicht jetzt</button></span></div>
-<div class="hub-kpis">${kpi(sum((i) => i.open), 'offene Aufgaben')}${kpi(sum((i) => i.p1.length), 'P1 kritisch')}${kpi(perms, 'wartet auf Freigabe', perms ? ' hub-warnk' : '')}${kpi(sum((i) => i.review), 'im Review')}${kpi(fmtCost(cost, cur), `Verbrauch heute · ${fmtTokens(tokens)} Tokens`)}</div>
+<div class="hub-hdtop"><h1 class="hub-mark"><i>w</i>works <small>HUB</small></h1><span class="hub-m">${on.length === 1 ? tr('1 board running') : tr('{n} boards running', { n: on.length })} · ${tr('updated {time}', { time: hhmm(new Date().toISOString()) })}</span>
+<span class="hub-right"><button class="btn small hub-bell" type="button" data-notify aria-pressed="false" hidden>${BELL_ICON}<span>${tr('Notifications off')}</span></button><button class="btn small icon" type="button" data-theme-toggle aria-label="${tr('Switch color scheme')}" title="${tr('Switch color scheme')}">${THEME_ICON}</button></span></div>
+<div class="hub-ask" id="hubAsk" role="region" aria-label="${tr('Turn on notifications')}" hidden>${BELL_ICON}<p>${tr('Notify you when Claude is waiting for your approval in a project?')}<small>${tr('The browser then asks once for permission. The notification only comes when this tab is in the background.')}</small></p><span class="hub-ask-acts"><button class="btn small primary" type="button" data-notify-on>${tr('Turn on')}</button><button class="btn small ghost" type="button" data-notify-later>${tr('Not now')}</button></span></div>
+<div class="hub-kpis">${kpi(sum((i) => i.open), tr('open tasks'))}${kpi(sum((i) => i.p1.length), tr('P1 critical'))}${kpi(perms, tr('waiting for approval'), perms ? ' hub-warnk' : '')}${kpi(sum((i) => i.review), tr('in review'))}${kpi(fmtCost(cost, cur), tr('Usage today · {tokens} tokens', { tokens: fmtTokens(tokens) }))}</div>
 </div></header>
 <main class="hub-wrap">
-<div class="hub-sec"><h2>Laufende Boards</h2><span class="hub-m">${on.length}</span></div>
-${on.length ? `<div class="hub-cards">${on.map((i) => boardCard(i, self)).join('')}</div>` : '<p class="hub-m">Gerade läuft kein Board.</p>'}
+<div class="hub-sec"><h2>${tr('Running boards')}</h2><span class="hub-m">${on.length}</span></div>
+${on.length ? `<div class="hub-cards">${on.map((i) => boardCard(i, self)).join('')}</div>` : `<p class="hub-m">${tr('No board is running right now.')}</p>`}
 <div style="height:28px"></div>
 </main>`;
 }
@@ -165,6 +179,8 @@ ${on.length ? `<div class="hub-cards">${on.map((i) => boardCard(i, self)).join('
 // events: Die Seite hält /events offen, damit works board --open sie als offenen works-Tab zählt.
 const HUB_JS = `(() => {
   const H = window.HUB;
+  // Texte über den kleinen Katalog in window.HUB.t (W-0041), Platzhalter wie im Board.
+  const tr = (s, v) => { const x = (H.t && H.t[s]) || s; return v ? x.replace(/\\{(\\w+)\\}/g, (a, k) => (k in v ? String(v[k]) : a)) : x; };
   const get = (k, f) => { try { const v = localStorage.getItem(k); return v === null ? f : JSON.parse(v); } catch (e) { return f; } };
   const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* privat */ } };
   const theme = () => { const t = get('works-theme', 'auto'); if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t); };
@@ -184,8 +200,8 @@ const HUB_JS = `(() => {
     ask.hidden = !canNotify || denied || choice() !== '';
     bell.hidden = !canNotify || !ask.hidden;
     bell.setAttribute('aria-pressed', String(notifyOn()));
-    bell.title = denied ? 'Im Browser blockiert. Erlauben in den Website-Einstellungen.' : 'Hinweis, wenn Claude auf eine Freigabe wartet';
-    bell.querySelector('span').textContent = notifyOn() ? 'Hinweise an' : denied ? 'Hinweise blockiert' : 'Hinweise aus';
+    bell.title = denied ? tr('Blocked in the browser. Allow it in the site settings.') : tr('Notification when Claude is waiting for an approval');
+    bell.querySelector('span').textContent = notifyOn() ? tr('Notifications on') : denied ? tr('Notifications blocked') : tr('Notifications off');
   }
   // Was beim Laden schon wartet, sieht man; gemeldet werden nur neue Freigaben, und nur im Hintergrund.
   const seen = new Set();
@@ -195,7 +211,7 @@ const HUB_JS = `(() => {
       if (seen.has(k)) continue;
       seen.add(k);
       if (initial || !notifyOn() || !document.hidden) continue;
-      const n = new Notification(c.dataset.permName + ' wartet auf deine Freigabe', { body: c.dataset.permWhat, tag: k });
+      const n = new Notification(tr('{name} is waiting for your approval', { name: c.dataset.permName }), { body: c.dataset.permWhat, tag: k });
       const url = c.dataset.url;
       n.onclick = () => { window.focus(); location.href = url; n.close(); };
     }
@@ -251,35 +267,41 @@ const HUB_JS = `(() => {
     const b = e.target.closest('[data-op]');
     if (!b) return;
     let dir = b.dataset.path;
-    if (b.dataset.op === 'stop' && !confirm('Board von ' + b.dataset.name + ' stoppen?')) return;
+    if (b.dataset.op === 'stop' && !confirm(tr('Stop the board of {name}?', { name: b.dataset.name }))) return;
     b.disabled = true;
     try {
       const r = await fetch('/api/hub', { method: 'POST', headers: { 'X-Works-Token': H.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: b.dataset.op, path: dir }) });
       if (r.status === 403) { location.reload(); return; }
-      if (!r.ok) alert((await r.json().catch(() => ({}))).error || 'Das hat nicht geklappt.');
-    } catch (err) { alert('Keine Verbindung zum Board.'); }
+      if (!r.ok) alert((await r.json().catch(() => ({}))).error || tr('That did not work.'));
+    } catch (err) { alert(tr('No connection to the board.')); }
     b.disabled = false;
     setTimeout(refresh, 1500); setTimeout(refresh, 4000);
   });
 })();`;
 
+// Texte des Skripts im Browser: die tr-Aufrufe in HUB_JS, übersetzt beim Aufbau der Seite.
+const HUB_KEYS = [...HUB_JS.matchAll(/\btr\('((?:[^'\\]|\\.)*)'/g)].map((m) => m[1]);
+
 // Ganze Seite mit dem CSS des Boards. part: nur den Inhalt für die Aktualisierung.
-export function hubHtml({ token, self = '', part = false, partUrl = '/?part=1', events = false } = {}) {
+// root: Projekt des Boards, dessen Sprache gilt (W-0041); ohne root wie das CLI im aktuellen Ordner.
+export function hubHtml({ token, self = '', part = false, partUrl = '/?part=1', events = false, root } = {}) {
+  const lang = language(root);
+  setLanguage(lang);
   const body = hubBody(hubInfos(), { self });
   if (part) return body;
-  const boot = JSON.stringify({ token, part: partUrl, events }).replace(/</g, '\\u003c');
-  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><title>works Hub</title><style>${boardCss()}${HUB_CSS}</style></head>
+  const boot = JSON.stringify({ token, part: partUrl, events, t: Object.fromEntries(HUB_KEYS.map((k) => [k, tr(k)]).filter(([k, v]) => k !== v)) }).replace(/</g, '\\u003c');
+  return `<!doctype html><html lang="${esc(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><title>works Hub</title><style>${boardCss()}${HUB_CSS}</style></head>
 <body><div class="hub-page" id="hub">${body}</div><script>window.HUB = ${boot};${HUB_JS}</script></body></html>`;
 }
 
 // Knöpfe im Hub: Board starten, stoppen, neu starten, Projekt hinzufügen. Nur für angemeldete Projekte.
 // Läuft über das CLI im Projektordner, wie works board von Hand. Gibt { status, error? } zurück.
 export function hubAction(op, dir) {
-  if (!['start', 'stop', 'restart'].includes(op)) return { status: 400, error: 'Unbekannte Aktion.' };
+  if (!['start', 'stop', 'restart'].includes(op)) return { status: 400, error: tr('Unknown action.') };
   const real = (x) => { try { return fs.realpathSync(String(x || '')); } catch { return null; } };
   const target = real(dir);
   const p = target && projectList().find((x) => real(x.path) === target);
-  if (!p) return { status: 400, error: 'Unbekanntes Projekt.' };
+  if (!p) return { status: 400, error: tr('Unknown project.') };
   const args = { start: ['board', '--serve', '--detach'], stop: ['board', '--stop'], restart: ['board', '--restart'] }[op];
   spawn(process.execPath, [newestCli(), ...args], { cwd: p.path, detached: true, windowsHide: true, stdio: 'ignore', env: { ...process.env, WORKS_ACTOR: '' } }).unref();
   return { status: 200 };
@@ -289,12 +311,13 @@ export function serveHub({ port = 4740 } = {}) {
   const token = crypto.randomBytes(16).toString('hex');
   const head = { 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' };
   const server = http.createServer((req, res) => {
+    setLanguage(language());
     const host = String(req.headers.host || '').replace(/:\d+$/, '');
     if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) { res.writeHead(421); return res.end(); }
     const url = new URL(req.url, 'http://x');
     if (req.method === 'POST' && url.pathname === '/api/hub') {
       const origin = req.headers.origin;
-      if (req.headers['x-works-token'] !== token || (origin && origin !== `http://${req.headers.host}`)) { res.writeHead(403, { ...head, 'Content-Type': 'application/json' }); return res.end('{"error":"Zugriff verweigert."}'); }
+      if (req.headers['x-works-token'] !== token || (origin && origin !== `http://${req.headers.host}`)) { res.writeHead(403, { ...head, 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: tr('Access denied.') })); }
       let body = '';
       req.on('data', (c) => { body += c; if (body.length > 4000) req.destroy(); });
       req.on('end', () => {
@@ -306,11 +329,11 @@ export function serveHub({ port = 4740 } = {}) {
       });
       return;
     }
-    if (req.method !== 'GET' || url.pathname !== '/') { res.writeHead(404, head); return res.end('Nicht gefunden'); }
+    if (req.method !== 'GET' || url.pathname !== '/') { res.writeHead(404, { ...head, 'Content-Type': 'text/plain; charset=utf-8' }); return res.end(tr('Not found')); }
     res.writeHead(200, { ...head, 'Content-Type': 'text/html; charset=utf-8' });
     res.end(hubHtml({ token, part: url.searchParams.has('part') }));
   });
-  server.listen(port, '127.0.0.1', () => process.stdout.write(`Projektübersicht läuft: http://127.0.0.1:${port}/\nBeenden mit Strg+C.\n`));
-  server.on('error', (e) => { process.stderr.write(`Fehler: ${e.message}\n`); process.exit(1); });
+  server.listen(port, '127.0.0.1', () => process.stdout.write(`${tr('Project overview running: {url}', { url: `http://127.0.0.1:${port}/` })}\n${tr('Stop with Ctrl+C.')}\n`));
+  server.on('error', (e) => { process.stderr.write(tr('Error: {msg}', { msg: e.message }) + '\n'); process.exit(1); });
   return server;
 }

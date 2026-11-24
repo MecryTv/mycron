@@ -50,6 +50,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   // WORKS_DRY_OPEN: --open meldet nur, was es öffnen würde. Der Selbsttest öffnet nie einen Browser.
   // WORKS_LANG=de: Die Prüfungen erwarten deutsche Ausgaben; die englische Standardausgabe prüft ein eigener Schritt (W-0041).
   const env = { ...process.env, HOME: home, USERPROFILE: home, WORKS_ACTOR: '', WORKS_DRY_OPEN: '1', WORKS_LANG: 'de', GIT_AUTHOR_NAME: 'works', GIT_AUTHOR_EMAIL: 'works@test', GIT_COMMITTER_NAME: 'works', GIT_COMMITTER_EMAIL: 'works@test' };
+  // Direkt importierte Module (board.mjs, checks.mjs …) sprechen hier wie die Kindprozesse Deutsch, unabhängig vom
+  // Ordner und von ~/.works des Aufrufers. board.mjs bestimmt die Sprache je Aufbau neu (W-0041). Am Ende zurück.
+  const langBefore = process.env.WORKS_LANG;
+  process.env.WORKS_LANG = 'de';
   const results = [];
   const hasGit = spawnSync('git', ['--version'], { encoding: 'utf8' }).status === 0;
 
@@ -168,7 +172,77 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         if (!(key in de)) missing.push(`${path.basename(f)}: ${key.slice(0, 80)}`);
       }
     }
+    // Board (W-0041): tr('...') in board.js (eigene Funktion im Browser, kein Import) und {{t:...}} in template.html.
+    for (const key of boardTexts()) if (!(key in de)) missing.push(`board: ${key.slice(0, 80)}`);
     expect(!missing.length, `${missing.length} Texte ohne deutsche Übersetzung:\n${missing.slice(0, 15).join('\n')}`);
+  });
+
+  // W-0041: Board und Hub sprechen die eingestellte Sprache. Deutsch kommt als kleiner Katalog in die Seite,
+  // works lang wirkt am laufenden Board ohne Neustart, POST /api/lang stellt um.
+  await step('Sprache: Board und Hub englisch und deutsch', async () => {
+    const p = path.join(base, 'board-sprache');
+    fs.mkdirSync(p, { recursive: true });
+    const wl = (lang, args, o = {}) => w(args, { cwd: p, extraEnv: { WORKS_LANG: lang }, ...o });
+    wl('', ['init']);
+    wl('', ['new', '--type=feature', '--title=Export', '--description=Export as JSON', '--criteria=Works']);
+    const de = JSON.parse(fs.readFileSync(path.join(HERE, 'i18n', 'de.json'), 'utf8'));
+    const page = () => fs.readFileSync(path.join(p, '.works', 'board.html'), 'utf8');
+    const bootOf = (h) => JSON.parse((h.match(/<script>window\.WORKS = ([\s\S]*?);<\/script>/) || [])[1] || 'null');
+    // Nur die Vorlage, ohne Stile, Skript und Daten.
+    const shell = (h) => h.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script>[\s\S]*?<\/script>/g, '');
+    wl('', ['board']);
+    let h = page();
+    let b = bootOf(h);
+    expect(b && b.i18n && b.i18n.lang === 'en' && b.data.meta.lang === 'en' && b.i18n.source === 'default', `Boot englisch: ${JSON.stringify(b && b.i18n).slice(0, 200)}`);
+    expect(!Object.keys(b.i18n.catalog).length && b.i18n.languages.some((l) => l.code === 'de' && l.name === 'Deutsch'), `Katalog oder Sprachen englisch: ${JSON.stringify(b.i18n).slice(0, 200)}`);
+    has(h, '<html lang="en">', 'board.html englisch'); has(h, 'Skip to the board', 'board.html englisch');
+    const german = /[äöüÄÖÜß]|\b(Aufgabe|Aufgaben|Warteschlange|Zeitleiste|Tabelle|Teilen|Suchen|Alle|oder|und|für|mit)\b/;
+    expect(!german.test(shell(h)), `Deutsch in der englischen Vorlage: ${(shell(h).match(german) || [])[0]}`);
+    wl('de', ['board']);
+    h = page();
+    b = bootOf(h);
+    expect(b.i18n.lang === 'de' && b.data.meta.lang === 'de' && b.i18n.source === 'env', `Boot deutsch: ${JSON.stringify(b.i18n).slice(0, 200)}`);
+    for (const s of ['<html lang="de">', 'Zum Board springen', 'Nächste Aufgabe', 'Aufgabe suchen, # für Tags, &gt; für Befehle']) has(h, s, 'board.html deutsch');
+    // Nur Texte des Boards im Katalog, nicht der ganze de.json; aus board.js mindestens einer, sobald es tr-Texte hat.
+    const own = boardTexts();
+    const cat = b.i18n.catalog;
+    expect(Object.keys(cat).length && Object.keys(cat).every((k) => own.includes(k) && cat[k] === de[k]), `Katalog im Board: ${Object.keys(cat).filter((k) => !own.includes(k)).slice(0, 5).join(', ')}`);
+    const fromJs = boardTexts({ template: false }).filter((k) => de[k]);
+    if (fromJs.length) expect(fromJs.every((k) => cat[k] === de[k]), `Übersetzung aus board.js fehlt im Katalog: ${fromJs.find((k) => cat[k] !== de[k])}`);
+    // Live: works lang wirkt ohne Neustart (meta.lang), POST /api/lang stellt um, nur mit Token, global nur lokal.
+    const port = await highPort();
+    wl('', ['board', '--serve', '--detach', `--port=${port}`]);
+    try {
+      const url = `http://127.0.0.1:${port}`;
+      const html = await (await fetch(url + '/')).text();
+      const token = (html.match(/"token":"([a-f0-9]{20,})"/) || [])[1];
+      expect(token && bootOf(html).i18n.lang === 'en', 'Live-Board nicht englisch oder ohne Token');
+      const meta = async () => (await (await fetch(url + '/data.json')).json()).meta;
+      const lang = (body, t = token) => fetch(url + '/api/lang', { method: 'POST', headers: { ...(t ? { 'X-Works-Token': t } : {}), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      expect((await lang({ lang: 'de', scope: 'project' }, '')).status === 403, '/api/lang ohne Token erlaubt');
+      expect((await lang({ lang: 'xx', scope: 'project' })).status === 400, '/api/lang mit unbekannter Sprache angenommen');
+      let r = await lang({ lang: 'de', scope: 'project' });
+      let j = await r.json();
+      expect(r.ok && j.ok && j.lang === 'de' && j.source === 'project', `/api/lang project: ${JSON.stringify(j)}`);
+      expect((await meta()).lang === 'de', 'meta.lang nach /api/lang nicht de');
+      has(await (await fetch(url + '/hub')).text(), 'Laufende Boards', 'Hub deutsch');
+      const note = await (await fetch(url + '/api/action', { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'log', id: 'W-0001', text: 'Notiz' }) })).json();
+      expect(note.message === 'Notiz gespeichert.', `Meldung der API nicht deutsch: ${note.message}`);
+      r = await lang({ lang: '', scope: 'project' });
+      j = await r.json();
+      expect(r.ok && j.lang === 'en' && j.source === 'default', `/api/lang zurücksetzen: ${JSON.stringify(j)}`);
+      has(await (await fetch(url + '/hub')).text(), 'Running boards', 'Hub englisch');
+      // Von außen (CLI im Terminal) geändert: das laufende Board merkt es bei der nächsten Anfrage.
+      wl('', ['lang', 'de']);
+      expect((await meta()).lang === 'de', 'works lang de wirkt nicht am laufenden Board');
+      wl('', ['lang', '--reset']);
+      r = await lang({ lang: 'de', scope: 'global' });
+      expect(r.ok && (await r.json()).source === 'global', '/api/lang global lokal nicht erlaubt');
+      r = await lang({ lang: '', scope: 'global' });
+      expect(r.ok && (await r.json()).lang === 'en', '/api/lang global zurücksetzen');
+    } finally {
+      wl('', ['board', '--stop'], { ok: false });
+    }
   });
 
   // W-0041: Überschriften in der Sprache der Aufgabe, deutsche Aufgaben bleiben gültig, englische Werte als Alias.
@@ -2100,7 +2174,17 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   log(`\n${results.length - failed.length} von ${results.length} Prüfungen bestanden${failed.length ? `, ${failed.length} fehlgeschlagen` : ''}.`);
   if (!keep) { try { cleanupWorktrees(proj); fs.rmSync(base, { recursive: true, force: true }); } catch { /* Windows hält Dateien manchmal kurz fest */ } }
   else log(`Testprojekt bleibt erhalten: ${proj}`);
+  if (langBefore === undefined) delete process.env.WORKS_LANG; else process.env.WORKS_LANG = langBefore;
   return { ok: !failed.length, results };
+}
+
+// Texte des Boards (W-0041): tr('...') in board.js und {{t:...}} in template.html, wie board.mjs sie in den Katalog nimmt.
+function boardTexts({ template = true } = {}) {
+  const unesc = (s) => s.replace(/\\(.)/g, (a, c) => ({ n: '\n', t: '\t' })[c] || c);
+  const js = fs.readFileSync(path.join(HERE, 'board', 'board.js'), 'utf8').replace(/\r\n?/g, '\n');
+  const keys = [...js.matchAll(/\btr\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.)*)`)\s*[,)]/g)].map((m) => unesc(m[1] ?? m[2] ?? m[3]));
+  if (template) keys.push(...[...fs.readFileSync(path.join(HERE, 'board', 'template.html'), 'utf8').matchAll(/\{\{t:(.+?)\}\}/g)].map((m) => m[1]));
+  return [...new Set(keys)];
 }
 
 function cleanupWorktrees(proj) { spawnSync('git', ['worktree', 'prune'], { cwd: proj }); }
