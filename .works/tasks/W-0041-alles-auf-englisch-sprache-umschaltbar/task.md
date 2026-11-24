@@ -3,13 +3,13 @@ id: W-0041
 title: Alles auf Englisch, Sprache umschaltbar
 type: feature
 priority: P2
-status: review
+status: erledigt
 effort: XL
 risk:
 created: 2026-11-23
 updated: 2026-11-24
 due:
-completed:
+completed: 2026-11-24
 milestone:
 branch: feature/w-0041-alles-auf-englisch-sprache
 tags: []
@@ -80,13 +80,7 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - [x] Sollen die README.md der Plugins und des Repos auch englisch werden (mit README.de.md), oder bleiben sie deutsch? Sie gehörten nicht zum Plan. Antwort: Nutzer am 2026-11-24: Ja, README.md englisch mit README.de.md daneben (Plugins und Repo).
 
 ## Übergabe
-Stand: 2026-11-24 20:46
-
-Stand: alle sieben Phasen fertig und committet im Branch feature/w-0041-alles-auf-englisch-sprache (zuletzt 441d39a Merge von main mit W-0046, d1d3aa2 Discord und Dialog). Alle Kriterien und Planpunkte abgehakt. Tests unter der Sperre grün: Selbsttest mit Browser 54/54 (WORKS_LANG=de plus englische Schritte, NODE_PATH auf das Playwright im npx-Cache), ohne WebSocket 47/47, services/works-bot/test.mjs, ci-watch und mockups.
-
-Aufbau: scripts/i18n.mjs (tr, language, Migration language-1), Katalog scripts/i18n/de.json; Vorlagen und Doku englisch mit deutscher Fassung (SKILL.de.md, references/de/, README.de.md); Abschnitts- und Werte-Aliase in lib.mjs; Board bekommt seinen Katalog mit den Boot-Daten, Sprachwahl in den Werkzeugen (global, nur dieses Projekt, zurücksetzen); Discord: Kanalnachrichten in der globalen Sprache, Antworten in der Sprache des Clients, discord-ui.mjs ohne i18n-Import (Dienst), useCatalog für weitere Sprachen; ci-watch und mockups mit wortgleicher i18n.mjs-Kopie und eigenem Katalog.
-
-Offen für die Hauptsitzung: Branch nach main mergen, danach die Sprache des Nutzers mit works lang de global auf Deutsch stellen. Bekannte Grenzen: eine Sprache je Bot-Prozess (zwei gleichzeitige Discord-Antworten in verschiedenen Sprachen können sich mischen, im Code als ponytail markiert); bot.log und die Zeilen des Selbsttests bleiben teils deutsch; einige Datumsformate im CLI de-DE; Demo-Inhalte deutsch; Discord-Paare mit eingesetzten Werten bleiben in einer dritten Sprache englisch.
+Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -123,3 +117,6 @@ Offen für die Hauptsitzung: Branch nach main mergen, danach die Sprache des Nut
 - 2026-11-24: Status: in-arbeit → review (Grund: Agent fertig)
 - 2026-11-24: Code-Durchsicht: nichts Kritisches. Drei Funde auf Wunsch des Nutzers behoben: Migration löschte eine später von Hand gesetzte Projekt-Sprache (init setzt das Kennzeichen, erstes Lesen auch ohne language); Sitzungsstart sagt einmal, dass eine alte Sprache entfernt wurde; works know add legte neben Allgemein einen Bereich General an (Zusammenführung jetzt in knowledge.mjs für CLI und Board). Selbsttest-Schritt dafür ergänzt.
 - 2026-11-24: Parallele Arbeit beendet
+- 2026-11-24: Abgeschlossen (Status: review → erledigt), DoD bestätigt [Board]
+- 2026-11-24: Decision E2 documented: Alte Spracheinträge entfernen, Projekt-Sprache mit Kennzeichen
+- 2026-11-24: Decision E3 documented: READMEs englisch mit deutscher Fassung daneben
