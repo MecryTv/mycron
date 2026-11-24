@@ -122,3 +122,4 @@ Offen für die Hauptsitzung: Branch nach main mergen, danach die Sprache des Nut
 - 2026-11-24: Übergabe aktualisiert
 - 2026-11-24: Status: in-arbeit → review (Grund: Agent fertig)
 - 2026-11-24: Code-Durchsicht: nichts Kritisches. Drei Funde auf Wunsch des Nutzers behoben: Migration löschte eine später von Hand gesetzte Projekt-Sprache (init setzt das Kennzeichen, erstes Lesen auch ohne language); Sitzungsstart sagt einmal, dass eine alte Sprache entfernt wurde; works know add legte neben Allgemein einen Bereich General an (Zusammenführung jetzt in knowledge.mjs für CLI und Board). Selbsttest-Schritt dafür ergänzt.
+- 2026-11-24: Parallele Arbeit beendet
