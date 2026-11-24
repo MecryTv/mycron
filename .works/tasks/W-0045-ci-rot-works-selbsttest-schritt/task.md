@@ -3,13 +3,13 @@ id: W-0045
 title: "CI rot: works Selbsttest, Schritt Selbsttest"
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort:
 risk:
 created: 2026-11-24
 updated: 2026-11-24
 due:
-completed:
+completed: 2026-11-24
 milestone:
 branch: fix/w-0045-ci-rot-works-selbsttest
 tags: []
@@ -83,9 +83,7 @@ Prüfungen von Menü und Knöpfen in den Zweig mit Gateway verschoben; ohne Gate
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-24 15:06
-
-Behoben: Prüfung von Menü und Knöpfen im W-0044-Schritt nur mit Gateway, ohne Gateway prüft der Test, dass keine Knöpfe da sind. Discord-Schritte 9/9 mit und ohne WebSocket (NODE_OPTIONS=--no-experimental-websocket). Wissensvorschlag 20f11a angelegt. Code-Audit: reine Teständerung, nichts gefunden. Weiter: works ship W-0045.
+Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -94,3 +92,4 @@ Behoben: Prüfung von Menü und Knöpfen im W-0044-Schritt nur mit Gateway, ohne
 - 2026-11-24: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
 - 2026-11-24: Akzeptanzkriterien: "Discord-Schritte des Selbsttests grün mit und ohne globales WebSocket (wie Node 22 und Node 18/20 in der CI)" abgehakt
 - 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
