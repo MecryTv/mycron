@@ -104,10 +104,15 @@ function parseFrames(buf) {
 
 // ---------- Fake ----------
 
+// Rechte des Bots (Standard für @everyone im Fake): sehen, senden, einbetten, Verlauf, anheften.
+const BOT_PERMS = String((1n << 10n) | (1n << 11n) | (1n << 14n) | (1n << 16n) | (1n << 51n));
+
+// Ein Server darf roles (ohne: @everyone mit BOT_PERMS), members ({ Nutzer-ID: { roles } }, der Bot ist immer
+// Mitglied) und an Kanälen permission_overwrites und parent_id (Kategorie, type 4) haben (W-0038).
 export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242', appId = '1000', botId = '5000', heartbeatMs = 300, guilds } = {}) {
   const fake = {
     token,
-    guilds: guilds || [{ id: '1', name: 'Mein Server', channels: [{ id: '11', name: 'works', type: 0, position: 1 }, { id: '12', name: 'allgemein', type: 0, position: 0 }, { id: '13', name: 'Sprache', type: 2, position: 2 }] }],
+    guilds: guilds || [{ id: '1', name: 'Mein Server', owner_id: ownerId, channels: [{ id: '11', name: 'works', type: 0, position: 1 }, { id: '12', name: 'allgemein', type: 0, position: 0 }, { id: '13', name: 'Sprache', type: 2, position: 2 }] }],
     messages: new Map(),
     callbacks: new Map(),
     denyChannels: new Set(),
@@ -178,7 +183,12 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
       }
       if (req.method === 'GET' && (m = p.match(/^\/guilds\/(\d+)$/))) {
         const g = fake.guilds.find((x) => x.id === m[1]);
-        return g ? json(res, 200, { id: g.id, name: g.name }, rl) : json(res, 404, { message: 'Unknown Guild', code: 10004 });
+        return g ? json(res, 200, { id: g.id, name: g.name, owner_id: g.owner_id || '', roles: g.roles || [{ id: g.id, name: '@everyone', permissions: BOT_PERMS }] }, rl) : json(res, 404, { message: 'Unknown Guild', code: 10004 });
+      }
+      if (req.method === 'GET' && (m = p.match(/^\/guilds\/(\d+)\/members\/(\d+)$/))) {
+        const g = fake.guilds.find((x) => x.id === m[1]);
+        const mem = g && ((g.members || {})[m[2]] || (m[2] === botId ? { roles: [] } : null));
+        return mem ? json(res, 200, { user: { id: m[2] }, roles: mem.roles || [] }, rl) : json(res, 404, { message: 'Unknown Member', code: 10007 });
       }
       if (req.method === 'GET' && (m = p.match(/^\/channels\/(\d+)$/))) {
         const c = channel(m[1]);
@@ -288,8 +298,7 @@ export async function startFakeDiscord({ token = 'fake-token', ownerId = '4242',
   // Slash-Befehl wie aus dem Discord-Client: /works <sub> im Kanal. perms ist die Rechte-Bitmaske des Mitglieds
   // (32 = Server verwalten). Gibt die ID der Interaktion zurück; die Antwort landet in fake.callbacks.
   let seqI = 0;
-  // appPerms: Rechte des Bots im Kanal (Standard: sehen, senden, einbetten, Verlauf, anheften).
-  const BOT_PERMS = String((1n << 10n) | (1n << 11n) | (1n << 14n) | (1n << 16n) | (1n << 51n));
+  // appPerms: Rechte des Bots im Kanal (Standard: BOT_PERMS).
   // type 2: Slash-Befehl, 3: Knopf oder Auswahl an der Nachricht messageId, 5: Antwort aus einem Dialog (fields).
   fake.interact = ({ sub, type = 2, customId = '', messageId = '', values = null, fields = null, locale = 'de', guild = '1', channel: ch = '11', user = ownerId, perms = '32', appPerms = BOT_PERMS, name = 'works', options = [] } = {}) => {
     const id = String(800000 + ++seqI);

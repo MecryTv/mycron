@@ -3,15 +3,15 @@ id: W-0038
 title: "Board: Einstellungen für den Discord-Bot"
 type: feature
 priority: P2
-status: backlog
+status: erledigt
 effort: M
 risk:
 created: 2026-11-23
-updated: 2026-11-23
+updated: 2026-11-24
 due:
-completed:
+completed: 2026-11-24
 milestone:
-branch:
+branch: feature/w-0038-board-einstellungen-fuer-den
 tags: [ui, discord, board]
 blocked_by: [W-0036]
 blocks: []
@@ -38,22 +38,22 @@ Gewählt: Entwurf J2 (Dialog mit Reitern und Vorschau), Einrichtung nach R aus W
 
 ## Akzeptanzkriterien
 <!-- Prüfbare Aussagen. Jede Zeile muss sich mit ja oder nein beantworten lassen. -->
-- [ ] Dialog Discord-Bot im Board nach J2 mit den Reitern Verbindung, Projekte, Ereignisse, Befehle, Datenschutz und Vorschau
-- [ ] Einrichtung nach R: gemeinsamer Bot mit Code oder eigener Bot mit Token, Token und Schlüssel nie sichtbar
-- [ ] Kanalwahl nach K: Server und Textkanäle live vom Bot, Kanäle ohne Schreibrecht ausgegraut, Verschieben des Dashboards
-- [ ] Änderungen wirken ohne Neustart des Bots
-- [ ] Selbsttest mit Browser deckt Dialog und Kanalwahl ab
+- [x] Dialog Discord-Bot im Board nach J2 mit den Reitern Verbindung, Projekte, Ereignisse, Befehle, Datenschutz und Vorschau
+- [x] Einrichtung nach R: gemeinsamer Bot mit Code oder eigener Bot mit Token, Token und Schlüssel nie sichtbar
+- [x] Kanalwahl nach K: Server und Textkanäle live vom Bot, Kanäle ohne Schreibrecht ausgegraut, Verschieben des Dashboards
+- [x] Änderungen wirken ohne Neustart des Bots
+- [x] Selbsttest mit Browser deckt Dialog und Kanalwahl ab
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] Entwürfe lesen: design/J2-j-verbessert.html (Dialog, Reiter, Vorschau) und design/K-kanal-im-board-waehlen.html (Kanalwahl); Aussehen und Texte daraus übernehmen, Stil wie die übrigen Dialoge unter Werkzeuge in board.js/board.css
-- [ ] Test zuerst: Selbsttest-Schritte (API ohne Browser und ein Browser-Schritt für Dialog und Kanalwahl) gegen discord-fake.mjs, vorher rot sehen
-- [ ] Board-API (serve.mjs/api.mjs, nur Besitzer-Level edit): Stand lesen (Modus, Bot läuft, Server/Kanal, Ereignisse, Ruhezeit, Datenschutz, Verzögerungen, cleanup.hours, Projekte an/aus und eigener Kanal), Einstellungen schreiben über applySetting aus discord.mjs, Projekt an/aus, Token setzen (nur schreiben, nie zurückgeben, Prüfung wie works discord token), Code koppeln (wie works discord link), trennen
-- [ ] Kanalwahl K: Server und Textkanäle live; eigener Bot über REST mit dem Token aus secret.json (Kanäle nach Kategorie, Schreibrecht des Bots aus Rollen und Overwrites berechnen, ohne Schreibrecht ausgegraut mit Grund); gemeinsamer Bot: neue Dienst-Routen GET /v1/guild/channels (Kanäle des gekoppelten Servers mit Schreibrecht) und POST /v1/link/channel {channel_id} (Kopplung auf einen anderen Kanal desselben Servers umziehen, nur wenn der Bot dort schreiben darf) in services/works-bot/server.mjs mit Test in services/works-bot/test.mjs
-- [ ] „Hierher verschieben“: channel_id in ~/.works/discord/config.json setzen (gemeinsam: erst Dienst umziehen); der laufende Bot legt das Dashboard im neuen Kanal an und löscht das alte selbst (dashboards() in discord-bot.mjs räumt Kanäle ohne Projekte schon auf), kein Neustart
-- [ ] Dialog J2 im Board unter Werkzeuge: Reiter Verbindung (Einrichtung nach R: gemeinsamer Bot mit Code oder eigener Bot mit Token, Status, Kanalwahl K), Projekte, Ereignisse (on/at je Ereignis, Ruhezeit, Verzögerungen, Frist cleanup.hours), Befehle (Übersicht der /works-Befehle aus discord-ui.mjs), Datenschutz, Vorschau (renderEvent/renderDashboard als Discord-ähnliche Vorschau)
-- [ ] Doku: references/board.md und integrations.md (Abschnitt Discord-Bot), cli.md falls neue Befehle
-- [ ] Selbsttest grün: works selftest --only Discord, die Browser-Schritte für das Board, services/works-bot/test.mjs
+- [x] Entwürfe lesen: design/J2-j-verbessert.html (Dialog, Reiter, Vorschau) und design/K-kanal-im-board-waehlen.html (Kanalwahl); Aussehen und Texte daraus übernehmen, Stil wie die übrigen Dialoge unter Werkzeuge in board.js/board.css
+- [x] Test zuerst: Selbsttest-Schritte (API ohne Browser und ein Browser-Schritt für Dialog und Kanalwahl) gegen discord-fake.mjs, vorher rot sehen
+- [x] Board-API (serve.mjs/api.mjs, nur Besitzer-Level edit): Stand lesen (Modus, Bot läuft, Server/Kanal, Ereignisse, Ruhezeit, Datenschutz, Verzögerungen, cleanup.hours, Projekte an/aus und eigener Kanal), Einstellungen schreiben über applySetting aus discord.mjs, Projekt an/aus, Token setzen (nur schreiben, nie zurückgeben, Prüfung wie works discord token), Code koppeln (wie works discord link), trennen
+- [x] Kanalwahl K: Server und Textkanäle live; eigener Bot über REST mit dem Token aus secret.json (Kanäle nach Kategorie, Schreibrecht des Bots aus Rollen und Overwrites berechnen, ohne Schreibrecht ausgegraut mit Grund); gemeinsamer Bot: neue Dienst-Routen GET /v1/guild/channels (Kanäle des gekoppelten Servers mit Schreibrecht) und POST /v1/link/channel {channel_id} (Kopplung auf einen anderen Kanal desselben Servers umziehen, nur wenn der Bot dort schreiben darf) in services/works-bot/server.mjs mit Test in services/works-bot/test.mjs
+- [x] „Hierher verschieben“: channel_id in ~/.works/discord/config.json setzen (gemeinsam: erst Dienst umziehen); der laufende Bot legt das Dashboard im neuen Kanal an und löscht das alte selbst (dashboards() in discord-bot.mjs räumt Kanäle ohne Projekte schon auf), kein Neustart
+- [x] Dialog J2 im Board unter Werkzeuge: Reiter Verbindung (Einrichtung nach R: gemeinsamer Bot mit Code oder eigener Bot mit Token, Status, Kanalwahl K), Projekte, Ereignisse (on/at je Ereignis, Ruhezeit, Verzögerungen, Frist cleanup.hours), Befehle (Übersicht der /works-Befehle aus discord-ui.mjs), Datenschutz, Vorschau (renderEvent/renderDashboard als Discord-ähnliche Vorschau)
+- [x] Doku: references/board.md und integrations.md (Abschnitt Discord-Bot), cli.md falls neue Befehle
+- [x] Selbsttest grün: works selftest --only Discord, die Browser-Schritte für das Board, services/works-bot/test.mjs
 
 Hinweise für die Umsetzung:
 - Token, Geräteschlüssel und Codes nie in API-Antworten, Logs, URLs oder im DOM; Eingabefelder für Token als type=password, nach dem Speichern leeren. Nur maskiert (…abcd) anzeigen.
@@ -75,13 +75,23 @@ Hinweise für die Umsetzung:
 Details und verworfene Alternativen: [decisions.md](decisions.md)
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Vorher: Werkzeuge im Board ohne Einstellungen für den Discord-Bot, nur Webhook f](assets/2026-11-24-vorher-werkzeuge-im-board-ohne-vorher.jpg)
+Beschreibung: Vorher: Werkzeuge im Board ohne Einstellungen für den Discord-Bot, nur Webhook für den Wochenbericht
+Art: vorher · Hinzugefügt: 2026-11-24
+
+![Nachher: Dialog Discord-Bot nach J2, Reiter Verbindung mit Kanalwahl nach K und ](assets/2026-11-24-nachher-dialog-discord-bot-nach-j2-nachher.png)
+Beschreibung: Nachher: Dialog Discord-Bot nach J2, Reiter Verbindung mit Kanalwahl nach K und Vorschau
+Art: nachher · Hinzugefügt: 2026-11-24
+
+![Nachher auf dem Handy: Reiter Befehle, Vorschau darunter](assets/2026-11-24-nachher-auf-dem-handy-reiter-befehle-nachher.png)
+Beschreibung: Nachher auf dem Handy: Reiter Befehle, Vorschau darunter
+Art: nachher · Hinzugefügt: 2026-11-24
 
 ## Offene Fragen
-<!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
+- [x] Entwurf J2 zeigt zwei Dinge, für die es noch keine Einstellung gibt: den Schalter „Befehle und Knöpfe erlauben“ und je Projekt eine Kanalwahl (eigener Kanal). Beides fehlt im Dialog; der eigene Kanal wird nur angezeigt, wenn er in config.json steht. Je Projekt einen Kanal ginge nur beim eigenen Bot, der gemeinsame schreibt in genau einen Kanal. Sollen beide als eigene Aufgabe nachgezogen werden, oder reicht es so? Antwort: Nutzer am 2026-11-24: als eigene Aufgabe mit P3 nachziehen (angelegt).
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -96,3 +106,34 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - 2026-11-23: Entwurf K „Kanal im Board wählen“ angehängt
 - 2026-11-23: Entwurf J2 „J verbessert“ gewählt. Grund: Wahl des Nutzers (J verbessert), dazu K für die Kanalwahl
 - 2026-11-23: Beziehung entfernt: blocked-by W-0040
+- 2026-11-24: Parallel gestartet im Worktree W-0038-board-einstellungen (Status: backlog → in-arbeit)
+- 2026-11-24: Umsetzungsplan: "Entwürfe lesen: design/J2-j-verbessert.html (Dialog, Reiter, Vorschau) und design/K-kanal-im-board-waehlen.html (Kanalwahl); Aussehen und Texte daraus übernehmen, Stil wie die übrigen Dialoge unter Werkzeuge in board.js/board.css" abgehakt
+- 2026-11-24: Entwürfe J2, K und R gelesen; Plan: gemeinsame Logik in discord.mjs, Rechte in discord-api.mjs, Routen /api/discord, Dienst-Routen /v1/guild/channels und /v1/link/channel
+- 2026-11-24: Umsetzungsplan: "Board-API (serve.mjs/api.mjs, nur Besitzer-Level edit): Stand lesen (Modus, Bot läuft, Server/Kanal, Ereignisse, Ruhezeit, Datenschutz, Verzögerungen, cleanup.hours, Projekte an/aus und eigener Kanal), Einstellungen schreiben über applySetting aus discord.mjs, Projekt an/aus, Token setzen (nur schreiben, nie zurückgeben, Prüfung wie works discord token), Code koppeln (wie works discord link), trennen" abgehakt
+- 2026-11-24: Umsetzungsplan: "Kanalwahl K: Server und Textkanäle live; eigener Bot über REST mit dem Token aus secret.json (Kanäle nach Kategorie, Schreibrecht des Bots aus Rollen und Overwrites berechnen, ohne Schreibrecht ausgegraut mit Grund); gemeinsamer Bot: neue Dienst-Routen GET /v1/guild/channels (Kanäle des gekoppelten Servers mit Schreibrecht) und POST /v1/link/channel {channel_id} (Kopplung auf einen anderen Kanal desselben Servers umziehen, nur wenn der Bot dort schreiben darf) in services/works-bot/server.mjs mit Test in services/works-bot/test.mjs" abgehakt
+- 2026-11-24: Umsetzungsplan: "„Hierher verschieben“: channel_id in ~/.works/discord/config.json setzen (gemeinsam: erst Dienst umziehen); der laufende Bot legt das Dashboard im neuen Kanal an und löscht das alte selbst (dashboards() in discord-bot.mjs räumt Kanäle ohne Projekte schon auf), kein Neustart" abgehakt
+- 2026-11-24: Board-API /api/discord und Dienst-Routen /v1/guild/channels, /v1/link/channel fertig; Selbsttest-Schritt API und works-bot-Test grün; Kanalwechsel ohne Neustart geprüft (eigener und gemeinsamer Bot)
+- 2026-11-24: Umsetzungsplan: "Test zuerst: Selbsttest-Schritte (API ohne Browser und ein Browser-Schritt für Dialog und Kanalwahl) gegen discord-fake.mjs, vorher rot sehen" abgehakt
+- 2026-11-24: Umsetzungsplan: "Dialog J2 im Board unter Werkzeuge: Reiter Verbindung (Einrichtung nach R: gemeinsamer Bot mit Code oder eigener Bot mit Token, Status, Kanalwahl K), Projekte, Ereignisse (on/at je Ereignis, Ruhezeit, Verzögerungen, Frist cleanup.hours), Befehle (Übersicht der /works-Befehle aus discord-ui.mjs), Datenschutz, Vorschau (renderEvent/renderDashboard als Discord-ähnliche Vorschau)" abgehakt
+- 2026-11-24: Dialog J2 mit Kanalwahl K im Board umgesetzt, Browser-Schritt des Selbsttests grün
+- 2026-11-24: Umsetzungsplan: "Doku: references/board.md und integrations.md (Abschnitt Discord-Bot), cli.md falls neue Befehle" abgehakt
+- 2026-11-24: Entscheidung E2 dokumentiert: Schreibrecht im Kanal lokal berechnet
+- 2026-11-24: Entscheidung E3 dokumentiert: Umzug der Kopplung beim gemeinsamen Bot
+- 2026-11-24: Entscheidung E4 dokumentiert: Token, Code und Trennen nur am Rechner
+- 2026-11-24: Umsetzungsplan: "Selbsttest grün: works selftest --only Discord, die Browser-Schritte für das Board, services/works-bot/test.mjs" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Dialog Discord-Bot im Board nach J2 mit den Reitern Verbindung, Projekte, Ereignisse, Befehle, Datenschutz und Vorschau" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Einrichtung nach R: gemeinsamer Bot mit Code oder eigener Bot mit Token, Token und Schlüssel nie sichtbar" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Kanalwahl nach K: Server und Textkanäle live vom Bot, Kanäle ohne Schreibrecht ausgegraut, Verschieben des Dashboards" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Änderungen wirken ohne Neustart des Bots" abgehakt
+- 2026-11-24: Akzeptanzkriterien: "Selbsttest mit Browser deckt Dialog und Kanalwahl ab" abgehakt
+- 2026-11-24: Selbsttest voll 40/40, --browser --only Discord 11/11 (auch ohne WebSocket), services/works-bot/test.mjs grün
+- 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Status: in-arbeit → review (Grund: Agent fertig)
+- 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Frage 1 geklärt: Nutzer am 2026-11-24: als eigene Aufgabe mit P3 nachziehen (angelegt).
+- 2026-11-24: Parallele Arbeit beendet
+- 2026-11-24: Asset hinzugefügt: assets/2026-11-24-vorher-werkzeuge-im-board-ohne-vorher.jpg (vorher)
+- 2026-11-24: Asset hinzugefügt: assets/2026-11-24-nachher-dialog-discord-bot-nach-j2-nachher.png (nachher)
+- 2026-11-24: Asset hinzugefügt: assets/2026-11-24-nachher-auf-dem-handy-reiter-befehle-nachher.png (nachher)
+- 2026-11-24: Responsive-Check im eingebauten Browser (Ausweichlösung statt Chrome-Erweiterung) auf einem Board aus dem Branch mit Test-Home: Handy 375, Tablet 768, Desktop 1440 ohne waagerechten Überlauf, keine Konsolenfehler. Code-Audit: Board-API und Dienst-Routen in Ordnung; Nebensache: Handy-Vorschau nennt nach dem Verschieben noch den alten Kanal.
+- 2026-11-24: Abgeschlossen (Status: review → erledigt), DoD bestätigt

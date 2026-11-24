@@ -97,6 +97,8 @@ Das Detailpanel hat die Reiter **Übersicht**, **Kommentare** (Gespräch mit Cla
 
 Das Symbol mit den Reglern in der Kopfzeile öffnet die **Werkzeuge**: Wochenbericht (Zeitplan, Discord, Inhalt, Berichte ansehen), Vorlagen (anlegen, bearbeiten, nutzen), Prüfungen vor dem Abschluss, Prüfungen im Projekt (je Prüfung über alle Aufgaben: Anteil rot mit Läufen im Tooltip, Median der Laufzeit mit Pfeil bei deutlicher Abweichung, letzte Läufe und wackelig; sortierbar nach oft rot, langsam, wackelig; die ersten zehn, Rest aufklappbar) und Benachrichtigungen im Browser (Freigabe, Review, Frage oder Kommentar von Claude, neue P1, Blockade aufgelöst, Warteschlange leer, Ton und Zähler im Tab-Titel).
 
+Oben unter Werkzeuge öffnet **Discord-Bot** (nur im Live-Board mit Bearbeiten) den Dialog für den Bot nach Entwurf J2: Reiter Verbindung (Stand, Einrichtung beim ersten Mal mit gemeinsamem Bot und Code oder eigenem Bot und Token, Kanalwahl live vom Bot mit „Hierher verschieben“), Projekte (Hinweise je Projekt an oder aus), Ereignisse (an und @ je Ereignis, Ruhezeit, Verzögerungen, Frist zum Löschen), Befehle und Datenschutz. Rechts steht eine Vorschau der gewählten Nachricht wie in Discord und wie sie auf dem Sperrbildschirm erscheint, schon mit den ungespeicherten Änderungen. Unten zählt der Dialog die Änderungen; Speichern wirkt ohne Neustart des Bots. Token und Schlüssel zeigt er nur maskiert. Details in integrations.md.
+
 Neue Aufgaben: Gibt es Vorlagen, fragt der Dialog zuerst nach einer Vorlage oder "Leer". Mit Vorlage gibt es die Felder der Vorlage, das freie Feld "Was genau soll passieren?" und die Kriterien zum An- und Abwählen.
 
 Im Detailpanel zeigt der Reiter **Code und Commits** den Branch der Aufgabe (aus dem Feld `branch` oder der ID im Branchnamen), wie weit er dem Hauptbranch voraus ist, einen Pull Request (wenn `gh` angemeldet ist), alle Commits mit der ID in der Nachricht und die geänderten Dateien. Ein Klick auf eine Datei zeigt den Diff. Arbeitet man gerade auf dem Branch, stehen noch nicht committete Änderungen extra.
@@ -253,6 +255,7 @@ Verwaiste Tabs: Endet ein Board und startet auf seinem Port ein anderes Projekt,
 - Git wird ohne Shell mit festen Argumenten und Zeitlimit aufgerufen, Diffs nur für Dateien, die zur Aufgabe gehören, und gekürzt auf 400 Zeilen.
 - Temporäre Dateien liegen kurz in `.works/.tmp/` und werden sofort wieder gelöscht.
 - HTML-Mockups aus `design/` laufen in einem iframe mit `sandbox="allow-scripts"` und eigener Content-Security-Policy. Sie haben keinen Zugriff auf das Board, seine Tokens oder Cookies und dürfen nicht in fremde Seiten eingebettet werden.
+- Den Discord-Bot einstellen (`/api/discord`) darf nur der Besitzer. Token, Code und Trennen gehen nur bei lokalen Anfragen, damit das Token nicht unverschlüsselt durchs Netz geht; Token, Geräteschlüssel und Codes stehen in keiner Antwort, nur maskiert.
 - GitHub-Abgleich und seine Einstellungen gehen nur bei lokalen Anfragen, weil sie über das gh CLI mit den Rechten des Nutzers handeln. Die Kalenderadresse braucht im geteilten Modus den Leseschlüssel.
 - Der Hub (`/hub` am Board, `works hub`) ist nur lokal erreichbar, prüft den Hostnamen und startet, stoppt oder startet Boards nur mit dem Token aus der eigenen Seite neu, und nur für eingetragene Projekte.
 

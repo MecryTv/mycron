@@ -250,6 +250,20 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     const p = url.pathname;
     const q = url.searchParams;
     try {
+      // Discord-Bot (W-0038): nur für den Besitzer. Token, Code und Trennen nur direkt am Rechner, nicht über einen
+      // geteilten Link (das Token ginge sonst unverschlüsselt durchs Netz). Fehler kommen als Meldung für den Nutzer.
+      if (p === '/api/discord' || p === '/api/discord/channels') {
+        if (level !== 'edit') throw new ApiError(403, 'Nur für den Besitzer des Boards.');
+        const d = await import('./discord.mjs');
+        let body = {};
+        if (req.method === 'POST') { try { body = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8')) || {}; } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, 'Ungültiges JSON.'); } }
+        if (['token', 'link', 'disconnect'].includes(body.op) && !isLocal(req)) throw new ApiError(403, 'Das geht nur direkt am Rechner, auf dem das Board läuft.');
+        try {
+          if (req.method === 'GET') return json(res, 200, p === '/api/discord' ? await d.boardState(root) : await d.channelsOf());
+          if (p === '/api/discord') return json(res, 200, await d.boardAction(root, body));
+        } catch (e) { throw new ApiError(400, e.message); }
+        return json(res, 405, { error: 'Nur GET.' });
+      }
       if (req.method === 'GET') {
         if (p === '/api/templates') return json(res, 200, templatesList(root));
         if (p === '/api/knowledge') return json(res, 200, knowledgeList(root));

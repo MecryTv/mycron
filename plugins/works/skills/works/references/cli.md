@@ -157,8 +157,8 @@ One bot per machine for all projects. Everything lives in `~/.works/discord`, ne
 | `discord link <Code>` | Pair with the shared bot. `/works link` in Discord gives the code, in the channel works should post to |
 | `discord unlink` | Unpair: revoke the key at the service and delete it locally, stop the bot |
 | `discord token` | Check and save a token. Reads from input (hidden) or from a pipe, never as an argument: `Get-Clipboard \| works discord token`. Prints the invite link |
-| `discord channel [name\|id]` | Show the servers' text channels or choose the channel for dashboard and notices |
-| `discord set k=v ..` | `service` (address of the shared bot, https only), `autostart`, `auto_enroll`, `delay.perm`, `delay.idle` (seconds), `quiet.on`, `quiet.from`, `quiet.to` (HH:MM), `privacy.commands\|costs\|ci_error\|titles`, `cleanup.hours` (delete messages other than the dashboard after this many hours, default 24, 0 never), `event.<name>` and `event.<name>.at` (mention) |
+| `discord channel [name\|id]` | Show the text channels live from the bot (without write permission, with the reason) or choose the channel for dashboard and notices. With the shared bot, the channels of the linked server. A running bot moves the dashboard without a restart |
+| `discord set k=v ..` | `service` (address of the shared bot, https only), `autostart`, `auto_enroll`, `delay.perm`, `delay.idle` (seconds), `quiet.on`, `quiet.from`, `quiet.to` (HH:MM), `privacy.commands\|costs\|ci_error\|titles`, `cleanup.hours` (delete messages other than the dashboard after this many hours, default 24, 0 never), `event.<name>` and `event.<name>.at` (mention), `project.<id>` (notices for one project on or off; the board sets the id in the Discord bot dialog) |
 | `discord test` | Test message to the channel |
 | `discord start\|stop\|restart` | Bot process; otherwise starts with the board and at session start |
 | `discord emit <ship\|ci\|report> --json '{..}'` | Put an event into the outbox (for ship, ci-watch, reports). Does nothing without setup |

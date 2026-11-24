@@ -113,7 +113,11 @@ Commands and buttons (W-0037, design HS): `/works help` (German: hilfe), `status
 
 How clicks arrive: your own bot registers `/works` for the channel's server and receives clicks through its gateway (Node 22 or later, otherwise there are no buttons). With the shared bot, the service answers immediately with a provisional reply, opens dialogs itself and puts the request into an inbox of the device that wrote the message (commands: the caller's most recently active device in the channel). The local bot fetches it by long poll, acknowledges it with the next poll (otherwise it arrives again) and replies through the service; the interaction token stays in the service. If the device is off, the service says so after 10 s; if it runs a works version without commands, the service suggests an update.
 
-Log in `~/.works/discord/bot.log` (without the token). Settings in the board come with W-0038.
+Log in `~/.works/discord/bot.log` (without the token).
+
+Settings in the board (W-0038, design J2): Tools, "Discord bot" opens a dialog with the tabs Connection, Projects, Events (on and @ per event, quiet hours, delays, deletion period), Commands and Privacy, and on the right a preview of the message as in Discord and as it appears on the lock screen. The preview already uses the unsaved changes; saving writes `config.json` with the same keys as `works discord set`. The first time, the Connection tab guides through the choice from design R: shared bot with a code or own bot with a token. The token sits in a password field that is emptied after saving; token, key and code never appear in a board response, only `…abcd` is shown. Token, code and disconnecting only work directly on the computer, not via a shared link.
+
+Channel choice (design K): the Connection tab reads servers and text channels live from the bot, by category. Whether the bot may write in a channel, works computes like Discord from roles and overwrites (view, send, embed links); channels without this permission are greyed out, with the reason. With the shared bot these are the channels of the linked server, the service checks the permission itself. "Move here" sets `channel_id` (with the shared bot the service moves the link first). The running bot reads `config.json` on every pass, creates the dashboard in the new channel, pins it and deletes the old one. Neither this nor any other setting needs a restart. In the terminal it works with `works discord channel`, for both ways.
 
 ## Playwright and browser tools
 

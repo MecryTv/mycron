@@ -231,6 +231,34 @@ try {
   r = await wa(['discord', 'start']);
   assert.match(r.out, /gestartet/, r.out);
 
+  // W-0038: channel choice in the board. The channels of the linked server live, greyed out without rights; moving the
+  // link moves the dashboard: the running bot creates it in the new channel and deletes the old one, no restart.
+  fake.guilds[0].channels.push({ id: '16', name: 'regeln', type: 0, position: 5, permission_overwrites: [{ id: '1', type: 0, allow: '0', deny: String(1n << 11n) }] });
+  const gc = await api('GET', '/v1/guild/channels', null, key1b);
+  assert.equal(gc.status, 200, JSON.stringify(gc.body));
+  assert.deepEqual(gc.body.channels.map((c) => [c.name, c.can]), [['allgemein', true], ['works', true], ['regeln', false]]);
+  assert.deepEqual(gc.body.channels.find((c) => c.id === '16').missing, ['send']);
+  assert.equal((await api('GET', '/v1/guild/channels')).status, 401);
+  assert.equal((await api('POST', '/v1/link/channel', { channel_id: '16' }, key1b)).status, 403, 'moved into a channel without rights');
+  assert.equal((await api('POST', '/v1/link/channel', { channel_id: '999' }, key1b)).status, 404, 'moved into an unknown channel');
+  r = await wa(['discord', 'channel']);
+  assert.match(r.out, /#regeln \(darf nicht senden\)/, r.out);
+  // The dashboard the bot keeps (the one of the revoked first key stays behind as a foreign message).
+  const botDash = (ch) => { try { const id = JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')).dash[ch].message_id; return fake.messages.get(id); } catch { return null; } };
+  const dash11 = await wait(() => botDash('11'), 'dashboard in #works before the move');
+  const pidOf = () => JSON.parse(fs.readFileSync(path.join(ddir, 'bot.pid'), 'utf8')).pid;
+  const pid0 = pidOf();
+  r = await wa(['discord', 'channel', 'allgemein']);
+  assert.equal(r.code, 0, r.out);
+  assert.equal((await api('GET', '/v1/users/@me', null, key1b)).body.link.channel_id, '12');
+  await wait(() => dashboards('12').find((x) => x.pinned), 'dashboard in #allgemein after the move');
+  await wait(() => !fake.messages.has(dash11.id), 'old dashboard deleted after the move');
+  assert.equal(pidOf(), pid0, 'bot restarted for the move');
+  assert.equal((await api('POST', '/v1/channels/11/messages', { content: 'x' }, key1b)).status, 403, 'new message in the channel the link left');
+  r = await wa(['discord', 'channel', 'works']);
+  assert.equal(r.code, 0, r.out);
+  await wait(() => botDash('11') && !dashboards('12').length, 'dashboard back in #works');
+
   // Security: a second device in another channel.
   const key2 = await linkKey({ channel: '12', user: '88' });
   const own = await api('POST', '/v1/channels/12/messages', { content: 'eigene' }, key2);

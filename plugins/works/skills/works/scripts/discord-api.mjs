@@ -73,6 +73,48 @@ export class Rest {
   del(route) { return this.req('DELETE', route); }
 }
 
+// ---------- Rechte in Kanälen (W-0038) ----------
+
+// Was der Bot zum Schreiben braucht: Kanal sehen, senden, Links einbetten. Die Namen stehen in missing.
+export const WRITE = { view: 1n << 10n, send: 1n << 11n, embed: 1n << 14n };
+const ADMIN = 1n << 3n;
+const ALL = (1n << 53n) - 1n;
+const big = (v) => { try { return BigInt(v || 0); } catch { return 0n; } };
+
+// Rechte eines Mitglieds in einem Kanal, wie Discord sie berechnet: @everyone und Rollen, dann die Overwrites des
+// Kanals (@everyone, alle Rollen zusammen, das Mitglied). Besitzer und Administratoren dürfen alles.
+export function permissionsIn(guild, member, channel) {
+  if (guild.owner_id && guild.owner_id === member.id) return ALL;
+  const roles = new Map((guild.roles || []).map((r) => [r.id, big(r.permissions)]));
+  let p = roles.get(guild.id) || 0n;
+  for (const r of member.roles) p |= roles.get(r) || 0n;
+  if (p & ADMIN) return ALL;
+  const ow = channel.permission_overwrites || [];
+  const apply = (allow, deny) => { p = (p & ~deny) | allow; };
+  const every = ow.find((o) => o.id === guild.id);
+  if (every) apply(big(every.allow), big(every.deny));
+  let allow = 0n; let deny = 0n;
+  for (const o of ow) if (Number(o.type) === 0 && o.id !== guild.id && member.roles.includes(o.id)) { allow |= big(o.allow); deny |= big(o.deny); }
+  apply(allow, deny);
+  const mine = ow.find((o) => Number(o.type) === 1 && o.id === member.id);
+  if (mine) apply(big(mine.allow), big(mine.deny));
+  return p;
+}
+
+// Textkanäle eines Servers (Text und Ankündigungen) in der Reihenfolge von Discord: ohne Kategorie zuerst, dann je
+// Kategorie. can: der Bot darf dort schreiben, sonst nennt missing, was fehlt. get: Abruf einer REST-Route.
+export async function guildChannels(get, guildId, botId) {
+  const [guild, channels, m] = await Promise.all([get(`/guilds/${guildId}`), get(`/guilds/${guildId}/channels`), get(`/guilds/${guildId}/members/${botId}`)]);
+  const member = { id: botId, roles: (m && m.roles) || [] };
+  const cats = new Map(channels.filter((c) => c.type === 4).map((c) => [c.id, c]));
+  const order = (c) => (cats.has(c.parent_id) ? (cats.get(c.parent_id).position || 0) + 1 : 0) * 1e6 + (c.position || 0);
+  return channels.filter((c) => c.type === 0 || c.type === 5).sort((a, b) => order(a) - order(b)).map((c) => {
+    const p = permissionsIn(guild, member, c);
+    const missing = Object.keys(WRITE).filter((k) => !(p & WRITE[k]));
+    return { id: c.id, name: c.name, category: cats.has(c.parent_id) ? cats.get(c.parent_id).name : '', can: !missing.length, missing };
+  });
+}
+
 // Status des Bots in der Mitgliederliste (W-0044): ein eigener Status, ohne Text nur online.
 export const presenceOf = (text) => ({ status: 'online', since: null, afk: false, activities: text ? [{ type: 4, name: 'Custom Status', state: String(text).slice(0, 128) }] : [] });
 
@@ -126,17 +168,22 @@ export class Gateway {
     else if (p.op === 7) this.reconnect(true);
     else if (p.op === 9) { if (!p.d) { this.session = null; this.seq = null; } setTimeout(() => this.reconnect(!!p.d), 1000 + Math.random() * 2000); }
     else if (p.op === 0) {
-      if (p.t === 'READY') { this.session = p.d.session_id; this.resumeUrl = p.d.resume_gateway_url; this.ready = true; this.backoff = 1000; this.log('Gateway verbunden'); }
-      if (p.t === 'RESUMED') { this.ready = true; this.backoff = 1000; this.log('Gateway fortgesetzt'); }
+      if (p.t === 'READY') { this.session = p.d.session_id; this.resumeUrl = p.d.resume_gateway_url; this.ready = true; this.backoff = 1000; this.presenceDue = false; this.log('Gateway verbunden'); }
+      if (p.t === 'RESUMED') {
+        this.ready = true; this.backoff = 1000; this.log('Gateway fortgesetzt');
+        if (this.presenceDue) { this.presenceDue = false; this.send(3, this.presence); }
+      }
       this.onDispatch(p.t, p.d);
     }
   }
 
   stopBeat() { clearTimeout(this.hbStart); clearInterval(this.hb); }
 
-  // Neuer Status; ohne Verbindung geht er beim nächsten Identify mit.
+  // Neuer Status; ohne Verbindung geht er beim nächsten Identify mit, nach einer Fortsetzung (Resume, kein Identify)
+  // schickt handle() ihn bei RESUMED nach (W-0047).
   setStatus(text) {
     this.presence = presenceOf(text);
+    this.presenceDue = !this.ready;
     if (this.ready) this.send(3, this.presence);
   }
 
@@ -150,6 +197,8 @@ export class Gateway {
   reconnect(resume) {
     const ws = this.ws;
     this.ws = null;
+    // Ab hier ist die Verbindung weg: Ein Status aus dieser Lücke muss nach der Fortsetzung nachkommen (W-0048).
+    this.ready = false;
     this.stopBeat();
     if (ws) { ws.onclose = null; try { ws.close(4000); } catch { /* schon zu */ } }
     if (!resume) { this.session = null; this.seq = null; }

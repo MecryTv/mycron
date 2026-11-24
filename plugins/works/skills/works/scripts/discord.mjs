@@ -234,6 +234,222 @@ export function applySetting(cfg, key, value) {
     if (parts.length === 2) { cfg.events[b].on = bool(value); return; }
     if (c === 'on' || c === 'at') { cfg.events[b][c] = bool(value); return; }
   }
-  throw new Error(`Unbekannte Einstellung ${key}. Möglich: autostart, auto_enroll, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, cleanup.hours, event.<name>[.at]`);
+  // Hinweise je Projekt an oder aus (W-0038); die Kennung ist die rootId des Projekts.
+  if (a === 'project' && parts.length === 2 && /^[0-9a-f]{16}$/.test(b)) { cfg.projects[b] = { ...(cfg.projects[b] || {}), enabled: bool(value) }; return; }
+  throw new Error(`Unbekannte Einstellung ${key}. Möglich: autostart, auto_enroll, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, cleanup.hours, event.<name>[.at], project.<id>`);
+}
+
+// ---------- Einrichtung, Kanalwahl und Stand: gemeinsam für CLI und Board (W-0038) ----------
+// Fehler tragen eine Meldung für den Nutzer, nie Token, Schlüssel oder Code.
+
+const discordApi = () => import('./discord-api.mjs');
+
+// Discord-Fehler in Worte fassen: 401 Token oder Schlüssel abgelehnt, 410 Kopplung kaputt.
+export function explain(e, shared) {
+  if (e.status === 401) return shared ? 'Der Dienst lehnt den Geräteschlüssel ab (getrennt?).' : 'Discord lehnt das Token ab.';
+  if (e.status === 410) return 'Kopplung kaputt (Bot entfernt, Rechte entzogen oder Kanal gelöscht). Neu koppeln mit /works verbinden.';
+  return e.message;
+}
+
+// Öffentliche Angaben des gemeinsamen Bots (Einladungslink). Kurz warten, Status und Board sollen nicht hängen.
+export async function serviceInfo(cfg = loadDiscordConfig()) {
+  try {
+    const r = await fetch(`${serviceBase(cfg)}/v1/info`, { signal: AbortSignal.timeout(4000) });
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+
+const serviceRest = async (cfg) => { const { Rest } = await discordApi(); return new Rest({ token: loadKey(), base: `${serviceBase(cfg)}/v1`, scheme: 'Bearer' }); };
+
+// Geräteschlüssel beim Dienst widerrufen, bevor er lokal verschwindet. Ein Fehler hält nichts auf.
+export async function revokeKey(cfg = loadDiscordConfig()) {
+  const k = loadKey();
+  if (!k) return;
+  try { await fetch(`${serviceBase(cfg)}/v1/link`, { method: 'DELETE', headers: { authorization: `Bearer ${k}` }, signal: AbortSignal.timeout(10000) }); } catch { /* lokal trotzdem weg */ }
+}
+
+// Token des eigenen Bots prüfen und speichern. Vom gemeinsamen Bot aus: Schlüssel widerrufen, der Kanal der Kopplung
+// gilt nicht mehr. Andere Bot-Anwendung: deren alte Nachrichten kann der neue Bot nicht bearbeiten, also neu beginnen.
+export async function setToken(raw) {
+  const t = String(raw || '').trim();
+  if (!t) throw new Error('Kein Token eingegeben.');
+  if (/\s/.test(t) || t.length < 20) throw new Error('Token ungültig: Das sieht nicht nach einem Bot-Token aus.');
+  const { Rest } = await discordApi();
+  const rest = new Rest({ token: t, base: apiBase() });
+  let me; let app;
+  try { me = await rest.get('/users/@me'); app = await rest.get('/oauth2/applications/@me'); } catch (e) { throw new Error(e.status === 401 ? 'Token ungültig: Discord lehnt es ab.' : `Discord nicht erreichbar: ${e.message}`); }
+  const cfg = loadDiscordConfig();
+  if (cfg.app_id && cfg.app_id !== app.id) { await stopBot(); try { fs.unlinkSync(dfile('state.json')); } catch { /* keiner */ } }
+  if (isShared(cfg)) { await stopBot(); await revokeKey(cfg); Object.assign(cfg, { guild_id: '', guild_name: '', channel_id: '', channel_name: '' }); }
+  saveToken(t);
+  Object.assign(cfg, {
+    mode: 'own', app_id: app.id,
+    bot_name: me.discriminator && me.discriminator !== '0' ? `${me.username}#${me.discriminator}` : me.username,
+    owner_id: (app.team && app.team.owner_user_id) || (app.owner && app.owner.id) || '',
+  });
+  saveDiscordConfig(cfg);
+  const restarted = !!botInfo();
+  if (restarted) { await stopBot(); await ensureBot({ force: true }); }
+  return { bot_name: cfg.bot_name, owner: !!cfg.owner_id, invite_url: inviteUrl(app.id), channel: !!cfg.channel_id, restarted };
+}
+
+// Code aus /works verbinden gegen einen Geräteschlüssel tauschen (gemeinsamer Bot).
+export async function linkCode(raw, device = os.hostname()) {
+  const code = String(raw || '').trim();
+  if (!code) throw new Error('Kein Code eingegeben. Den Code gibt /works verbinden in Discord, im Kanal, in den works schreiben soll.');
+  const cfg = loadDiscordConfig();
+  const base = serviceBase(cfg);
+  let r;
+  try { r = await fetch(`${base}/v1/link`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, device }), signal: AbortSignal.timeout(15000) }); } catch (e) { throw new Error(`Der gemeinsame Bot ist nicht erreichbar: ${e.message}`); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(r.status === 429 ? 'Zu viele falsche Codes, später erneut versuchen.' : `Kopplung fehlgeschlagen: ${j.message || `HTTP ${r.status}`}. In Discord mit /works verbinden einen neuen Code holen.`);
+  if (botInfo()) await stopBot();
+  // Schon gekoppelt: den alten Schlüssel widerrufen, sonst bleibt er beim Dienst gültig.
+  await revokeKey(cfg);
+  if (!isShared(cfg) || cfg.app_id !== j.app_id) { try { fs.unlinkSync(dfile('state.json')); } catch { /* keiner */ } }
+  saveKey(j.key);
+  Object.assign(cfg, { mode: 'shared', app_id: j.app_id, bot_name: j.bot_name, owner_id: j.owner_id, guild_id: j.guild_id, guild_name: j.guild_name, channel_id: j.channel_id, channel_name: j.channel_name });
+  saveDiscordConfig(cfg);
+  return { bot_name: j.bot_name, guild_name: j.guild_name, channel_name: j.channel_name };
+}
+
+// Bot stoppen, Schlüssel widerrufen, Geheimnis löschen. Die Nachrichten in Discord bleiben.
+export async function disconnect() {
+  const key = !!loadKey();
+  await stopBot();
+  if (key) await revokeKey();
+  removeToken();
+  return { key };
+}
+
+const MISSING = { view: 'kann den Kanal nicht sehen', send: 'darf nicht senden', embed: 'darf keine Links einbetten' };
+
+// Server und Textkanäle live vom Bot (Kanalwahl nach K). Eigener Bot: REST mit dem Token, alle Server. Gemeinsamer
+// Bot: der Dienst, nur der gekoppelte Server. why: warum der Bot in einem Kanal nicht schreiben darf.
+export async function channelsOf(cfg = loadDiscordConfig()) {
+  const withWhy = (list) => list.map((c) => ({ ...c, why: c.can ? '' : c.missing.map((k) => MISSING[k] || k).join(', ') }));
+  if (isShared(cfg)) {
+    if (!loadKey()) throw new Error('Nicht mit dem gemeinsamen Bot gekoppelt.');
+    let r;
+    try { r = await (await serviceRest(cfg)).get('/guild/channels'); } catch (e) { throw new Error(e.status === 404 ? 'Der gemeinsame Bot kennt die Kanalwahl noch nicht (ältere Version).' : explain(e, true)); }
+    return { mode: 'shared', channel_id: cfg.channel_id, guilds: [{ id: r.guild_id, name: r.guild_name || cfg.guild_name, channels: withWhy(r.channels || []) }] };
+  }
+  const token = loadToken();
+  if (!token) throw new Error('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.');
+  const { Rest, guildChannels } = await discordApi();
+  const rest = new Rest({ token, base: apiBase() });
+  const get = (p) => rest.get(p);
+  try {
+    const [me, guilds] = await Promise.all([get('/users/@me'), get('/users/@me/guilds')]);
+    const out = [];
+    for (const g of guilds.slice(0, 10)) out.push({ id: g.id, name: g.name, channels: withWhy(await guildChannels(get, g.id, me.id)) });
+    return { mode: 'own', channel_id: cfg.channel_id, guilds: out };
+  } catch (e) { throw new Error(`Kanäle nicht lesbar: ${explain(e, false)}`); }
+}
+
+// Dashboard und Hinweise in einen anderen Kanal („Hierher verschieben“). Gemeinsamer Bot: erst die Kopplung beim
+// Dienst umziehen. Der laufende Bot liest config.json bei jedem Durchgang, legt das Dashboard im neuen Kanal an und
+// löscht das alte (dashboards in discord-bot.mjs), ohne Neustart. list: schon gelesene Kanäle (channelsOf).
+export async function moveChannel(id, list = null) {
+  const cid = String(id || '');
+  if (!/^\d{1,25}$/.test(cid)) throw new Error('Kein Kanal gewählt.');
+  const cfg = loadDiscordConfig();
+  const all = list || await channelsOf(cfg);
+  const hit = all.guilds.flatMap((g) => g.channels.map((c) => ({ ...c, guild: g }))).find((c) => c.id === cid);
+  if (!hit) throw new Error('Kanal nicht gefunden. Liste neu laden.');
+  if (!hit.can) throw new Error(`#${hit.name}: Der Bot ${hit.why}. In Discord die Rechte des Kanals ändern oder einen anderen wählen.`);
+  if (isShared(cfg) && cid !== cfg.channel_id) {
+    try { await (await serviceRest(cfg)).post('/link/channel', { channel_id: cid }); } catch (e) { throw new Error(explain(e, true)); }
+  }
+  Object.assign(cfg, { guild_id: hit.guild.id, guild_name: hit.guild.name, channel_id: hit.id, channel_name: hit.name });
+  saveDiscordConfig(cfg);
+  return { channel_id: hit.id, channel_name: hit.name, guild_name: hit.guild.name, running: !!botInfo() };
+}
+
+export async function sendTest(cfg = loadDiscordConfig()) {
+  if (!isConfigured(cfg)) throw new Error('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.');
+  const cred = credential(cfg);
+  const { Rest } = await discordApi();
+  const rest = new Rest({ token: cred.secret, base: cred.base, scheme: cred.scheme });
+  try { await rest.post(`/channels/${cfg.channel_id}/messages`, { embeds: [{ title: 'Testnachricht von works', description: 'Wenn du das siehst, klappt die Verbindung.', color: 0x5865f2 }], flags: 4096, allowed_mentions: { parse: [] } }); } catch (e) { throw new Error(`Senden fehlgeschlagen: ${explain(e, cred.shared)}`); }
+  return { channel_name: cfg.channel_name };
+}
+
+// ---------- Board: Stand, Vorschau, Aktionen (Dialog nach J2) ----------
+
+// Stand für den Dialog. Token und Schlüssel nur maskiert.
+export async function boardState(root) {
+  const cfg = loadDiscordConfig();
+  const shared = isShared(cfg);
+  const secret = shared ? loadKey() : loadToken();
+  const info = botInfo();
+  const [{ projectList }, { commands }] = await Promise.all([import('./hub.mjs'), import('./discord-ui.mjs')]);
+  const here = rootIdOf(root);
+  const list = projectList().map((p) => ({ rid: rootIdOf(p.path), name: p.name || path.basename(p.path) }));
+  if (!list.some((p) => p.rid === here)) list.unshift({ rid: here, name: path.basename(root) });
+  const dash = (readJson(dfile('state.json'), null) || {}).dash || {};
+  let service = null;
+  if (!secret || shared) {
+    try { const base = serviceBase(cfg); const i = await serviceInfo(cfg); service = { base, reachable: !!i, invite_url: (i && i.invite_url) || '' }; } catch (e) { service = { base: '', error: e.message }; }
+  }
+  return {
+    mode: secret ? cfg.mode : '', ready: !!secret && !!cfg.channel_id, secret: maskToken(secret),
+    bot_name: cfg.bot_name, owner: !!cfg.owner_id,
+    guild_id: cfg.guild_id, guild_name: cfg.guild_name, channel_id: cfg.channel_id, channel_name: cfg.channel_name,
+    running: info ? { since: info.started } : null,
+    autostart: cfg.autostart !== false, auto_enroll: cfg.auto_enroll !== false,
+    invite_url: !shared && cfg.app_id ? inviteUrl(cfg.app_id) : (service && service.invite_url) || '',
+    service,
+    events: EVENT_GROUPS.map(([group, items]) => ({ group, items: items.map(([key, label]) => ({ key, label, ...cfg.events[key] })) })),
+    quiet: cfg.quiet, privacy: cfg.privacy, delays: cfg.delays, cleanup: cfg.cleanup,
+    projects: list.map((p) => {
+      const own = cfg.projects[p.rid] || {};
+      const d = dash[own.channel_id || cfg.channel_id];
+      return { ...p, here: p.rid === here, enabled: own.enabled !== undefined ? !!own.enabled : cfg.auto_enroll !== false, channel: own.channel_id ? `#${own.channel_name || own.channel_id}` : '', dash: d && d.message_id ? d.at || 1 : 0 };
+    }),
+    commands: commands({ shared })[0].options.map((o) => ({ cmd: `/works ${(o.name_localizations && o.name_localizations.de) || o.name}`, text: o.description_localizations.de })),
+    waiting: readOutbox().length,
+  };
+}
+
+// Vorschau einer Nachricht mit dem ungespeicherten Stand (draft), mit Beispieldaten aus dem Projekt des Boards.
+// ring: klingelt auf dem Handy (Erwähnung ohne Ruhezeit).
+export async function preview(root, { type = 'perm', draft = {} } = {}) {
+  const cfg = loadDiscordConfig();
+  for (const [k, v] of Object.entries(draft || {})) if (!k.startsWith('project.')) applySetting(cfg, k, String(v));
+  const bot = await import('./discord-bot.mjs');
+  const rid = rootIdOf(root);
+  let snap;
+  try { snap = bot.snapshotOf(root); } catch { snap = { name: path.basename(root), tasks: {}, queue: [] }; }
+  if (type === 'dashboard') return { ...bot.renderDashboard([{ rid, snap }], cfg, { interactive: true }), ring: false, why: 'Das Dashboard wird nur bearbeitet und klingelt nie.', channel: cfg.channel_name };
+  const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
+  const sample = { perm: { tool: 'Bash', what: 'npm test', since: ago(3) }, idle: { since: ago(2) }, review: { crit: [7, 7], cost: '8,20 $' }, ci_red: { sha: '81fe2a0c4d', failed: 1, total: 3, job: 'test (windows)', error: 'AssertionError: expected 3 to be 4', bug: 'W-0011', url: 'https://github.com' } }[type];
+  if (!sample) throw new Error('Unbekanntes Ereignis für die Vorschau.');
+  const a = snap.active || { id: 'W-0001', title: 'Beispielaufgabe' };
+  const body = bot.renderEvent({ type, project: snap.name, id: a.id, title: a.title, ...sample }, cfg, { owner: cfg.owner_id || '0', rid, interactive: true });
+  const e = cfg.events[type];
+  const ring = e.on && !(body.flags & 4096);
+  const why = !e.on ? 'Ist aus: works schickt dazu keine Nachricht.' : ring ? 'Klingelt, weil @ an ist. In der Ruhezeit käme es still.'
+    : e.at ? 'Gerade ist Ruhezeit: kommt still, ohne Hinweis auf dem Sperrbildschirm.' : 'Kommt still, weil @ aus ist. Kein Hinweis auf dem Sperrbildschirm.';
+  return { ...body, ring, why, channel: cfg.channel_name };
+}
+
+// Aktionen aus dem Dialog. Nach Token oder Kopplung startet der Bot, wenn er eingerichtet ist (wie beim Board-Start).
+export async function boardAction(root, b = {}) {
+  const op = String(b.op || '');
+  if (op === 'set') {
+    const cfg = loadDiscordConfig();
+    for (const [k, v] of Object.entries(b.values || {})) applySetting(cfg, k, String(v));
+    saveDiscordConfig(cfg);
+    return boardState(root);
+  }
+  if (op === 'token') { const r = await setToken(b.token); await ensureBot(); return r; }
+  if (op === 'link') { const r = await linkCode(b.code); await ensureBot(); return r; }
+  if (op === 'disconnect') return disconnect();
+  if (op === 'move') return moveChannel(b.channel_id);
+  if (op === 'test') return sendTest();
+  if (op === 'start') { if (!isConfigured()) throw new Error('Discord-Bot ist nicht eingerichtet.'); return { started: await ensureBot({ force: true }) }; }
+  if (op === 'preview') return preview(root, b);
+  throw new Error(`Unbekannte Aktion ${op}.`);
 }
 

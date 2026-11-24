@@ -97,6 +97,8 @@ Above the progress, the **Views** row shows saved filters as chips; "Save curren
 
 The icon with the sliders in the header opens the **Tools**: weekly report (schedule, Discord, content, view reports), templates (create, edit, use), checks before completion, checks in the project (per check across all tasks: share of red with runs in the tooltip, median runtime with an arrow for clear deviations, recent runs and flaky; sortable by often red, slow, flaky; the first ten, the rest expandable) and browser notifications (approval, review, question or comment from Claude, new P1, blocker resolved, queue empty, sound and counter in the tab title).
 
+At the top of Tools, **Discord bot** (only in the live board with editing) opens the dialog for the bot from design J2: tabs Connection (state, first-time setup with the shared bot and a code or an own bot and a token, channel choice live from the bot with "Move here"), Projects (notices per project on or off), Events (on and @ per event, quiet hours, delays, deletion period), Commands and Privacy. On the right is a preview of the selected message as in Discord and as it appears on the lock screen, already with the unsaved changes. At the bottom the dialog counts the changes; saving takes effect without restarting the bot. Token and keys are only shown masked. Details in integrations.md.
+
 New tasks: if there are templates, the dialog first asks for a template or "Blank". With a template there are the template's fields, the free field "What exactly should happen?" and the criteria to select and deselect.
 
 In the detail panel, the **Code and commits** tab shows the task's branch (from the `branch` field or the ID in the branch name), how far it is ahead of the main branch, a pull request (if `gh` is logged in), all commits with the ID in the message and the changed files. A click on a file shows the diff. If you are currently on the branch, uncommitted changes are listed separately.
@@ -253,6 +255,7 @@ Orphaned tabs: if a board ends and another project starts on its port, the old t
 - Git is called without a shell with fixed arguments and a time limit, diffs only for files that belong to the task, and cut to 400 lines.
 - Temporary files sit briefly in `.works/.tmp/` and are deleted right away.
 - HTML mockups from `design/` run in an iframe with `sandbox="allow-scripts"` and their own Content Security Policy. They have no access to the board, its tokens or cookies and must not be embedded in other pages.
+- Only the owner may configure the Discord bot (`/api/discord`). Token, code and disconnecting only work for local requests, so the token never travels unencrypted over the network; token, device key and codes appear in no response, only masked.
 - The GitHub sync and its settings only work for local requests, because they act via the gh CLI with the user's rights. The calendar address needs the read key in shared mode.
 - The hub (`/hub` on the board, `works hub`) is only reachable locally, checks the host name and starts, stops or restarts boards only with the token from its own page, and only for registered projects.
 
