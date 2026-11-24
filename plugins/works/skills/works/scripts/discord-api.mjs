@@ -168,17 +168,22 @@ export class Gateway {
     else if (p.op === 7) this.reconnect(true);
     else if (p.op === 9) { if (!p.d) { this.session = null; this.seq = null; } setTimeout(() => this.reconnect(!!p.d), 1000 + Math.random() * 2000); }
     else if (p.op === 0) {
-      if (p.t === 'READY') { this.session = p.d.session_id; this.resumeUrl = p.d.resume_gateway_url; this.ready = true; this.backoff = 1000; this.log('Gateway verbunden'); }
-      if (p.t === 'RESUMED') { this.ready = true; this.backoff = 1000; this.log('Gateway fortgesetzt'); }
+      if (p.t === 'READY') { this.session = p.d.session_id; this.resumeUrl = p.d.resume_gateway_url; this.ready = true; this.backoff = 1000; this.presenceDue = false; this.log('Gateway verbunden'); }
+      if (p.t === 'RESUMED') {
+        this.ready = true; this.backoff = 1000; this.log('Gateway fortgesetzt');
+        if (this.presenceDue) { this.presenceDue = false; this.send(3, this.presence); }
+      }
       this.onDispatch(p.t, p.d);
     }
   }
 
   stopBeat() { clearTimeout(this.hbStart); clearInterval(this.hb); }
 
-  // Neuer Status; ohne Verbindung geht er beim nächsten Identify mit.
+  // Neuer Status; ohne Verbindung geht er beim nächsten Identify mit, nach einer Fortsetzung (Resume, kein Identify)
+  // schickt handle() ihn bei RESUMED nach (W-0047).
   setStatus(text) {
     this.presence = presenceOf(text);
+    this.presenceDue = !this.ready;
     if (this.ready) this.send(3, this.presence);
   }
 
