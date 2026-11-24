@@ -126,9 +126,9 @@
   },
   "handoff_stale_days": 3,
   "queue": [
+    "W-0051",
     "W-0050",
-    "W-0049",
-    "W-0051"
+    "W-0049"
   ],
   "queue_settings": {
     "auto_next": false,
