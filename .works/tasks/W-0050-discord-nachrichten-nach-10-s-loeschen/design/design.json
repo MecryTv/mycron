@@ -75,5 +75,9 @@
     }
   ],
   "brainstorm": [],
-  "chosen": null
+  "chosen": {
+    "name": "P2",
+    "at": "2026-11-24 20:58",
+    "reason": "Nutzer am 2026-11-24: P2 mit Spuren. Panel bleibt, Bild bekommt die letzten 24 Stunden je Projekt als Spur, Text knapper, Verlauf-Ansicht wie gezeigt"
+  }
 }
