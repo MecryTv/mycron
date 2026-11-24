@@ -2834,35 +2834,15 @@ async function cmdDiscord() {
   const sub = pos[0] || 'status';
   const cfg = d.loadDiscordConfig();
   const token = d.loadToken();
-  const restFor = async (t) => {
-    const { Rest } = await import('./discord-api.mjs');
-    let base;
-    try { base = d.apiBase(); } catch (e) { fail(e.message); }
-    return new Rest({ token: t, base });
-  };
-  const needToken = () => { if (!token) fail('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.'); };
   const shared = d.isShared(cfg);
-  const why = (e) => (e.status === 401 ? (shared ? 'Der Dienst lehnt den Geräteschlüssel ab (getrennt?).' : 'Discord lehnt das Token ab.') : e.status === 410 ? 'Kopplung kaputt (Bot entfernt, Rechte entzogen oder Kanal gelöscht). Neu koppeln mit /works verbinden.' : e.message);
-  // Geräteschlüssel beim Dienst widerrufen, bevor er lokal verschwindet (erneutes link, Wechsel zum eigenen Bot,
-  // disconnect, unlink). Ein Fehler hier hält nichts auf: lokal ist der Schlüssel danach trotzdem weg.
-  const revokeKey = async () => {
-    const k = d.loadKey();
-    if (!k) return;
-    try { await fetch(`${d.serviceBase(cfg)}/v1/link`, { method: 'DELETE', headers: { authorization: `Bearer ${k}` }, signal: AbortSignal.timeout(10000) }); } catch { /* lokal trotzdem weg */ }
-  };
   const key = d.loadKey();
-  // Öffentliche Angaben des gemeinsamen Bots (Einladungslink). Kurz warten, der Status soll nicht hängen.
-  const serviceInfo = async () => {
-    try {
-      const r = await fetch(`${d.serviceBase(cfg)}/v1/info`, { signal: AbortSignal.timeout(4000) });
-      return r.ok ? await r.json() : null;
-    } catch { return null; }
-  };
+  // Token, Kopplung, Kanalwahl und Test teilt sich die CLI mit dem Board (discord.mjs, W-0038).
+  const call = async (fn) => { try { return await fn(); } catch (e) { return fail(e.message); } };
 
   if (sub === 'status') {
     if (!token && !key) {
       // Entwurf R (W-0040): zuerst die Wahl, der gemeinsame Bot ist empfohlen.
-      const info = await serviceInfo();
+      const info = await d.serviceInfo(cfg);
       out('Discord-Bot works: nicht eingerichtet. Zwei Wege:\n');
       out('Gemeinsamer Bot (empfohlen, ohne Token):');
       out(`  1. Bot einladen: ${info ? info.invite_url : '(der Dienst ist nicht erreichbar oder hat noch keine Adresse: works discord set service=https://…)'}`);
@@ -2891,47 +2871,19 @@ async function cmdDiscord() {
 
   if (sub === 'token') {
     if (pos[1]) fail('Das Token nicht als Argument angeben, sonst steht es in der Shell-Historie. Über die Eingabe: works discord token (fragt danach) oder Get-Clipboard | works discord token');
-    const rest0 = await restFor('');
-    const t = (await readHidden('Token des Bots einfügen (wird nicht angezeigt): ')).trim();
-    if (!t) fail('Kein Token eingegeben.');
-    if (/\s/.test(t) || t.length < 20) fail('Token ungültig: Das sieht nicht nach einem Bot-Token aus.');
-    rest0.token = t;
-    let me; let app;
-    try { me = await rest0.get('/users/@me'); app = await rest0.get('/oauth2/applications/@me'); } catch (e) { fail(e.status === 401 ? 'Token ungültig: Discord lehnt es ab.' : `Discord nicht erreichbar: ${e.message}`); }
-    // Andere Bot-Anwendung: alte Nachrichten kann der neue Bot nicht bearbeiten, also Zustand verwerfen.
-    if (cfg.app_id && cfg.app_id !== app.id) { await d.stopBot(); try { fs.unlinkSync(d.dfile('state.json')); } catch { /* keiner */ } }
-    // Vom gemeinsamen zum eigenen Bot: Schlüssel widerrufen, der Kanal der Kopplung gilt nicht mehr.
-    if (shared) { await d.stopBot(); await revokeKey(); Object.assign(cfg, { guild_id: '', guild_name: '', channel_id: '', channel_name: '' }); }
-    d.saveToken(t);
-    cfg.mode = 'own';
-    cfg.app_id = app.id;
-    cfg.bot_name = me.discriminator && me.discriminator !== '0' ? `${me.username}#${me.discriminator}` : me.username;
-    cfg.owner_id = (app.team && app.team.owner_user_id) || (app.owner && app.owner.id) || '';
-    d.saveDiscordConfig(cfg);
-    out(`Token gültig: ${cfg.bot_name}${cfg.owner_id ? ', Besitzer erkannt (wird bei Erwähnungen angesprochen)' : ''}.`);
+    try { d.apiBase(); } catch (e) { fail(e.message); }
+    const t = await readHidden('Token des Bots einfügen (wird nicht angezeigt): ');
+    const r = await call(() => d.setToken(t));
+    out(`Token gültig: ${r.bot_name}${r.owner ? ', Besitzer erkannt (wird bei Erwähnungen angesprochen)' : ''}.`);
     out('Gespeichert nur auf diesem Rechner, nicht im Projekt.');
-    out(`\nBot auf deinen Server einladen:\n${d.inviteUrl(app.id)}\n\nDanach Kanal wählen: works discord channel`);
-    if (d.botInfo()) { await d.stopBot(); await d.ensureBot({ force: true }); out('Laufender Bot mit dem neuen Token neu gestartet.'); }
+    out(`\nBot auf deinen Server einladen:\n${r.invite_url}\n\nDanach Kanal wählen: works discord channel`);
+    if (r.restarted) out('Laufender Bot mit dem neuen Token neu gestartet.');
     return;
   }
 
   if (sub === 'link') {
-    const code = String(pos[1] || '').trim();
-    if (!code) fail('works discord link <Code>. Den Code gibt /works verbinden in Discord, im Kanal, in den works schreiben soll.');
-    let base;
-    try { base = d.serviceBase(cfg); } catch (e) { fail(e.message); }
-    let r;
-    try { r = await fetch(`${base}/v1/link`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, device: os.hostname() }), signal: AbortSignal.timeout(15000) }); } catch (e) { fail(`Der gemeinsame Bot ist nicht erreichbar: ${e.message}`); }
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) fail(r.status === 429 ? 'Zu viele falsche Codes, später erneut versuchen.' : `Kopplung fehlgeschlagen: ${j.message || `HTTP ${r.status}`}. In Discord mit /works verbinden einen neuen Code holen.`);
-    if (d.botInfo()) await d.stopBot();
-    // Schon gekoppelt: den alten Schlüssel widerrufen, sonst bleibt er beim Dienst gültig.
-    await revokeKey();
-    // Anderer Bot als bisher: Dessen Nachrichten kann dieser nicht bearbeiten, also mit neuen Statusposts beginnen.
-    if (!shared || cfg.app_id !== j.app_id) { try { fs.unlinkSync(d.dfile('state.json')); } catch { /* keiner */ } }
-    d.saveKey(j.key);
-    Object.assign(cfg, { mode: 'shared', app_id: j.app_id, bot_name: j.bot_name, owner_id: j.owner_id, guild_id: j.guild_id, guild_name: j.guild_name, channel_id: j.channel_id, channel_name: j.channel_name });
-    d.saveDiscordConfig(cfg);
+    if (!String(pos[1] || '').trim()) fail('works discord link <Code>. Den Code gibt /works verbinden in Discord, im Kanal, in den works schreiben soll.');
+    const j = await call(() => d.linkCode(pos[1]));
     out(`Gekoppelt: #${j.channel_name} auf ${j.guild_name} über den gemeinsamen Bot ${j.bot_name}. Erwähnt wird, wer /works verbinden ausgeführt hat.`);
     out('Der Geräteschlüssel liegt nur auf diesem Rechner. Der Bot startet mit dem Board, sofort mit works discord start.');
     return;
@@ -2939,29 +2891,19 @@ async function cmdDiscord() {
 
   if (sub === 'unlink') {
     if (!shared || !key) fail('Nicht mit dem gemeinsamen Bot gekoppelt.');
-    await d.stopBot();
-    await revokeKey();
-    d.removeToken();
+    await d.disconnect();
     out('Getrennt: Geräteschlüssel gelöscht, Bot gestoppt. Die Nachrichten in Discord bleiben stehen.');
     return;
   }
 
+  // Kanalwahl (W-0038): live vom Bot, mit Schreibrecht; beim gemeinsamen Bot die Kanäle des gekoppelten Servers.
   if (sub === 'channel') {
-    if (shared) fail('Beim gemeinsamen Bot legt die Kopplung den Kanal fest. Für einen anderen Kanal dort /works verbinden, dann works discord link <Code>.');
-    needToken();
-    const rest = await restFor(token);
-    let chans = [];
-    let guilds = [];
-    try {
-      guilds = await rest.get('/users/@me/guilds');
-      for (const g of guilds) {
-        const list = await rest.get(`/guilds/${g.id}/channels`);
-        chans.push(...list.filter((c) => c.type === 0 || c.type === 5).sort((a, b) => (a.position || 0) - (b.position || 0)).map((c) => ({ ...c, guild: g })));
-      }
-    } catch (e) { fail(`Kanäle nicht lesbar: ${why(e)}`); }
-    if (!guilds.length) { out(`works ist noch auf keinem Server. Einladen:\n${d.inviteUrl(cfg.app_id)}`); return; }
+    if (!token && !key) fail('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.');
+    const list = await call(() => d.channelsOf(cfg));
+    if (!list.guilds.length) { out(`works ist noch auf keinem Server. Einladen:\n${d.inviteUrl(cfg.app_id)}`); return; }
+    const chans = list.guilds.flatMap((g) => g.channels.map((c) => ({ ...c, guild: g })));
     if (!pos[1]) {
-      for (const g of guilds) out(`${g.name}: ${chans.filter((c) => c.guild.id === g.id).map((c) => `#${c.name}`).join(', ') || 'keine Textkanäle'}`);
+      for (const g of list.guilds) out(`${g.name}: ${g.channels.map((c) => `#${c.name}${c.can ? '' : ` (${c.why})`}`).join(', ') || 'keine Textkanäle'}`);
       out('\nWählen mit works discord channel <name>. Am besten ein eigener Kanal wie #works.');
       return;
     }
@@ -2969,10 +2911,8 @@ async function cmdDiscord() {
     const hits = chans.filter((c) => c.id === want || c.name === want);
     if (!hits.length) fail(`Kanal ${want} nicht gefunden. Vorhanden: ${chans.map((c) => `#${c.name}`).join(', ')}`);
     if (hits.length > 1) fail(`#${want} gibt es mehrfach. Bitte die Kanal-ID angeben: ${hits.map((h) => `${h.guild.name}: ${h.id}`).join(', ')}`);
-    const c = hits[0];
-    Object.assign(cfg, { guild_id: c.guild.id, guild_name: c.guild.name, channel_id: c.id, channel_name: c.name });
-    d.saveDiscordConfig(cfg);
-    out(`Kanal: #${c.name} auf ${c.guild.name}. Der Bot startet mit dem Board, sofort mit works discord start.`);
+    const c = await call(() => d.moveChannel(hits[0].id, list));
+    out(`Kanal: #${c.channel_name} auf ${c.guild_name}. ${c.running ? 'Der laufende Bot zieht das Dashboard gleich um.' : 'Der Bot startet mit dem Board, sofort mit works discord start.'}`);
     return;
   }
 
@@ -2990,13 +2930,8 @@ async function cmdDiscord() {
   }
 
   if (sub === 'test') {
-    if (!d.isConfigured(cfg)) fail('Discord-Bot ist nicht eingerichtet. works discord zeigt die Schritte.');
-    let cred;
-    try { cred = d.credential(cfg); } catch (e) { fail(e.message); }
-    const { Rest } = await import('./discord-api.mjs');
-    const rest = new Rest({ token: cred.secret, base: cred.base, scheme: cred.scheme });
-    try { await rest.post(`/channels/${cfg.channel_id}/messages`, { embeds: [{ title: 'Testnachricht von works', description: 'Wenn du das siehst, klappt die Verbindung.', color: 0x5865f2 }], flags: 4096, allowed_mentions: { parse: [] } }); } catch (e) { fail(`Senden fehlgeschlagen: ${why(e)}`); }
-    out(`Testnachricht gesendet an #${cfg.channel_name}.`);
+    const r = await call(() => d.sendTest(cfg));
+    out(`Testnachricht gesendet an #${r.channel_name}.`);
     return;
   }
 
@@ -3032,9 +2967,7 @@ async function cmdDiscord() {
   }
 
   if (sub === 'disconnect') {
-    await d.stopBot();
-    if (key) await revokeKey();
-    d.removeToken();
+    await d.disconnect();
     out(`${key ? 'Geräteschlüssel widerrufen und gelöscht' : 'Token gelöscht'}, Bot gestoppt. Die Nachrichten in Discord bleiben stehen.`);
     return;
   }
