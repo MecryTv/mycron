@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Entwurf: TITEL</title>
+<title>Mockup: TITLE</title>
 <!-- Echte Styles: dieselbe(n) CSS-Datei(en), die die echte Oberfläche lädt, ganz und unverändert.
      Pfad relativ zu dieser Datei oder als file:///. Für das works-Board bettet `entwurf.mjs inline` sie ein. -->
-<link rel="stylesheet" href="PFAD/ZUR/PROJEKT.css">
+<link rel="stylesheet" href="PATH/TO/PROJECT.css">
 <style>
 /* Varianten-Styles hier, nur für ihre Variante: html[data-v="B"] .klasse { ... }
    Eigene Klassen immer mit Präfix ew-, damit nichts mit dem Projekt-CSS kollidiert. */
@@ -27,19 +27,19 @@
 </style>
 </head>
 <body>
-<div class="ew-frame" role="region" aria-label="Entwurfsrahmen">
-  <b>Entwurf: TITEL</b>
-  <span class="ew-seg" id="ew-variants" role="group" aria-label="Variante"></span>
-  <span class="ew-seg" role="group" aria-label="Farbschema"><button type="button" data-ew-theme="light">Hell</button><button type="button" data-ew-theme="dark">Dunkel</button></span>
+<div class="ew-frame" role="region" aria-label="Mockup frame">
+  <b>Mockup: TITLE</b>
+  <span class="ew-seg" id="ew-variants" role="group" aria-label="Variant"></span>
+  <span class="ew-seg" role="group" aria-label="Color scheme"><button type="button" data-ew-theme="light">Light</button><button type="button" data-ew-theme="dark">Dark</button></span>
   <p class="ew-note" id="ew-note"></p>
 </div>
 
 <!-- Je Variante ein Abschnitt. Markup aus dem echten Code übernehmen, mit denselben Klassen wie die Oberfläche.
      data-ew-note erscheint oben im Rahmen: was die Variante anders macht, in ein bis zwei Sätzen. -->
-<section data-ew-variant="A" data-ew-note="A: WAS DIESE VARIANTE MACHT">
+<section data-ew-variant="A" data-ew-note="A: WHAT THIS VARIANT DOES">
 </section>
 
-<section data-ew-variant="B" data-ew-note="B: WAS DIESE VARIANTE MACHT">
+<section data-ew-variant="B" data-ew-note="B: WHAT THIS VARIANT DOES">
 </section>
 
 <script>

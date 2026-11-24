@@ -29,7 +29,7 @@ No screenshot script of your own, no generator of your own: both already exist h
    ```
    Default: 1440, 768 and 390 px, each light and dark, stored in `<page>-shots/`. Fix every `PROBLEM` line and capture again until "All screenshots without problems" appears. `not loaded: …PROJECT.css` means: the path in the `<link>` is wrong.
    Then look at the images yourself (Read on the PNG files): every one with a problem, and per variant at least 390 dark and 1440 light. Watch for cut-off text, overlaps and contrast in dark mode.
-   Exit 2 with "Playwright missing": give the user the command from the message and do not install it unasked.
+   Exit 2 with "Playwright is missing": give the user the command from the message and do not install it unasked.
 4. **Attach.**
    - With works, inline and attach each variant:
      ```

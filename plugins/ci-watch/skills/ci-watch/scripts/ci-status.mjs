@@ -16,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { tr, languages } from './i18n.mjs';
 
 export function repoFromUrl(url) {
   const m = String(url).trim().match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/);
@@ -27,7 +28,7 @@ export function errorExcerpt(log, before = 15) {
   const lines = String(log).split(/\r?\n/).map((l) => l.replace(/^\d{4}-\d\d-\d\dT[\d:.]+Z ?/, ''));
   const i = lines.findIndex((l) => l.includes('##[error]'));
   if (i < 0) return lines.filter(Boolean).slice(-before).join('\n');
-  return lines.slice(Math.max(0, i - before), i + 1).map((l) => l.replace('##[error]', 'Fehler: ')).join('\n');
+  return lines.slice(Math.max(0, i - before), i + 1).map((l) => l.replace('##[error]', tr('Error: '))).join('\n');
 }
 
 // Fehler-Annotationen eines Jobs als Zeilen. Gibt GitHub auch ohne Token heraus, anders als die Logs.
@@ -44,11 +45,12 @@ export function failureLines(annotations) {
 export function bugFor({ repo, sha, failures }) {
   const f = failures[0] || { run: 'CI', job: '', steps: [] };
   const steps = [...new Set(failures.flatMap((x) => x.steps))];
-  const title = `CI rot: ${f.run}, ${steps.length ? `Schritt ${steps.join(', ')}` : `Job ${f.job}`}`;
-  const jobs = failures.map((x) => `- ${x.job}${x.steps.length ? ` (Schritt ${x.steps.join(', ')})` : ''}: ${x.url}`).join('\n');
+  const titleIn = (lang) => (steps.length ? tr('CI red: {run}, step {steps}', { run: f.run, steps: steps.join(', ') }, lang) : tr('CI red: {run}, job {job}', { run: f.run, job: f.job }, lang));
+  const title = titleIn();
+  const jobs = failures.map((x) => (x.steps.length ? tr('- {job} (step {steps}): {url}', { job: x.job, steps: x.steps.join(', '), url: x.url }) : `- ${x.job}: ${x.url}`)).join('\n');
   const log = [...new Set(failures.flatMap((x) => [...x.lines, ...(x.excerpt ? [x.excerpt] : [])]))].join('\n');
-  const description = `Vom CI-Wächter angelegt: CI rot für Commit ${sha.slice(0, 7)} in ${repo}.\n\nRote Jobs:\n${jobs}\n\nDie Fehlerstelle steht unter Logs, soweit GitHub sie herausgibt (ohne GITHUB_TOKEN nur die Annotationen). Den ganzen Log zeigen die Links.`;
-  return { title, description, log, jobs: failures.map((x) => x.job).join(', ') };
+  const description = tr('Created by the CI watcher: CI red for commit {sha} in {repo}.\n\nFailed jobs:\n{jobs}\n\nThe error location is under Logs, as far as GitHub provides it (without GITHUB_TOKEN only the annotations). The links show the full log.', { sha: sha.slice(0, 7), repo, jobs });
+  return { title, titles: languages().map(titleIn), description, log, jobs: failures.map((x) => x.job).join(', ') };
 }
 
 // works-CLI: im Repo nebenan (plugins/works), sonst aus der Plugin-Installation.
@@ -90,16 +92,18 @@ export function fileBug({ cwd = process.cwd(), bug, sha, cli = findWorksCli(), e
   const short = sha.slice(0, 7);
   let open = [];
   try { open = JSON.parse(works(['list', '--json']).stdout || '[]'); } catch { return null; }
-  const known = open.find((t) => t.type === 'bug' && t.title === bug.title);
+  // Ein offener Bug zählt auch, wenn er unter einer anderen Sprache angelegt wurde.
+  const titles = bug.titles || [bug.title];
+  const known = open.find((t) => t.type === 'bug' && titles.includes(t.title));
   if (known) {
     if ((works(['show', known.id]).stdout || '').includes(short)) return { action: 'bekannt', id: known.id };
-    works(['log', known.id, `CI erneut rot für ${short}: ${bug.jobs}`]);
+    works(['log', known.id, tr('CI red again for {sha}: {jobs}', { sha: short, jobs: bug.jobs })]);
     return { action: 'ergänzt', id: known.id };
   }
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-watch-'));
   try {
     const logFile = path.join(tmp, 'ci.log');
-    fs.writeFileSync(logFile, bug.log || 'Keine Fehlerstelle abgefragt.');
+    fs.writeFileSync(logFile, bug.log || tr('No error location fetched.'));
     const r = works(['new', '--type', 'bug', '--priority', 'P2', '--title', bug.title, '--description', bug.description, '--source', 'ci-watch', '--log-file', logFile]);
     const id = (String(r.stdout).match(/\b[A-Z]+-\d+\b/) || [])[0];
     return r.status === 0 && id ? { action: 'neu', id } : null;
@@ -128,11 +132,11 @@ async function main() {
     if (!repo) repo = repoFromUrl(git(['remote', 'get-url', 'origin']));
     sha = git(['rev-parse', '--verify', `${typeof a.sha === 'string' ? a.sha : 'HEAD'}^{commit}`]);
   } catch (e) {
-    console.log(`Fehler: ${e.message.split('\n')[0]}`);
+    console.log(tr('Error: {msg}', { msg: e.message.split('\n')[0] }));
     return 3;
   }
-  if (!repo) { console.log('Fehler: origin zeigt nicht auf ein GitHub-Repo.'); return 3; }
-  if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || repo.includes('..')) { console.log(`Fehler: ${repo} ist kein Repo im Format owner/name.`); return 3; }
+  if (!repo) { console.log(tr('Error: origin does not point to a GitHub repo.')); return 3; }
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || repo.includes('..')) { console.log(tr('Error: {repo} is not a repo in the format owner/name.', { repo })); return 3; }
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
   const timeout = (Number(a.timeout) || 20) * 60000;
   const interval = Math.max(30, Number(a.interval) || (token ? 30 : 60)) * 1000;
@@ -142,10 +146,10 @@ async function main() {
     const r = await fetch(`https://api.github.com/repos/${repo}${p}`, { headers });
     if (r.status === 403 && r.headers.get('x-ratelimit-remaining') === '0') {
       const reset = new Date(Number(r.headers.get('x-ratelimit-reset')) * 1000);
-      throw new Error(`GitHub-Rate-Limit erreicht, wieder frei um ${reset.toLocaleTimeString('de-DE')}. Mit GITHUB_TOKEN gibt es mehr Abfragen.`);
+      throw new Error(tr('GitHub rate limit reached, free again at {time}. With GITHUB_TOKEN there are more requests.', { time: reset.toLocaleTimeString('de-DE') }));
     }
-    if (r.status === 404) throw new Error(`${repo} nicht gefunden. Bei einem privaten Repo GITHUB_TOKEN setzen.`);
-    if (!r.ok) throw new Error(`GitHub antwortet mit ${r.status}.`);
+    if (r.status === 404) throw new Error(tr('{repo} not found. For a private repo, set GITHUB_TOKEN.', { repo }));
+    if (!r.ok) throw new Error(tr('GitHub responds with {status}.', { status: r.status }));
     return r.json();
   };
   const short = sha.slice(0, 7);
@@ -155,17 +159,18 @@ async function main() {
       const runs = (await api(`/actions/runs?head_sha=${sha}&per_page=50`)).workflow_runs || [];
       const waited = Date.now() - start;
       if (!runs.length && waited >= grace) {
-        console.log(`Kein CI-Lauf für ${short} in ${repo}. Vermutlich passt der Commit nicht zu den Pfaden oder Branches der Workflows.`);
+        console.log(tr('No CI run for {sha} in {repo}. The commit probably does not match the paths or branches of the workflows.', { sha: short, repo }));
         return 2;
       }
       if (runs.length && runs.every((r) => r.status === 'completed')) {
         const bad = runs.filter((r) => !GOOD.includes(r.conclusion));
         if (!bad.length) {
-          console.log(`CI grün für ${short}: ${runs.map((r) => r.name).join(', ')}.`);
+          // works ship liest diese Zeile (CI (?:grün für|green for) <sha>: A, B.).
+          console.log(tr('CI green for {sha}: {workflows}.', { sha: short, workflows: runs.map((r) => r.name).join(', ') }));
           notifyWorks({ data: { ok: true, sha, workflows: runs.length } });
           return 0;
         }
-        console.log(`CI rot für ${short}: ${bad.map((r) => `${r.name} (${r.conclusion})`).join(', ')}.`);
+        console.log(tr('CI red for {sha}: {runs}.', { sha: short, runs: bad.map((r) => `${r.name} (${r.conclusion})`).join(', ') }));
         let detail = 0; // Annotationen und Logs nur für die ersten 5 Jobs, schont das Abfragelimit
         const failures = [];
         let jobCount = 0;
@@ -174,13 +179,13 @@ async function main() {
           jobCount += all.length;
           const jobs = all.filter((j) => !GOOD.includes(j.conclusion));
           const ok = all.filter((j) => GOOD.includes(j.conclusion)).map((j) => j.name);
-          console.log(`\n${run.name}: ${jobs.length} von ${all.length} Jobs rot.${ok.length ? ` Grün: ${ok.join(', ')}.` : ''}`);
+          console.log(`\n${tr('{run}: {red} of {total} jobs red.', { run: run.name, red: jobs.length, total: all.length })}${ok.length ? ` ${tr('Green: {jobs}.', { jobs: ok.join(', ') })}` : ''}`);
           for (const j of jobs) {
             const steps = (j.steps || []).filter((s) => s.conclusion && !GOOD.includes(s.conclusion)).map((s) => s.name);
-            console.log(`\nJob: ${j.name}${steps.length ? `, Schritt: ${steps.join(', ')}` : ''}\n${j.html_url}`);
+            console.log(`\n${steps.length ? tr('Job: {job}, step: {steps}', { job: j.name, steps: steps.join(', ') }) : `Job: ${j.name}`}\n${j.html_url}`);
             const f = { run: run.name, job: j.name, steps, url: j.html_url, lines: [], excerpt: '' };
             failures.push(f);
-            if (++detail > 5) { console.log('  (keine Fehlerstelle abgefragt, Details nur für die ersten 5 Jobs)'); continue; }
+            if (++detail > 5) { console.log(`  ${tr('(no error location fetched, details only for the first 5 jobs)')}`); continue; }
             f.lines = failureLines(await api(`/check-runs/${j.id}/annotations`).catch(() => []));
             for (const l of f.lines) console.log(`  ${l}`);
             if (!token) continue;
@@ -191,14 +196,14 @@ async function main() {
             if (log.ok) { f.excerpt = errorExcerpt(await log.text()); console.log(f.excerpt); }
           }
         }
-        if (!token) console.log('\nDen Log-Auszug gibt es nur mit GITHUB_TOKEN in der Umgebung, sonst hinter den Links.');
+        if (!token) console.log(`\n${tr('The log excerpt is only available with GITHUB_TOKEN in the environment, otherwise behind the links.')}`);
         let res = null;
         if (!a['no-bug']) {
           const bug = bugFor({ repo, sha, failures });
           res = fileBug({ bug, sha });
-          if (res && res.action === 'neu') console.log(`\nBug ${res.id} angelegt: ${bug.title}`);
-          else if (res && res.action === 'ergänzt') console.log(`\nBug ${res.id} ist noch offen, um diesen Commit ergänzt: ${bug.title}`);
-          else if (res) console.log(`\nBug ${res.id} kennt diesen Commit schon.`);
+          if (res && res.action === 'neu') console.log(`\n${tr('Bug {id} created: {title}', { id: res.id, title: bug.title })}`);
+          else if (res && res.action === 'ergänzt') console.log(`\n${tr('Bug {id} is still open, updated with this commit: {title}', { id: res.id, title: bug.title })}`);
+          else if (res) console.log(`\n${tr('Bug {id} already lists this commit.', { id: res.id })}`);
         }
         const first = failures[0] || {};
         notifyWorks({ data: { ok: false, sha, failed: failures.length, total: jobCount, job: first.job || '', error: (first.lines && first.lines[0]) || String(first.excerpt || '').split('\n').find((l) => l.trim()) || '', bug: res ? res.id : '', url: bad[0] && bad[0].html_url } });
@@ -206,13 +211,13 @@ async function main() {
       }
       if (waited + interval > timeout) {
         const open = runs.filter((r) => r.status !== 'completed').map((r) => `${r.name} (${r.status})`);
-        console.log(`Zeitlimit nach ${Math.round(timeout / 60000)} Minuten, noch nicht fertig: ${open.join(', ') || 'kein Lauf'}.`);
+        console.log(tr('Timeout after {min} minutes, not finished yet: {open}.', { min: Math.round(timeout / 60000), open: open.join(', ') || tr('no run') }));
         return 2;
       }
       await new Promise((res) => setTimeout(res, interval));
     }
   } catch (e) {
-    console.log(`Fehler: ${e.message}`);
+    console.log(tr('Error: {msg}', { msg: e.message }));
     return 3;
   }
 }

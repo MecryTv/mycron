@@ -1,0 +1,17 @@
+{
+  "inlined: {file}": "eingebettet: {file}",
+  "inlined: {file} ({kb} KB)": "eingebettet: {file} ({kb} KB)",
+  "not inlined: {ref} (file missing or unknown type, the reference stays as it is)": "nicht eingebettet: {ref} (Datei fehlt oder Typ unbekannt, Verweis bleibt stehen)",
+  "Error: --widths 200 to 4000, --themes light or dark.": "Fehler: --widths 200 bis 4000, --themes light oder dark.",
+  "Error: {file} not found.": "Fehler: {file} nicht gefunden.",
+  "Playwright is missing. Run `npm install -g playwright` once (it downloads no browsers, the installed Chrome is used) or set NODE_PATH to a folder that contains playwright.": "Playwright fehlt. Einmalig `npm install -g playwright` (lädt keine Browser, genutzt wird das installierte Chrome) oder NODE_PATH auf einen Ordner mit playwright setzen.",
+  "Error: no browser could be started (Chrome, Edge, Chromium): {msg}": "Fehler: kein Browser startbar (Chrome, Edge, Chromium): {msg}",
+  "Error: {msg}": "Fehler: {msg}",
+  "Console: {msg}": "Konsole: {msg}",
+  "not loaded: {url}": "nicht geladen: {url}",
+  "horizontal scrolling (page {sw} px, window {w} px)": "seitliches Scrollen (Seite {sw} px, Fenster {w} px)",
+  "{n} screenshot(s) with problems.": "{n} Screenshot(s) mit Problemen.",
+  "All screenshots without problems.": "Alle Screenshots ohne Probleme.",
+  "Error: --variant only letters, digits, - and _.": "Fehler: --variant nur Buchstaben, Ziffern, - und _.",
+  "node entwurf.mjs shots <file.html|url> [--out folder] [--widths 1440,768,390] [--themes light,dark] [--variants A,B]\nnode entwurf.mjs inline <file.html> [--out file.html] [--variant B]": "node entwurf.mjs shots <datei.html|url> [--out ordner] [--widths 1440,768,390] [--themes light,dark] [--variants A,B]\nnode entwurf.mjs inline <datei.html> [--out datei.html] [--variant B]"
+}

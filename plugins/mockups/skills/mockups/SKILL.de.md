@@ -27,7 +27,7 @@ Kein eigenes Screenshot-Skript, kein eigener Generator: Beides gibt es hier scho
    ```
    node "${CLAUDE_SKILL_DIR}/scripts/entwurf.mjs" shots <seite.html> --variants A,B
    ```
-   Standard: 1440, 768 und 390 px, je hell und dunkel, Ablage in `<seite>-shots/`. Jede Zeile `PROBLEM` beheben und neu aufnehmen, bis „Alle Screenshots ohne Probleme“ kommt. `nicht geladen: …PROJEKT.css` heißt: Pfad im `<link>` falsch.
+   Standard: 1440, 768 und 390 px, je hell und dunkel, Ablage in `<seite>-shots/`. Jede Zeile `PROBLEM` beheben und neu aufnehmen, bis „Alle Screenshots ohne Probleme“ kommt. `nicht geladen: …PROJECT.css` heißt: Pfad im `<link>` falsch.
    Danach die Bilder selbst ansehen (Read auf die PNG-Dateien): jedes mit Problem und je Variante mindestens 390 dunkel und 1440 hell. Achten auf abgeschnittenen Text, Überlappungen und Kontrast im Dunkeln.
    Exit 2 mit „Playwright fehlt“: dem Nutzer den Befehl aus der Meldung nennen und nicht ungefragt installieren.
 4. **Anhängen.**
