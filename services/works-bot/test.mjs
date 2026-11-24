@@ -57,7 +57,8 @@ const linkCode = async (opts = {}) => codeOf(await reply({ sub: 'link', ...opts 
 const linkKey = async (opts = {}) => { const r = await api('POST', '/v1/link', { code: await linkCode(opts), device: 'test' }); assert.equal(r.status, 200, JSON.stringify(r.body)); return r.body.key; };
 const ddir = path.join(home, '.works', 'discord');
 const secret = () => JSON.parse(fs.readFileSync(path.join(ddir, 'secret.json'), 'utf8'));
-const statusPosts = (name, ch = '11') => fake.inChannel(ch).filter((m) => m.embeds[0] && m.embeds[0].author && m.embeds[0].author.name === `${name} · Stand`);
+// The dashboard (W-0044): one pinned message per channel for all projects.
+const dashboards = (ch = '11') => fake.inChannel(ch).filter((m) => /^works · \d+ Projekte?$/.test((m.embeds[0] || {}).title || ''));
 const botRunning = () => fs.existsSync(path.join(ddir, 'bot.pid'));
 
 try {
@@ -111,14 +112,19 @@ try {
   assert.notEqual((await wa(['discord', 'link', code])).code, 0, 'code accepted twice');
   assert.ok(!fs.readFileSync(path.join(data, 'links.json'), 'utf8').includes(key1), 'service stores the plain key');
 
-  // Bot through the service: exactly one pinned status post, event with mention for the linked user only.
+  // Bot through the service: exactly one pinned dashboard with its image, event with mention for the linked user only.
   await wa(['discord', 'set', 'delay.perm=0', 'delay.idle=0', 'quiet.on=false']);
   r = await wa(['discord', 'start']);
   assert.match(r.out, /gestartet/, r.out);
-  await wait(() => { const s = statusPosts('projekt').pop(); return s && s.pinned; }, 'pinned status post through the service');
+  const dash = await wait(() => { const s = dashboards().pop(); return s && s.pinned && s.attachments.length ? s : null; }, 'pinned dashboard with image through the service');
+  assert.equal(dash.attachments[0].filename, 'works.png');
+  assert.equal(dash.attachments[0].data.subarray(1, 4).toString(), 'PNG', 'image is no PNG');
+  assert.ok(dash.components.flatMap((x) => x.components).some((c) => c.custom_id === 'w:proj::'), 'select menu dropped by the service');
+  // The shared bot is one for everybody: its status shows the help, not a project.
+  assert.match(JSON.stringify(fake.gateway.identifies[0].presence || {}), /\/works help/);
   await wa(['new', '--type=chore', '--title=Neuer Stand']);
   await sleep(2500);
-  assert.equal(statusPosts('projekt').length, 1, `status post created ${statusPosts('projekt').length} times`);
+  assert.equal(dashboards().length, 1, `dashboard created ${dashboards().length} times`);
   assert.ok(fake.requests.every((q) => q.auth === `Bot ${TOKEN}` || q.path.includes('/callback')), 'request to Discord without the bot token');
   spawnSync(process.execPath, [path.join(HOOKS, 'permission.mjs')], { cwd: proj, env, input: JSON.stringify({ cwd: proj, session_id: 's', tool_name: 'Bash', tool_input: { command: 'npm test' } }), encoding: 'utf8', windowsHide: true });
   const pm = await wait(() => fake.inChannel('11').find((m) => (m.embeds[0] || {}).title === 'Wartet auf deine Freigabe'), 'permission message');
@@ -164,6 +170,15 @@ try {
   assert.equal(comp.status, 200, JSON.stringify(comp.body));
   const kept = fake.messages.get(comp.body.id).components;
   assert.deepEqual(kept.map((x) => x.components.map((c) => c.custom_id)), [['w:acc::W-1'], ['w:proj::']]);
+  // Dashboard (W-0044): help from the service itself, project details from the device, buttons on that answer work.
+  const d0 = dashboards().pop();
+  a = await ask({ type: 3, customId: 'w:help::', messageId: d0.id }, 'help button through the service');
+  assert.equal(a.type, 4); assert.match(JSON.stringify(a.data), /\/works/);
+  const opt = d0.components.flatMap((x) => x.components).find((c) => c.type === 3).options[0];
+  a = await ask({ type: 3, customId: 'w:proj::', messageId: d0.id, values: [opt.value] }, 'project details through the service');
+  const tb = (a.data.components || []).flatMap((x) => x.components).find((c) => /^w:tasks:/.test(c.custom_id || ''));
+  assert.ok(tb, `no tasks button in ${JSON.stringify(a.data).slice(0, 300)}`);
+  assert.match(JSON.stringify((await ask({ type: 3, customId: tb.custom_id, messageId: a.data.id }, 'button on an answer')).data), /offen/);
   // Answers only for interactions of the own device.
   assert.equal((await api('POST', `/v1/interactions/${sid}/reply`, { content: 'x' }, key1)).status, 404, 'answered twice');
   // A second person with an own device in the same channel: each command goes to the device of whoever typed it.
@@ -179,12 +194,27 @@ try {
   const btn = await api('POST', '/v1/channels/11/messages', { content: 'b', components: [{ type: 1, components: [{ type: 2, style: 3, label: 'ok', custom_id: 'w:acc::W-1' }] }] }, key88);
   const cid88 = fake.interact({ type: 3, customId: 'w:acc::W-1', messageId: btn.body.id, user: '88' });
   await wait(() => fake.callbacks.get(cid88), 'deferred click for the second device');
-  const got = (await api('GET', '/v1/inbox', null, key88)).body.interactions.map((x) => x.id);
+  const got = (await api('GET', '/v1/inbox?wait=2', null, key88)).body.interactions.map((x) => x.id);
   assert.deepEqual(got, [cid88]);
   assert.deepEqual((await api('GET', '/v1/inbox', null, key88)).body.interactions.map((x) => x.id), [cid88], 'lost delivery not repeated');
   assert.deepEqual((await api('GET', `/v1/inbox?ack=${cid88}`, null, key88)).body.interactions, [], 'acknowledged request delivered again');
   assert.equal((await api('POST', `/v1/interactions/${cid88}/reply`, { content: 'erledigt' }, key88)).status, 200);
   assert.equal((await api('DELETE', '/v1/link', null, key88)).status, 200);
+  // Answers to clicks (only visible to the clicker) must not push channel messages out of the device's memory
+  // (cap 6 here): the channel message stays deletable for the cleanup.
+  const keyE = await linkKey({ user: '4242' });
+  const keepMsg = await api('POST', '/v1/channels/11/messages', { content: 'bleibt löschbar' }, keyE);
+  const withBtn = await api('POST', '/v1/channels/11/messages', { content: 'k', components: [{ type: 1, components: [{ type: 2, style: 1, label: 'ok', custom_id: 'w:queue::' }] }] }, keyE);
+  assert.equal(withBtn.status, 200, JSON.stringify(withBtn.body));
+  for (let n = 0; n < 7; n++) {
+    const iid = fake.interact({ type: 3, customId: 'w:queue::', messageId: withBtn.body.id });
+    await wait(() => fake.callbacks.get(iid), 'deferred click');
+    assert.deepEqual((await api('GET', '/v1/inbox?wait=2', null, keyE)).body.interactions.map((x) => x.id), [iid], JSON.stringify(fake.callbacks.get(iid)));
+    await api('GET', `/v1/inbox?ack=${iid}`, null, keyE);
+    assert.equal((await api('POST', `/v1/interactions/${iid}/reply`, { content: `antwort ${n}` }, keyE)).status, 200);
+  }
+  assert.equal((await api('DELETE', `/v1/channels/11/messages/${keepMsg.body.id}`, null, keyE)).status, 204, 'channel message pushed out by answers');
+  assert.equal((await api('DELETE', '/v1/link', null, keyE)).status, 200);
   // Device off: the service says so instead of leaving Discord waiting.
   await wa(['discord', 'stop']);
   a = await ask({ sub: 'tasks' }, 'answer for a device that is off');
@@ -205,12 +235,21 @@ try {
   const key2 = await linkKey({ channel: '12', user: '88' });
   const own = await api('POST', '/v1/channels/12/messages', { content: 'eigene' }, key2);
   assert.equal(own.status, 200);
-  const foreign = statusPosts('projekt').pop().id;
+  const foreign = dashboards().pop().id;
   assert.equal((await api('POST', '/v1/channels/11/messages', { content: 'x' }, key2)).status, 403, 'foreign channel');
   assert.equal((await api('PATCH', `/v1/channels/11/messages/${foreign}`, { content: 'y' }, key2)).status, 403, 'edit in foreign channel');
   assert.equal((await api('PATCH', `/v1/channels/12/messages/${foreign}`, { content: 'y' }, key2)).status, 403, 'edit of a foreign message');
   assert.equal((await api('PUT', `/v1/channels/12/messages/pins/${foreign}`, null, key2)).status, 403, 'pin of a foreign message');
   assert.equal((await api('PUT', `/v1/channels/12/messages/pins/${own.body.id}`, null, key2)).status, 204, 'pin of an own message');
+  // Deleting (W-0044, the channel cleans itself up): only own messages.
+  assert.equal((await api('DELETE', `/v1/channels/12/messages/${foreign}`, null, key2)).status, 403, 'delete of a foreign message');
+  const gone = await api('POST', '/v1/channels/12/messages', { content: 'weg' }, key2);
+  assert.equal((await api('DELETE', `/v1/channels/12/messages/${gone.body.id}`, null, key2)).status, 204, 'delete of an own message');
+  assert.ok(!fake.messages.has(gone.body.id), 'message not deleted at Discord');
+  assert.equal((await api('PATCH', `/v1/channels/12/messages/${gone.body.id}`, { content: 'x' }, key2)).status, 403, 'deleted message still owned');
+  // Files only as a small PNG.
+  const pngB64 = fs.readFileSync(path.join(HERE, 'test.mjs')).toString('base64');
+  assert.equal((await api('POST', '/v1/channels/12/messages', { content: 'f', files: [{ name: 'works.png', type: 'image/png', data: pngB64 }] }, key2)).status, 400, 'file that is no PNG accepted');
   const evil = await api('POST', '/v1/channels/12/messages', { content: '@everyone <@4242> hallo', allowed_mentions: { parse: ['everyone', 'users'], users: ['4242'] }, flags: 4096 | 4 }, key2);
   assert.equal(evil.status, 200);
   assert.deepEqual(fake.messages.get(evil.body.id).allowed_mentions, { parse: [], users: [] }, 'mentions not restricted');

@@ -1146,14 +1146,16 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const fromUrl = pathToFileURL(path.join(HERE, 'discord-fake.mjs')).href;
   const { startFakeDiscord } = await import(fromUrl);
   const fake = await startFakeDiscord({ token: DTOKEN });
-  // Schnelle Takte für den Test: Bot-Schleife 100 ms, Statuspost frühestens alle 300 ms.
+  // Schnelle Takte für den Test: Bot-Schleife 100 ms, Dashboard frühestens alle 300 ms.
   const denv = { WORKS_DISCORD_API: fake.api, WORKS_DISCORD_FAST: '1' };
   // Gateway nur mit globalem WebSocket (ab Node 22, abschaltbar mit --no-experimental-websocket).
   const hasWs = typeof globalThis.WebSocket === 'function';
   const embedsOf = (ch = '11') => fake.inChannel(ch).map((m) => ({ m, e: m.embeds[0] || {} }));
   const findMsg = (pred, ch) => embedsOf(ch).find(({ m, e }) => pred(e, m));
-  // Neuester Statuspost: Nach einem 403 bleibt der alte stehen, der Bot legt einen neuen an.
-  const statusOf = (name) => embedsOf().filter(({ e }) => e.author && e.author.name === `${name} · Stand`).pop();
+  // Dashboard (W-0044): eine Nachricht je Kanal für alle Projekte. dashOf(name): das neueste, in dem das Projekt steht
+  // (nach einem 403 bleibt das alte stehen, der Bot legt ein neues an).
+  const isDash = (e) => /^works · \d+ Projekte?$/.test((e && e.title) || '');
+  const dashOf = (name) => embedsOf().filter(({ e }) => isDash(e) && (e.description || '').includes(`**${name}**`)).pop();
   let dprobe = '';
 
   await step('Discord: Einrichtung, Token nur lokal und nie in der Ausgabe', async () => {
@@ -1203,7 +1205,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(r.code !== 0, 'Ungültige Uhrzeit angenommen');
   });
 
-  await step('Discord: Bot startet einmal, verbindet sich, Statuspost angeheftet und gebündelt bearbeitet', async () => {
+  await step('Discord: Bot startet einmal, verbindet sich, Dashboard angeheftet und gebündelt bearbeitet', async () => {
     let r = await wa(['discord', 'start'], { extraEnv: denv });
     has(r.out, 'gestartet');
     try {
@@ -1212,10 +1214,11 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         expect(fake.gateway.identifies[0].token === DTOKEN, 'Identify ohne Token');
       }
       // Anheften ist eine eigene Anfrage nach dem Anlegen: darauf warten, nicht nur auf die Nachricht.
-      const st = await dwait(() => { const s = statusOf('projekt'); return s && s.m.pinned ? s : null; }, 'Statuspost für projekt angeheftet');
+      const st = await dwait(() => { const s = dashOf('projekt'); return s && s.m.pinned ? s : null; }, 'Dashboard mit projekt angeheftet');
       const names = (st.e.fields || []).map((f) => f.name);
-      expect(names.includes('CI') && names.includes('Heute'), `Felder fehlen: ${names.join(', ')}`);
-      expect(st.m.flags & 4096, 'Statuspost nicht still');
+      expect(names.includes('Heute'), `Felder fehlen: ${names.join(', ')}`);
+      expect(st.m.attachments.some((a) => a.filename === 'works.png'), 'Bild fehlt');
+      expect(st.m.flags & 4096, 'Dashboard nicht still');
       r = await wa(['discord', 'start'], { extraEnv: denv });
       has(r.out, 'läuft schon');
       await new Promise((res) => setTimeout(res, 600));
@@ -1227,11 +1230,11 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       dprobe = (w(['new', '--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0];
       w(['start', dprobe, '--force']);
       for (let i = 0; i < 5; i++) w(['log', dprobe, `Schritt ${i}`]);
-      await dwait(() => (statusOf('projekt').e.description || '').includes(dprobe), `Statuspost zeigt ${dprobe}`);
+      await dwait(() => (dashOf('projekt').e.description || '').includes(dprobe), `Dashboard zeigt ${dprobe}`);
       await new Promise((res) => setTimeout(res, 800));
-      const edits = statusOf('projekt').m.edits - before;
-      expect(edits >= 1 && edits <= 4, `Statuspost ${edits}-mal bearbeitet`);
-      expect(fake.inChannel('11').filter((m) => m.embeds[0] && m.embeds[0].author && m.embeds[0].author.name === 'projekt · Stand').length === 1, 'Statuspost doppelt');
+      const edits = dashOf('projekt').m.edits - before;
+      expect(edits >= 1 && edits <= 4, `Dashboard ${edits}-mal bearbeitet`);
+      expect(fake.inChannel('11').filter((m) => isDash(m.embeds[0])).length === 1, 'Dashboard doppelt');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
       expect(fake.requests.every((q) => q.auth === `Bot ${DTOKEN}`), 'Anfrage ohne Token');
       const log = fs.readFileSync(path.join(ddir, 'bot.log'), 'utf8');
@@ -1302,7 +1305,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     } catch (e) { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); throw e; }
   });
 
-  await step('Discord: nichts geht verloren (Bot aus, 429, 502, gelöschter Statuspost), Gateway verbindet neu', async () => {
+  await step('Discord: nichts geht verloren (Bot aus, 429, 502, gelöschtes Dashboard), Gateway verbindet neu', async () => {
     await wa(['discord', 'start'], { extraEnv: denv, ok: false });
     try {
       if (hasWs) {
@@ -1320,14 +1323,14 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       w(['discord', 'emit', 'report', `--json=${JSON.stringify({ kind: 'woche', title: 'Woche 48', summary: 'Offline geschrieben.' })}`], { extraEnv: denv });
       expect(Date.now() - t0 < 5000, 'emit hat gewartet');
       expect(fs.readdirSync(path.join(ddir, 'outbox')).length === 1, 'Ereignis nicht in der outbox');
-      const st = statusOf('projekt');
+      const st = dashOf('projekt');
       fake.deleteMessage(st.m.id);
       fake.limitNext = 2; fake.failNext = 1;
       await wa(['discord', 'start'], { extraEnv: denv });
       await dwait(() => findMsg((e) => /Woche 48/.test(e.title || '')), 'Offline-Ereignis nachgeliefert');
-      w(['log', 'W-0001', 'Neuer Stand für den Statuspost']);
-      const again = await dwait(() => { const s = statusOf('projekt'); return s && s.m.id !== st.m.id && s.m.pinned ? s : null; }, 'Statuspost neu angelegt und angeheftet');
-      expect(again, 'kein neuer Statuspost');
+      w(['log', 'W-0001', 'Neuer Stand für das Dashboard']);
+      const again = await dwait(() => { const s = dashOf('projekt'); return s && s.m.id !== st.m.id && s.m.pinned ? s : null; }, 'Dashboard neu angelegt und angeheftet');
+      expect(again, 'kein neues Dashboard');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
     } finally {
       await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
@@ -1366,7 +1369,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(info.cwd && fs.realpathSync(info.cwd).toLowerCase() === fs.realpathSync(ddir).toLowerCase(), `Bot läuft in ${info.cwd}`);
     } finally { other.kill(); }
     try {
-      await dwait(() => statusOf('projekt'), 'Statuspost nach Neustart');
+      await dwait(() => dashOf('projekt'), 'Dashboard nach Neustart');
       // Ohne Änderung schreibt der Bot seinen Zustand nicht dauernd neu.
       await sleep(800);
       const m0 = fs.statSync(path.join(ddir, 'state.json')).mtimeMs;
@@ -1410,12 +1413,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(np, 'Freigabe nach Neustart fehlt');
       await wa(['discord', 'set', 'delay.perm=0'], { extraEnv: denv });
       hook('prompt-submit.mjs', { cwd: proj, session_id: 's-n', prompt: 'weiter' });
-      // Statuspost, den der Bot nicht mehr bearbeiten darf (anderer Bot, 403): neu anlegen.
-      const old = statusOf('projekt');
+      // Dashboard, das der Bot nicht mehr bearbeiten darf (anderer Bot, 403): neu anlegen.
+      const old = dashOf('projekt');
       fake.forbidEdit = true;
       w(['new', '--type=chore', '--title=Neuer Stand für 403', '--priority=P2']);
-      const fresh = await dwait(() => { const s = statusOf('projekt'); return s && s.m.id !== old.m.id && s.m.pinned ? s : null; }, 'neuer Statuspost nach 403');
-      expect(fresh, 'kein neuer Statuspost');
+      const fresh = await dwait(() => { const s = dashOf('projekt'); return s && s.m.id !== old.m.id && s.m.pinned ? s : null; }, 'neues Dashboard nach 403');
+      expect(fresh, 'kein neues Dashboard');
       fake.forbidEdit = false;
       // Abgeschaltetes Projekt: auch Ereignisse aus der outbox kommen nicht.
       const { rootIdOf } = await import(pathToFileURL(path.join(HERE, 'lib.mjs')).href);
@@ -1441,7 +1444,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         w(['init'], { cwd: bp });
         git(['add', '-A'], bp); git(['commit', '-q', '-m', 'Start'], bp);
         git(['switch', '-q', '-c', 'feature/x'], bp);
-        await dwait(() => statusOf('dbranch'), 'Statuspost dbranch');
+        await dwait(() => dashOf('dbranch'), 'Dashboard dbranch');
         w(['new', '--type=bug', '--title=Branch-P1', '--priority=P1'], { cwd: bp });
         await dwait(() => p1Msgs('Branch-P1').length, 'P1 auf dem Branch');
         git(['add', '-A'], bp); git(['commit', '-q', '-m', 'P1'], bp);
@@ -1574,6 +1577,93 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
       expect(!fs.readFileSync(path.join(ddir, 'bot.log'), 'utf8').includes('itok-'), 'Interaktions-Token im Log');
     } finally { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); }
+  });
+
+  await step('Discord: Dashboard nach D3 mit Bild und Knöpfen, Status des Bots, der Kanal räumt sich auf (W-0044)', async () => {
+    const img = await import(pathToFileURL(path.join(HERE, 'discord-image.mjs')).href);
+    const { loadTasks } = await import('./lib.mjs');
+    // Bild: jedes Zeichen der Pixelschrift 5x7, gültiges PNG, gleiche Daten ergeben dasselbe Bild.
+    for (const [ch, g] of Object.entries(img.GLYPHS)) expect(g.length === 35, `Zeichen ${ch} hat ${g.length} Punkte`);
+    const data = { projects: [{ name: 'projekt', done: 3, wip: 1, open: 2, color: 0x8e8cf7 }], days: [{ label: 'MO', counts: [2] }] };
+    const png = img.dashboardPng(data);
+    expect(png.subarray(1, 4).toString() === 'PNG' && png.length < 100 * 1024, `kein kleines PNG (${png.length} Bytes)`);
+    expect(Buffer.compare(png, img.dashboardPng(data)) === 0, 'Bild nicht gleich bei gleichen Daten');
+    // Ohne Prozess: Aufräumen löscht eine Nachricht je Durchgang (der gemeinsame Bot erlaubt 60 in der Minute),
+    // der Status nennt das zuletzt wartende Projekt, die Zeile nennt bei einer Freigabe die Aufgabe.
+    const botM = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
+    const uiM = await import(pathToFileURL(path.join(HERE, 'discord-ui.mjs')).href);
+    let dels = 0;
+    const b = new botM.Bot({ rest: { del: async () => { dels++; } }, log: () => {} });
+    const old = new Date(Date.now() - 3 * 86400000).toISOString();
+    b.state.msgs = { a: { channel_id: '11', message_id: '1', at: old, done: 1 }, b: { channel_id: '11', message_id: '2', at: old, done: 1 }, c: { channel_id: '11', message_id: '3', at: old, done: 1 } };
+    b.state.queue = []; b.state.open = {};
+    await b.cleanup(botM.normalizeConfig({}));
+    expect(dels === 1, `${dels} Löschungen in einem Durchgang`);
+    const snapOf = (name, since) => ({ root: 'x', name, snap: { name, tasks: {}, perm: { since, tool: 'Bash' }, perms: [], busy: true, active: { id: 'W-9', title: 'Probe' } } });
+    b.state.projects = { r1: snapOf('alt', '2026-01-01T10:00:00.000Z'), r2: snapOf('neu', '2026-06-01T10:00:00.000Z') };
+    expect(b.statusLine(botM.normalizeConfig({})) === 'neu wartet auf deine Freigabe', `Status: ${b.statusLine(botM.normalizeConfig({}))}`);
+    expect(botM.stateOf(b.state.projects.r1.snap, botM.normalizeConfig({}), (de) => de)[1].includes('W-9'), 'Freigabe ohne Aufgabe');
+    expect(uiM.modalFor('w:ins::', 'de').components.length === 2 && uiM.modalFor('w:ins:0123456789abcdef:W-1', 'de').components.length === 1, 'Dialog Anweisung ohne Projektfeld');
+    // Ein früherer Schritt lässt ein Dashboard zurück, das der Bot nach 403 (fremde Anwendung) nicht mehr anfassen darf.
+    const dashCount = Math.max(1, fake.inChannel('11').filter((m) => isDash(m.embeds[0])).length);
+    await wa(['discord', 'start'], { extraEnv: denv, ok: false });
+    try {
+      // Eine angeheftete Nachricht mit Bild, still; keine Statusposts je Projekt mehr.
+      const d = await dwait(() => { const x = dashOf('projekt'); return x && x.m.pinned && x.m.attachments.length ? x : null; }, 'Dashboard mit Bild');
+      const file = d.m.attachments.find((a) => a.filename === 'works.png');
+      expect(file && file.data.subarray(1, 4).toString() === 'PNG', 'Bild fehlt oder ist kein PNG');
+      expect(d.e.image && d.e.image.url === 'attachment://works.png', 'Bild steht nicht im Dashboard');
+      expect(fake.inChannel('11').filter((m) => isDash(m.embeds[0])).length === dashCount, 'Dashboard doppelt');
+      expect(!fake.inChannel('11').some((m) => / · Stand$/.test(((m.embeds[0] || {}).author || {}).name || '')), 'alter Statuspost steht noch');
+      const comps = d.m.components.flatMap((r) => r.components);
+      const sel = comps.find((c) => c.type === 3);
+      expect(sel && sel.custom_id === 'w:proj::' && sel.options.some((o) => o.label === 'projekt'), `Auswahlmenü fehlt: ${JSON.stringify(comps).slice(0, 300)}`);
+      for (const id of ['w:queue::', 'w:ins::', 'w:new::', 'w:help::']) expect(comps.some((c) => c.custom_id === id), `Knopf ${id} fehlt`);
+      if (hasWs) {
+        const send = async (opts, what) => {
+          for (let n = 1; ; n++) {
+            const id = fake.interact(opts);
+            try { await dwait(() => fake.callbacks.get(id), `${what}: Eingang`, 5000); return id; } catch (e) { if (n >= 3) throw e; }
+          }
+        };
+        const ask = async (opts, what) => { const id = await send(opts, what); return dwait(() => fake.answerOf(id), what); };
+        // Projekt wählen: Details nur für dich, mit Knöpfen; Aufgaben daraus.
+        let a = await ask({ type: 3, customId: 'w:proj::', messageId: d.m.id, values: [sel.options.find((o) => o.label === 'projekt').value] }, 'Projekt wählen');
+        has(JSON.stringify(a.data), 'projekt', 'Details zum Projekt');
+        const tb = (a.data.components || []).flatMap((r) => r.components).find((c) => /^w:tasks:/.test(c.custom_id || ''));
+        expect(tb, `Knopf Aufgaben in den Details fehlt: ${JSON.stringify(a.data.components)}`);
+        has(JSON.stringify((await ask({ type: 3, customId: tb.custom_id, messageId: a.data.id }, 'Aufgaben aus den Details')).data), 'offen');
+        has(JSON.stringify((await ask({ type: 3, customId: 'w:queue::', messageId: d.m.id }, 'Warteschlange')).data), 'Warteschlange');
+        a = await ask({ type: 3, customId: 'w:help::', messageId: d.m.id }, 'Hilfe');
+        expect(a.type === 4, 'Hilfe nicht sofort'); has(JSON.stringify(a.data), '/works');
+        // Neue Aufgabe aus dem Dashboard: Dialog mit Titel, Priorität und Projekt.
+        const nd = await ask({ type: 3, customId: 'w:new::', messageId: d.m.id }, 'Dialog Neue Aufgabe');
+        expect(nd.type === 9 && nd.data.components.length === 3, `Dialog ohne Projektfeld: ${JSON.stringify(nd.data && nd.data.components)}`);
+        has(JSON.stringify((await ask({ type: 5, customId: nd.data.custom_id, messageId: d.m.id, fields: { title: 'Aus dem Dashboard', priority: 'p3', project: 'projekt' } }, 'Neue Aufgabe aus dem Dashboard')).data), 'angelegt');
+        expect(loadTasks(proj).some((t) => t.title === 'Aus dem Dashboard' && t.priority === 'P3'), 'Aufgabe aus dem Dashboard fehlt');
+        // Status des Bots: was gerade wichtig ist.
+        hook('permission.mjs', { cwd: proj, session_id: 's-p', tool_name: 'Bash', tool_input: { command: 'ls' } });
+        await dwait(() => /projekt wartet auf deine Freigabe/.test(JSON.stringify(fake.gateway.presence || {})), 'Status des Bots bei einer Freigabe');
+        hook('stop-reminder.mjs', { cwd: proj, session_id: 's-p' });
+      }
+      // Aufräumen mit kurzer Frist: Infos verschwinden, Offenes bleibt bis zur Erledigung, das Dashboard bleibt.
+      await wa(['discord', 'set', 'cleanup.hours=0.0005'], { extraEnv: denv });
+      w(['discord', 'emit', 'report', `--json=${JSON.stringify({ title: 'Kurzlebig', summary: 'weg damit' })}`], { extraEnv: denv });
+      const info = await dwait(() => findMsg((e) => e.title === 'Kurzlebig'), 'Info-Nachricht');
+      const rid = (w(['new', '--type=chore', '--title=Offen im Review', '--criteria=Ja']).out.match(/W-\d+/) || [])[0];
+      w(['check', rid, '1', '--section=Akzeptanzkriterien']); w(['set', rid, 'status=review']);
+      const rv = await dwait(() => findMsg((e) => e.title === `${rid} im Review`), 'offenes Review');
+      await dwait(() => !fake.messages.has(info.m.id), 'Info-Nachricht nach der Frist gelöscht');
+      await new Promise((res) => setTimeout(res, 2500));
+      expect(fake.messages.has(rv.m.id), 'offenes Review gelöscht');
+      w(['done', rid, '--confirm']);
+      await dwait(() => !fake.messages.has(rv.m.id), 'Review nach der Erledigung gelöscht');
+      expect(fake.messages.has(dashOf('projekt').m.id), 'Dashboard gelöscht');
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+    } finally {
+      await wa(['discord', 'set', 'cleanup.hours=24'], { extraEnv: denv, ok: false });
+      await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+    }
   });
 
   await step('Discord: Start mit Board und Sitzung nur mit Einrichtung, Nachrichten passen in die Grenzen', async () => {

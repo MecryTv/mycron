@@ -107,14 +107,18 @@ export function modalFor(customId, locale) {
     return { custom_id: cid('retm', p.rid, p.id), title: short(t(`${p.id} zurück an Claude`, `${p.id} back to Claude`), 45),
       components: [input('text', t('Was fehlt oder stört?', 'What is missing or wrong?'), 2, { required: true, min_length: 3, max_length: 4000 })] };
   }
+  // Ohne Projekt im Knopf (Dashboard) fragt der Dialog nach dem Projekt, für den Fall, dass mehrere aktiv sind.
+  const project = () => (p.rid ? [] : [input('project', t('Projekt (nur bei mehreren nötig)', 'Project (only with several)'), 1, { required: false, max_length: 100 })]);
   if (p.act === 'ins') {
     return { custom_id: cid('insm', p.rid, p.id), title: short(p.id ? t(`Anweisung an Claude (${p.id})`, `Instruction for Claude (${p.id})`) : t('Anweisung an Claude', 'Instruction for Claude'), 45),
-      components: [input('text', t('Anweisung', 'Instruction'), 2, { required: true, max_length: 4000, placeholder: t('Kommt bei Claude an, sobald es den nächsten Schritt macht.', 'Reaches Claude with its next step.') })] };
+      components: [input('text', t('Anweisung', 'Instruction'), 2, { required: true, max_length: 4000, placeholder: t('Kommt bei Claude an, sobald es den nächsten Schritt macht.', 'Reaches Claude with its next step.') }), ...project()] };
   }
+  // Vom Dashboard aus (ohne Projekt im Knopf) fragt der Dialog auch nach dem Projekt.
   return { custom_id: cid('newm', p.rid, ''), title: t('Neue Aufgabe', 'New task'),
     components: [
       input('title', t('Titel', 'Title'), 1, { required: true, max_length: 160 }),
       input('priority', t('Priorität: P1, P2, P3 oder P4', 'Priority: P1, P2, P3 or P4'), 1, { required: true, min_length: 2, max_length: 2, placeholder: t('P1 kritisch … P4 niedrig', 'P1 critical … P4 low') }),
+      ...project(),
     ] };
 }
 

@@ -12,6 +12,7 @@
 //   POST /v1/channels/:id/messages                new message in the linked channel
 //   PATCH /v1/channels/:id/messages/:mid          edit a message created with this key
 //   PUT  /v1/channels/:id/messages/pins/:mid      pin a message created with this key
+//   DELETE /v1/channels/:id/messages/:mid         delete a message created with this key (W-0044)
 //   GET  /v1/inbox?wait=s                         commands and clicks for this device (long poll, W-0037)
 //   POST /v1/interactions/:id/reply               answer one of them (the interaction token stays here)
 // Status 410 means: the link is broken (bot removed, rights taken away, channel deleted); link again with /works link.
@@ -42,7 +43,7 @@ const ADMIN = 1n << 3n;
 const NEEDED = { 'Kanal sehen / View Channel': 1n << 10n, 'Nachrichten senden / Send Messages': 1n << 11n, 'Links einbetten / Embed Links': 1n << 14n };
 const INVITE_PERMISSIONS = String((1n << 10n) | (1n << 11n) | (1n << 14n) | (1n << 16n) | (1n << 51n));
 // Per key and minute. The local bot bundles status post edits (at most every 10 s per project).
-const LIMITS = { post: 30, patch: 120, pin: 10, reply: 60 };
+const LIMITS = { post: 30, patch: 120, pin: 10, del: 60, reply: 60 };
 // A command or click waits this long for its device to fetch it, then this long for the answer (W-0037).
 const PICKUP = FAST ? 2000 : 10000;
 const ANSWER = FAST ? 20000 : 120000;
@@ -164,6 +165,9 @@ const inbox = new Map();    // key hash -> interactions for the device
 const inflight = new Map(); // key hash -> interactions sent, not yet acknowledged
 const waiting = new Map();  // key hash -> { res, timer } of the open long poll
 const pending = new Map();  // interaction id -> { token, h, de, delivered, timer }
+// Answers to clicks are messages of their own, visible only to the clicker; clicks on their buttons go back to the
+// device that answered. Kept apart from the channel messages and only in memory, so they never push those out.
+const answers = new Map();  // message id of an answer -> key hash
 
 const editOriginal = (token, data) => discord(() => rest.patch(`/webhooks/${app.id}/${token}/messages/@original`, data));
 
@@ -242,9 +246,11 @@ async function onInteraction(i) {
   if (!i.guild_id || !i.member) return reply({ title: t('Nur in einem Server', 'Only in a server'), description: t('/works geht nur in einem Kanal eines Servers.', '/works only works in a server channel.') });
   // Commands and clicks for a device: only its owner; dialogs open here (they cannot wait), the rest is deferred.
   const forward = async (h, link) => {
+    const p = i.type === 3 ? parseCid(i.data.custom_id) : null;
+    // The help button on the dashboard is answered here, for anybody.
+    if (p && p.act === 'help') return answer(helpMessage({ locale: i.locale, shared: true, devices: deviceLines(i.guild_id, t) }));
     if (who(i) !== link.user_id) return answer(notOwner(i.locale));
     if (i.type === 3) {
-      const p = parseCid(i.data.custom_id);
       if (!p) return reply({ title: '?', description: t('Unbekannter Knopf.', 'Unknown button.') });
       if (MODAL.has(p.act)) return callback({ type: 9, data: modalFor(i.data.custom_id, i.locale) }).catch((e) => log('dialog failed:', e.message));
     }
@@ -254,7 +260,7 @@ async function onInteraction(i) {
   if (i.type !== 2) {
     // Buttons and dialogs belong to the device that wrote the message.
     const mid = i.message && i.message.id;
-    const h = mid && Object.hasOwn(store.messages, mid) ? store.messages[mid].h : '';
+    const h = !mid ? '' : Object.hasOwn(store.messages, mid) ? store.messages[mid].h : answers.get(mid) || '';
     const link = h && store.links[h];
     if (!link || link.broken) return reply({ title: t('Nicht mehr gekoppelt', 'No longer linked'), description: t('Das Gerät, das diese Nachricht geschrieben hat, ist nicht mehr gekoppelt.', 'The device that wrote this message is no longer linked.') });
     return forward(h, link);
@@ -326,10 +332,10 @@ function clientIp(req) {
   return ip || '?';
 }
 
-function readBody(req) {
+function readBody(req, max = 64 * 1024) {
   return new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
-    req.on('data', (c) => { size += c.length; if (size > 64 * 1024) { reject(Object.assign(new Error('too large'), { status: 413 })); req.destroy(); } else chunks.push(c); });
+    req.on('data', (c) => { size += c.length; if (size > max) { reject(Object.assign(new Error('too large'), { status: 413 })); req.destroy(); } else chunks.push(c); });
     req.on('end', () => { const s = Buffer.concat(chunks).toString('utf8'); if (!s) return resolve({}); try { const j = JSON.parse(s); resolve(j && typeof j === 'object' ? j : {}); } catch { reject(Object.assign(new Error('invalid JSON'), { status: 400 })); } });
     req.on('error', reject);
   });
@@ -384,7 +390,24 @@ function sanitize(body, link, create) {
   const users = body.allowed_mentions && Array.isArray(body.allowed_mentions.users) ? body.allowed_mentions.users.filter((u) => u === link.user_id) : [];
   out.allowed_mentions = { parse: [], users };
   if (create) out.flags = Number(body.flags || 0) & 4096;
+  // Which attachments the message keeps or gets: ids of existing ones or the index of a new file.
+  if (Array.isArray(body.attachments)) out.attachments = body.attachments.filter((x) => x && /^\d{1,25}$/.test(String(x.id))).slice(0, 10).map((x) => ({ id: typeof x.id === 'number' ? x.id : String(x.id), filename: str(x.filename, 100) }));
   return out;
+}
+
+// The dashboard image (W-0044) comes as base64 in JSON. Only one small PNG with a plain name.
+const PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+function filesOf(body) {
+  if (body.files === undefined) return undefined;
+  const bad = (msg) => { throw Object.assign(new Error(msg), { status: 400 }); };
+  if (!Array.isArray(body.files) || body.files.length > 1) bad('At most one file');
+  return body.files.map((f) => {
+    if (!f || !/^[\w.-]{1,60}\.png$/.test(String(f.name || ''))) bad('Only PNG files with a plain name');
+    const data = Buffer.from(String(f.data || ''), 'base64');
+    if (data.length > 256 * 1024) bad('File too large (at most 256 KB)');
+    if (!data.subarray(0, 8).equals(PNG)) bad('File is not a PNG');
+    return { name: f.name, type: 'image/png', data };
+  });
 }
 
 // Calls Discord for a client. Returns { ok: true, data } or sends the error itself and returns { ok: false }.
@@ -466,30 +489,43 @@ async function handle(req, res) {
     clearTimeout(pe.timer);
     const r = await forward(res, a, () => rest.patch(`/webhooks/${app.id}/${pe.token}/messages/@original`, sanitize(body, a.link, false)), { soft: true });
     if (!r.ok) return undefined;
+    // The answer is a message of its own: clicks on its buttons go back to this device.
+    if (r.data && r.data.id) { answers.set(String(r.data.id), a.h); while (answers.size > 5000) answers.delete(answers.keys().next().value); }
     return send(res, 200, { ok: true });
   }
   if ((m = p.match(/^\/v1\/channels\/(\d+)\/messages(?:\/(pins\/)?(\d+))?$/))) {
     const [, cid, pin, mid] = m;
     if (cid !== a.link.channel_id) return err(res, 403, 'Missing Access', { code: 50001 });
     if (mid && (!Object.hasOwn(store.messages, mid) || store.messages[mid].h !== a.h)) return err(res, 403, 'Cannot edit a message of another device', { code: 50005 });
-    const kind = req.method === 'POST' && !mid ? 'post' : req.method === 'PATCH' && mid && !pin ? 'patch' : req.method === 'PUT' && mid && pin ? 'pin' : '';
+    const kind = req.method === 'POST' && !mid ? 'post' : req.method === 'PATCH' && mid && !pin ? 'patch' : req.method === 'PUT' && mid && pin ? 'pin' : req.method === 'DELETE' && mid && !pin ? 'del' : '';
     if (!kind) return err(res, 404, 'Not found');
     const wait = limited(a.h, kind);
     if (wait) return err(res, 429, 'You are being rate limited.', { retry_after: wait });
-    const body = kind === 'pin' ? {} : await readBody(req);
+    const body = kind === 'pin' || kind === 'del' ? {} : await readBody(req, 512 * 1024);
     if (kind === 'post') {
-      const r = await forward(res, a, () => rest.post(`/channels/${cid}/messages`, sanitize(body, a.link, true)));
+      const files = filesOf(body);
+      const r = await forward(res, a, () => rest.post(`/channels/${cid}/messages`, sanitize(body, a.link, true), files));
       if (!r.ok) return undefined;
       own(a.h, r.data.id);
       save();
       return send(res, 200, { id: r.data.id, channel_id: cid });
     }
     if (kind === 'patch') {
-      const r = await forward(res, a, () => rest.patch(`/channels/${cid}/messages/${mid}`, sanitize(body, a.link, false)));
+      const files = filesOf(body);
+      const r = await forward(res, a, () => rest.patch(`/channels/${cid}/messages/${mid}`, sanitize(body, a.link, false), files));
       if (!r.ok) return undefined;
-      own(a.h, mid); // edited messages stay owned (the status post lives for months)
+      own(a.h, mid); // edited messages stay owned (the dashboard lives for months)
       save();
       return send(res, 200, { id: mid, channel_id: cid });
+    }
+    if (kind === 'del') {
+      // Already gone at Discord counts as deleted.
+      const r = await forward(res, a, () => rest.del(`/channels/${cid}/messages/${mid}`).catch((e) => { if (e.status === 404) return null; throw e; }));
+      if (!r.ok) return undefined;
+      delete store.messages[mid];
+      a.link.mids = (a.link.mids || []).filter((x) => x !== mid);
+      save();
+      return send(res, 204);
     }
     const r = await forward(res, a, () => rest.put(`/channels/${cid}/messages/pins/${mid}`), { soft: true });
     if (!r.ok) return undefined;
@@ -521,7 +557,8 @@ async function start() {
   app = await retrying('start', () => rest.get('/oauth2/applications/@me'));
   try { await rest.put(`/applications/${app.id}/commands`, commands({ shared: true })); } catch (e) { log('registering /works failed:', e.message); }
   const g = await retrying('gateway', () => rest.get('/gateway/bot'));
-  gateway = new Gateway({ token: TOKEN, url: g.url, intents: 1, log: (s) => log(s), onFatal: (code) => { log(`gateway closed for good (code ${code})`); process.exit(1); }, onDispatch });
+  // One bot for everybody: its status points to the help instead of a project (W-0044).
+  gateway = new Gateway({ token: TOKEN, url: g.url, intents: 1, status: '/works help', log: (s) => log(s), onFatal: (code) => { log(`gateway closed for good (code ${code})`); process.exit(1); }, onDispatch });
   gateway.start();
   setInterval(prune, FAST ? 1000 : 60000).unref();
   server.listen(PORT, HOST, () => log(`works-bot ${me.username} listening on ${HOST}:${PORT}`));

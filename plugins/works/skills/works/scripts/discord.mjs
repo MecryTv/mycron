@@ -44,13 +44,15 @@ export const DEFAULTS = {
   quiet: { on: true, from: '22:00', to: '07:00' },
   privacy: { commands: false, costs: true, ci_error: true, titles: true },
   delays: { perm: 30, idle: 120 },
+  // Aufräumen (W-0044): Nachrichten außer dem Dashboard nach so vielen Stunden löschen, offene erst nach der Erledigung. 0: nie.
+  cleanup: { hours: 24 },
 };
 
 export function normalizeConfig(c = {}) {
   const src = c && typeof c === 'object' ? c : {};
   const out = { ...DEFAULTS, ...src };
   out.events = Object.fromEntries(Object.entries(DEFAULTS.events).map(([k, v]) => [k, { ...v, ...((src.events || {})[k] || {}) }]));
-  for (const k of ['quiet', 'privacy', 'delays']) out[k] = { ...DEFAULTS[k], ...(src[k] || {}) };
+  for (const k of ['quiet', 'privacy', 'delays', 'cleanup']) out[k] = { ...DEFAULTS[k], ...(src[k] || {}) };
   out.projects = { ...(src.projects || {}) };
   return out;
 }
@@ -223,10 +225,15 @@ export function applySetting(cfg, key, value) {
     if (b === 'from' || b === 'to') { if (!TIME.test(value)) throw new Error(`${key}: Uhrzeit als HH:MM.`); cfg.quiet[b] = value; return; }
   }
   if (a === 'privacy' && b in DEFAULTS.privacy && parts.length === 2) { cfg.privacy[b] = bool(value); return; }
+  if (a === 'cleanup' && b === 'hours' && parts.length === 2) {
+    const n = Number(String(value).replace(',', '.'));
+    if (!Number.isFinite(n) || n < 0 || n > 720) throw new Error(`${key}: Stunden von 0 (nie löschen) bis 720.`);
+    cfg.cleanup.hours = n; return;
+  }
   if (a === 'events' && b in DEFAULTS.events) {
     if (parts.length === 2) { cfg.events[b].on = bool(value); return; }
     if (c === 'on' || c === 'at') { cfg.events[b][c] = bool(value); return; }
   }
-  throw new Error(`Unbekannte Einstellung ${key}. Möglich: autostart, auto_enroll, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, event.<name>[.at]`);
+  throw new Error(`Unbekannte Einstellung ${key}. Möglich: autostart, auto_enroll, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, cleanup.hours, event.<name>[.at]`);
 }
 

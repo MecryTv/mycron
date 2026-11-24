@@ -106,17 +106,18 @@ Then in Discord, in the channel works should post to: `/works link` (shown as `/
 | Who may link | Only members with **Manage Server**. `/works` is restricted to them, and the service checks again. |
 | Codes | 8 characters (32^8 ≈ 10^12 possibilities), valid for 10 minutes, single use. An address (IPv6: its /64) is blocked for an hour after 5 wrong codes. |
 | Device keys | 256 bit, stored only as a SHA-256 hash, revocable at any time. |
-| What a key may do | Post into its linked channel, edit and pin only the messages it created (the newest 300 per device). At most 30 new messages, 120 edits and 10 pins per minute. |
+| What a key may do | Post into its linked channel, edit, pin and delete only the messages it created (the newest 300 per device). At most 30 new messages, 120 edits, 10 pins and 60 deletions per minute. |
 | Devices | At most 20 per server. Links unused for 90 days expire. `/works link` only hands out a code if the bot can view, post and embed in the channel. |
 | Broken links | If Discord denies the channel (bot removed, permissions taken away, channel deleted), the link is marked broken and works gets status 410: its bot stops and asks to link again, instead of failing over and over. |
 | Discord bans | Discord bans an IP after 10 000 answers with 401, 403 or 429 in 10 minutes. The service paces all calls (40 per second) and pauses posting for everyone above 5 000 such answers. |
 | Mentions | Only the user who ran `/works link`, never `@everyone` or roles. |
 | Commands and buttons | Only the user who ran `/works link` may use them; everyone else gets a refusal. Clicks go to the device that wrote the message, commands to the device of whoever typed them in the channel that was active last. Devices may only attach buttons and select menus with the works scheme (`w:…`), so a click can never reach another device. The interaction token stays in the service; answers are visible only to the person who clicked. |
+| Files | Only the dashboard image: one PNG of at most 256 KB per message, sent as base64 in JSON and passed on to Discord. |
 | Contents | Messages pass through, nothing is stored except which message belongs to which key (30 days). |
 
 ## Limits
 
-- Discord allows a bot 50 requests per second in total and 5 messages per 5 seconds per channel. works bundles its status posts, so this is enough for a few hundred users.
+- Discord allows a bot 50 requests per second in total and 5 messages per 5 seconds per channel. works bundles its dashboard edits, so this is enough for a few hundred users.
 - From 100 servers on, Discord requires the bot to be verified (with the developer's ID).
 
 ## Commands and buttons
@@ -137,6 +138,7 @@ The message routes mirror the Discord routes works uses, so works needs no secon
 | `POST /v1/channels/:id/messages` | New message in the linked channel |
 | `PATCH /v1/channels/:id/messages/:mid` | Edit an own message |
 | `PUT /v1/channels/:id/messages/pins/:mid` | Pin an own message |
+| `DELETE /v1/channels/:id/messages/:mid` | Delete an own message (the channel cleans itself up) |
 | `GET /v1/inbox?wait=s&ack=ids` | Commands and clicks for this device, long poll up to 25 s. `ack` confirms the ids of the last answer; unconfirmed ones come again |
 | `POST /v1/interactions/:id/reply` | Answer one of them (only once, only the own) |
 
