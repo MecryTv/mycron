@@ -14,7 +14,7 @@ milestone:
 branch: feature/w-0041-alles-auf-englisch-sprache
 tags: []
 blocked_by: []
-blocks: [W-0049, W-0050]
+blocks: [W-0049, W-0050, W-0051]
 related: []
 source: manuell
 incomplete: false
@@ -114,3 +114,4 @@ Bekannte Kleinigkeiten: selftest.mjs gibt eigene Zeilen deutsch aus; einige Datu
 - 2026-11-24: Übergabe aktualisiert
 - 2026-11-24: Beziehung: W-0049 blocked-by
 - 2026-11-24: Beziehung: W-0050 blocked-by
+- 2026-11-24: Beziehung: W-0051 blocked-by

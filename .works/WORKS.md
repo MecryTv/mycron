@@ -1,14 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-24 20:34 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-24 20:41 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 2 | 0 | 1 | 0 | 2 | 0 | 47 | 0 |
+| 3 | 0 | 1 | 0 | 3 | 0 | 47 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 3 · P3 Mittel: 0 · P4 Niedrig: 0
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 4 · P3 Mittel: 0 · P4 Niedrig: 0
 
 ## Aktive Aufgabe
 
@@ -30,11 +30,13 @@ _Keine Einträge._
 |---|---|---|---|---|---|---|---|---|
 | [W-0049](tasks/W-0049-hub-als-einstieg-zweites-board-startet/task.md) | Hub als Einstieg: zweites Board startet nicht selbst, Port erst beim Klick im Hub | Feature | P2 Hoch | Backlog | M |  |  | blockiert durch W-0041 |
 | [W-0050](tasks/W-0050-discord-nachrichten-nach-10-s-loeschen/task.md) | Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard | Feature | P2 Hoch | Backlog | M |  |  | blockiert durch W-0041 |
+| [W-0051](tasks/W-0051-discord-panel-zeigt-projekte-ohne-works/task.md) | Discord-Panel zeigt Projekte ohne .works-Ordner | Bug | P2 Hoch | Backlog | S |  |  | blockiert durch W-0041 |
 
 ## Blockiert
 
 - [W-0049](tasks/W-0049-hub-als-einstieg-zweites-board-startet/task.md) Hub als Einstieg: zweites Board startet nicht selbst, Port erst beim Klick im Hub: wartet auf W-0041
 - [W-0050](tasks/W-0050-discord-nachrichten-nach-10-s-loeschen/task.md) Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard: wartet auf W-0041
+- [W-0051](tasks/W-0051-discord-panel-zeigt-projekte-ohne-works/task.md) Discord-Panel zeigt Projekte ohne .works-Ordner: wartet auf W-0041
 
 ## Zuletzt erledigt
 
