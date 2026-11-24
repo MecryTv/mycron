@@ -2920,6 +2920,9 @@ async function cmdDiscord() {
     const evs = Object.entries(cfg.events);
     out(`Ereignisse: ${evs.filter(([, v]) => v.on).length} von ${evs.length} an, mit Erwähnung: ${evs.filter(([, v]) => v.on && v.at).map(([k]) => k).join(', ') || 'keine'}`);
     out(`Ruhezeit: ${cfg.quiet.on ? `${cfg.quiet.from} bis ${cfg.quiet.to}` : 'aus'}. Verzögerung: Freigabe ${cfg.delays.perm} s, fertig ${cfg.delays.idle} s`);
+    out(`Befehle und Knöpfe: ${cfg.commands !== false ? 'an' : 'aus'}`);
+    const own = shared ? [] : Object.values(cfg.projects).filter((p) => p.channel_id);
+    if (own.length) out(`Eigener Kanal: ${own.length === 1 ? 'ein Projekt' : `${own.length} Projekte`} (${own.map((p) => `#${p.channel_name || p.channel_id}`).join(', ')})`);
     const waiting = d.readOutbox().length;
     if (waiting) out(`Wartende Ereignisse: ${waiting}`);
     return;
@@ -2980,6 +2983,7 @@ async function cmdDiscord() {
       if (i < 1) fail(`${p}: schlüssel=wert erwartet.`);
       try { d.applySetting(cfg, p.slice(0, i), p.slice(i + 1)); } catch (e) { fail(e.message); }
     }
+    await call(() => d.checkProjectChannels(cfg));
     d.saveDiscordConfig(cfg);
     out(`Gespeichert: ${pairs.join(', ')}`);
     return;

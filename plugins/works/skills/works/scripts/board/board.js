@@ -3457,10 +3457,10 @@
 
   // Gespeicherter Stand unter den Schlüsseln von works discord set.
   function dcValues(s) {
-    const v = { auto_enroll: onOff(s.auto_enroll), 'quiet.on': onOff(s.quiet.on), 'quiet.from': s.quiet.from, 'quiet.to': s.quiet.to, 'delay.perm': String(s.delays.perm), 'delay.idle': String(s.delays.idle), 'cleanup.hours': String(s.cleanup.hours) };
+    const v = { auto_enroll: onOff(s.auto_enroll), commands: onOff(s.commands_on), 'quiet.on': onOff(s.quiet.on), 'quiet.from': s.quiet.from, 'quiet.to': s.quiet.to, 'delay.perm': String(s.delays.perm), 'delay.idle': String(s.delays.idle), 'cleanup.hours': String(s.cleanup.hours) };
     for (const g of s.events) for (const e of g.items) { v['event.' + e.key + '.on'] = onOff(e.on); v['event.' + e.key + '.at'] = onOff(e.at); }
     for (const k of Object.keys(s.privacy)) v['privacy.' + k] = onOff(s.privacy[k]);
-    for (const p of s.projects) v['project.' + p.rid] = onOff(p.enabled);
+    for (const p of s.projects) { v['project.' + p.rid] = onOff(p.enabled); v['project.' + p.rid + '.channel'] = p.channel_id || ''; }
     return v;
   }
 
@@ -3564,10 +3564,25 @@
         '<div class="dc-danger"><div><b>Bot trennen</b><small>' + (shared ? 'Widerruft den Schlüssel beim Dienst' : 'Löscht das Token von diesem Rechner') + ' und beendet den Bot. Die Nachrichten bleiben in Discord stehen.</small></div><button type="button" class="btn small danger" data-dc="disconnect">Trennen</button></div>';
     }
 
+    // Kanal je Projekt (W-0046): beim eigenen Bot aus der Liste vom Bot, leer heißt Standardkanal. Der gemeinsame Bot
+    // schreibt in genau einen Kanal, dort ist die Wahl gesperrt.
+    function chanSel(p) {
+      const k = 'project.' + p.rid + '.channel';
+      const cur = val(k);
+      const attrs = ' class="input" data-k="' + k + '" aria-label="Kanal für ' + esc(p.name) + '"';
+      const std = '<option value="">#' + esc(s.channel_name || '–') + ' (Standard)</option>';
+      if (s.mode === 'shared') return '<select' + attrs + ' disabled>' + std + '</select>';
+      const many = chans && chans.guilds.length > 1;
+      const all = chans ? chans.guilds.flatMap((g) => g.channels.map((c) => ({ ...c, g: g.name }))).filter((c) => c.id !== s.channel_id) : [];
+      const opts = all.map((c) => '<option value="' + esc(c.id) + '"' + (c.id === cur ? ' selected' : '') + (c.can ? '' : ' disabled') + '>#' + esc(c.name) + (many ? ' · ' + esc(c.g) : '') + (c.can ? '' : ' (' + esc(c.why) + ')') + '</option>');
+      if (cur && !all.some((c) => c.id === cur)) opts.unshift('<option value="' + esc(cur) + '" selected>' + esc(cur === p.channel_id ? p.channel : '#' + cur) + '</option>');
+      return '<select' + attrs + '>' + std + opts.join('') + '</select>';
+    }
     const pProjects = () => '<div class="dc-tblwrap"><table class="dc-tbl"><thead><tr><th>Projekt</th><th>Kanal</th><th>Dashboard</th><th>An</th></tr></thead><tbody>' +
-      s.projects.map((p) => '<tr><td>' + esc(p.name) + (p.here ? '<small>dieses Projekt</small>' : '') + '</td><td>' + esc(p.channel || '#' + (s.channel_name || '–')) + (p.channel ? '<small>eigener Kanal</small>' : '') + '</td><td>' + (p.dash ? 'angeheftet' + (p.dash > 1e12 ? '<small>' + dcAgo(p.dash) + ' bearbeitet</small>' : '') : 'noch keins') + '</td><td>' + bare('project.' + p.rid, 'Hinweise für ' + p.name) + '</td></tr>').join('') +
-      '</tbody></table></div>' + sw('auto_enroll', 'Neue Projekte automatisch anmelden', 'Erscheinen im Dashboard, sobald ihr Board oder eine Claude-Sitzung läuft') +
-      '<p class="dc-hint">Ein Dashboard je Kanal für alle Projekte, die dorthin melden. Abgeschaltete Projekte fehlen dort und schicken keine Hinweise.</p>';
+      s.projects.map((p) => '<tr><td>' + esc(p.name) + (p.here ? '<small>dieses Projekt</small>' : '') + '</td><td>' + chanSel(p) + '</td><td>' + (p.dash ? 'angeheftet' + (p.dash > 1e12 ? '<small>' + dcAgo(p.dash) + ' bearbeitet</small>' : '') : 'noch keins') + '</td><td>' + bare('project.' + p.rid, 'Hinweise für ' + p.name) + '</td></tr>').join('') +
+      '</tbody></table></div>' + sw('auto_enroll', 'Neue Projekte automatisch anmelden', 'Erscheinen im Dashboard des Standardkanals, sobald ihr Board oder eine Claude-Sitzung läuft') +
+      '<p class="dc-hint">' + (s.mode === 'shared' ? 'Der gemeinsame Bot schreibt in genau einen Kanal, den gekoppelten. Einen Kanal je Projekt gibt es nur mit eigenem Bot. ' : chErr ? esc(chErr) + ' ' : '') +
+      'Ein Dashboard je Kanal für alle Projekte, die dorthin melden. Abgeschaltete Projekte fehlen dort und schicken keine Hinweise.</p>';
 
     function pEvents() {
       const grp = (g) => {
@@ -3582,8 +3597,10 @@
         '<p class="dc-hint">Die Verzögerung spart Hinweise, wenn du schneller warst. Das Dashboard bleibt stehen, offene Nachrichten erst nach ihrer Erledigung gelöscht.</p>';
     }
 
-    const pCmds = () => '<div class="dc-cmdl">' + s.commands.map((c) => '<div><code>' + esc(c.cmd) + '</code><span>' + esc(c.text) + '</span></div>').join('') + '<div><code>Knöpfe</code><span>Annehmen, Zurück an Claude, Anweisung an Claude, Neue Aufgabe, Bug ansehen</span></div></div>' +
-      '<p class="dc-hint">Befehle und Knöpfe nutzt nur ' + (s.mode === 'shared' ? 'wer gekoppelt hat' : 'der Besitzer der Bot-Anwendung') + ', die Antworten sieht nur er. Freigaben für Werkzeuge erteilst du weiter in Claude Code.</p>';
+    // Schalter nach J2 (W-0046); ausgeschaltet wird die Liste blass (CSS über :has).
+    const pCmds = () => sw('commands', 'Befehle und Knöpfe erlauben', s.mode === 'shared' ? 'Nur du, als die Person, die /works verbinden ausgeführt hat. Die Antworten siehst nur du.' : 'Nur du, als Besitzer der Bot-Anwendung. Die Antworten siehst nur du.') +
+      '<div class="dc-cmdl">' + s.commands.map((c) => '<div><code>' + esc(c.cmd) + '</code><span>' + esc(c.text) + '</span></div>').join('') + '<div><code>Knöpfe</code><span>Annehmen, Zurück an Claude, Anweisung an Claude, Neue Aufgabe, Bug ansehen</span></div></div>' +
+      '<p class="dc-hint">Ausgeschaltet zeigt works keine Knöpfe am Dashboard und an neuen Nachrichten' + (s.mode === 'shared' ? ' und antwortet auf /works nur mit einem kurzen Hinweis' : ' und meldet /works auf dem Server ab') + '. Freigaben für Werkzeuge erteilst du weiter in Claude Code.</p>';
     const pPrivacy = () => sw('privacy.commands', 'Befehle aus Freigaben zeigen', 'Können Pfade, Adressen oder Geheimnisse enthalten') + sw('privacy.costs', 'Kosten zeigen', 'Tageskosten im Dashboard, Kosten je Aufgabe im Review') +
       sw('privacy.ci_error', 'Fehlerzeile bei roter CI zeigen', 'Erste Zeile des Fehlers aus dem Log') + sw('privacy.titles', 'Aufgabentitel zeigen', 'Aus: nur IDs, etwa für Server mit anderen Leuten') +
       '<p class="dc-hint">Links gehen auf GitHub, nie auf das lokale Board. ' + (s.mode === 'shared' ? 'Der Geräteschlüssel' : 'Das Token') + ' steht nirgends außer auf diesem Rechner.</p>';
@@ -3610,8 +3627,10 @@
       if (r.error) { $('#dcPvBox', root).innerHTML = '<p class="dc-bad">' + esc(r.error) + '</p>'; return; }
       $('#dcPvBox', root).innerHTML = dcMessage(r);
       const lock = $('#dcLock', root);
+      // Ein eben erst gewählter Kanal je Projekt hat noch keinen gespeicherten Namen: aus der Liste vom Bot.
+      const ch = r.channel || ((chans ? chans.guilds.flatMap((g) => g.channels) : []).find((c) => c.id === r.channel_id) || {}).name || 'works';
       lock.className = 'dc-lock' + (r.ring ? '' : ' mute');
-      lock.innerHTML = r.ring ? '<i>w</i><b>works · #' + esc(r.channel || 'works') + '</b><span>' + esc(String(r.content || '').replace(/<@\d+>/g, '@du')) + '</span>' : '<b>Kein Hinweis</b><span>Die Nachricht erscheint nur im Kanal.</span>';
+      lock.innerHTML = r.ring ? '<i>w</i><b>works · #' + esc(ch) + '</b><span>' + esc(String(r.content || '').replace(/<@\d+>/g, '@du')) + '</span>' : '<b>Kein Hinweis</b><span>Die Nachricht erscheint nur im Kanal.</span>';
       $('.dc-cap', root).textContent = r.why;
     }
     const schedule = () => { clearTimeout(pvTimer); pvTimer = setTimeout(preview, 150); };
@@ -3646,7 +3665,7 @@
       if (!s.secret) return;
       chErr = '';
       try { chans = await api('GET', 'api/discord/channels'); } catch (e) { chans = null; chErr = e.message; }
-      if (root && root.isConnected && tab === 'verbindung') renderMain();
+      if (root && root.isConnected && (tab === 'verbindung' || tab === 'projekte')) renderMain();
     }
     // Aktion mit Rückmeldung im Dialog; der Knopf ist solange gesperrt.
     async function busy(btn, fn) {

@@ -14,7 +14,7 @@ milestone:
 branch: feature/w-0041-alles-auf-englisch-sprache
 tags: []
 blocked_by: []
-blocks: []
+blocks: [W-0049]
 related: []
 source: manuell
 incomplete: false
@@ -36,7 +36,7 @@ Wunsch des Nutzers am 2026-11-23: Die Skills und alle Infos auf Englisch umschre
 
 ## Akzeptanzkriterien
 - [ ] CLI, Board, Hub und Discord-Nachrichten sind standardmäßig englisch
-- [ ] Die Sprache lässt sich jederzeit umstellen (mindestens Deutsch und Englisch)
+- [x] Die Sprache lässt sich jederzeit umstellen (mindestens Deutsch und Englisch)
 - [x] SKILL.md und references aller vier Plugins sind englisch
 - [x] Claude antwortet in der eingestellten Sprache
 - [ ] Selbsttest und Plugin-Tests laufen in beiden Sprachen grün
@@ -76,19 +76,18 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
 
 ## Offene Fragen
-- [ ] Bestehende Projekte haben durch das alte works init "language": "de" in .works/config.json. Das zählt jetzt als Projekt-Einstellung und hat Vorrang vor der globalen Sprache (works lang zeigt das an, works lang --reset --project entfernt es). So lassen oder alte Einträge bei der Migration entfernen, damit nur die globale Einstellung gilt?
-- [ ] Sollen die README.md der Plugins und des Repos auch englisch werden (mit README.de.md), oder bleiben sie deutsch? Sie gehörten nicht zum Plan.
+- [x] Bestehende Projekte haben durch das alte works init "language": "de" in .works/config.json. Das zählt jetzt als Projekt-Einstellung und hat Vorrang vor der globalen Sprache (works lang zeigt das an, works lang --reset --project entfernt es). So lassen oder alte Einträge bei der Migration entfernen, damit nur die globale Einstellung gilt? Antwort: Nutzer am 2026-11-24: Migration entfernt den alten automatisch geschriebenen Eintrag language=de einmalig, dann gilt die globale Sprache.
+- [x] Sollen die README.md der Plugins und des Repos auch englisch werden (mit README.de.md), oder bleiben sie deutsch? Sie gehörten nicht zum Plan. Antwort: Nutzer am 2026-11-24: Ja, README.md englisch mit README.de.md daneben (Plugins und Repo).
 
 ## Übergabe
-Stand: 2026-11-24 16:56
+Stand: 2026-11-24 19:55
 
-Stand: Phasen 1, 2, 3, 4 und 7 fertig und committet (Branch feature/w-0041-alles-auf-englisch-sprache, Commits 1310ec0, e3c2b18, cdee542, fa07623, ea34a8b). Selbsttest 42/42 grün mit WORKS_LANG=de (mit und ohne WebSocket), inklusive neuer Schritte 'Sprache: works lang, Vorrang, Katalog', 'Sprache: Aufgabenformat', 'Sprache: englische Standardausgabe'. Plugin-Tests ci-watch und mockups grün in beiden Sprachen.
+Stand: Phasen 1–4 und 7 fertig, dazu Merge von main (W-0038), Migration für altes language aus works init (Kennzeichen language-1), READMEs englisch mit README.de.md und Phase 5 ohne den Discord-Dialog. Letzte Commits: 0a70bf4 (Merge), 092b688 (Migration, READMEs), c808801 (Board, Hub, Export, API, Sprachwahl). Selbsttest 45/45 grün mit WORKS_LANG=de, mit und ohne WebSocket; services/works-bot/test.mjs, ci-watch- und mockups-Tests grün.
 
-Aufbau: scripts/i18n.mjs mit tr() (heißt tr, weil t im Code die Aufgabe ist), Katalog scripts/i18n/de.json (gut 1000 Einträge, englisch → deutsch). Abschnitts-Aliase in lib.mjs (SECTION_NAMES, sectionTitle, bodyLang); Werte-Aliase normValue (status/risk/kind). Vorlagen englisch in references/templates, deutsch in references/de/templates. ci-watch und mockups haben wortgleiche Kopien von i18n.mjs plus eigenes de.json (Test prüft Gleichheit).
+Board: Katalog kommt mit den Boot-Daten (i18n: lang, source, languages, catalog nur mit Board-Texten), meta.lang in den Daten, Neuladen bei Sprachwechsel; Werkzeuge haben die Sprachwahl (global oder nur dieses Projekt) über POST /api/lang. template.html nutzt {{t:…}}, hub.mjs hat einen eigenen kleinen Katalog in window.HUB.t.
 
-Nächster Schritt (nach Nachricht der Hauptsitzung): git merge main (W-0038), dann Phase 5 und 6.
-Phase 5 zuerst: api.mjs erkennt neue Aufgaben nur an 'Angelegt:' (Zeilen ~349, ~614 → (?:Created|Angelegt)), promote an 'als (\S+?):' (~480 → (?:als|as)), Asset-Zeilen 'Beschreibung:/Art:/Hinzugefügt:' (~165-168, englisch Description/Kind/Added), SKIP_IN_DETAIL und Zeile ~444 mit deutschen Abschnittsnamen (sectionKey nutzen), Wissensbereich 'Allgemein' (~940, CLI nutzt jetzt tr('General')), Texte ~1024. Bis dahin ist services/works-bot/test.mjs rot ('Neue Aufgaben-ID nicht erkannt'), weil der Test ohne WORKS_LANG englisch läuft. board.js: DoD-Trennung /^(Prüfung |Automatische Prüfungen)/ (~636) braucht 'Check '/'Automatic checks', 'Allgemein' (~3250), dazu alle Texte über Katalog vom Server und Sprachwahl. hub.mjs, template.html, export.mjs-HTML, Discord-Dateien (Phase 6). fmtCost/fmtTokens formatieren auf Englisch anders (hub, discord-bot nutzen sie).
-Sonst offen: selftest.mjs gibt seine eigenen Zeilen (FEHLER, 'x von y Prüfungen bestanden') weiter deutsch aus; einige Datumsformate bleiben de-DE (cmdTime, inbox, ci-watch Rate-Limit); Demo-Inhalte deutsch; Status review erst nach Phase 6 setzen.
+Nächster Schritt (nach Nachricht der Hauptsitzung, wenn W-0046 in main ist): git merge main, dann den Dialog Discord-Bot in board.js (Bereich ab '// ---------- Discord-Bot (W-0038)') und board.css übersetzen und Phase 6: discord-bot.mjs, discord.mjs, discord-ui.mjs, discord-api.mjs über tr() mit der globalen Sprache, Antworten auf Befehle und Knöpfe weiter in der Sprache des Discord-Clients (fmtTokens/fmtCost haben dafür einen lang-Parameter). Discord-Teile von serve.mjs, api.mjs und works.mjs (cmdDiscord) ebenso. Der Discord-Bot ruft runActionWithUndo in einem langlebigen Prozess: dort vor Aktionen setLanguage(language(root)) bzw. die Client-Sprache setzen. Danach Kriterien 1 und 5 prüfen, Umsetzungsplan Punkt 5 und 6 abhaken, Status review.
+Bekannte Kleinigkeiten: selftest.mjs gibt eigene Zeilen deutsch aus; einige Datumsformate de-DE im CLI (cmdTime, inbox); Demo-Inhalte deutsch; die Sprachwahl im Board hat kein Zurücksetzen der Projekt-Sprache (geht mit works lang --reset --project).
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -108,3 +107,9 @@ Sonst offen: selftest.mjs gibt seine eigenen Zeilen (FEHLER, 'x von y Prüfungen
 - 2026-11-24: Umsetzungsplan: "Phase 7, Plugins workday, ci-watch, mockups: Skript-Ausgaben ebenso; Selbsttest und Plugin-Tests in beiden Sprachen grün (einmal WORKS_LANG=de, einmal en für die englischen Prüfungen)." abgehakt
 - 2026-11-24: Phase 7 fertig: ci-watch und mockups über tr() mit eigenem Katalog, Plugin-Tests in beiden Sprachen grün; Selbsttest 42/42 grün
 - 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Frage 1 geklärt: Nutzer am 2026-11-24: Migration entfernt den alten automatisch geschriebenen Eintrag language=de einmalig, dann gilt die globale Sprache.
+- 2026-11-24: Frage 1 geklärt: Nutzer am 2026-11-24: Ja, README.md englisch mit README.de.md daneben (Plugins und Repo).
+- 2026-11-24: Akzeptanzkriterien: "Die Sprache lässt sich jederzeit umstellen (mindestens Deutsch und Englisch)" abgehakt
+- 2026-11-24: Merge von main (W-0038), Migration für altes language aus works init, READMEs englisch mit README.de.md, Phase 5 ohne Discord-Dialog: Board, Hub, Export, API, Sprachwahl im Board. Selbsttest 45/45, works-bot- und Plugin-Tests grün
+- 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Beziehung: W-0049 blocked-by

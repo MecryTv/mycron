@@ -181,6 +181,16 @@ try {
   assert.match(JSON.stringify((await ask({ type: 3, customId: tb.custom_id, messageId: a.data.id }, 'button on an answer')).data), /offen/);
   // Answers only for interactions of the own device.
   assert.equal((await api('POST', `/v1/interactions/${sid}/reply`, { content: 'x' }, key1)).status, 404, 'answered twice');
+  // W-0046: commands and buttons switched off on the device, without a restart. The dashboard loses its select menu
+  // and buttons, a command gets a short hint from the device. A channel per project needs an own bot.
+  assert.equal((await wa(['discord', 'set', 'commands=aus'])).code, 0);
+  await wait(() => { const d = dashboards().pop(); return d && !d.components.length; }, 'dashboard without buttons');
+  assert.match(JSON.stringify((await ask({ sub: 'status' }, 'command with commands off')).data), /ausgeschaltet/);
+  r = await wa(['discord', 'set', 'project.0123456789abcdef.channel=12']);
+  assert.notEqual(r.code, 0, 'channel per project accepted for the shared bot');
+  assert.match(r.out, /eigenen Bot/);
+  assert.equal((await wa(['discord', 'set', 'commands=an'])).code, 0);
+  await wait(() => { const d = dashboards().pop(); return d && d.components.length; }, 'buttons back on the dashboard');
   // A second person with an own device in the same channel: each command goes to the device of whoever typed it.
   // That device never asked for its inbox (an older works), so the service suggests an update instead of "off".
   const key88 = await linkKey({ user: '88' });
