@@ -177,6 +177,34 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(!missing.length, `${missing.length} Texte ohne deutsche Übersetzung:\n${missing.slice(0, 15).join('\n')}`);
   });
 
+  // Funde der Code-Durchsicht zu W-0041: Eine von Hand gesetzte Projekt-Sprache bleibt (nach frischem init und in alten
+  // Projekten ohne language), der Sitzungsstart sagt einmal, dass eine alte Sprache entfernt wurde, und works know add
+  // ohne --area nutzt einen vorhandenen Bereich Allgemein, statt daneben General anzulegen.
+  await step('Sprache: Migration nach init, Hinweis, Wissensbereich', () => {
+    const p = path.join(base, 'sprache-audit');
+    fs.mkdirSync(p, { recursive: true });
+    const we = (args, o = {}) => w(args, { cwd: p, extraEnv: { WORKS_LANG: '' }, ...o });
+    const cfgFile = path.join(p, '.works', 'config.json');
+    const cfg = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+    const put = (c) => fs.writeFileSync(cfgFile, JSON.stringify(c, null, 2));
+    const unflagged = () => (cfg().migrations || []).filter((x) => x !== 'language-1');
+    we(['init']);
+    put({ ...cfg(), language: 'de' });
+    has(we(['lang']).out, 'Sprache: Deutsch (de), für dieses Projekt', 'von Hand gesetzte Sprache nach works init');
+    put({ ...cfg(), language: undefined, migrations: unflagged() });
+    we(['list']);
+    put({ ...cfg(), language: 'de' });
+    has(we(['lang']).out, 'Sprache: Deutsch (de), für dieses Projekt', 'von Hand gesetzte Sprache in altem Projekt');
+    put({ ...cfg(), language: 'de', migrations: unflagged() });
+    const start = () => spawnSync(process.execPath, [path.join(HOOKS, 'session-start.mjs')], { cwd: p, env: { ...env, WORKS_LANG: '' }, encoding: 'utf8', input: '{}', timeout: 20000 }).stdout;
+    has(start(), 'works lang de', 'Sitzungsstart nach entfernter Sprache');
+    expect(!start().includes('works lang de'), 'Hinweis auf entfernte Sprache kommt mehr als einmal');
+    w(['know', 'add', '--title=Erst', '--text=eins'], { cwd: p });
+    we(['know', 'add', '--title=Zweit', '--text=zwei']);
+    const wissen = fs.readFileSync(path.join(p, '.works', 'wissen.md'), 'utf8');
+    expect(wissen.includes('## Allgemein') && !wissen.includes('## General'), `zweiter Bereich General:\n${wissen.slice(0, 400)}`);
+  });
+
   // W-0041: Board und Hub sprechen die eingestellte Sprache. Deutsch kommt als kleiner Katalog in die Seite,
   // works lang wirkt am laufenden Board ohne Neustart, POST /api/lang stellt um.
   await step('Sprache: Board und Hub englisch und deutsch', async () => {

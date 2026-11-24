@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { readText, worksDir, exists, today } from './lib.mjs';
-import { tr } from './i18n.mjs';
+import { tr, variants } from './i18n.mjs';
 
 export const knowledgeFile = (root) => path.join(worksDir(root), 'wissen.md');
 const HEAD = () => tr('# Project knowledge\n\nWhat Claude needs to know in this project. Claude reads the relevant entries before working. Edit in the board under Knowledge or with works know.\n');
@@ -38,11 +38,19 @@ export function saveKnowledge(root, list) {
 
 const clean = (s, max) => String(s || '').replace(/\r\n/g, '\n').replace(/<!--|-->/g, '').trim().slice(0, max);
 
+// Ohne Angabe der allgemeine Bereich in der eingestellten Sprache. "Allgemein" und "General" sind derselbe Bereich
+// (W-0041): Gibt es einen davon schon in wissen.md, kommt der Eintrag dorthin, für CLI und Board gleich.
+function areaOf(list, area) {
+  const a = clean(area || tr('General'), 60).replace(/[\n#]/g, ' ');
+  const general = variants('General');
+  return general.includes(a) ? list.map((e) => e.area).find((x) => general.includes(x)) || a : a;
+}
+
 export function addKnowledge(root, { area, title, text, by = 'Claude', source = '', proposal = false }) {
   const list = loadKnowledge(root);
   const t = clean(title, 140).replace(/\n/g, ' ');
   if (!t) throw new Error(tr('Title missing.'));
-  const e = { id: crypto.randomBytes(3).toString('hex'), area: clean(area || tr('General'), 60).replace(/[\n#]/g, ' '), title: t, text: clean(text, 4000), by, source: clean(source, 40), date: today(), status: proposal ? 'vorschlag' : 'ok' };
+  const e = { id: crypto.randomBytes(3).toString('hex'), area: areaOf(list, area), title: t, text: clean(text, 4000), by, source: clean(source, 40), date: today(), status: proposal ? 'vorschlag' : 'ok' };
   list.push(e);
   saveKnowledge(root, list);
   return e;
@@ -54,7 +62,7 @@ export function updateKnowledge(root, id, patch) {
   if (!e) throw new Error(tr('Entry {id} not found.', { id }));
   if ('title' in patch) e.title = clean(patch.title, 140).replace(/\n/g, ' ') || e.title;
   if ('text' in patch) e.text = clean(patch.text, 4000);
-  if ('area' in patch) e.area = clean(patch.area, 60).replace(/[\n#]/g, ' ') || e.area;
+  if ('area' in patch && clean(patch.area, 60)) e.area = areaOf(list, patch.area);
   if ('status' in patch) e.status = ['ok', 'vorschlag', 'veraltet'].includes(patch.status) ? patch.status : e.status;
   saveKnowledge(root, list);
   return e;

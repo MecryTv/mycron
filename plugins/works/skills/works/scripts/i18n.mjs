@@ -34,14 +34,16 @@ function findRoot(start = process.cwd()) {
 }
 
 // Alte works init schrieben "language": "de" ungefragt ins Projekt. Das zählt nicht als Projekt-Sprache und wird beim
-// ersten Lesen einmalig entfernt. works lang --project setzt das Kennzeichen, eine so gesetzte Sprache bleibt.
+// ersten Lesen einmalig entfernt (language_removed merkt es für den Hinweis beim Sitzungsstart). Das Kennzeichen kommt
+// auch ohne language in die Datei, damit eine später von Hand oder mit works lang --project gesetzte Sprache bleibt.
 export const LANG_MIGRATION = 'language-1';
 function projectLanguage(root) {
   const file = path.join(root, '.works', 'config.json');
   const cfg = readJson(file);
-  if (!cfg || !cfg.language) return null;
+  if (!cfg) return null;
   const done = Array.isArray(cfg.migrations) ? cfg.migrations : [];
-  if (done.includes(LANG_MIGRATION)) return cfg.language;
+  if (done.includes(LANG_MIGRATION)) return cfg.language || null;
+  if (cfg.language) cfg.language_removed = cfg.language;
   delete cfg.language;
   cfg.migrations = [...done, LANG_MIGRATION];
   try { fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n'); } catch { /* schreibgeschützt: nur nicht beachten */ }

@@ -49,6 +49,13 @@ async function main() {
       saveConfig(root, config);
     } catch (e) { repairNotes.push(tr('Repair skipped: {msg}', { msg: e.message })); }
   }
+  // Einmal nach der Migration language-1 (W-0041): sagen, dass die alte Sprache aus works init nicht mehr gilt.
+  if (config.language_removed) {
+    const old = config.language_removed;
+    if (old !== lang) repairNotes.push(tr('The language "{old}" from an older works init no longer applies, output is now in {now}. "works lang {old}" switches back for all projects', { old, now: LANGUAGE_NAMES[lang] || lang }));
+    delete config.language_removed;
+    saveConfig(root, config);
+  }
   registerProject(root);
   const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'works.mjs');
   // Fällige wiederkehrende Aufgaben anlegen.

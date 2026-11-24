@@ -2727,5 +2727,6 @@
   "--json is not valid JSON.": "--json ist kein gültiges JSON.",
   "Device key revoked and deleted, bot stopped. The messages in Discord stay.": "Geräteschlüssel widerrufen und gelöscht, Bot gestoppt. Die Nachrichten in Discord bleiben stehen.",
   "Token deleted, bot stopped. The messages in Discord stay.": "Token gelöscht, Bot gestoppt. Die Nachrichten in Discord bleiben stehen.",
-  "Unknown: works discord {sub}. Possible: {list}": "Unbekannt: works discord {sub}. Möglich: {list}"
+  "Unknown: works discord {sub}. Possible: {list}": "Unbekannt: works discord {sub}. Möglich: {list}",
+  "The language \"{old}\" from an older works init no longer applies, output is now in {now}. \"works lang {old}\" switches back for all projects": "Die Sprache „{old}“ aus einem älteren works init gilt nicht mehr, die Ausgabe ist jetzt {now}. „works lang {old}“ stellt für alle Projekte zurück"
 }

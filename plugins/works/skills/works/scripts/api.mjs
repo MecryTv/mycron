@@ -10,7 +10,7 @@ import { readText,
   isBlocked, openBlockers, openQuestions, relFromWorks, exists,
   STATUSES, OPEN_STATUSES, STATUS_LABEL, PRIORITIES, PRIO_LABEL, TYPES, TYPE_LABEL, EFFORTS, RISKS, sectionKey, sectionTitle,
 } from './lib.mjs';
-import { tr, variants, languages, languageSource } from './i18n.mjs';
+import { tr, languages, languageSource } from './i18n.mjs';
 import { dodCheck, nextCandidates, byIdMap } from './views.mjs';
 import { loadComments, unreadForClaude } from './comments.mjs';
 import { listTemplates, templateFromTask, normalizeTemplate, SLUG_RE } from './templates.mjs';
@@ -926,15 +926,6 @@ export async function runActionWithUndo(root, body) {
   } catch (e) { dropSnapshot(root, key); throw e; }
 }
 
-// Wissensbereich: ohne Angabe der allgemeine Bereich in der eingestellten Sprache. "Allgemein" und "General" sind
-// derselbe Bereich (W-0041): Gibt es einen davon schon in wissen.md, kommt der Eintrag dorthin.
-function knowArea(root, area) {
-  const general = variants('General');
-  const a = area || tr('General');
-  if (!general.includes(a)) return a;
-  return loadKnowledge(root).map((e) => e.area).find((x) => general.includes(x)) || a;
-}
-
 Object.assign(actions, {
   async undo(root, b) {
     const key = typeof b.key === 'string' && /^[a-z0-9-]{4,40}$/.test(b.key) ? b.key : undefined;
@@ -956,7 +947,7 @@ Object.assign(actions, {
     return { message: tr('Instruction sent. Claude reads it when it fits.') };
   },
   async knowAdd(root, b) {
-    const args = ['know', 'add', `--title=${str(b.title, tr('Title'), { max: 140, required: true })}`, `--area=${knowArea(root, str(b.area, tr('Area'), { max: 60 }))}`];
+    const args = ['know', 'add', `--title=${str(b.title, tr('Title'), { max: 140, required: true })}`, `--area=${str(b.area, tr('Area'), { max: 60 })}`];
     const text = str(b.text, tr('Text'), { max: 4000 });
     await withTextFile(root, text, (f) => must(root, [...args, `--file=${f}`]));
     return { message: tr('Entry saved.') };
@@ -966,7 +957,7 @@ Object.assign(actions, {
     const f = b.fields || {};
     const args = ['know', 'edit', b.kid];
     if ('title' in f) args.push(`--title=${str(f.title, tr('Title'), { max: 140, required: true })}`);
-    if ('area' in f) args.push(`--area=${knowArea(root, str(f.area, tr('Area'), { max: 60, required: true }))}`);
+    if ('area' in f) args.push(`--area=${str(f.area, tr('Area'), { max: 60, required: true })}`);
     if (f.ok) args.push('--ok');
     if ('text' in f) { const text = str(f.text, tr('Text'), { max: 4000 }); await withTextFile(root, text, (file) => must(root, [...args, `--file=${file}`])); } else await must(root, args);
     return { message: tr('Saved.') };

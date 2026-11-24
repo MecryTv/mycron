@@ -90,6 +90,7 @@ function cmdInit() {
   if (!exists(path.join(wd, 'config.json'))) {
     const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
     if (flags.prefix) cfg.id_prefix = String(flags.prefix).toUpperCase();
+    cfg.migrations = [LANG_MIGRATION];
     saveConfig(root, cfg);
   }
   if (!exists(path.join(wd, 'state.json'))) saveState(root, {});
