@@ -39,6 +39,9 @@ export const DEFAULTS = {
   guild_id: '', guild_name: '', channel_id: '', channel_name: '',
   autostart: true,
   auto_enroll: true,
+  // Befehle und Knöpfe (W-0046): aus heißt kein /works beim eigenen Bot und keine Knöpfe an neuen Nachrichten.
+  commands: true,
+  // Je Projekt (rootId): enabled (Hinweise an oder aus), beim eigenen Bot channel_id und channel_name (W-0046).
   projects: {},
   events: Object.fromEntries(EVENT_GROUPS.flatMap(([, list]) => list.map(([k]) => [k, { on: !OFF.has(k), at: AT.has(k) }]))),
   quiet: { on: true, from: '22:00', to: '07:00' },
@@ -81,6 +84,8 @@ export function removeToken() { try { fs.unlinkSync(dfile('secret.json')); } cat
 
 export const maskToken = (t) => (t ? `…${t.slice(-4)}` : '');
 export const isShared = (cfg) => cfg.mode === 'shared';
+// Kanal eines Projekts: ein eigener nur beim eigenen Bot, der gemeinsame schreibt in genau einen Kanal (W-0046).
+export const channelOf = (cfg, rid) => (!isShared(cfg) && cfg.projects[rid] && cfg.projects[rid].channel_id) || cfg.channel_id;
 export const isConfigured = (cfg = loadDiscordConfig()) => !!((isShared(cfg) ? loadKey() : loadToken()) && cfg.channel_id);
 
 const LOOPBACK = ['127.0.0.1', 'localhost', '[::1]'];
@@ -209,7 +214,7 @@ export function applySetting(cfg, key, value) {
   const parts = key.split('.').map((p, i) => (i === 0 ? ALIAS[p] || p : p));
   const bool = (v) => { if (/^(true|an|on|ja|1)$/i.test(v)) return true; if (/^(false|aus|off|nein|0)$/i.test(v)) return false; throw new Error(`${key}: an oder aus erwartet, nicht "${v}".`); };
   const [a, b, c] = parts;
-  if (parts.length === 1 && ['autostart', 'auto_enroll'].includes(a)) { cfg[a] = bool(value); return; }
+  if (parts.length === 1 && ['autostart', 'auto_enroll', 'commands'].includes(a)) { cfg[a] = bool(value); return; }
   if (parts.length === 1 && a === 'service') {
     if (value) serviceBase({ service: value });
     cfg.service = value.replace(/\/$/, '');
@@ -236,7 +241,18 @@ export function applySetting(cfg, key, value) {
   }
   // Hinweise je Projekt an oder aus (W-0038); die Kennung ist die rootId des Projekts.
   if (a === 'project' && parts.length === 2 && /^[0-9a-f]{16}$/.test(b)) { cfg.projects[b] = { ...(cfg.projects[b] || {}), enabled: bool(value) }; return; }
-  throw new Error(`Unbekannte Einstellung ${key}. Möglich: autostart, auto_enroll, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, cleanup.hours, event.<name>[.at], project.<id>`);
+  // Kanal je Projekt (W-0046): Kanal-ID, leer oder der Standardkanal heißt Standardkanal. Den Namen und das
+  // Schreibrecht prüft checkProjectChannels gegen die Liste vom Bot.
+  if (a === 'project' && c === 'channel' && parts.length === 3 && /^[0-9a-f]{16}$/.test(b)) {
+    const v = String(value).trim().replace(/^#/, '');
+    if (v && isShared(cfg)) throw new Error(`${key}: Kanal je Projekt gibt es nur beim eigenen Bot. Der gemeinsame schreibt in genau einen Kanal, den gekoppelten.`);
+    if (v && !/^\d{1,25}$/.test(v)) throw new Error(`${key}: Kanal-ID erwartet (works discord channel zeigt die Kanäle), leer für den Standardkanal.`);
+    const p = { ...(cfg.projects[b] || {}) };
+    if (!v || v === cfg.channel_id) { delete p.channel_id; delete p.channel_name; } else if (p.channel_id !== v) Object.assign(p, { channel_id: v, channel_name: '' });
+    cfg.projects[b] = p;
+    return;
+  }
+  throw new Error(`Unbekannte Einstellung ${key}. Möglich: autostart, auto_enroll, commands, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, cleanup.hours, event.<name>[.at], project.<id>, project.<id>.channel`);
 }
 
 // ---------- Einrichtung, Kanalwahl und Stand: gemeinsam für CLI und Board (W-0038) ----------
@@ -347,6 +363,23 @@ export async function channelsOf(cfg = loadDiscordConfig()) {
   } catch (e) { throw new Error(`Kanäle nicht lesbar: ${explain(e, false)}`); }
 }
 
+// Kanal aus der Liste vom Bot, in den er schreiben darf; sonst ein Fehler mit Grund.
+function writable(list, cid) {
+  const hit = list.guilds.flatMap((g) => g.channels.map((c) => ({ ...c, guild: g }))).find((c) => c.id === cid);
+  if (!hit) throw new Error(`Kanal ${cid} nicht gefunden. Liste neu laden oder works discord channel.`);
+  if (!hit.can) throw new Error(`#${hit.name}: Der Bot ${hit.why}. In Discord die Rechte des Kanals ändern oder einen anderen wählen.`);
+  return hit;
+}
+
+// Kanal je Projekt (W-0046): neu gesetzte Kanäle (noch ohne Namen) gegen die Liste vom Bot prüfen und benennen.
+// Ohne neue fragt works Discord nicht; beim gemeinsamen Bot gelten eigene Kanäle ohnehin nicht.
+export async function checkProjectChannels(cfg) {
+  const fresh = isShared(cfg) ? [] : Object.values(cfg.projects).filter((p) => p.channel_id && !p.channel_name);
+  if (!fresh.length) return;
+  const list = await channelsOf(cfg);
+  for (const p of fresh) p.channel_name = writable(list, p.channel_id).name;
+}
+
 // Dashboard und Hinweise in einen anderen Kanal („Hierher verschieben“). Gemeinsamer Bot: erst die Kopplung beim
 // Dienst umziehen. Der laufende Bot liest config.json bei jedem Durchgang, legt das Dashboard im neuen Kanal an und
 // löscht das alte (dashboards in discord-bot.mjs), ohne Neustart. list: schon gelesene Kanäle (channelsOf).
@@ -354,10 +387,7 @@ export async function moveChannel(id, list = null) {
   const cid = String(id || '');
   if (!/^\d{1,25}$/.test(cid)) throw new Error('Kein Kanal gewählt.');
   const cfg = loadDiscordConfig();
-  const all = list || await channelsOf(cfg);
-  const hit = all.guilds.flatMap((g) => g.channels.map((c) => ({ ...c, guild: g }))).find((c) => c.id === cid);
-  if (!hit) throw new Error('Kanal nicht gefunden. Liste neu laden.');
-  if (!hit.can) throw new Error(`#${hit.name}: Der Bot ${hit.why}. In Discord die Rechte des Kanals ändern oder einen anderen wählen.`);
+  const hit = writable(list || await channelsOf(cfg), cid);
   if (isShared(cfg) && cid !== cfg.channel_id) {
     try { await (await serviceRest(cfg)).post('/link/channel', { channel_id: cid }); } catch (e) { throw new Error(explain(e, true)); }
   }
@@ -397,15 +427,18 @@ export async function boardState(root) {
     bot_name: cfg.bot_name, owner: !!cfg.owner_id,
     guild_id: cfg.guild_id, guild_name: cfg.guild_name, channel_id: cfg.channel_id, channel_name: cfg.channel_name,
     running: info ? { since: info.started } : null,
-    autostart: cfg.autostart !== false, auto_enroll: cfg.auto_enroll !== false,
+    autostart: cfg.autostart !== false, auto_enroll: cfg.auto_enroll !== false, commands_on: cfg.commands !== false,
     invite_url: !shared && cfg.app_id ? inviteUrl(cfg.app_id) : (service && service.invite_url) || '',
     service,
     events: EVENT_GROUPS.map(([group, items]) => ({ group, items: items.map(([key, label]) => ({ key, label, ...cfg.events[key] })) })),
     quiet: cfg.quiet, privacy: cfg.privacy, delays: cfg.delays, cleanup: cfg.cleanup,
+    // channel_id und channel: eigener Kanal des Projekts, leer im Standardkanal.
     projects: list.map((p) => {
       const own = cfg.projects[p.rid] || {};
-      const d = dash[own.channel_id || cfg.channel_id];
-      return { ...p, here: p.rid === here, enabled: own.enabled !== undefined ? !!own.enabled : cfg.auto_enroll !== false, channel: own.channel_id ? `#${own.channel_name || own.channel_id}` : '', dash: d && d.message_id ? d.at || 1 : 0 };
+      const ch = channelOf(cfg, p.rid);
+      const d = dash[ch];
+      const mine = ch !== cfg.channel_id;
+      return { ...p, here: p.rid === here, enabled: own.enabled !== undefined ? !!own.enabled : cfg.auto_enroll !== false, channel_id: mine ? ch : '', channel: mine ? `#${own.channel_name || ch}` : '', dash: d && d.message_id ? d.at || 1 : 0 };
     }),
     commands: commands({ shared })[0].options.map((o) => ({ cmd: `/works ${(o.name_localizations && o.name_localizations.de) || o.name}`, text: o.description_localizations.de })),
     waiting: readOutbox().length,
@@ -413,25 +446,29 @@ export async function boardState(root) {
 }
 
 // Vorschau einer Nachricht mit dem ungespeicherten Stand (draft), mit Beispieldaten aus dem Projekt des Boards.
-// ring: klingelt auf dem Handy (Erwähnung ohne Ruhezeit).
+// ring: klingelt auf dem Handy (Erwähnung ohne Ruhezeit). channel_id und channel: Kanal des Projekts; den Namen
+// eines eben erst gewählten Kanals kennt nur die Liste im Dialog.
 export async function preview(root, { type = 'perm', draft = {} } = {}) {
   const cfg = loadDiscordConfig();
-  for (const [k, v] of Object.entries(draft || {})) if (!k.startsWith('project.')) applySetting(cfg, k, String(v));
+  for (const [k, v] of Object.entries(draft || {})) applySetting(cfg, k, String(v));
   const bot = await import('./discord-bot.mjs');
   const rid = rootIdOf(root);
+  const interactive = cfg.commands !== false;
+  const channel_id = channelOf(cfg, rid);
+  const where = { channel_id, channel: channel_id === cfg.channel_id ? cfg.channel_name : cfg.projects[rid].channel_name || '' };
   let snap;
   try { snap = bot.snapshotOf(root); } catch { snap = { name: path.basename(root), tasks: {}, queue: [] }; }
-  if (type === 'dashboard') return { ...bot.renderDashboard([{ rid, snap }], cfg, { interactive: true }), ring: false, why: 'Das Dashboard wird nur bearbeitet und klingelt nie.', channel: cfg.channel_name };
+  if (type === 'dashboard') return { ...bot.renderDashboard([{ rid, snap }], cfg, { interactive }), ring: false, why: 'Das Dashboard wird nur bearbeitet und klingelt nie.', ...where };
   const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
   const sample = { perm: { tool: 'Bash', what: 'npm test', since: ago(3) }, idle: { since: ago(2) }, review: { crit: [7, 7], cost: '8,20 $' }, ci_red: { sha: '81fe2a0c4d', failed: 1, total: 3, job: 'test (windows)', error: 'AssertionError: expected 3 to be 4', bug: 'W-0011', url: 'https://github.com' } }[type];
   if (!sample) throw new Error('Unbekanntes Ereignis für die Vorschau.');
   const a = snap.active || { id: 'W-0001', title: 'Beispielaufgabe' };
-  const body = bot.renderEvent({ type, project: snap.name, id: a.id, title: a.title, ...sample }, cfg, { owner: cfg.owner_id || '0', rid, interactive: true });
+  const body = bot.renderEvent({ type, project: snap.name, id: a.id, title: a.title, ...sample }, cfg, { owner: cfg.owner_id || '0', rid, interactive });
   const e = cfg.events[type];
   const ring = e.on && !(body.flags & 4096);
   const why = !e.on ? 'Ist aus: works schickt dazu keine Nachricht.' : ring ? 'Klingelt, weil @ an ist. In der Ruhezeit käme es still.'
     : e.at ? 'Gerade ist Ruhezeit: kommt still, ohne Hinweis auf dem Sperrbildschirm.' : 'Kommt still, weil @ aus ist. Kein Hinweis auf dem Sperrbildschirm.';
-  return { ...body, ring, why, channel: cfg.channel_name };
+  return { ...body, ring, why, ...where };
 }
 
 // Aktionen aus dem Dialog. Nach Token oder Kopplung startet der Bot, wenn er eingerichtet ist (wie beim Board-Start).
@@ -440,6 +477,7 @@ export async function boardAction(root, b = {}) {
   if (op === 'set') {
     const cfg = loadDiscordConfig();
     for (const [k, v] of Object.entries(b.values || {})) applySetting(cfg, k, String(v));
+    await checkProjectChannels(cfg);
     saveDiscordConfig(cfg);
     return boardState(root);
   }

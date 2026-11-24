@@ -13,9 +13,9 @@ import { loadLanes } from './parallel.mjs';
 import { liveUsage, fmtCost } from './usage.mjs';
 import { projectList } from './hub.mjs';
 import { runningVersion, OWN_CLI, isAlive } from './server-control.mjs';
-import { dfile, discordDir, loadDiscordConfig, normalizeConfig, credential, readOutbox } from './discord.mjs';
+import { dfile, discordDir, loadDiscordConfig, normalizeConfig, credential, readOutbox, channelOf } from './discord.mjs';
 import { Rest, Gateway, hasWebSocket } from './discord-api.mjs';
-import { tr, who, subOf, parseCid, cid, MODAL, modalFor, modalValues, helpMessage, ephemeral, notOwner, commands } from './discord-ui.mjs';
+import { tr, who, subOf, parseCid, cid, MODAL, modalFor, modalValues, helpMessage, ephemeral, notOwner, commandsOff, commands } from './discord-ui.mjs';
 import { dashboardPng } from './discord-image.mjs';
 
 export { normalizeConfig };
@@ -392,9 +392,10 @@ const emptyState = () => ({ projects: {}, msgs: {}, queue: [], open: {}, ships: 
 const DAY = 86400000;
 
 export class Bot {
-  // shared: gemeinsamer Bot über den Dienst. interactive: Klicks und Befehle kommen an (Gateway oder Dienst).
+  // shared: gemeinsamer Bot über den Dienst. clicks: Klicks und Befehle kommen an (Gateway oder Dienst).
+  // interactive: Knöpfe zeigen; dazu muss auch der Schalter commands an sein, gelesen bei jedem Durchgang (W-0046).
   constructor({ rest, log, shared = false, interactive = false }) {
-    this.rest = rest; this.log = log; this.shared = shared; this.interactive = interactive;
+    this.rest = rest; this.log = log; this.shared = shared; this.clicks = interactive; this.interactive = interactive;
     this.commandsFor = '';
     const s = readJson(dfile('state.json'), null);
     this.state = { ...emptyState(), ...(s || {}) };
@@ -413,7 +414,7 @@ export class Bot {
     this.warned = new Set();
   }
 
-  channelFor(rid, cfg) { return (cfg.projects[rid] && cfg.projects[rid].channel_id) || cfg.channel_id; }
+  channelFor(rid, cfg) { return channelOf(cfg, rid); }
   enrolled(rid, cfg) { const p = cfg.projects[rid]; return p && p.enabled !== undefined ? !!p.enabled : cfg.auto_enroll !== false; }
   project(rid) { return this.state.projects[rid] || (this.state.projects[rid] = { name: '', root: '', snap: null, status: null, recent: [] }); }
 
@@ -793,7 +794,8 @@ export class Bot {
 
   async tick() {
     const cfg = loadDiscordConfig();
-    if (!this.shared && this.interactive) await this.registerCommands(cfg);
+    this.interactive = this.clicks && cfg.commands !== false;
+    if (!this.shared) await this.registerCommands(cfg);
     const done = [];
     // Ereignisse älter als zwei Tage (Bot lange aus) wären nur noch Lärm: verwerfen.
     for (const { file, ev } of readOutbox()) {
@@ -819,15 +821,17 @@ export class Bot {
 
   // ---------- Befehle und Knöpfe (W-0037) ----------
 
-  // Eigener Bot: /works für den Server des Kanals registrieren (Server-Befehle sind sofort da). Wieder bei einem
-  // anderen Server; nach einem Fehler frühestens in zehn Minuten erneut.
+  // Eigener Bot: /works für den Server des Kanals registrieren (Server-Befehle sind sofort da), ohne Gateway nicht.
+  // Schalter commands aus (W-0046): mit leerer Liste abmelden, auch ohne Gateway (ein früherer Lauf kann sie
+  // registriert haben). Wieder bei einem anderen Server oder Schalter; nach einem Fehler frühestens in zehn Minuten.
   async registerCommands(cfg) {
-    const key = `${cfg.app_id}:${cfg.guild_id}`;
-    if (!cfg.app_id || !cfg.guild_id || this.commandsFor === key || Date.now() < (this.commandsRetry || 0)) return;
+    const on = cfg.commands !== false;
+    const key = `${cfg.app_id}:${cfg.guild_id}:${on}`;
+    if ((on && !this.clicks) || !cfg.app_id || !cfg.guild_id || this.commandsFor === key || Date.now() < (this.commandsRetry || 0)) return;
     try {
-      await this.rest.put(`/applications/${cfg.app_id}/guilds/${cfg.guild_id}/commands`, commands());
+      await this.rest.put(`/applications/${cfg.app_id}/guilds/${cfg.guild_id}/commands`, on ? commands() : []);
       this.commandsFor = key;
-      this.log(`Befehle /works für ${cfg.guild_name || cfg.guild_id} registriert`);
+      this.log(`Befehle /works für ${cfg.guild_name || cfg.guild_id} ${on ? 'registriert' : 'abgemeldet'}`);
     } catch (e) {
       if (e.status === 401) throw e;
       this.commandsRetry = Date.now() + (FAST ? 1000 : 600000);
@@ -951,12 +955,14 @@ export class Bot {
 
   // Eine Interaktion beantworten. io kapselt den Weg: eigener Bot direkt zu Discord, gemeinsamer Bot über den Dienst.
   // Nur der Besitzer darf etwas auslösen. Dialoge und Hilfe sofort, alles andere erst vorläufig, dann das Ergebnis
-  // (Annehmen kann Prüfungen laufen lassen, Discord wartet aber nur 3 s).
+  // (Annehmen kann Prüfungen laufen lassen, Discord wartet aber nur 3 s). Schalter aus: nur ein kurzer Hinweis
+  // (beim gemeinsamen Bot bleibt /works registriert, beim eigenen kommen noch Klicks auf alte Knöpfe).
   async onInteraction(i, io) {
     const cfg = loadDiscordConfig();
     const t = tr(i.locale || i.guild_locale);
     try {
       if (!cfg.owner_id || who(i) !== cfg.owner_id) return await io.reply(notOwner(i.locale));
+      if (cfg.commands === false) return await io.reply(commandsOff(i.locale));
       const p = i.type === 3 ? parseCid(i.data && i.data.custom_id) : null;
       if (p && MODAL.has(p.act)) return await io.modal(modalFor(i.data.custom_id, i.locale));
       if ((i.type === 2 && subOf(i).sub === 'help') || (p && p.act === 'help')) return await io.reply(helpMessage({ locale: i.locale, shared: this.shared }));
