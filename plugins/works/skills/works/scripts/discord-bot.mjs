@@ -33,6 +33,8 @@ const STATUS_MIN = FAST ? 300 : 10000;
 const IMAGE_MIN = FAST ? 1000 : 300000; // Bild höchstens alle 5 Minuten neu zeichnen
 const PRESENCE_MIN = FAST ? 200 : 20000;
 const RETRY = FAST ? 200 : 15000;
+// W-0051: so lange darf .works/config.json fehlen (Branch-Wechsel), bevor ein Projekt aus Panel und state.json fällt.
+const GONE_AFTER = FAST ? 2000 : 60000;
 const SILENT = 4096;
 const COLOR = { need: 0xe8a33d, done: 0x23a55a, red: 0xf23f43, run: 0x5865f2, gone: 0x80848e, status: 0x8e8cf7 };
 const PALETTE = [0x8e8cf7, 0xe8a33d, 0x3aa7a3, 0xd16ba5, 0x5aa9e6, 0x9bc53d, 0xf08a4b];
@@ -420,6 +422,7 @@ export class Bot {
     this.fingers = new Map();
     this.snapAt = new Map();
     this.caches = new Map();
+    this.missing = new Map();
     this.snapJson = new Map();
     // Bild je Kanal (nur im Speicher: nach einem Neustart wird es neu gezeichnet und das Dashboard einmal bearbeitet,
     // so fällt auch ein gelöschtes Dashboard auf). setStatus: Status des Bots, nur mit Gateway.
@@ -801,6 +804,22 @@ export class Bot {
     this.setStatus(text);
   }
 
+  // W-0051: Projekte, die nicht mehr in projects.json stehen oder kein .works/config.json mehr haben (projectList),
+  // fallen nach GONE_AFTER mit ihrem Stand aus state.json und damit aus Panel, Status und /works status. Einen alten
+  // Statuspost je Projekt räumt dashboards() vorher weg.
+  forget(present) {
+    const now = Date.now();
+    for (const [rid, pr] of Object.entries(this.state.projects)) {
+      if (present.has(rid)) { this.missing.delete(rid); continue; }
+      if (!this.missing.has(rid)) this.missing.set(rid, now);
+      if (now - this.missing.get(rid) < GONE_AFTER || pr.status) continue;
+      delete this.state.projects[rid];
+      for (const m of [this.missing, this.fingers, this.snapAt, this.caches, this.snapJson]) m.delete(rid);
+      this.dirty = true;
+      this.log(`${pr.name || rid}: kein .works mehr, aus dem Panel genommen`);
+    }
+  }
+
   prune(cfg) {
     const now = Date.now();
     // Gemerkte Nachrichten bleiben, bis das Aufräumen sie gelöscht hat (spätestens Frist plus eine Woche).
@@ -822,10 +841,13 @@ export class Bot {
       done.push(file);
     }
     if (done.length) this.dirty = true;
+    const present = new Set();
     for (const p of projectList()) {
       const rid = rootIdOf(p.path);
+      present.add(rid);
       if (this.enrolled(rid, cfg)) this.scanProject(p.path, rid, cfg);
     }
+    this.forget(present);
     if (!this.restored) this.restoreTimers(cfg);
     this.fireTimers(cfg);
     if (this.dirty) this.save();

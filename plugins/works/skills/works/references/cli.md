@@ -179,7 +179,7 @@ One bot per machine for all projects. Everything lives in `~/.works/discord`, ne
 | `import <file> [--format ..] [--map field=Column,..] [--sheet ..] [--json] [--all]` | Preview with duplicates, see import.md |
 | `import <backup.json> [--apply] [--mode merge\|restore] [--only 1,4]` | works backup from `export --json`: preview with new, changed, same, only here. `--apply` merges (new tasks get free IDs, selected changed ones are taken over), `--mode=restore` replaces the state and backs it up first in `.works/backups/`. Both can be reverted with `undo` |
 | `import <file> --apply [--only 1,4] [--skip 3] [--status planned] [--tags ..] [--include-done] [--keep-dups] [--include-archived]` | Create |
-| `selftest [--browser] [--keep] [--verbose] [--only <text>]` | Checks CLI, hooks, import, files, parallel work, server and API in a throwaway project. Exit 1 on errors. `--only` runs only steps whose name contains the text (for standalone steps like `works ship`) |
+| `selftest [--browser] [--keep] [--verbose] [--only <text>]` | Checks CLI, hooks, import, files, parallel work, server and API in a throwaway project. Exit 1 on errors. `--only` runs only steps whose name contains the text (for standalone steps like `works ship`); several parts separated by `\|`, e.g. `--only "init, new\|Discord"` |
 
 In the worktree of a parallel task (recognizable by `.works.link`), the CLI works on the `.works` of the main project. `start` doesn't change the active task there, `done` is blocked.
 
