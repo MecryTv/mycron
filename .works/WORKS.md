@@ -10,6 +10,10 @@
 
 Open by priority: P1 Critical: 0 · P2 High: 3 · P3 Medium: 0 · P4 Low: 0
 
+## Active task
+
+[W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) Alles auf Englisch, Sprache umschaltbar (Done), last handoff 2026-11-24 21:40
+
 ## Critical (P1)
 
 _No entries._

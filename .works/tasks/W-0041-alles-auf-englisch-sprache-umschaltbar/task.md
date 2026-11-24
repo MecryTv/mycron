@@ -80,7 +80,9 @@ Details und verworfene Alternativen: [decisions.md](decisions.md)
 - [x] Sollen die README.md der Plugins und des Repos auch englisch werden (mit README.de.md), oder bleiben sie deutsch? Sie gehörten nicht zum Plan. Antwort: Nutzer am 2026-11-24: Ja, README.md englisch mit README.de.md daneben (Plugins und Repo).
 
 ## Übergabe
-Abgeschlossen am 2026-11-24. Keine offene Übergabe.
+As of: 2026-11-24 21:40
+
+Fertig zur Auslieferung: alle Phasen, drei Funde der Code-Durchsicht behoben (8282743). Tests: Selbsttest mit Browser 55/55, ohne WebSocket 48/48 (erster Lauf einmal rot beim schnellen Bot-Neustart, Wiederholung grün), works-bot, ci-watch, mockups grün. Nach ship: works lang de global für den Nutzer.
 
 ## Verlauf
 - 2026-11-23: Aufgabe angelegt
@@ -120,3 +122,4 @@ Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 - 2026-11-24: Abgeschlossen (Status: review → erledigt), DoD bestätigt [Board]
 - 2026-11-24: Decision E2 documented: Alte Spracheinträge entfernen, Projekt-Sprache mit Kennzeichen
 - 2026-11-24: Decision E3 documented: READMEs englisch mit deutscher Fassung daneben
+- 2026-11-24: Handoff updated
