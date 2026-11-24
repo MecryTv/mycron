@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tr } from './i18n.mjs';
 
 // Board-Ansichten und ihre Tasten im Board.
 export const BOARD_VIEWS = { board: '1', sprint: '2', queue: '3', timeline: '4', graph: '5', table: '6', live: '7' };
@@ -25,7 +26,7 @@ async function launch(pw) {
   for (const opt of tries.filter(Boolean)) {
     try { return await pw.chromium.launch(opt); } catch (e) { err = e; }
   }
-  throw new Error(`Kein Browser startbar (Chrome, Edge, Chromium): ${String(err && err.message).split('\n')[0]}`);
+  throw new Error(tr('No browser could be started (Chrome, Edge, Chromium): {msg}', { msg: String(err && err.message).split('\n')[0] }));
 }
 
 // shots: je Farbschema und Breite ein Bild. prepare(page) bringt die Seite in den gewünschten Zustand (Ansicht, Aufgabe).
@@ -39,9 +40,9 @@ export async function takeShots(pw, { url, name, out, widths, themes, prepare, w
     for (const theme of themes) for (const w of widths) {
       const page = await browser.newPage({ viewport: { width: w, height }, colorScheme: theme });
       const found = [];
-      page.on('pageerror', (e) => found.push(`Fehler: ${e.message}`));
-      page.on('console', (m) => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) found.push(`Konsole: ${m.text()}`); });
-      page.on('requestfailed', (r) => { if (!/\/events$/.test(r.url())) found.push(`nicht geladen: ${r.url()}`); });
+      page.on('pageerror', (e) => found.push(tr('Error: {msg}', { msg: e.message })));
+      page.on('console', (m) => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) found.push(tr('Console: {msg}', { msg: m.text() })); });
+      page.on('requestfailed', (r) => { if (!/\/events$/.test(r.url())) found.push(tr('not loaded: {url}', { url: r.url() })); });
       const shot = perShot ? await perShot({ theme, width: w }) : { url, prepare, done: null };
       try {
         await page.goto(shot.url, { waitUntil: 'load' });
@@ -57,9 +58,10 @@ export async function takeShots(pw, { url, name, out, widths, themes, prepare, w
             if (over(el) && !over(el.parentElement)) els.push(el.tagName.toLowerCase() + [...el.classList].map((c) => `.${c}`).join(''));
             if (els.length >= 3) break;
           }
-          return `seitliches Scrollen (Seite ${sw} px, Fenster ${W} px)${els.length ? `: ${els.join(', ')}` : ''}`;
+          return { sw, W, els };
         });
-        if (wide) found.unshift(wide);
+        // Text erst hier bauen: page.evaluate läuft im Browser und kennt tr() nicht.
+        if (wide) found.unshift(tr('horizontal scrolling (page {sw} px, window {w} px)', { sw: wide.sw, w: wide.W }) + (wide.els.length ? `: ${wide.els.join(', ')}` : ''));
         const file = path.join(out, `${name}-${theme}-${w}.png`);
         await page.screenshot({ path: file, fullPage });
         res.push({ file, width: w, theme, problems: found });
@@ -82,7 +84,7 @@ export function boardPrepare({ view, task }) {
     await page.waitForTimeout(400);
     if (task) {
       const card = await page.$(`.card[data-id="${task}"]`);
-      if (!card) throw new Error(`${task} ist auf dem Board nicht zu sehen (archiviert oder ausgefiltert?).`);
+      if (!card) throw new Error(tr('{id} is not visible on the board (archived or filtered out?).', { id: task }));
       await card.click();
       await page.waitForTimeout(700);
     }

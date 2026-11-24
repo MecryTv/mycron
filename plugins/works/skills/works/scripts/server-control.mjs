@@ -5,6 +5,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { SKILL_DIR, worksDir, exists, readJson, writeJson, run } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 const VERSIONED = ['scripts', path.join('scripts', 'board'), 'hooks'];
 
@@ -199,7 +200,7 @@ export async function refreshServers(root) {
     if (info.version !== current) {
       await stopProcess(info.pid);
       startDetached(root, { cli, port: info.port, host: info.host || '127.0.0.1' });
-      notes.push(`Board-Server auf Port ${info.port} auf die neue Version umgestellt`);
+      notes.push(tr('Board server on port {port} switched to the new version', { port: info.port }));
     }
     return notes;
   }
@@ -207,7 +208,7 @@ export async function refreshServers(root) {
   for (const p of findServerProcesses(root)) {
     await stopProcess(p.pid);
     startDetached(root, { cli, port: p.port || 4747 });
-    notes.push(`Alten Board-Server (PID ${p.pid}) durch die neue Version ersetzt, Port ${p.port || 4747}`);
+    notes.push(tr('Replaced the old board server (PID {pid}) with the new version, port {port}', { pid: p.pid, port: p.port || 4747 }));
   }
   return notes;
 }

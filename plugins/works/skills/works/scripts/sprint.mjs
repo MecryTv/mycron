@@ -1,6 +1,7 @@
 // Sprints: ein Zeitraum mit Ziel, Kapazität in Punkten und den eingeplanten Aufgaben.
 // Gespeichert in config.json unter sprints und sprint_settings.
 import { today, daysBetween } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 export const DEFAULT_POINTS = { S: 1, M: 2, L: 4, XL: 8 };
 
@@ -68,6 +69,8 @@ export function sprintSummaryLine(config, tasks) {
   if (!s) return '';
   const st = sprintStats(config, s, tasks);
   const open = (s.tasks || []).map((id) => tasks.find((t) => t.id === id)).filter((t) => t && !['erledigt', 'verworfen'].includes(t.status));
-  return `Sprint ${s.id}${s.title ? ` ${s.title}` : ''} bis ${s.end}${s.goal ? `, Ziel: ${s.goal}` : ''}: ${st.done} von ${st.planned} Punkten erledigt.`
-    + (open.length ? ` Offen im Sprint: ${open.slice(0, 6).map((t) => t.id).join(', ')}${open.length > 6 ? ' und weitere' : ''}. Sprint-Aufgaben haben nach der Warteschlange Vorrang.` : '');
+  const v = { name: `${s.id}${s.title ? ` ${s.title}` : ''}`, end: s.end, goal: s.goal, done: st.done, planned: st.planned };
+  const ids = open.slice(0, 6).map((t) => t.id).join(', ') + (open.length > 6 ? ` ${tr('and more')}` : '');
+  return (s.goal ? tr('Sprint {name} until {end}, goal: {goal}: {done} of {planned} points done.', v) : tr('Sprint {name} until {end}: {done} of {planned} points done.', v))
+    + (open.length ? ` ${tr('Open in the sprint: {ids}. Sprint tasks take precedence right after the queue.', { ids })}` : '');
 }

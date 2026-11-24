@@ -4,15 +4,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { readText, worksDir, exists, today } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 export const knowledgeFile = (root) => path.join(worksDir(root), 'wissen.md');
-const HEAD = '# Projektwissen\n\nWas Claude in diesem Projekt wissen muss. Claude liest die passenden Einträge vor der Arbeit. Bearbeiten im Board unter Wissen oder mit works know.\n';
+const HEAD = () => tr('# Project knowledge\n\nWhat Claude needs to know in this project. Claude reads the relevant entries before working. Edit in the board under Knowledge or with works know.\n');
 
 export function loadKnowledge(root) {
   const f = knowledgeFile(root);
   if (!exists(f)) return [];
   const out = [];
-  let area = 'Allgemein';
+  let area = tr('General');
   let cur = null;
   for (const line of readText(f).split('\n')) {
     const a = line.match(/^## (.+)$/);
@@ -32,7 +33,7 @@ export function saveKnowledge(root, list) {
   const areas = [...new Set(list.map((e) => e.area))];
   const meta = (e) => `<!-- k:${['id', 'by', 'source', 'date', 'status'].filter((k) => e[k]).map((k) => `${k}=${encodeURIComponent(e[k])}`).join(' ')} -->`;
   const body = areas.map((a) => `## ${a}\n\n` + list.filter((e) => e.area === a).map((e) => `### ${e.title}\n${meta(e)}\n${e.text.trim()}\n`).join('\n')).join('\n');
-  fs.writeFileSync(knowledgeFile(root), `${HEAD}\n${body}`);
+  fs.writeFileSync(knowledgeFile(root), `${HEAD()}\n${body}`);
 }
 
 const clean = (s, max) => String(s || '').replace(/\r\n/g, '\n').replace(/<!--|-->/g, '').trim().slice(0, max);
@@ -40,8 +41,8 @@ const clean = (s, max) => String(s || '').replace(/\r\n/g, '\n').replace(/<!--|-
 export function addKnowledge(root, { area, title, text, by = 'Claude', source = '', proposal = false }) {
   const list = loadKnowledge(root);
   const t = clean(title, 140).replace(/\n/g, ' ');
-  if (!t) throw new Error('Titel fehlt.');
-  const e = { id: crypto.randomBytes(3).toString('hex'), area: clean(area || 'Allgemein', 60).replace(/[\n#]/g, ' '), title: t, text: clean(text, 4000), by, source: clean(source, 40), date: today(), status: proposal ? 'vorschlag' : 'ok' };
+  if (!t) throw new Error(tr('Title missing.'));
+  const e = { id: crypto.randomBytes(3).toString('hex'), area: clean(area || tr('General'), 60).replace(/[\n#]/g, ' '), title: t, text: clean(text, 4000), by, source: clean(source, 40), date: today(), status: proposal ? 'vorschlag' : 'ok' };
   list.push(e);
   saveKnowledge(root, list);
   return e;
@@ -50,7 +51,7 @@ export function addKnowledge(root, { area, title, text, by = 'Claude', source = 
 export function updateKnowledge(root, id, patch) {
   const list = loadKnowledge(root);
   const e = list.find((x) => x.id === id);
-  if (!e) throw new Error(`Eintrag ${id} nicht gefunden.`);
+  if (!e) throw new Error(tr('Entry {id} not found.', { id }));
   if ('title' in patch) e.title = clean(patch.title, 140).replace(/\n/g, ' ') || e.title;
   if ('text' in patch) e.text = clean(patch.text, 4000);
   if ('area' in patch) e.area = clean(patch.area, 60).replace(/[\n#]/g, ' ') || e.area;
@@ -62,7 +63,7 @@ export function updateKnowledge(root, id, patch) {
 export function removeKnowledge(root, id) {
   const list = loadKnowledge(root);
   const next = list.filter((x) => x.id !== id);
-  if (next.length === list.length) throw new Error(`Eintrag ${id} nicht gefunden.`);
+  if (next.length === list.length) throw new Error(tr('Entry {id} not found.', { id }));
   saveKnowledge(root, next);
 }
 
@@ -71,7 +72,8 @@ export function knowledgeSummary(root, max = 1200) {
   const list = loadKnowledge(root).filter((e) => e.status !== 'vorschlag');
   if (!list.length) return '';
   const areas = [...new Set(list.map((e) => e.area))];
-  let s = `Projektwissen (.works/wissen.md, vor passender Arbeit lesen): ${areas.map((a) => `${a}: ${list.filter((e) => e.area === a).map((e) => e.title + (e.status === 'veraltet' ? ' (veraltet?)' : '')).join('; ')}`).join(' | ')}`;
+  const items = areas.map((a) => `${a}: ${list.filter((e) => e.area === a).map((e) => e.title + (e.status === 'veraltet' ? ` (${tr('outdated?')})` : '')).join('; ')}`).join(' | ');
+  let s = tr('Project knowledge (.works/wissen.md, read before relevant work): {items}', { items });
   if (s.length > max) s = s.slice(0, max) + ' …';
   return s;
 }

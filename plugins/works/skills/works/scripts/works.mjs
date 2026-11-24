@@ -17,7 +17,7 @@ import { readText,
   getSection, setSection, appendToSection, stripComments, checkboxes, hasContent, imageLinks,
   loadTasks, loadTask, findTask, saveTask, addHistory, relFromWorks, isBlocked, openBlockers,
   isOverdue, openQuestions, sortTasks, readTemplate, fillTemplate, parseArgs, listFlag,
-  queueOf, pruneQueue, laneLink, normValue, sectionTitle, sectionKey,
+  queueOf, pruneQueue, laneLink, normValue, sectionTitle, sectionKey, bodyLang,
 } from './lib.mjs';
 import { tasksForFile, filesForTask } from './files.mjs';
 import { parseImport, FORMATS } from './import.mjs';
@@ -68,7 +68,7 @@ function refresh(root) {
 
 function validateEnum(name, value, allowed) {
   if (value === undefined || value === null || value === '') return;
-  if (!allowed.includes(value)) fail(`Ungültiger Wert für ${name}: "${value}". Erlaubt: ${allowed.join(', ')}`);
+  if (!allowed.includes(value)) fail(tr('Invalid value for {name}: "{value}". Allowed: {allowed}', { name, value, allowed: allowed.join(', ') }));
 }
 
 function normPriority(p) {
@@ -84,7 +84,7 @@ function cmdInit() {
   const root = path.resolve(flags.path || process.cwd());
   const wd = path.join(root, '.works');
   if (exists(path.join(wd, 'config.json')) && !flags.force) {
-    out(`.works existiert bereits in ${root}. Mit --force werden fehlende Dateien ergänzt.`);
+    out(tr('.works already exists in {root}. --force adds missing files.', { root }));
   }
   for (const sub of ['tasks', 'archive', 'inbox', 'reports']) fs.mkdirSync(path.join(wd, sub), { recursive: true });
   if (!exists(path.join(wd, 'config.json'))) {
@@ -99,13 +99,13 @@ function cmdInit() {
     if (!exists(keep)) fs.writeFileSync(keep, '');
   }
   const mode = flags.gitignore || 'default';
-  const ignore = ['# works: generierte und lokale Dateien', 'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'steps.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json', 'inbox/*', '!inbox/.gitkeep'];
+  const ignore = [tr('# works: generated and local files'),'board.html', 'state.json', 'server.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'steps.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json', 'inbox/*', '!inbox/.gitkeep'];
   if (mode === 'assets') ignore.push('tasks/*/assets/', 'archive/*/assets/');
   if (mode === 'all') ignore.splice(1, ignore.length - 1, '*', '!.gitignore');
   if (mode !== 'none') fs.writeFileSync(path.join(wd, '.gitignore'), ignore.join('\n') + '\n');
   refresh(root);
-  out(`works initialisiert in ${wd}`);
-  out('Nächste Schritte: Aufgabe anlegen mit `works new`, optional Hooks mit `works install-hooks`.');
+  out(tr('works initialized in {dir}', { dir: wd }));
+  out(tr('Next steps: create a task with `works new`, optionally install hooks with `works install-hooks`.'));
 }
 
 // ---------- new ----------
@@ -120,7 +120,7 @@ function createTask(root, config, opts) {
   validateEnum('effort', opts.effort, EFFORTS);
   const risk = normValue('risk', opts.risk);
   validateEnum('risk', risk, RISKS);
-  if (!opts.title || opts.title === true) fail('Titel fehlt (--title "...").');
+  if (!opts.title || opts.title === true) fail(tr('Title missing (--title "...").'));
 
   const existing = loadTasks(root);
   const maxId = Math.max(0, ...existing.map((t) => idNumber(t.id)).filter((n) => !Number.isNaN(n)));
@@ -204,12 +204,12 @@ function cmdNew() {
   const title = flags.title || pos.join(' ');
   const task = flags.template && flags.template !== true ? newFromTemplate(root, config) : createTask(root, config, { ...flags, title });
   refresh(root);
-  out(`Angelegt: ${task.id} ${task.title}`);
+  out(tr('Created: {id} {title}', { id: task.id, title: task.title }));
   const sim = findSimilar({ id: task.id, title: task.title, tags: task.tags, text: getSection(task._body, 'Beschreibung') || '' }, loadTasks(root, { archive: false }), { min: 0.55 });
-  if (sim.length) out(`Hinweis: ähnliche offene Aufgabe ${sim.map((x) => `${x.t.id} ${x.t.title} (${Math.round(x.score * 100)} %)`).join(', ')}. Falls doppelt, dem Nutzer vorschlagen, sie zusammenzuführen.`);
-  out(`Datei: ${task._file}`);
-  if (exists(path.join(task._dir, 'decisions.md'))) out(`Entscheidungen: ${path.join(task._dir, 'decisions.md')}`);
-  out('Nächster Schritt: Abschnitte der task.md ausfüllen (Platzhalterkommentare ersetzen).');
+  if (sim.length) out(tr('Note: similar open task {list}. If it is a duplicate, suggest merging them to the user.', { list: sim.map((x) => `${x.t.id} ${x.t.title} (${Math.round(x.score * 100)} %)`).join(', ') }));
+  out(tr('File: {file}', { file: task._file }));
+  if (exists(path.join(task._dir, 'decisions.md'))) out(tr('Decisions: {file}', { file: path.join(task._dir, 'decisions.md') }));
+  out(tr('Next step: fill in the sections of task.md (replace the placeholder comments).'));
 }
 
 // ---------- list / show ----------
@@ -236,23 +236,23 @@ function cmdList() {
     })), null, 2));
     return;
   }
-  if (!list.length) { out('Keine passenden Aufgaben.'); return; }
+  if (!list.length) { out(tr('No matching tasks.')); return; }
   const rows = list.map((t) => {
     const hints = [];
-    if (OPEN_STATUSES.includes(t.status) && isBlocked(t, byId)) hints.push(`blockiert: ${openBlockers(t, byId).join(',')}`);
-    if (isOverdue(t)) hints.push(`überfällig ${t.due}`);
-    if (t.incomplete) hints.push('unvollständig');
+    if (OPEN_STATUSES.includes(t.status) && isBlocked(t, byId)) hints.push(tr('blocked: {ids}', { ids: openBlockers(t, byId).join(',') }));
+    if (isOverdue(t)) hints.push(tr('overdue {due}', { due: t.due }));
+    if (t.incomplete) hints.push(tr('incomplete'));
     const q = openQuestions(t).length;
-    if (q) hints.push(`${q} Frage(n)`);
+    if (q) hints.push(tr('{n} question(s)', { n: q }));
     return [t.id, t.priority, STATUS_LABEL[t.status] || t.status, TYPE_LABEL[t.type] || t.type, t.effort || '-', t.title, hints.join(', ')];
   });
-  const head = ['ID', 'Prio', 'Status', 'Typ', 'Aufw.', 'Titel', 'Hinweise'];
+  const head = ['ID', 'Prio', 'Status', tr('Type'), tr('Eff.'), tr('Title'), tr('Notes')];
   const w = head.map((h, i) => Math.min(i === 5 ? 50 : 30, Math.max(h.length, ...rows.map((r) => String(r[i]).length))));
   const fmt = (r) => r.map((c, i) => { const s = String(c); return (s.length > w[i] ? s.slice(0, w[i] - 1) + '…' : s).padEnd(w[i]); }).join('  ').trimEnd();
   out(fmt(head));
   out(w.map((x) => '-'.repeat(x)).join('  '));
   rows.forEach((r) => out(fmt(r)));
-  out(`\n${list.length} Aufgabe(n)`);
+  out('\n' + tr('{n} task(s)', { n: list.length }));
 }
 
 function cmdShow() {
@@ -261,31 +261,31 @@ function cmdShow() {
   const t = findTask(root, config, pos[0]);
   if (flags.section) {
     const s = getSection(t._body, String(flags.section));
-    if (s === null) fail(`Abschnitt "${flags.section}" nicht gefunden.`);
+    if (s === null) fail(tr('Section "{name}" not found.', { name: flags.section }));
     out(s.trim());
     return;
   }
   out(readText(t._file));
   const byId = byIdMap(loadTasks(root));
   const info = [];
-  if (isBlocked(t, byId)) info.push(`Blockiert durch: ${openBlockers(t, byId).join(', ')}`);
+  if (isBlocked(t, byId)) info.push(tr('Blocked by: {ids}', { ids: openBlockers(t, byId).join(', ') }));
   const dec = path.join(t._dir, 'decisions.md');
-  if (exists(dec)) info.push(`Designentscheidungen: ${dec}`);
+  if (exists(dec)) info.push(tr('Design decisions: {file}', { file: dec }));
   const assets = fs.existsSync(path.join(t._dir, 'assets')) ? fs.readdirSync(path.join(t._dir, 'assets')).filter((f) => !f.startsWith('.')) : [];
-  if (assets.length) info.push(`Assets: ${assets.length} Datei(en)`);
+  if (assets.length) info.push(tr('Assets: {n} file(s)', { n: assets.length }));
   if (info.length) out('---\n' + info.join('\n'));
 }
 
 // ---------- set / log / question / link ----------
 
 function applyField(t, key, value, config) {
-  if (key === 'id' || key === 'created') fail(`Feld ${key} kann nicht geändert werden.`);
-  if (!FIELD_ORDER.includes(key) && !flags.custom) fail(`Unbekanntes Feld ${key}. Mit --custom erlaubst du eigene Felder.`);
+  if (key === 'id' || key === 'created') fail(tr('Field {key} cannot be changed.', { key }));
+  if (!FIELD_ORDER.includes(key) && !flags.custom) fail(tr('Unknown field {key}. --custom allows your own fields.', { key }));
   let v = value;
   if (LIST_FIELDS.includes(key)) {
     v = listFlag(value);
     if (['blocked_by', 'blocks', 'related'].includes(key)) v = v.map((x) => normalizeId(config, x));
-  } else if (key === 'incomplete') v = value === 'true' || value === '1' || value === 'ja';
+  } else if (key === 'incomplete') v = value === 'true' || value === '1' || value === 'ja' || value === 'yes';
   else if (value === '' || value === 'null' || value === '-') v = null;
   if (key === 'priority') v = normPriority(v);
   if (key === 'priority') validateEnum(key, v, PRIORITIES);
@@ -293,8 +293,8 @@ function applyField(t, key, value, config) {
   if (key === 'type') validateEnum(key, v, TYPES);
   if (key === 'effort') validateEnum(key, v, EFFORTS);
   if (key === 'risk') validateEnum(key, v, RISKS);
-  if ((key === 'due' || key === 'completed') && v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) fail(`${key} braucht das Format JJJJ-MM-TT.`);
-  if (key === 'milestone' && v && !(config.milestones || []).some((m) => m.id === v)) warn(`Meilenstein ${v} ist nicht in config.json definiert.`);
+  if ((key === 'due' || key === 'completed') && v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) fail(tr('{key} needs the format YYYY-MM-DD.', { key }));
+  if (key === 'milestone' && v && !(config.milestones || []).some((m) => m.id === v)) warn(tr('Milestone {id} is not defined in config.json.', { id: v }));
   const old = t[key];
   t[key] = v;
   return old;
@@ -304,27 +304,27 @@ function cmdSet() {
   const root = requireRoot();
   const config = loadConfig(root);
   const t = findTask(root, config, pos.shift());
-  if (!pos.length) fail('Keine Änderungen angegeben. Beispiel: works set W-0012 priority=P1 status=geplant');
+  if (!pos.length) fail(tr('No changes given. Example: works set W-0012 priority=P1 status=planned'));
   const changes = [];
   for (const pair of pos) {
     const eq = pair.indexOf('=');
-    if (eq === -1) fail(`Ungültige Angabe "${pair}", erwartet feld=wert.`);
+    if (eq === -1) fail(tr('Invalid argument "{arg}", expected field=value.', { arg: pair }));
     const key = pair.slice(0, eq).trim().replace(/-/g, '_');
     const value = normValue(key, pair.slice(eq + 1).trim());
-    if (key === 'status' && value === 'erledigt' && !flags.force) fail('Zum Abschließen `works done` verwenden, damit die Definition of Done geprüft wird.');
-    if (key === 'status' && value === 'verworfen' && !flags.reason) fail('Verwerfen braucht eine Begründung (--reason "...") oder `works drop`.');
+    if (key === 'status' && value === 'erledigt' && !flags.force) fail(tr('Use `works done` to close a task, so the Definition of Done gets checked.'));
+    if (key === 'status' && value === 'verworfen' && !flags.reason) fail(tr('Dropping needs a reason (--reason "...") or `works drop`.'));
     const old = applyField(t, key, value, config);
     if (key === 'type' && old && old !== t[key]) adaptToType(t, old, t[key]);
-    const fmt = (x) => (Array.isArray(x) ? `[${x.join(', ')}]` : (x ?? 'leer'));
+    const fmt = (x) => (Array.isArray(x) ? `[${x.join(', ')}]` : (x ?? tr('empty')));
     if (key === 'status') changes.push(`Status: ${fmt(old)} → ${fmt(t[key])}`);
-    else if (key === 'priority') changes.push(`Priorität: ${fmt(old)} → ${fmt(t[key])}`);
+    else if (key === 'priority') changes.push(tr('Priority: {old} → {new}', { old: fmt(old), new: fmt(t[key]) }));
     else changes.push(`${key}: ${fmt(old)} → ${fmt(t[key])}`);
   }
-  addHistory(t, changes.join('; ') + (flags.reason ? ` (Grund: ${flags.reason})` : ''));
+  addHistory(t, changes.join('; ') + (flags.reason ? ' ' + tr('(reason: {reason})', { reason: flags.reason }) : ''));
   saveTask(t);
   if (t.status === 'in-arbeit') { const st = loadState(root); st.active = t.id; saveState(root, st); }
   refresh(root);
-  out(`${t.id} aktualisiert: ${changes.join('; ')}`);
+  out(tr('{id} updated: {changes}', { id: t.id, changes: changes.join('; ') }));
 }
 
 function cmdLog() {
@@ -332,11 +332,11 @@ function cmdLog() {
   const config = loadConfig(root);
   const t = findTask(root, config, pos.shift());
   const text = flags.text || pos.join(' ');
-  if (!text) fail('Text fehlt.');
+  if (!text) fail(tr('Text missing.'));
   addHistory(t, text);
   saveTask(t);
   refresh(root);
-  out(`Verlauf von ${t.id} ergänzt.`);
+  out(tr('Added to the history of {id}.', { id: t.id }));
 }
 
 function cmdQuestion() {
@@ -349,17 +349,17 @@ function cmdQuestion() {
     let i = 0;
     const lines = sec.split('\n').map((l) => {
       const m = l.match(/^(\s*[-*]\s+)\[ \](\s*)(.*)$/);
-      if (m && m[3].trim()) { i++; if (i === n) return `${m[1]}[x]${m[2]}${m[3]}${flags.answer ? ` Antwort: ${flags.answer}` : ''}`; }
+      if (m && m[3].trim()) { i++; if (i === n) return `${m[1]}[x]${m[2]}${m[3]}${flags.answer ? ' ' + tr('Answer: {answer}', { answer: flags.answer }) : ''}`; }
       return l;
     });
-    if (i < n) fail(`Frage ${n} nicht gefunden.`);
+    if (i < n) fail(tr('Question {n} not found.', { n }));
     t._body = setSection(t._body, 'Offene Fragen', lines.join('\n'));
-    addHistory(t, `Frage ${n} geklärt${flags.answer ? `: ${flags.answer}` : ''}`);
+    addHistory(t, tr('Question {n} resolved', { n }) + (flags.answer ? `: ${flags.answer}` : ''));
   } else {
     const text = flags.text && flags.text !== true ? String(flags.text) : pos.join(' ');
     if (!text) {
       const q = openQuestions(t);
-      out(q.length ? q.map((x, i) => `${i + 1}. ${x.text}`).join('\n') : 'Keine offenen Fragen.');
+      out(q.length ? q.map((x, i) => `${i + 1}. ${x.text}`).join('\n') : tr('No open questions.'));
       return;
     }
     const sec = stripComments(getSection(t._body, 'Offene Fragen') || '').split('\n').filter((l) => l.trim() && !/^\s*[-*]\s+\[ \]\s*$/.test(l));
@@ -368,14 +368,14 @@ function cmdQuestion() {
   }
   saveTask(t);
   refresh(root);
-  out(`Offene Fragen von ${t.id} aktualisiert.`);
+  out(tr('Open questions of {id} updated.', { id: t.id }));
 }
 
 function cmdLink() {
   const root = requireRoot();
   const config = loadConfig(root);
   const [a, rel, b] = pos;
-  if (!a || !rel || !b) fail('Aufruf: works link <A> blocks|blocked-by|related <B>');
+  if (!a || !rel || !b) fail(tr('Usage: works link <A> blocks|blocked-by|related <B>'));
   const ta = findTask(root, config, a);
   const tb = findTask(root, config, b);
   const remove = cmd === 'unlink';
@@ -385,15 +385,16 @@ function cmdLink() {
   if (rel === 'blocks') { op(ta.blocks, tb.id); op(tb.blocked_by, ta.id); }
   else if (rel === 'blocked-by' || rel === 'blocked_by') { op(ta.blocked_by, tb.id); op(tb.blocks, ta.id); }
   else if (rel === 'related') { op(ta.related, tb.id); op(tb.related, ta.id); }
-  else fail(`Unbekannte Beziehung ${rel}.`);
+  else fail(tr('Unknown relation {rel}.', { rel }));
   if (!remove && rel !== 'related' && hasCycle(loadTasks(root).map((t) => (t.id === ta.id ? ta : t.id === tb.id ? tb : t)))) {
-    fail('Diese Abhängigkeit würde einen Zyklus erzeugen.');
+    fail(tr('This dependency would create a cycle.'));
   }
-  addHistory(ta, `${remove ? 'Beziehung entfernt' : 'Beziehung'}: ${rel} ${tb.id}`);
-  addHistory(tb, `${remove ? 'Beziehung entfernt' : 'Beziehung'}: ${ta.id} ${rel}`);
+  const relWord = remove ? tr('Relation removed') : tr('Relation');
+  addHistory(ta, `${relWord}: ${rel} ${tb.id}`);
+  addHistory(tb, `${relWord}: ${ta.id} ${rel}`);
   saveTask(ta); saveTask(tb);
   refresh(root);
-  out(`${ta.id} ${remove ? 'nicht mehr ' : ''}${rel} ${tb.id}`);
+  out(remove ? tr('{a} no longer {rel} {b}', { a: ta.id, rel, b: tb.id }) : `${ta.id} ${rel} ${tb.id}`);
 }
 
 function hasCycle(tasks) {
@@ -419,18 +420,18 @@ function branchName(t) {
 }
 
 function printContext(root, t) {
-  out(`Aufgabe: ${t.id} ${t.title}`);
-  out(`Typ ${TYPE_LABEL[t.type]}, ${t.priority} ${PRIO_LABEL[t.priority]}, Status ${STATUS_LABEL[t.status]}${t.effort ? `, Aufwand ${t.effort}` : ''}`);
-  out(`Datei: ${t._file}`);
+  out(tr('Task: {id} {title}', { id: t.id, title: t.title }));
+  out(tr('Type {type}, {prio} {prioLabel}, Status {status}', { type: TYPE_LABEL[t.type], prio: t.priority, prioLabel: PRIO_LABEL[t.priority], status: STATUS_LABEL[t.status] }) + (t.effort ? tr(', effort {effort}', { effort: t.effort }) : ''));
+  out(tr('File: {file}', { file: t._file }));
   if (t.branch) out(`Branch: ${t.branch}`);
   for (const s of ['Ziel', 'Zusammenfassung', 'Forschungsfrage', 'Abkürzung', 'Beschreibung', 'Kontext und Problem', 'Akzeptanzkriterien', 'Umsetzungsplan', 'Checkliste', 'Übergabe', 'Offene Fragen']) {
     const c = getSection(t._body, s);
     if (hasContent(c)) out(`\n## ${sectionTitle(s, t._body)}\n${stripComments(c).trim()}`);
   }
   const dec = path.join(t._dir, 'decisions.md');
-  if (exists(dec)) out(`\nDesignentscheidungen: ${dec}`);
+  if (exists(dec)) out('\n' + tr('Design decisions: {file}', { file: dec }));
   const assets = getSection(t._body, 'Assets');
-  if (hasContent(assets)) out(`\n## Assets (Beschreibungen)\n${stripComments(assets).trim()}`);
+  if (hasContent(assets)) out(`\n## ${tr('Assets (descriptions)')}\n${stripComments(assets).trim()}`);
 }
 
 function cmdStart() {
@@ -439,26 +440,26 @@ function cmdStart() {
   const t = findTask(root, config, pos[0]);
   const here = laneLink();
   if (here) {
-    if (here.task !== t.id) fail(`Dieser Worktree gehört zu ${here.task}. Andere Aufgaben nicht von hier starten.`);
-    out(`${t.id} läuft parallel in diesem Worktree. Die aktive Aufgabe des Hauptprojekts bleibt unverändert.`);
+    if (here.task !== t.id) fail(tr('This worktree belongs to {task}. Do not start other tasks from here.', { task: here.task }));
+    out(tr('{id} runs in parallel in this worktree. The active task of the main project stays unchanged.', { id: t.id }));
     printContext(root, t);
     return;
   }
   const lane = laneOf(root, t.id);
-  if (lane && !flags.force) fail(`${t.id} läuft parallel im Worktree ${lane.path}. Dort arbeitet ein Agent. Erst works parallel finish ${t.id} oder abort.`);
-  if (t._archived) fail(`${t.id} ist archiviert. Zum Wiederaufnehmen \`works reopen\` verwenden.`);
+  if (lane && !flags.force) fail(tr('{id} runs in parallel in the worktree {path}. An agent works there. First run works parallel finish {id} or abort.', { id: t.id, path: lane.path }));
+  if (t._archived) fail(tr('{id} is archived. Use `works reopen` to resume it.', { id: t.id }));
   const all = loadTasks(root);
   const byId = byIdMap(all);
   if (isBlocked(t, byId) && !flags.force) {
-    fail(`${t.id} ist blockiert durch ${openBlockers(t, byId).join(', ')}. Erst diese abschließen oder mit --force bewusst übergehen.`);
+    fail(tr('{id} is blocked by {ids}. Finish those first or override deliberately with --force.', { id: t.id, ids: openBlockers(t, byId).join(', ') }));
   }
-  if (t.incomplete) warn(`${t.id} ist als unvollständig markiert. Vor dem Start fehlende Angaben beim Nutzer erfragen.`);
+  if (t.incomplete) warn(tr('{id} is marked as incomplete. Ask the user for the missing details before starting.', { id: t.id }));
   const others = all.filter((x) => x.status === 'in-arbeit' && x.id !== t.id);
-  if (others.length) warn(`Bereits in Arbeit: ${others.map((x) => x.id).join(', ')}. Übergabe dort vorher aktualisieren.`);
+  if (others.length) warn(tr('Already in progress: {ids}. Update their handoff first.', { ids: others.map((x) => x.id).join(', ') }));
   const old = t.status;
   if (old !== 'in-arbeit') {
     t.status = 'in-arbeit';
-    addHistory(t, `Gestartet (Status: ${old} → in-arbeit)${isBlocked(t, byId) ? ' trotz Blockade' : ''}`);
+    addHistory(t, tr('Started (Status: {old} → in-arbeit)', { old }) + (isBlocked(t, byId) ? ' ' + tr('despite blockers') : ''));
   }
   if (!t.branch) t.branch = branchName(t);
   saveTask(t);
@@ -469,7 +470,7 @@ function cmdStart() {
   if (flags.git) {
     const exists_ = run('git', ['rev-parse', '--verify', t.branch], { cwd: root }).ok;
     const r = run('git', exists_ ? ['checkout', t.branch] : ['checkout', '-b', t.branch], { cwd: root });
-    out(r.ok ? `Git: auf Branch ${t.branch}` : `Git fehlgeschlagen: ${r.stderr.trim()}`);
+    out(r.ok ? tr('Git: on branch {branch}', { branch: t.branch }) : tr('Git failed: {error}', { error: r.stderr.trim() }));
   }
   refresh(root);
   printContext(root, t);
@@ -477,9 +478,11 @@ function cmdStart() {
     const d = loadDesign(t);
     const sk = detectDesignSkills();
     const names = [sk.uiux ? 'UI UX Pro Max' : '', sk.brainstorm ? 'Superpowers Brainstorming' : ''].filter(Boolean);
-    if (d && d.chosen) out(`\nEntwurf ${d.chosen.name} ist gewählt (works design ${t.id}). Danach umsetzen.`);
-    else if (d && d.variants.length) out(`\nEs gibt ${d.variants.length} Entwürfe, aber noch keine Wahl. Den Nutzer im Board unter Entwürfe wählen lassen oder nachfragen, bevor umgesetzt wird.`);
-    else out(`\nGestaltungsaufgabe: ${names.length ? `${names.join(' und ')} ${names.length > 1 ? 'sind' : 'ist'} installiert. Jetzt nutzen` : 'Falls UI UX Pro Max oder Superpowers Brainstorming verfügbar sind, jetzt nutzen'} und die Ergebnisse anhängen: works design brainstorm, works design direction, works design add (siehe references/integrations.md). Vor dem Umsetzen die Wahl des Nutzers abwarten.`);
+    if (d && d.chosen) out('\n' + tr('Design variant {name} is chosen (works design {id}). Implement it accordingly.', { name: d.chosen.name, id: t.id }));
+    else if (d && d.variants.length) out('\n' + tr('There are {n} design variants, but no choice yet. Let the user choose in the board under design variants, or ask before implementing.', { n: d.variants.length }));
+    else if (names.length > 1) out('\n' + tr('Design task: {a} and {b} are installed. Use them now and attach the results: works design brainstorm, works design direction, works design add (see references/integrations.md). Wait for the user\'s choice before implementing.', { a: names[0], b: names[1] }));
+    else if (names.length) out('\n' + tr('Design task: {name} is installed. Use it now and attach the results: works design brainstorm, works design direction, works design add (see references/integrations.md). Wait for the user\'s choice before implementing.', { name: names[0] }));
+    else out('\n' + tr('Design task: if UI UX Pro Max or Superpowers Brainstorming is available, use it now and attach the results: works design brainstorm, works design direction, works design add (see references/integrations.md). Wait for the user\'s choice before implementing.'));
   }
 }
 
@@ -488,23 +491,23 @@ function cmdHandoff() {
   const config = loadConfig(root);
   const st = loadState(root);
   const id = pos[0] || st.active;
-  if (!id) fail('Keine aktive Aufgabe. ID angeben.');
+  if (!id) fail(tr('No active task. Give an ID.'));
   const t = findTask(root, config, id);
   let text = flags.text;
   if (flags.file) text = readText(String(flags.file));
   if (!text || text === true) {
     const h = getSection(t._body, 'Übergabe');
-    out(hasContent(h) ? stripComments(h).trim() : `Keine Übergabe für ${t.id} vorhanden.`);
+    out(hasContent(h) ? stripComments(h).trim() : tr('No handoff for {id} yet.', { id: t.id }));
     return;
   }
-  t._body = setSection(t._body, 'Übergabe', `Stand: ${nowStamp()}\n\n${String(text).trim()}`);
-  addHistory(t, 'Übergabe aktualisiert');
+  t._body = setSection(t._body, 'Übergabe', `${tr('As of: {time}', { time: nowStamp() })}\n\n${String(text).trim()}`);
+  addHistory(t, tr('Handoff updated'));
   saveTask(t);
   st.active = t.id;
   st.last_handoff = nowStamp();
   saveState(root, st);
   refresh(root);
-  out(`Übergabe für ${t.id} gespeichert.`);
+  out(tr('Handoff for {id} saved.', { id: t.id }));
 }
 
 function cmdDod() {
@@ -526,8 +529,8 @@ function cmdSection() {
   const config = loadConfig(root);
   const t = findTask(root, config, pos.shift());
   const name = pos.shift();
-  if (!name) fail('Abschnittsname fehlt. Aufruf: works section <ID> "Ziel" --text "..." | --file pfad');
-  if (['Verlauf', 'Assets'].includes(sectionKey(name))) fail(`Der Abschnitt ${name} wird nur über das CLI gepflegt.`);
+  if (!name) fail(tr('Section name missing. Usage: works section <ID> "Goal" --text "..." | --file path'));
+  if (['Verlauf', 'Assets'].includes(sectionKey(name))) fail(tr('The section {name} is maintained only through the CLI.', { name }));
   let text = flags.text;
   if (flags.file) text = readText(String(flags.file));
   if (text === undefined || text === true) {
@@ -541,10 +544,10 @@ function cmdSection() {
   } else {
     t._body = setSection(t._body, name, clean);
   }
-  addHistory(t, `Abschnitt ${name} aktualisiert`);
+  addHistory(t, tr('Section {name} updated', { name }));
   saveTask(t);
   refresh(root);
-  out(`${t.id}: Abschnitt ${name} gespeichert.`);
+  out(tr('{id}: section {name} saved.', { id: t.id, name }));
 }
 
 // Zählt nur echte Punkte außerhalb von HTML-Kommentaren, genau wie checkboxes() in lib.mjs.
@@ -567,21 +570,22 @@ function cmdCheck() {
   const t = findTask(root, config, pos.shift());
   const n = parseInt(pos.shift(), 10);
   const name = flags.section && flags.section !== true ? String(flags.section) : 'Akzeptanzkriterien';
-  if (!n) fail('Nummer des Punkts fehlt. Aufruf: works check <ID> <Nr> [--section Akzeptanzkriterien] [--undo]');
+  if (!n) fail(tr('Item number missing. Usage: works check <ID> <no.> [--section "Acceptance criteria"] [--undo]'));
   const sec = getSection(t._body, name);
-  if (sec === null) fail(`Abschnitt ${name} nicht gefunden.`);
+  if (sec === null) fail(tr('Section {name} not found.', { name }));
   let text = '';
   const next = mapChecklist(sec.split('\n'), (l, m, i) => {
     if (i !== n) return l;
     text = m[4].trim();
     return `${m[1]}[${flags.undo ? ' ' : 'x'}]${m[3] || ' '}${m[4]}`;
   });
-  if (!text) fail(`Punkt ${n} in ${name} nicht gefunden.`);
+  if (!text) fail(tr('Item {n} in {section} not found.', { n, section: sectionTitle(name, t._body) }));
   t._body = setSection(t._body, name, next.join('\n'));
-  addHistory(t, `${name}: "${text}" ${flags.undo ? 'wieder geöffnet' : 'abgehakt'}`);
+  const section = sectionTitle(name, t._body);
+  addHistory(t, flags.undo ? tr('{section}: "{text}" reopened', { section, text }) : tr('{section}: "{text}" checked', { section, text }));
   saveTask(t);
   refresh(root);
-  out(`${t.id}: ${name} Punkt ${n} ${flags.undo ? 'offen' : 'erledigt'}.`);
+  out(flags.undo ? tr('{id}: {section} item {n} open.', { id: t.id, section, n }) : tr('{id}: {section} item {n} done.', { id: t.id, section, n }));
 }
 
 function cmdItem() {
@@ -590,7 +594,7 @@ function cmdItem() {
   const t = findTask(root, config, pos.shift());
   const text = (flags.text && flags.text !== true ? String(flags.text) : pos.join(' ')).trim();
   const name = flags.section && flags.section !== true ? String(flags.section) : 'Akzeptanzkriterien';
-  if (!CHECK_SECTIONS.includes(name)) warn(`Checklisten stehen üblicherweise in: ${CHECK_SECTIONS.join(', ')}`);
+  if (!CHECK_SECTIONS.includes(sectionKey(name))) warn(tr('Checklists usually go in: {list}', { list: CHECK_SECTIONS.map((s) => sectionTitle(s, t._body)).join(', ') }));
   const sec = getSection(t._body, name) || '';
   if (flags.remove) {
     const n = parseInt(flags.remove, 10);
@@ -600,43 +604,43 @@ function cmdItem() {
       removed = m[4].trim();
       return null;
     }).filter((l) => l !== null);
-    if (!removed) fail(`Punkt ${n} nicht gefunden.`);
+    if (!removed) fail(tr('Item {n} not found.', { n }));
     t._body = setSection(t._body, name, kept.join('\n'));
-    addHistory(t, `${name}: "${removed}" entfernt`);
+    addHistory(t, tr('{section}: "{text}" removed', { section: sectionTitle(name, t._body), text: removed }));
   } else {
-    if (!text) fail('Text fehlt.');
+    if (!text) fail(tr('Text missing.'));
     const lines = stripComments(sec).split('\n').filter((l) => l.trim() && !/^\s*[-*]\s+\[ \]\s*$/.test(l));
     lines.push(`- [ ] ${text}`);
     t._body = setSection(t._body, name, lines.join('\n'));
-    addHistory(t, `${name}: "${text}" ergänzt`);
+    addHistory(t, tr('{section}: "{text}" added', { section: sectionTitle(name, t._body), text }));
   }
   saveTask(t);
   refresh(root);
-  out(`${t.id}: ${name} aktualisiert.`);
+  out(tr('{id}: {section} updated.', { id: t.id, section: sectionTitle(name, t._body) }));
 }
 
 function printDod(res) {
-  out('Automatisch geprüft:');
+  out(tr('Checked automatically:'));
   for (const a of res.auto) out(`  [${a.ok ? 'x' : ' '}] ${a.text}${a.detail ? ` (${a.detail})` : ''}`);
   if (res.manual.length) {
-    out('Manuell zu bestätigen:');
+    out(tr('To confirm manually:'));
     for (const m of res.manual) out(`  [?] ${m}`);
   }
-  if (res.commands.length) out(`Befehle (mit --run ausführen): ${res.commands.join(' ; ')}`);
+  if (res.commands.length) out(tr('Commands (run with --run): {list}', { list: res.commands.join(' ; ') }));
 }
 
 async function cmdDone() {
   const root = requireRoot();
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
-  if (t.status === 'erledigt') { out(`${t.id} ist bereits erledigt.`); return; }
-  if (laneLink()) fail('Im Worktree einer parallelen Aufgabe nicht abschließen. Status review setzen, das Hauptprojekt schließt ab.');
-  { const lane = laneOf(root, t.id); if (lane && !flags.force) fail(`${t.id} läuft noch parallel im Worktree ${lane.path}. Erst works parallel finish ${t.id} [--merge].`); }
+  if (t.status === 'erledigt') { out(tr('{id} is already done.', { id: t.id })); return; }
+  if (laneLink()) fail(tr('Do not close a task inside the worktree of a parallel task. Set status review, the main project closes it.'));
+  { const lane = laneOf(root, t.id); if (lane && !flags.force) fail(tr('{id} still runs in parallel in the worktree {path}. First run works parallel finish {id} [--merge].', { id: t.id, path: lane.path })); }
   // Eingerichtete Prüfungen laufen automatisch, wenn es für den aktuellen Stand noch kein Ergebnis gibt.
   if (checksFor(config, t).length && !flags['no-checks']) {
     const st = dodCheck(root, config, t).checks;
     if (st && st.stale) {
-      out('Automatische Prüfungen:');
+      out(tr('Automatic checks:'));
       printChecks(await runChecks(root, config, t, { onStart: (c) => out(`> ${c.name}: ${c.cmd}`) }));
       out('');
     }
@@ -652,32 +656,32 @@ async function cmdDone() {
   }
   printDod(res);
   const failed = res.auto.filter((a) => !a.ok);
-  if (cmdFail.length) out(`Fehlgeschlagene Befehle: ${cmdFail.join(', ')}`);
+  if (cmdFail.length) out(tr('Failed commands: {list}', { list: cmdFail.join(', ') }));
   if ((failed.length || cmdFail.length) && !flags.force) {
-    out(`\n${t.id} erfüllt die Definition of Done noch nicht. Punkte erledigen oder mit --force --reason "..." bewusst abschließen.`);
+    out('\n' + tr('{id} does not meet the Definition of Done yet. Finish the items or close it deliberately with --force --reason "...".', { id: t.id }));
     process.exit(1);
   }
   if (!flags.confirm) {
-    out(`\nAutomatische Prüfungen bestanden. Manuelle Punkte prüfen, dann: works done ${t.id} --confirm`);
+    out('\n' + tr('Automatic checks passed. Check the manual items, then: works done {id} --confirm', { id: t.id }));
     return;
   }
   const old = t.status;
   t.status = 'erledigt';
   t.completed = today();
   const forced = failed.length || cmdFail.length;
-  addHistory(t, `Abgeschlossen (Status: ${old} → erledigt)${forced ? `, DoD übergangen: ${flags.reason || 'ohne Begründung'}` : ', DoD bestätigt'}`);
-  t._body = setSection(t._body, 'Übergabe', `Abgeschlossen am ${today()}. Keine offene Übergabe.`);
+  addHistory(t, tr('Closed (Status: {old} → erledigt)', { old }) + (forced ? tr(', DoD skipped: {reason}', { reason: flags.reason || tr('no reason given') }) : tr(', DoD confirmed')));
+  t._body = setSection(t._body, 'Übergabe', tr('Closed on {date}. No open handoff.', { date: today() }));
   saveTask(t);
   const st = loadState(root);
   if (st.active === t.id) { delete st.active; saveState(root, st); }
   refresh(root);
-  out(`${t.id} ist erledigt.`);
+  out(tr('{id} is done.', { id: t.id }));
   afterClose(root, t);
   const unblocked = loadTasks(root).filter((o) => (o.blocked_by || []).includes(t.id) && OPEN_STATUSES.includes(o.status) && !isBlocked(o, byIdMap(loadTasks(root))));
-  if (unblocked.length) out(`Jetzt frei: ${unblocked.map((o) => `${o.id} ${o.title}`).join('; ')}`);
+  if (unblocked.length) out(tr('Now unblocked: {list}', { list: unblocked.map((o) => `${o.id} ${o.title}`).join('; ') }));
   const dec = path.join(t._dir, 'decisions.md');
   if (exists(dec) && hasContent(getSection(readText(dec), 'Entscheidungen'))) {
-    out('Hinweis: decisions.md enthält Entscheidungen. Übernahme ins Decision Log (second-brain-sync) anbieten.');
+    out(tr('Note: decisions.md contains decisions. Offer to copy them into the Decision Log (second-brain-sync).'));
   }
 }
 
@@ -699,16 +703,16 @@ function cmdDrop() {
   const root = requireRoot();
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
-  if (!flags.reason) fail('Begründung fehlt (--reason "...").');
+  if (!flags.reason) fail(tr('Reason missing (--reason "...").'));
   const old = t.status;
   t.status = 'verworfen';
   t.completed = today();
-  addHistory(t, `Verworfen (Status: ${old} → verworfen). Grund: ${flags.reason}`);
+  addHistory(t, tr('Dropped (Status: {old} → verworfen). Reason: {reason}', { old, reason: flags.reason }));
   saveTask(t);
   const st = loadState(root);
   if (st.active === t.id) { delete st.active; saveState(root, st); }
   refresh(root);
-  out(`${t.id} verworfen.`);
+  out(tr('{id} dropped.', { id: t.id }));
   afterClose(root, t);
 }
 
@@ -716,8 +720,8 @@ function cmdReopen() {
   const root = requireRoot();
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
-  if (!flags.reason) fail('Wiedereröffnen braucht eine Begründung (--reason "...").');
-  if (OPEN_STATUSES.includes(t.status)) fail(`${t.id} ist bereits offen.`);
+  if (!flags.reason) fail(tr('Reopening needs a reason (--reason "...").'));
+  if (OPEN_STATUSES.includes(t.status)) fail(tr('{id} is already open.', { id: t.id }));
   const status = normValue('status', flags.status) || 'backlog';
   validateEnum('status', status, OPEN_STATUSES);
   if (t._archived) {
@@ -731,10 +735,10 @@ function cmdReopen() {
   t.status = status;
   t.completed = null;
   t.reopened = (parseInt(t.reopened, 10) || 0) + 1;
-  addHistory(t, `Wiedereröffnet (Status: ${old} → ${status}). Grund: ${flags.reason}`);
+  addHistory(t, tr('Reopened (Status: {old} → {status}). Reason: {reason}', { old, status, reason: flags.reason }));
   saveTask(t);
   refresh(root);
-  out(`${t.id} wiedereröffnet als ${status}.`);
+  out(tr('{id} reopened as {status}.', { id: t.id, status }));
 }
 
 function cmdArchive() {
@@ -748,12 +752,12 @@ function cmdArchive() {
     const days = parseInt(flags['older-than'] ?? 0, 10);
     list = list.filter((t) => daysBetween(String(t.completed || t.updated), today()) >= days);
   }
-  if (!list.length) { out('Nichts zu archivieren.'); return; }
+  if (!list.length) { out(tr('Nothing to archive.')); return; }
   for (const t of list) {
     const target = path.join(worksDir(root), 'archive', path.basename(t._dir));
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.renameSync(t._dir, target);
-    out(`Archiviert: ${t.id} ${t.title}`);
+    out(tr('Archived: {id} {title}', { id: t.id, title: t.title }));
   }
   refresh(root);
 }
@@ -773,61 +777,62 @@ function cmdQueue() {
   const need = (raw) => {
     const id = normalizeId(config, raw);
     const t = byId.get(id);
-    if (!t) fail(`Aufgabe ${id} nicht gefunden.`);
+    if (!t) fail(tr('Task {id} not found.', { id }));
     return t;
   };
   if (sub === 'add') {
     const t = need(pos.shift());
-    if (!OPEN_STATUSES.includes(t.status)) fail(`${t.id} ist ${STATUS_LABEL[t.status]} und kann nicht eingereiht werden.`);
+    if (!OPEN_STATUSES.includes(t.status)) fail(tr('{id} is {status} and cannot be queued.', { id: t.id, status: STATUS_LABEL[t.status] }));
     q = q.filter((x) => x !== t.id);
     const p = flags.pos && flags.pos !== true ? Math.max(1, parseInt(flags.pos, 10)) : q.length + 1;
     q.splice(p - 1, 0, t.id);
     save();
-    out(`${t.id} steht auf Platz ${q.indexOf(t.id) + 1} der Warteschlange.`);
+    out(tr('{id} is at position {n} in the queue.', { id: t.id, n: q.indexOf(t.id) + 1 }));
   } else if (sub === 'remove') {
     const id = normalizeId(config, pos.shift());
     q = q.filter((x) => x !== id);
     save();
-    out(`${id} aus der Warteschlange entfernt.`);
+    out(tr('{id} removed from the queue.', { id }));
   } else if (sub === 'move') {
     const t = need(pos.shift());
     const p = Math.max(1, parseInt(pos.shift(), 10) || 1);
     q = q.filter((x) => x !== t.id);
     q.splice(p - 1, 0, t.id);
     save();
-    out(`${t.id} steht jetzt auf Platz ${q.indexOf(t.id) + 1}.`);
+    out(tr('{id} is now at position {n}.', { id: t.id, n: q.indexOf(t.id) + 1 }));
   } else if (sub === 'order') {
     const ids = listFlag(pos.join(',')).map((x) => normalizeId(config, x));
-    for (const id of ids) if (!byId.has(id)) fail(`Aufgabe ${id} nicht gefunden.`);
+    for (const id of ids) if (!byId.has(id)) fail(tr('Task {id} not found.', { id }));
     q = [...new Set(ids)];
     save();
-    out(`Warteschlange mit ${q.length} Aufgabe(n) gespeichert.`);
+    out(tr('Queue with {n} task(s) saved.', { n: q.length }));
   } else if (sub === 'clear') {
     q = [];
     save();
-    out('Warteschlange geleert.');
+    out(tr('Queue cleared.'));
   } else if (sub === 'set') {
     config.queue_settings = config.queue_settings || {};
     for (const pair of pos) {
       const [k, v] = pair.split('=');
-      if (!['auto_next', 'skip_blocked', 'ask_before'].includes(k)) fail(`Unbekannte Einstellung ${k}. Erlaubt: auto_next, skip_blocked, ask_before`);
-      config.queue_settings[k] = ['true', '1', 'ja', 'an'].includes(String(v).toLowerCase());
+      if (!['auto_next', 'skip_blocked', 'ask_before'].includes(k)) fail(tr('Unknown setting {key}. Allowed: auto_next, skip_blocked, ask_before', { key: k }));
+      config.queue_settings[k] = ['true', '1', 'ja', 'an', 'yes', 'on'].includes(String(v).toLowerCase());
     }
     saveConfig(root, config);
     refresh(root);
-    out(`Einstellungen: ${Object.entries(config.queue_settings).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+    out(tr('Settings: {list}', { list: Object.entries(config.queue_settings).map(([k, v]) => `${k}=${v}`).join(', ') }));
   } else {
     pruneQueue(root, config, tasks);
     q = queueOf(config);
     if (flags.json) { out(JSON.stringify({ queue: q, settings: config.queue_settings }, null, 2)); return; }
-    if (!q.length) { out('Die Warteschlange ist leer. Einreihen mit works queue add <ID>.'); return; }
+    if (!q.length) { out(tr('The queue is empty. Add tasks with works queue add <ID>.')); return; }
     q.forEach((id, i) => {
       const t = byId.get(id);
-      const hint = isBlocked(t, byId) ? `, blockiert durch ${openBlockers(t, byId).join(', ')}` : '';
+      const hint = isBlocked(t, byId) ? tr(', blocked by {ids}', { ids: openBlockers(t, byId).join(', ') }) : '';
       out(`${String(i + 1).padStart(2)}. ${t.id} ${t.priority} ${STATUS_LABEL[t.status]}: ${t.title}${hint}`);
     });
     const s = config.queue_settings || {};
-    out(`\nNach Abschluss automatisch weiter: ${s.auto_next ? 'ja' : 'nein'}${s.auto_next && s.ask_before ? ' (mit Rückfrage)' : ''}, Blockierte überspringen: ${s.skip_blocked === false ? 'nein' : 'ja'}`);
+    const auto = (s.auto_next ? tr('yes') : tr('no')) + (s.auto_next && s.ask_before ? ' ' + tr('(ask first)') : '');
+    out('\n' + tr('Continue automatically after closing: {auto}, skip blocked tasks: {skip}', { auto, skip: s.skip_blocked === false ? tr('no') : tr('yes') }));
   }
 }
 
@@ -840,8 +845,8 @@ function afterClose(root, t) {
   const s = config.queue_settings || {};
   const next = queueOf(config).map((id) => byId.get(id)).find((x) => x && ['backlog', 'geplant'].includes(x.status) && (s.skip_blocked === false || !isBlocked(x, byId)));
   if (!next) return;
-  out(`Nächste Aufgabe in der Warteschlange: ${next.id} ${next.title}`);
-  if (s.auto_next) out(s.ask_before ? `Laut Einstellung als Nächstes ${next.id} starten, vorher kurz beim Nutzer nachfragen.` : `Laut Einstellung direkt mit works start ${next.id} weitermachen.`);
+  out(tr('Next task in the queue: {id} {title}', { id: next.id, title: next.title }));
+  if (s.auto_next) out(s.ask_before ? tr('Per settings, start {id} next, but ask the user briefly first.', { id: next.id }) : tr('Per settings, continue directly with works start {id}.', { id: next.id }));
 }
 
 function cmdNext() {
@@ -849,25 +854,25 @@ function cmdNext() {
   const n = parseInt(flags.n || 3, 10);
   const { active, candidates } = nextCandidates(root, n);
   if (active.length) {
-    out('Bereits in Arbeit oder Review:');
+    out(tr('Already in progress or in review:'));
     for (const t of sortTasks(active)) out(`  ${t.id} ${t.priority} ${STATUS_LABEL[t.status]}: ${t.title}`);
     out('');
   }
-  if (!candidates.length) { out('Keine startbaren Aufgaben im Backlog.'); return; }
-  out('Empfehlung für die nächste Aufgabe:');
+  if (!candidates.length) { out(tr('No startable tasks in the backlog.')); return; }
+  out(tr('Recommended next task:'));
   candidates.forEach((c, i) => out(`  ${i + 1}. ${c.task.id} ${c.task.title}\n     ${c.reasons.join(', ')}`));
 }
 
 function cmdStatus() {
   const root = findRoot();
-  if (!root) { out('Kein .works Ordner in diesem Projekt.'); return; }
+  if (!root) { out(tr('No .works folder in this project.')); return; }
   out(sessionSummary(root));
 }
 
 function cmdIndex() {
   const root = requireRoot();
   refresh(root);
-  out(`WORKS.md aktualisiert: ${path.join(worksDir(root), 'WORKS.md')}`);
+  out(tr('WORKS.md updated: {file}', { file: path.join(worksDir(root), 'WORKS.md') }));
 }
 
 function serverUrl(info) {
@@ -910,27 +915,27 @@ async function openBoardOnce(info, wait = 0) {
     await new Promise((r) => setTimeout(r, 250));
     tabs = await count();
   }
-  out(tabs === 'own' ? 'Das Board ist schon in einem Browser-Tab offen, kein neuer Tab.'
-    : tabs ? 'Ein anderes works-Board ist schon in einem Browser-Tab offen, kein neuer Tab. Der Tab wechselt von selbst zum Hub.'
+  out(tabs === 'own' ? tr('The board is already open in a browser tab, no new tab.')
+    : tabs ? tr('Another works board is already open in a browser tab, no new tab. That tab switches to the hub by itself.')
       : openInBrowser(serverUrl(info)));
 }
 
 function printShare(root, info) {
   if (!info || !['0.0.0.0', '::'].includes(info.host)) return;
   const links = shareLinks(root, info.port);
-  if (!links.length) { out('Im Netzwerk freigegeben, aber keine Netzwerkadresse gefunden.'); return; }
-  out('Im Netzwerk geteilt. Link zum Ansehen (nur lesen):');
+  if (!links.length) { out(tr('Shared on the network, but no network address found.')); return; }
+  out(tr('Shared on the network. Link for viewing (read-only):'));
   for (const l of links) out(`  ${l.view}`);
-  if (flags['owner-link']) { out('Link mit Bearbeitungsrechten, nicht weitergeben:'); for (const l of links) out(`  ${l.edit}`); }
-  out('Freigabe beenden: works board --restart --private. Links erneuern: works share --rotate');
+  if (flags['owner-link']) { out(tr('Link with edit rights, do not pass it on:')); for (const l of links) out(`  ${l.edit}`); }
+  out(tr('Stop sharing: works board --restart --private. Renew links: works share --rotate'));
 }
 
 function cmdShare() {
   const root = requireRoot();
-  if (flags.rotate) { rotateKeys(root); out('Neue Links erzeugt. Die alten funktionieren nicht mehr. Offene geteilte Tabs brauchen den neuen Link.'); }
+  if (flags.rotate) { rotateKeys(root); out(tr('New links created. The old ones no longer work. Open shared tabs need the new link.')); }
   const info = readServer(root);
-  if (!info) { out('Kein Live-Board aktiv. Teilen mit: works board --serve --detach --share'); return; }
-  if (!['0.0.0.0', '::'].includes(info.host)) { out(`Das Board läuft nur lokal (${serverUrl(info)}). Im Netzwerk teilen mit: works board --restart --share`); return; }
+  if (!info) { out(tr('No live board running. Share with: works board --serve --detach --share')); return; }
+  if (!['0.0.0.0', '::'].includes(info.host)) { out(tr('The board runs only locally ({url}). Share it on the network with: works board --restart --share', { url: serverUrl(info) })); return; }
   flags['owner-link'] = flags['owner-link'] || flags.owner;
   printShare(root, info);
 }
@@ -944,15 +949,16 @@ function cmdExport() {
     });
     const file = path.resolve(flags.out && flags.out !== true ? String(flags.out) : path.join(worksDir(root), 'reports', backupFileName(root)));
     writeJson(file, d);
-    out(`Sicherung gespeichert: ${file} (${d.tasks.length} ${d.tasks.length === 1 ? 'Aufgabe' : 'Aufgaben'}, ${Math.max(1, Math.round(fs.statSync(file).size / 1024))} KB). Einlesen mit works import <datei>.`);
+    const kb = Math.max(1, Math.round(fs.statSync(file).size / 1024));
+    out(d.tasks.length === 1 ? tr('Backup saved: {file} ({n} task, {kb} KB). Import it with works import <file>.', { file, n: 1, kb }) : tr('Backup saved: {file} ({n} tasks, {kb} KB). Import it with works import <file>.', { file, n: d.tasks.length, kb }));
     return;
   }
   const snap = buildSnapshot(root, { images: !flags['no-images'], closed: !flags['open-only'] });
   const file = path.resolve(flags.out && flags.out !== true ? String(flags.out) : path.join(worksDir(root), 'reports', snapshotName(root)));
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, snap.html);
-  out(`Schnappschuss gespeichert: ${file}`);
-  out(`${snap.tasks} Aufgaben, ${(snap.imageBytes / 1024 / 1024).toFixed(1)} MB Bilder eingebettet${snap.skipped ? `, ${snap.skipped} Bild(er) zu groß oder fehlend` : ''}. Öffnet sich ohne Server, nur zum Ansehen.`);
+  out(tr('Snapshot saved: {file}', { file }));
+  out(`${tr('{n} tasks, {mb} MB of images embedded', { n: snap.tasks, mb: (snap.imageBytes / 1024 / 1024).toFixed(1) })}${snap.skipped ? tr(', {n} image(s) too large or missing', { n: snap.skipped }) : ''}. ${tr('Opens without a server, view only.')}`);
 }
 
 async function cmdBoard() {
@@ -962,16 +968,16 @@ async function cmdBoard() {
   const legacy = info ? [] : findServerProcesses(root);
 
   if (flags.status) {
-    if (info) { out(`Live-Board läuft: ${serverUrl(info)} (PID ${info.pid}, Version ${info.version}${info.version === current ? ', aktuell' : `, veraltet, aktuell ist ${current}`})`); printShare(root, info); }
-    for (const p of legacy) out(`Board-Server einer älteren works-Version läuft: PID ${p.pid}${p.port ? `, Port ${p.port}` : ''}. Mit works board --restart ersetzen.`);
-    if (!info && !legacy.length) out('Kein Live-Board für dieses Projekt aktiv.');
+    if (info) { out(tr('Live board running: {url} (PID {pid}, version {version}{state})', { url: serverUrl(info), pid: info.pid, version: info.version, state: info.version === current ? tr(', current') : tr(', outdated, current is {current}', { current }) })); printShare(root, info); }
+    for (const p of legacy) out(tr('Board server of an older works version is running: PID {pid}{port}. Replace it with works board --restart.', { pid: p.pid, port: p.port ? tr(', port {port}', { port: p.port }) : '' }));
+    if (!info && !legacy.length) out(tr('No live board running for this project.'));
     return;
   }
   if (flags.stop) {
     let n = 0;
     if (info && await stopProcess(info.pid)) { clearServer(root, info.pid); n++; }
     for (const p of legacy) if (await stopProcess(p.pid)) n++;
-    out(n ? `${n} Board-Server beendet.` : 'Kein Live-Board für dieses Projekt aktiv.');
+    out(n ? tr('{n} board server(s) stopped.', { n }) : tr('No live board running for this project.'));
     return;
   }
 
@@ -982,14 +988,14 @@ async function cmdBoard() {
     let port = parseInt(flags.port || (info && info.port) || (legacy[0] && legacy[0].port) || lastPort(root) || 4747, 10);
     // Läuft schon ein aktueller Server, keinen zweiten starten.
     if (info && info.version === current && !flags.restart && !flags.takeover && !hostChanged) {
-      out(`Live-Board läuft bereits: ${serverUrl(info)}`);
+      out(tr('Live board already running: {url}', { url: serverUrl(info) }));
       if (flags.open) await openBoardOnce(info);
       return;
     }
     // Veraltete oder alte Server dieses Projekts durch die aktuelle Version ersetzen.
     if (!flags.takeover) {
-      if (info) { await stopProcess(info.pid); clearServer(root, info.pid); out(`Vorherigen Board-Server (Version ${info.version}) beendet.`); }
-      for (const p of legacy) { await stopProcess(p.pid); out(`Board-Server einer älteren works-Version (PID ${p.pid}) beendet.`); }
+      if (info) { await stopProcess(info.pid); clearServer(root, info.pid); out(tr('Stopped the previous board server (version {version}).', { version: info.version })); }
+      for (const p of legacy) { await stopProcess(p.pid); out(tr('Stopped the board server of an older works version (PID {pid}).', { pid: p.pid })); }
     }
     generateIndex(root);
     if (flags.detach || flags.restart) {
@@ -998,10 +1004,10 @@ async function cmdBoard() {
       const fixed = !!(flags.port || info || legacy.length);
       const pid = startDetached(root, { cli: newestCli(), port: fixed ? port : 0, host, takeover: !!(info || legacy.length) });
       const started = await waitForServer(root, info ? info.pid : null);
-      if (!started) fail(`Board-Server startet nicht (PID ${pid}). Details in .works/server.log`);
-      out(`Live-Board läuft: ${serverUrl(started)}`);
+      if (!started) fail(tr('Board server does not start (PID {pid}). Details in .works/server.log', { pid }));
+      out(tr('Live board running: {url}', { url: serverUrl(started) }));
       printShare(root, started);
-      out('Läuft im Hintergrund weiter. Beenden mit works board --stop.');
+      out(tr('Keeps running in the background. Stop it with works board --stop.'));
       if (flags.open) await openBoardOnce(started, 3000);
       return;
     }
@@ -1015,7 +1021,7 @@ async function cmdBoard() {
     return new Promise(() => {}); // läuft bis Strg+C
   }
   const file = generateBoard(root);
-  out(`Board erzeugt: ${file}`);
+  out(tr('Board created: {file}', { file }));
   if (flags.open) out(openInBrowser(file));
 }
 
@@ -1029,34 +1035,34 @@ async function cmdDemo() {
   const sub = (args) => run(process.execPath, [path.join(SKILL_DIR, 'scripts', 'works.mjs'), ...args], { cwd: root, encoding: 'utf8' });
 
   if (flags.remove) {
-    if (!isDemo) fail(`${root} ist kein Demo-Projekt, nichts entfernt.`);
+    if (!isDemo) fail(tr('{dir} is not a demo project, nothing removed.', { dir: root }));
     sub(['board', '--stop']);
     fs.rmSync(root, { recursive: true, force: true });
-    out(`Demo entfernt: ${root}`);
+    out(tr('Demo removed: {dir}', { dir: root }));
     return;
   }
   // Niemals ein echtes Projekt überschreiben.
-  if (exists(wd) && !isDemo) fail(`${root} enthält bereits ein echtes .works. Für die Demo einen anderen Ordner mit --path wählen.`);
-  if (exists(root) && !exists(wd) && fs.readdirSync(root).length && flags.path) fail(`${root} ist nicht leer. Für die Demo einen leeren oder neuen Ordner wählen.`);
+  if (exists(wd) && !isDemo) fail(tr('{dir} already contains a real .works. Choose another folder for the demo with --path.', { dir: root }));
+  if (exists(root) && !exists(wd) && fs.readdirSync(root).length && flags.path) fail(tr('{dir} is not empty. Choose an empty or new folder for the demo.', { dir: root }));
 
   if (isDemo) sub(['board', '--stop']);
-  out(`Lege Beispielprojekt an: ${root}`);
+  out(tr('Creating sample project: {dir}', { dir: root }));
   const tasks = seedDemo(root);
-  fs.writeFileSync(path.join(root, '.works', '.demo'), 'Von works demo angelegt. Mit works demo --remove entfernen.\n');
+  fs.writeFileSync(path.join(root, '.works', '.demo'), tr('Created by works demo. Remove it with works demo --remove.') + '\n');
   const args = ['board', '--serve', '--detach'];
   if (flags.port && flags.port !== true) args.push(`--port=${flags.port}`);
   if (flags.open) args.push('--open');
   const r = sub(args);
-  if (!r.ok) fail(`Board startet nicht: ${(r.stderr || r.stdout).trim()}`);
+  if (!r.ok) fail(tr('Board does not start: {msg}', { msg: (r.stderr || r.stdout).trim() }));
   out(r.stdout.trim().split('\n')[0]);
-  out(`${Object.keys(tasks).length} Aufgaben, 2 Meilensteine und 3 Ideen sind angelegt. Im Board kannst du alles ausprobieren.`);
+  out(tr('{n} tasks, 2 milestones and 3 ideas are created. Try everything out in the board.', { n: Object.keys(tasks).length }));
   if (flags.simulate) {
     const delay = Math.max(2, parseInt(flags.delay || 6, 10)) * 1000;
-    out(`\nSpiele jetzt alle ${delay / 1000} Sekunden eine Änderung vor, wie Claude sie macht. Schau dabei aufs Board:`);
+    out('\n' + tr('Now playing a change every {s} seconds, the way Claude makes them. Watch the board:', { s: delay / 1000 }));
     await simulate(root, tasks, { delay, log: out });
-    out('\nVorführung beendet. Das Board läuft weiter.');
+    out('\n' + tr('Demo run finished. The board keeps running.'));
   }
-  out(`Beenden: works board --stop im Ordner ${root}, oder alles entfernen mit works demo --remove`);
+  out(tr('Stop: works board --stop in the folder {dir}, or remove everything with works demo --remove', { dir: root }));
 }
 
 // ---------- doctor ----------
@@ -1074,50 +1080,50 @@ function cmdDoctor() {
   const missing = assetsIgnored ? warnings : errors;
   for (const t of all) {
     const where = relFromWorks(root, t._file);
-    if (!t._valid) { errors.push(`${where}: Frontmatter fehlt oder ist ungültig`); continue; }
-    for (const f of ['id', 'title', 'type', 'priority', 'status', 'created']) if (!t[f]) errors.push(`${where}: Pflichtfeld ${f} fehlt`);
-    if (t.type && !TYPES.includes(t.type)) errors.push(`${where}: ungültiger Typ ${t.type}`);
-    if (t.priority && !PRIORITIES.includes(t.priority)) errors.push(`${where}: ungültige Priorität ${t.priority}`);
-    if (t.status && !STATUSES.includes(t.status)) errors.push(`${where}: ungültiger Status ${t.status}`);
-    if (t.effort && !EFFORTS.includes(t.effort)) errors.push(`${where}: ungültiger Aufwand ${t.effort}`);
-    if (t.risk && !RISKS.includes(t.risk)) errors.push(`${where}: ungültiges Risiko ${t.risk}`);
-    for (const f of ['created', 'updated', 'due', 'completed']) if (t[f] && !/^\d{4}-\d{2}-\d{2}$/.test(String(t[f]))) errors.push(`${where}: ${f} hat kein Datumsformat JJJJ-MM-TT`);
-    if (t.id && !path.basename(t._dir).startsWith(t.id + '-')) errors.push(`${where}: Ordnername passt nicht zur ID ${t.id}`);
-    if (t.id && byId.has(t.id)) errors.push(`${where}: doppelte ID ${t.id}`);
+    if (!t._valid) { errors.push(tr('{where}: frontmatter missing or invalid', { where })); continue; }
+    for (const f of ['id', 'title', 'type', 'priority', 'status', 'created']) if (!t[f]) errors.push(tr('{where}: required field {field} missing', { where, field: f }));
+    if (t.type && !TYPES.includes(t.type)) errors.push(tr('{where}: invalid type {value}', { where, value: t.type }));
+    if (t.priority && !PRIORITIES.includes(t.priority)) errors.push(tr('{where}: invalid priority {value}', { where, value: t.priority }));
+    if (t.status && !STATUSES.includes(t.status)) errors.push(tr('{where}: invalid status {value}', { where, value: t.status }));
+    if (t.effort && !EFFORTS.includes(t.effort)) errors.push(tr('{where}: invalid effort {value}', { where, value: t.effort }));
+    if (t.risk && !RISKS.includes(t.risk)) errors.push(tr('{where}: invalid risk {value}', { where, value: t.risk }));
+    for (const f of ['created', 'updated', 'due', 'completed']) if (t[f] && !/^\d{4}-\d{2}-\d{2}$/.test(String(t[f]))) errors.push(tr('{where}: {field} is not in the date format YYYY-MM-DD', { where, field: f }));
+    if (t.id && !path.basename(t._dir).startsWith(t.id + '-')) errors.push(tr('{where}: folder name does not match the ID {id}', { where, id: t.id }));
+    if (t.id && byId.has(t.id)) errors.push(tr('{where}: duplicate ID {id}', { where, id: t.id }));
     byId.set(t.id, t);
-    if (t._archived && OPEN_STATUSES.includes(t.status)) errors.push(`${where}: offene Aufgabe liegt im Archiv (works reopen verwenden)`);
-    if (!t.effort && OPEN_STATUSES.includes(t.status)) warnings.push(`${t.id}: kein Aufwand gesetzt`);
-    if (t.milestone && !(config.milestones || []).some((m) => m.id === t.milestone)) warnings.push(`${t.id}: Meilenstein ${t.milestone} nicht definiert`);
+    if (t._archived && OPEN_STATUSES.includes(t.status)) errors.push(tr('{where}: open task is in the archive (use works reopen)', { where }));
+    if (!t.effort && OPEN_STATUSES.includes(t.status)) warnings.push(tr('{id}: no effort set', { id: t.id }));
+    if (t.milestone && !(config.milestones || []).some((m) => m.id === t.milestone)) warnings.push(tr('{id}: milestone {milestone} not defined', { id: t.id, milestone: t.milestone }));
   }
   for (const t of all) {
     if (!t._valid) continue;
-    for (const f of ['blocked_by', 'blocks', 'related']) for (const ref of t[f] || []) if (!byId.has(ref)) errors.push(`${t.id}: ${f} verweist auf unbekannte Aufgabe ${ref}`);
+    for (const f of ['blocked_by', 'blocks', 'related']) for (const ref of t[f] || []) if (!byId.has(ref)) errors.push(tr('{id}: {field} refers to unknown task {ref}', { id: t.id, field: f, ref }));
     for (const b of t.blocks || []) {
       const o = byId.get(b);
       if (o && !(o.blocked_by || []).includes(t.id)) {
-        if (flags.fix) { o.blocked_by.push(t.id); saveTask(o, { touch: false }); fixes.push(`${o.id}: blocked_by um ${t.id} ergänzt`); }
-        else warnings.push(`${t.id} blockiert ${b}, aber ${b} führt ${t.id} nicht in blocked_by`);
+        if (flags.fix) { o.blocked_by.push(t.id); saveTask(o, { touch: false }); fixes.push(tr('{id}: added {ref} to blocked_by', { id: o.id, ref: t.id })); }
+        else warnings.push(tr('{id} blocks {other}, but {other} does not list {id} in blocked_by', { id: t.id, other: b }));
       }
     }
     for (const b of t.blocked_by || []) {
       const o = byId.get(b);
       if (o && !(o.blocks || []).includes(t.id)) {
-        if (flags.fix) { o.blocks.push(t.id); saveTask(o, { touch: false }); fixes.push(`${o.id}: blocks um ${t.id} ergänzt`); }
-        else warnings.push(`${t.id} wartet auf ${b}, aber ${b} führt ${t.id} nicht in blocks`);
+        if (flags.fix) { o.blocks.push(t.id); saveTask(o, { touch: false }); fixes.push(tr('{id}: added {ref} to blocks', { id: o.id, ref: t.id })); }
+        else warnings.push(tr('{id} waits for {other}, but {other} does not list {id} in blocks', { id: t.id, other: b }));
       }
     }
     // Inhalte
     const open = OPEN_STATUSES.includes(t.status);
     const crit = checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '');
-    if (open && ['feature', 'bug', 'design', 'refactor', 'debt'].includes(t.type) && crit.total === 0 && !t.incomplete) warnings.push(`${t.id}: keine Akzeptanzkriterien`);
-    if (t.status === 'erledigt' && crit.done < crit.total) warnings.push(`${t.id}: erledigt, aber ${crit.total - crit.done} Akzeptanzkriterien offen`);
+    if (open && ['feature', 'bug', 'design', 'refactor', 'debt'].includes(t.type) && crit.total === 0 && !t.incomplete) warnings.push(tr('{id}: no acceptance criteria', { id: t.id }));
+    if (t.status === 'erledigt' && crit.done < crit.total) warnings.push(tr('{id}: done, but {n} acceptance criteria open', { id: t.id, n: crit.total - crit.done }));
     if (t.status === 'in-arbeit') {
       const h = getSection(t._body, 'Übergabe');
       const stale = daysBetween(String(t.updated || t.created), today()) > (config.handoff_stale_days || 3);
-      if (!hasContent(h)) warnings.push(`${t.id}: in Arbeit ohne Übergabenotiz`);
-      else if (stale) warnings.push(`${t.id}: in Arbeit, seit ${t.updated} nicht aktualisiert`);
+      if (!hasContent(h)) warnings.push(tr('{id}: in progress without a handoff note', { id: t.id }));
+      else if (stale) warnings.push(tr('{id}: in progress, not updated since {date}', { id: t.id, date: t.updated }));
     }
-    if (t.incomplete && open) warnings.push(`${t.id}: als unvollständig markiert`);
+    if (t.incomplete && open) warnings.push(tr('{id}: marked as incomplete', { id: t.id }));
     // Bilder
     const texts = [readText(t._file)];
     const dec = path.join(t._dir, 'decisions.md');
@@ -1128,58 +1134,59 @@ function cmdDoctor() {
         if (/^https?:/.test(img.src)) continue;
         const abs = path.resolve(t._dir, img.src);
         referenced.add(path.normalize(abs));
-        if (!exists(abs)) missing.push(`${t.id}: Bild fehlt: ${img.src}`);
-        if (!img.alt.trim()) warnings.push(`${t.id}: Bild ohne Alternativtext: ${img.src}`);
+        if (!exists(abs)) missing.push(tr('{id}: image missing: {src}', { id: t.id, src: img.src }));
+        if (!img.alt.trim()) warnings.push(tr('{id}: image without alt text: {src}', { id: t.id, src: img.src }));
       }
       const linkRe = /(?<!!)\[[^\]]*\]\((assets\/[^)\s]+)\)/g;
       let m;
       while ((m = linkRe.exec(txt))) {
         const abs = path.resolve(t._dir, decodeURI(m[1]));
         referenced.add(path.normalize(abs));
-        if (!exists(abs)) missing.push(`${t.id}: verlinkte Datei fehlt: ${m[1]}`);
+        if (!exists(abs)) missing.push(tr('{id}: linked file missing: {src}', { id: t.id, src: m[1] }));
       }
     }
     const adir = path.join(t._dir, 'assets');
     if (exists(adir)) {
       for (const f of fs.readdirSync(adir)) {
         if (f.startsWith('.')) continue;
-        if (!referenced.has(path.normalize(path.join(adir, f)))) warnings.push(`${t.id}: Asset nicht referenziert: assets/${f}`);
+        if (!referenced.has(path.normalize(path.join(adir, f)))) warnings.push(tr('{id}: asset not referenced: assets/{file}', { id: t.id, file: f }));
       }
     }
     const assetSec = getSection(t._body, 'Assets') || '';
     const lines = assetSec.split('\n');
     lines.forEach((l, i) => {
-      if (/^!\[/.test(l.trim()) && !/^Beschreibung:/i.test((lines[i + 1] || '').trim())) warnings.push(`${t.id}: Bild ohne Beschreibungszeile: ${l.trim().slice(0, 60)}`);
+      if (/^!\[/.test(l.trim()) && !/^(Beschreibung|Description):/i.test((lines[i + 1] || '').trim())) warnings.push(tr('{id}: image without a description line: {line}', { id: t.id, line: l.trim().slice(0, 60) }));
     });
   }
-  if (hasCycle(all.filter((t) => t._valid))) errors.push('Zyklische Abhängigkeit in blocked_by gefunden');
+  if (hasCycle(all.filter((t) => t._valid))) errors.push(tr('Circular dependency found in blocked_by'));
   // Beschreibung im falschen Abschnitt oder fehlende Vorlagenabschnitte
   for (const r of repairTasks(root, { dryRun: !flags.fix })) {
-    const what = [r.moved ? `Beschreibung steht in ${r.moved}` : null, r.added.length ? `fehlende Abschnitte: ${r.added.join(', ')}` : null].filter(Boolean).join(', ');
-    if (flags.fix) fixes.push(`${r.id}: ${what.replace('steht in', 'übernommen aus')}`);
-    else warnings.push(`${r.id}: ${what} (works doctor --fix repariert das)`);
+    const moved = r.moved ? (flags.fix ? tr('Description taken from {section}', { section: r.moved }) : tr('Description is in {section}', { section: r.moved })) : null;
+    const what = [moved, r.added.length ? tr('missing sections: {list}', { list: r.added.join(', ') }) : null].filter(Boolean).join(', ');
+    if (flags.fix) fixes.push(`${r.id}: ${what}`);
+    else warnings.push(tr('{id}: {what} (works doctor --fix repairs this)', { id: r.id, what }));
   }
   const maxId = Math.max(0, ...all.map((t) => idNumber(t.id)).filter((n) => !Number.isNaN(n)));
   if ((config.next_id || 1) <= maxId) {
-    if (flags.fix) { config.next_id = maxId + 1; saveConfig(root, config); fixes.push(`next_id auf ${maxId + 1} gesetzt`); }
-    else errors.push(`config.next_id (${config.next_id}) ist nicht größer als die höchste ID (${maxId})`);
+    if (flags.fix) { config.next_id = maxId + 1; saveConfig(root, config); fixes.push(tr('next_id set to {n}', { n: maxId + 1 })); }
+    else errors.push(tr('config.next_id ({next}) is not greater than the highest ID ({max})', { next: config.next_id, max: maxId }));
   }
   const inbox = path.join(worksDir(root), 'inbox');
   if (exists(inbox)) {
     const files = fs.readdirSync(inbox).filter((f) => !f.startsWith('.'));
-    if (files.length) warnings.push(`Inbox enthält ${files.length} nicht zugeordnete Datei(en): ${files.join(', ')}`);
+    if (files.length) warnings.push(tr('Inbox contains {n} unassigned file(s): {list}', { n: files.length, list: files.join(', ') }));
   }
   const state = loadState(root);
   if (state.active && !byId.has(state.active)) {
-    if (flags.fix) { delete state.active; saveState(root, state); fixes.push('ungültige aktive Aufgabe aus state.json entfernt'); }
-    else warnings.push(`state.json verweist auf unbekannte aktive Aufgabe ${state.active}`);
+    if (flags.fix) { delete state.active; saveState(root, state); fixes.push(tr('removed invalid active task from state.json')); }
+    else warnings.push(tr('state.json refers to unknown active task {id}', { id: state.active }));
   }
   refresh(root);
   if (!flags.quiet || errors.length) {
-    for (const f of fixes) out(`Behoben: ${f}`);
-    for (const e of errors) out(`FEHLER   ${e}`);
-    if (!flags.quiet) for (const w of warnings) out(`WARNUNG  ${w}`);
-    out(`\n${errors.length} Fehler, ${warnings.length} Warnungen${fixes.length ? `, ${fixes.length} behoben` : ''}. WORKS.md neu erzeugt.`);
+    for (const f of fixes) out(tr('Fixed: {fix}', { fix: f }));
+    for (const e of errors) out(`${tr('ERROR').padEnd(9)}${e}`);
+    if (!flags.quiet) for (const w of warnings) out(`${tr('WARNING').padEnd(9)}${w}`);
+    out('\n' + tr('{errors} error(s), {warnings} warning(s)', { errors: errors.length, warnings: warnings.length }) + (fixes.length ? tr(', {n} fixed', { n: fixes.length }) : '') + '. ' + tr('WORKS.md regenerated.'));
   }
   if (errors.length || (flags.strict && warnings.length)) process.exit(1);
 }
@@ -1223,17 +1230,19 @@ async function cmdAsset() {
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
   let src = pos[1];
-  if (!src) fail('Quelldatei fehlt. Aufruf: works asset <ID> <pfad> --desc "..." [--kind vorher]');
+  if (!src) fail(tr('Source file missing. Usage: works asset <ID> <path> --desc "..." [--kind before]'));
   if (!exists(src)) {
     const inInbox = path.join(worksDir(root), 'inbox', src);
-    if (exists(inInbox)) src = inInbox; else fail(`Datei nicht gefunden: ${src}`);
+    if (exists(inInbox)) src = inInbox; else fail(tr('File not found: {file}', { file: src }));
   }
   const fromInbox = path.resolve(src).startsWith(path.join(worksDir(root), 'inbox'));
   const kind = flags.kind && flags.kind !== true ? normValue('kind', String(flags.kind)) : null;
-  if (kind && !ASSET_KINDS.includes(kind)) warn(`Unübliche Art "${kind}". Üblich: ${ASSET_KINDS.join(', ')}`);
+  if (kind && !ASSET_KINDS.includes(kind)) warn(tr('Unusual kind "{kind}". Usual: {list}', { kind, list: ASSET_KINDS.join(', ') }));
   const desc = flags.desc && flags.desc !== true ? String(flags.desc) : '';
-  if (!desc) warn('Ohne --desc fehlt die Textbeschreibung. Spätere Sessions müssen das Bild dann laden.');
-  const alt = flags.alt && flags.alt !== true ? String(flags.alt) : (desc.split(/[.!?]/)[0].slice(0, 80) || (kind ? `Bild (${kind})` : 'Bild ohne Beschreibung'));
+  if (!desc) warn(tr('Without --desc the text description is missing. Later sessions then have to load the image.'));
+  // Bildtext und Zeilen unter dem Bild in der Sprache der Aufgabe (api.mjs liest sie).
+  const lang = bodyLang(t._body);
+  const alt = flags.alt && flags.alt !== true ? String(flags.alt) : (desc.split(/[.!?]/)[0].slice(0, 80) || (kind ? tr('Image ({kind})', { kind }, lang) : tr('Image without description', null, lang)));
   const ext = path.extname(src).toLowerCase();
   const name = flags.name && flags.name !== true ? slugify(flags.name, 50) : slugify(alt, 40);
   const adir = path.join(t._dir, 'assets');
@@ -1244,20 +1253,20 @@ async function cmdAsset() {
   if (flags.compress || config.assets.compress_on_add) {
     const sharp = loadSharp(root);
     if (sharp) { const r = await compressFile(sharp, target, config); if (r) note = ` (${Math.round(r.before / 1024)} KB → ${Math.round(r.after / 1024)} KB)`; }
-    else warn('sharp nicht gefunden, Bild wurde nicht komprimiert. Installation: npm i -D sharp');
+    else warn(tr('sharp not found, the image was not compressed. Install: npm i -D sharp'));
   }
   const rel = `assets/${path.basename(target)}`;
   const isImage = IMAGE_EXT.includes(ext);
   const block = [isImage ? `![${alt}](${encodeURI(rel)})` : `[${alt}](${encodeURI(rel)})`];
-  if (desc) block.push(`Beschreibung: ${desc}`);
-  const meta = [kind ? `Art: ${kind}` : null, `Hinzugefügt: ${today()}`, flags.origin ? `Quelle: ${flags.origin}` : null].filter(Boolean).join(' · ');
+  if (desc) block.push(tr('Description: {desc}', { desc }, lang));
+  const meta = [kind ? tr('Kind: {kind}', { kind }, lang) : null, tr('Added: {date}', { date: today() }, lang), flags.origin ? tr('Source: {origin}', { origin: flags.origin }, lang) : null].filter(Boolean).join(' · ');
   block.push(meta);
   const sec = stripComments(getSection(t._body, 'Assets') || '').trim();
   t._body = setSection(t._body, 'Assets', (sec ? sec + '\n\n' : '') + block.join('\n'));
-  addHistory(t, `Asset hinzugefügt: ${rel}${kind ? ` (${kind})` : ''}`);
+  addHistory(t, kind ? tr('Asset added: {file} ({kind})', { file: rel, kind }) : tr('Asset added: {file}', { file: rel }));
   saveTask(t);
   refresh(root);
-  out(`Gespeichert: ${target}${note}`);
+  out(tr('Saved: {file}{note}', { file: target, note }));
   out(`Markdown: ${block[0]}`);
 }
 
@@ -1266,20 +1275,20 @@ function cmdInbox() {
   const dir = path.join(worksDir(root), 'inbox');
   const files = exists(dir) ? fs.readdirSync(dir).filter((f) => !f.startsWith('.')) : [];
   if (flags.json) { out(JSON.stringify(files.map((f) => ({ name: f, path: path.join(dir, f), size: fs.statSync(path.join(dir, f)).size })), null, 2)); return; }
-  if (!files.length) { out('Inbox ist leer.'); return; }
+  if (!files.length) { out(tr('Inbox is empty.')); return; }
   out(`Inbox (${dir}):`);
   for (const f of files) {
     const st = fs.statSync(path.join(dir, f));
     out(`  ${f}  ${Math.round(st.size / 1024)} KB  ${st.mtime.toLocaleString('de-DE')}`);
   }
-  out('\nZuordnen mit: works asset <ID> <dateiname> --desc "..." [--kind ...]');
+  out(tr('\nAssign with: works asset <ID> <file name> --desc "..." [--kind ...]'));
 }
 
 async function cmdCompress() {
   const root = requireRoot();
   const config = loadConfig(root);
   const sharp = loadSharp(root);
-  if (!sharp) fail('sharp ist nicht installiert. Im Projekt `npm i -D sharp` ausführen.');
+  if (!sharp) fail(tr('sharp is not installed. Run `npm i -D sharp` in the project.'));
   const tasks = pos[0] ? [findTask(root, config, pos[0])] : loadTasks(root);
   let total = 0; let saved = 0;
   for (const t of tasks) {
@@ -1290,7 +1299,7 @@ async function cmdCompress() {
       if (r) { total++; saved += r.before - r.after; }
     }
   }
-  out(`${total} Bilder geprüft, ${Math.round(saved / 1024)} KB gespart.`);
+  out(tr('{n} images checked, {kb} KB saved.', { n: total, kb: Math.round(saved / 1024) }));
 }
 
 // ---------- Entscheidungen / Dokumente ----------
@@ -1298,12 +1307,13 @@ async function cmdCompress() {
 function createDecisions(root, t) {
   const file = path.join(t._dir, 'decisions.md');
   if (!exists(file)) {
-    fs.writeFileSync(file, fillTemplate(readTemplate('decisions.md'), { id: t.id, title: t.title, date: today() }));
+    const lang = bodyLang(t._body);
+    fs.writeFileSync(file, fillTemplate(readTemplate('decisions.md', lang), { id: t.id, title: t.title, date: today() }));
     const sec = stripComments(getSection(t._body, 'Designentscheidungen') || '').trim();
     if (!sec.includes('decisions.md')) {
-      t._body = setSection(t._body, 'Designentscheidungen', `${sec ? sec + '\n\n' : ''}Details und verworfene Alternativen: [decisions.md](decisions.md)`);
+      t._body = setSection(t._body, 'Designentscheidungen', `${sec ? sec + '\n\n' : ''}${tr('Details and rejected alternatives: [decisions.md](decisions.md)', null, lang)}`);
     }
-    addHistory(t, 'decisions.md angelegt');
+    addHistory(t, tr('decisions.md created'));
     saveTask(t, { touch: false });
   }
   return file;
@@ -1317,24 +1327,26 @@ function cmdDecisions() {
   if (flags.add) {
     let txt = readText(file);
     const n = (stripComments(txt).match(/^### E(\d+)/gm) || []).length + 1;
+    // Feldnamen in der Sprache von decisions.md.
+    const lang = bodyLang(txt);
     const entry = [
       `### E${n}: ${flags.add}`,
-      `- Datum: ${today()}`,
-      `- Quelle: ${flags.source || 'Gespräch'}`,
-      `- Kontext: ${flags.context || ''}`,
-      `- Entscheidung: ${flags.decision || ''}`,
-      `- Begründung: ${flags.why || ''}`,
-      '- Verworfene Alternativen:',
+      tr('- Date: {date}', { date: today() }, lang),
+      tr('- Source: {source}', { source: flags.source || tr('Conversation', null, lang) }, lang),
+      tr('- Context: {context}', { context: flags.context || '' }, lang),
+      tr('- Decision: {decision}', { decision: flags.decision || '' }, lang),
+      tr('- Rationale: {why}', { why: flags.why || '' }, lang),
+      tr('- Rejected alternatives:', null, lang),
       ...listFlag(flags.rejected).map((r) => `  - ${r}`),
-      `- Konsequenzen: ${flags.consequences || ''}`,
+      tr('- Consequences: {consequences}', { consequences: flags.consequences || '' }, lang),
     ].map((l) => l.trimEnd()).join('\n');
     const sec = stripComments(getSection(txt, 'Entscheidungen') || '').trim();
     txt = setSection(txt, 'Entscheidungen', (sec ? sec + '\n\n' : '') + entry);
     fs.writeFileSync(file, txt);
-    addHistory(t, `Entscheidung E${n} dokumentiert: ${flags.add}`);
+    addHistory(t, tr('Decision E{n} documented: {title}', { n, title: flags.add }));
     saveTask(t);
     refresh(root);
-    out(`E${n} in ${file} ergänzt.`);
+    out(tr('E{n} added to {file}.', { n, file }));
     return;
   }
   refresh(root);
@@ -1346,9 +1358,9 @@ function cmdAttachDoc() {
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
   const src = pos[1];
-  if (!src || !exists(src)) fail('Dokument nicht gefunden. Aufruf: works attach-doc <ID> <pfad> [--mode link|copy|move] [--label "..."]');
+  if (!src || !exists(src)) fail(tr('Document not found. Usage: works attach-doc <ID> <path> [--mode link|copy|move] [--label "..."]'));
   const mode = flags.mode || config.brainstorm.mode || 'link';
-  if (!['link', 'copy', 'move'].includes(mode)) fail('--mode muss link, copy oder move sein.');
+  if (!['link', 'copy', 'move'].includes(mode)) fail(tr('--mode must be link, copy or move.'));
   const decFile = createDecisions(root, t);
   let target = path.resolve(src);
   if (mode !== 'link') {
@@ -1360,13 +1372,16 @@ function cmdAttachDoc() {
   const rel = path.relative(t._dir, target).split(path.sep).join('/');
   const label = flags.label && flags.label !== true ? flags.label : path.basename(src);
   let txt = readText(decFile);
+  const lang = bodyLang(txt);
+  const date = today();
+  const how = mode === 'link' ? tr('linked on {date}', { date }, lang) : mode === 'copy' ? tr('copied on {date}', { date }, lang) : tr('moved on {date}', { date }, lang);
   const sec = stripComments(getSection(txt, 'Quellen') || '').trim();
-  txt = setSection(txt, 'Quellen', (sec ? sec + '\n' : '') + `- [${label}](${encodeURI(rel)}) (${mode === 'link' ? 'verlinkt' : mode === 'copy' ? 'kopiert' : 'verschoben'} am ${today()})`);
+  txt = setSection(txt, 'Quellen', (sec ? sec + '\n' : '') + `- [${label}](${encodeURI(rel)}) (${how})`);
   fs.writeFileSync(decFile, txt);
-  addHistory(t, `Dokument ${mode === 'link' ? 'verlinkt' : 'übernommen'}: ${label}`);
+  addHistory(t, mode === 'link' ? tr('Document linked: {label}', { label }) : tr('Document added: {label}', { label }));
   saveTask(t);
   refresh(root);
-  out(`${label} an ${t.id} angehängt (${mode}). Zusammenfassung jetzt in decisions.md unter "Brainstorm-Zusammenfassung" bzw. "Entscheidungen" eintragen.`);
+  out(tr('{label} attached to {id} ({mode}). Now write the summary in decisions.md under "Brainstorm summary" or "Decisions".', { label, id: t.id, mode }));
 }
 
 // ---------- Ideen ----------
@@ -1377,21 +1392,21 @@ function cmdIdea() {
   const root = requireRoot();
   const config = loadConfig(root);
   const text = flags.text || pos.join(' ');
-  if (!text) fail('Text fehlt.');
+  if (!text) fail(tr('Text missing.'));
   const id = `I-${String(config.next_idea_id || 1).padStart(3, '0')}`;
   config.next_idea_id = (config.next_idea_id || 1) + 1;
   saveConfig(root, config);
   const tags = listFlag(flags.tags).map((x) => `#${x}`).join(' ');
   fs.appendFileSync(ideasFile(root), `- [${id}] ${today()}: ${text}${tags ? ' ' + tags : ''}\n`);
   refresh(root);
-  out(`Idee ${id} notiert.`);
+  out(tr('Idea {id} noted.', { id }));
 }
 
 function cmdIdeas() {
   const root = requireRoot();
   const lines = readText(ideasFile(root)).split('\n').filter((l) => /^- \[I-\d+\]/.test(l));
   const open = lines.filter((l) => !l.includes('~~'));
-  out(open.length ? open.join('\n') : 'Keine offenen Ideen.');
+  out(open.length ? open.join('\n') : tr('No open ideas.'));
 }
 
 function cmdIdeaDrop() {
@@ -1400,11 +1415,11 @@ function cmdIdeaDrop() {
   const file = ideasFile(root);
   const lines = readText(file).split('\n');
   const idx = lines.findIndex((l) => l.startsWith(`- [${iid}]`));
-  if (idx === -1) fail(`Idee ${iid} nicht gefunden.`);
-  lines[idx] = `- ~~${lines[idx].slice(2)}~~ verworfen${flags.reason && flags.reason !== true ? `: ${flags.reason}` : ''}`;
+  if (idx === -1) fail(tr('Idea {id} not found.', { id: iid }));
+  lines[idx] = `- ~~${lines[idx].slice(2)}~~ ${tr('dropped')}${flags.reason && flags.reason !== true ? `: ${flags.reason}` : ''}`;
   fs.writeFileSync(file, lines.join('\n'));
   refresh(root);
-  out(`Idee ${iid} verworfen.`);
+  out(tr('Idea {id} dropped.', { id: iid }));
 }
 
 function cmdPromote() {
@@ -1414,20 +1429,20 @@ function cmdPromote() {
   const file = ideasFile(root);
   const lines = readText(file).split('\n');
   const idx = lines.findIndex((l) => l.startsWith(`- [${iid}]`));
-  if (idx === -1) fail(`Idee ${iid} nicht gefunden.`);
-  if (lines[idx].includes('~~')) fail(`Idee ${iid} wurde bereits übernommen.`);
+  if (idx === -1) fail(tr('Idea {id} not found.', { id: iid }));
+  if (lines[idx].includes('~~')) fail(tr('Idea {id} has already been promoted.', { id: iid }));
   const m = lines[idx].match(/^- \[I-\d+\] (\d{4}-\d{2}-\d{2}): (.*)$/);
   const raw = m ? m[2] : lines[idx];
   const tags = [...raw.matchAll(/#([\w-]+)/g)].map((x) => x[1]);
   const text = raw.replace(/#[\w-]+/g, '').trim();
   const task = createTask(root, config, {
     ...flags, title: flags.title || text, tags: [...tags, ...listFlag(flags.tags)].join(','),
-    source: `idee:${iid}`, incomplete: true, context: `Aus Idee ${iid} vom ${m ? m[1] : 'unbekannt'}: ${text}`,
+    source: `idee:${iid}`, incomplete: true, context: tr('From idea {iid} of {date}: {text}', { iid, date: m ? m[1] : tr('unknown'), text }),
   });
-  lines[idx] = `- ~~[${iid}] ${m ? m[1] + ': ' : ''}${raw}~~ übernommen als ${task.id}`;
+  lines[idx] = `- ~~[${iid}] ${m ? m[1] + ': ' : ''}${raw}~~ ${tr('promoted as {id}', { id: task.id })}`;
   fs.writeFileSync(file, lines.join('\n'));
   refresh(root);
-  out(`Idee ${iid} übernommen als ${task.id}: ${task._file}`);
+  out(tr('Idea {iid} promoted as {id}: {file}', { iid, id: task.id, file: task._file }));
 }
 
 // ---------- Meilensteine ----------
@@ -1439,24 +1454,24 @@ function cmdMilestone() {
   config.milestones = config.milestones || [];
   if (sub === 'add') {
     const id = String(pos.shift() || '').toUpperCase();
-    if (!/^M\d+$/.test(id)) fail('Meilenstein-ID im Format M1, M2 ... angeben.');
-    if (config.milestones.some((m) => m.id === id)) fail(`${id} existiert bereits.`);
+    if (!/^M\d+$/.test(id)) fail(tr('Give the milestone ID in the format M1, M2 ...'));
+    if (config.milestones.some((m) => m.id === id)) fail(tr('{id} already exists.', { id }));
     config.milestones.push({ id, title: flags.title || pos.join(' ') || id, due: flags.due || null, description: flags.desc || '', status: 'offen' });
     saveConfig(root, config);
     refresh(root);
-    out(`Meilenstein ${id} angelegt.`);
+    out(tr('Milestone {id} created.', { id }));
   } else if (sub === 'set') {
     const id = String(pos.shift() || '').toUpperCase();
     const m = config.milestones.find((x) => x.id === id);
-    if (!m) fail(`${id} nicht gefunden.`);
-    for (const pair of pos) { const [k, ...v] = pair.split('='); m[k] = v.join('=') || null; }
+    if (!m) fail(tr('{id} not found.', { id }));
+    for (const pair of pos) { const [k, ...v] = pair.split('='); m[k] = (k === 'status' ? normValue('status', v.join('=')) : v.join('=')) || null; }
     saveConfig(root, config);
     refresh(root);
-    out(`Meilenstein ${id} aktualisiert.`);
+    out(tr('Milestone {id} updated.', { id }));
   } else {
     const prog = milestoneProgress(config, loadTasks(root));
-    if (!prog.length) { out('Keine Meilensteine definiert.'); return; }
-    for (const m of prog) out(`${m.id}  ${m.title}  ${m.due ? `fällig ${m.due}  ` : ''}${m.status || 'offen'}  ${m.done}/${m.total} (${m.pct} %)`);
+    if (!prog.length) { out(tr('No milestones defined.')); return; }
+    for (const m of prog) out(`${m.id}  ${m.title}  ${m.due ? `${tr('due {date}', { date: m.due })}  ` : ''}${m.status || 'offen'}  ${m.done}/${m.total} (${m.pct} %)`);
   }
 }
 
@@ -1507,11 +1522,11 @@ function cmdScan() {
   }
   const fresh = found.filter((f) => !f.known);
   if (flags.json) { out(JSON.stringify(found, null, 2)); return; }
-  if (!found.length) { out('Keine Marker gefunden.'); return; }
+  if (!found.length) { out(tr('No markers found.')); return; }
   const mapping = { FIXME: ['bug', 'P2'], XXX: ['bug', 'P2'], HACK: ['debt', 'P3'], TODO: ['chore', 'P3'] };
   if (!flags.create) {
-    for (const f of found) out(`${f.known ? 'bekannt' : 'neu    '}  ${f.marker.padEnd(5)} ${f.file}:${f.line}  ${f.text}`);
-    out(`\n${found.length} Marker, davon ${fresh.length} ohne Aufgabe. Mit --create werden daraus Aufgaben (Filter: --marker FIXME,HACK).`);
+    for (const f of found) out(`${(f.known ? tr('known') : tr('new')).padEnd(7)}  ${f.marker.padEnd(5)} ${f.file}:${f.line}  ${f.text}`);
+    out(tr('\n{n} markers, {fresh} of them without a task. --create turns them into tasks (filter: --marker FIXME,HACK).', { n: found.length, fresh: fresh.length }));
     return;
   }
   const only = listFlag(flags.marker).map((x) => x.toUpperCase());
@@ -1523,13 +1538,13 @@ function cmdScan() {
     const task = createTask(root, config, {
       type, priority, title: f.text ? f.text.slice(0, 80) : `${f.marker} in ${f.file}`,
       source: f.source, incomplete: true, tags: 'code-scan',
-      context: `${f.marker} in \`${f.file}:${f.line}\`${f.author ? ` (von ${f.author})` : ''}\n\n\`\`\`${ext}\n${f.snippet}\n\`\`\``,
+      context: `${f.marker} in \`${f.file}:${f.line}\`${f.author ? tr(' (by {author})', { author: f.author }) : ''}\n\n\`\`\`${ext}\n${f.snippet}\n\`\`\``,
     });
     created++;
-    out(`Angelegt: ${task.id} ${task.title}`);
+    out(tr('Created: {id} {title}', { id: task.id, title: task.title }));
   }
   refresh(root);
-  out(`${created} Aufgabe(n) aus Code-Markern angelegt.`);
+  out(tr('{n} task(s) created from code markers.', { n: created }));
 }
 
 // ---------- GitHub ----------
@@ -1547,7 +1562,7 @@ function cmdGhImport() {
   if (flags['from-json']) issues = readJson(String(flags['from-json']), []);
   else {
     const r = run('gh', ['issue', 'list', '--state', flags.state || 'open', '--limit', String(flags.limit || 100), '--json', 'number,title,body,labels,url,state'], { cwd: root });
-    if (!r.ok) fail(`gh issue list fehlgeschlagen: ${(r.stderr || r.error?.message || '').trim()}`);
+    if (!r.ok) fail(tr('gh issue list failed: {err}', { err: (r.stderr || r.error?.message || '').trim() }));
     issues = JSON.parse(r.stdout || '[]');
   }
   const known = new Set(loadTasks(root).map((t) => String(t.source || '')));
@@ -1558,41 +1573,41 @@ function cmdGhImport() {
     const labels = (is.labels || []).map((l) => l.name || l);
     const type = matchLabel(labels, config.github.label_type, 'feature');
     const priority = matchLabel(labels, config.github.label_priority, 'P3');
-    if (flags['dry-run']) { out(`würde anlegen: #${is.number} ${is.title} (${type}, ${priority})`); n++; continue; }
+    if (flags['dry-run']) { out(tr('would create: #{num} {title} ({type}, {priority})', { num: is.number, title: is.title, type, priority })); n++; continue; }
     const body = (is.body || '').trim();
     const task = createTask(root, config, {
       type, priority, title: is.title, source, incomplete: true, tags: ['github', ...labels.map((l) => slugify(l, 20))].join(','),
-      context: `GitHub Issue [#${is.number}](${is.url || ''})${labels.length ? `, Labels: ${labels.join(', ')}` : ''}\n\n${body ? body.split('\n').map((l) => `> ${l}`).join('\n') : '_Keine Beschreibung._'}`,
+      context: `GitHub Issue [#${is.number}](${is.url || ''})${labels.length ? `, Labels: ${labels.join(', ')}` : ''}\n\n${body ? body.split('\n').map((l) => `> ${l}`).join('\n') : tr('_No description._')}`,
     });
-    out(`Angelegt: ${task.id} aus #${is.number} ${is.title}`);
+    out(tr('Created: {id} from #{num} {title}', { id: task.id, num: is.number, title: is.title }));
     n++;
   }
   if (!flags['dry-run']) refresh(root);
-  out(`${n} Issue(s) ${flags['dry-run'] ? 'würden importiert' : 'importiert'}.`);
+  out(flags['dry-run'] ? tr('{n} issue(s) would be imported.', { n }) : tr('{n} issue(s) imported.', { n }));
 }
 
 function cmdGhExport() {
   const root = requireRoot();
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
-  if (String(t.source || '').startsWith('github#') || t.issue) fail(`${t.id} ist bereits mit einem Issue verknüpft (${t.source || t.issue}).`);
+  if (String(t.source || '').startsWith('github#') || t.issue) fail(tr('{id} is already linked to an issue ({ref}).', { id: t.id, ref: t.source || t.issue }));
   const parts = [];
   for (const s of ['Ziel', 'Zusammenfassung', 'Kontext und Problem', 'Akzeptanzkriterien']) {
     const c = getSection(t._body, s);
     if (hasContent(c)) parts.push(`## ${sectionTitle(s, t._body)}\n${stripComments(c).trim()}`);
   }
-  parts.push(`_Verwaltet in .works als ${t.id}, Priorität ${t.priority} ${PRIO_LABEL[t.priority]}._`);
+  parts.push(tr('_Managed in .works as {id}, priority {priority} {label}._', { id: t.id, priority: t.priority, label: PRIO_LABEL[t.priority] }));
   const args = ['issue', 'create', '--title', `[${t.id}] ${t.title}`, '--body', parts.join('\n\n')];
   if (flags['dry-run']) { out(`gh ${args.slice(0, 4).join(' ')} ...\n\n${parts.join('\n\n')}`); return; }
   const r = run('gh', args, { cwd: root });
-  if (!r.ok) fail(`gh issue create fehlgeschlagen: ${r.stderr.trim()}`);
+  if (!r.ok) fail(tr('gh issue create failed: {err}', { err: r.stderr.trim() }));
   const url = r.stdout.trim().split('\n').pop();
   const num = (url.match(/\/(\d+)$/) || [])[1];
   t.issue = num ? `github#${num}` : url;
-  addHistory(t, `Als GitHub Issue exportiert: ${url}`);
+  addHistory(t, tr('Exported as GitHub issue: {url}', { url }));
   saveTask(t);
   refresh(root);
-  out(`Issue erstellt: ${url}`);
+  out(tr('Issue created: {url}', { url }));
 }
 
 // ---------- Git-Verlauf, Changelog, Report ----------
@@ -1602,9 +1617,9 @@ function cmdCommits() {
   const config = loadConfig(root);
   const t = findTask(root, config, pos[0]);
   const r = run('git', ['log', '--all', '--date=short', '--format=%h %ad %s', `--grep=${t.id}`], { cwd: root });
-  if (!r.ok) fail(`git log fehlgeschlagen: ${r.stderr.trim()}`);
+  if (!r.ok) fail(tr('git log failed: {err}', { err: r.stderr.trim() }));
   const lines = r.stdout.trim();
-  out(lines || `Keine Commits mit ${t.id} gefunden. Commit-Messages sollten die ID enthalten, z. B. "feat(${t.id}): ..."`);
+  out(lines || tr('No commits with {id} found. Commit messages should contain the ID, e.g. "feat({id}): ..."', { id: t.id }));
   if (flags.write && lines) {
     t._body = setSection(t._body, 'Commits', lines.split('\n').map((l) => `- ${l}`).join('\n'));
     saveTask(t, { touch: false });
@@ -1612,11 +1627,11 @@ function cmdCommits() {
   }
 }
 
-const CHANGELOG_GROUPS = [
-  ['Neu', ['feature', 'design']],
-  ['Behoben', ['bug']],
-  ['Verbessert', ['refactor', 'debt']],
-  ['Sonstiges', ['chore', 'spike']],
+const changelogGroups = () => [
+  [tr('Added'), ['feature', 'design']],
+  [tr('Fixed'), ['bug']],
+  [tr('Improved'), ['refactor', 'debt']],
+  [tr('Other'), ['chore', 'spike']],
 ];
 
 function cmdChangelog() {
@@ -1626,10 +1641,10 @@ function cmdChangelog() {
   if (flags.until) list = list.filter((t) => String(t.completed || t.updated) <= String(flags.until));
   if (flags.milestone) list = list.filter((t) => t.milestone === flags.milestone);
   if (!flags['include-internal']) list = list.filter((t) => !(t.tags || []).includes('intern'));
-  if (!list.length) { out('Keine erledigten Aufgaben im Zeitraum.'); return; }
-  const title = flags.version ? `## ${flags.version} (${today()})` : `## Unveröffentlicht (${today()})`;
+  if (!list.length) { out(tr('No completed tasks in this period.')); return; }
+  const title = flags.version ? `## ${flags.version} (${today()})` : tr('## Unreleased ({date})', { date: today() });
   const lines = [title, ''];
-  for (const [label, types] of CHANGELOG_GROUPS) {
+  for (const [label, types] of changelogGroups()) {
     const g = list.filter((t) => types.includes(t.type)).sort((a, b) => String(a.completed).localeCompare(String(b.completed)));
     if (!g.length) continue;
     lines.push(`### ${label}`, '');
@@ -1643,7 +1658,7 @@ function cmdChangelog() {
     const m = cur.match(/^# .*\n+/);
     cur = m ? cur.slice(0, m[0].length) + text + '\n' + cur.slice(m[0].length) : `# Changelog\n\n${text}\n${cur}`;
     fs.writeFileSync(file, cur);
-    out(`CHANGELOG.md ergänzt (${list.length} Einträge).`);
+    out(tr('CHANGELOG.md updated ({n} entries).', { n: list.length }));
   } else out(text);
 }
 
@@ -1657,28 +1672,31 @@ async function cmdReport() {
   const config = loadConfig(root);
   if (flags.webhook !== undefined) {
     try { setWebhook(root, flags.webhook === true ? '' : String(flags.webhook)); } catch (e) { fail(e.message); }
-    out(flags.webhook === true ? 'Discord-Webhook entfernt.' : 'Discord-Webhook gespeichert (nur lokal in .works/report.local.json).');
+    out(flags.webhook === true ? tr('Discord webhook removed.') : tr('Discord webhook saved (only locally in .works/report.local.json).'));
     return;
   }
   if (flags.settings) {
     const r = reportSettings(config);
-    for (const pair of pos) {
+    // parseArgs nimmt das erste Paar nach --settings als dessen Wert.
+    for (const pair of [...(typeof flags.settings === 'string' ? [flags.settings] : []), ...pos]) {
       const i = pair.indexOf('='); const k = pair.slice(0, i); const v = pair.slice(i + 1);
-      const yes = ['true', '1', 'ja', 'an'].includes(v.toLowerCase());
+      const yes = ['true', '1', 'ja', 'an', 'yes', 'on'].includes(v.toLowerCase());
       if (k === 'enabled') r.enabled = yes;
       else if (k === 'weekday') r.weekday = Math.min(7, Math.max(1, parseInt(v, 10) || 5));
-      else if (k === 'time') { if (!/^\d{2}:\d{2}$/.test(v)) fail('time braucht HH:MM.'); r.time = v; } else if (k === 'discord' || k === 'file') r.destinations[k] = yes;
+      else if (k === 'time') { if (!/^\d{2}:\d{2}$/.test(v)) fail(tr('time needs HH:MM.')); r.time = v; } else if (k === 'discord' || k === 'file') r.destinations[k] = yes;
       else if (['done', 'attention', 'next', 'milestones'].includes(k)) r.include[k] = yes;
-      else fail(`Unbekannte Einstellung ${k}.`);
+      else fail(tr('Unknown setting {key}.', { key: k }));
     }
     config.report = r; saveConfig(root, config);
-    out(`Wochenbericht: ${r.enabled ? `an, ${['', 'montags', 'dienstags', 'mittwochs', 'donnerstags', 'freitags', 'samstags', 'sonntags'][r.weekday]} ab ${r.time}` : 'aus'}, Discord ${r.destinations.discord ? 'an' : 'aus'}`);
+    const days = ['', tr('Mondays'), tr('Tuesdays'), tr('Wednesdays'), tr('Thursdays'), tr('Fridays'), tr('Saturdays'), tr('Sundays')];
+    const discord = r.destinations.discord ? tr('on') : tr('off');
+    out(r.enabled ? tr('Weekly report: on, {day} from {time}, Discord {discord}', { day: days[r.weekday], time: r.time, discord }) : tr('Weekly report: off, Discord {discord}', { discord }));
     return;
   }
   if (flags.week) {
     const summary = flags['summary-file'] && flags['summary-file'] !== true ? fs.readFileSync(String(flags['summary-file']), 'utf8') : flags.summary && flags.summary !== true ? String(flags.summary) : '';
     const r = await writeWeekly(root, config, { summary, send: flags.send ? true : flags['no-send'] ? false : null });
-    out(`Wochenbericht ${r.name} gespeichert:\n  ${r.md}\n  ${r.html}`);
+    out(tr('Weekly report {name} saved:\n  {md}\n  {html}', { name: r.name, md: r.md, html: r.html }));
     for (const n of r.notes) out(n);
     return;
   }
@@ -1692,32 +1710,33 @@ async function cmdReport() {
   const done = all.filter((t) => t.status === 'erledigt' && inRange(t.completed));
   const dropped = all.filter((t) => t.status === 'verworfen' && inRange(t.completed));
   const created = all.filter((t) => inRange(t.created));
-  const started = all.filter((t) => historyEntries(t).some((h) => inRange(h.date) && h.text.startsWith('Gestartet')));
+  const started = all.filter((t) => historyEntries(t).some((h) => inRange(h.date) && /^(Gestartet|Started)\b/.test(h.text)));
   const open = sortTasks(all.filter((t) => OPEN_STATUSES.includes(t.status)));
   const L = [];
-  L.push(`# Bericht ${start} bis ${end}`, '');
-  L.push('## Zusammenfassung', '');
-  L.push(`- Erledigt: ${done.length}`);
-  L.push(`- Neu angelegt: ${created.length}`);
-  L.push(`- Gestartet: ${started.length}`);
-  L.push(`- Verworfen: ${dropped.length}`);
-  L.push(`- Offen gesamt: ${open.length} (${PRIORITIES.map((p) => `${p}: ${open.filter((t) => t.priority === p).length}`).join(', ')})`);
+  L.push(tr('# Report {start} to {end}', { start, end }), '');
+  L.push(tr('## Summary'), '');
+  L.push(tr('- Done: {n}', { n: done.length }));
+  L.push(tr('- Newly created: {n}', { n: created.length }));
+  L.push(tr('- Started: {n}', { n: started.length }));
+  L.push(tr('- Dropped: {n}', { n: dropped.length }));
+  L.push(tr('- Open in total: {n} ({list})', { n: open.length, list: PRIORITIES.map((p) => `${p}: ${open.filter((t) => t.priority === p).length}`).join(', ') }));
   L.push('');
   const sect = (title, list, extra = () => '') => {
     L.push(`## ${title}`, '');
-    if (!list.length) L.push('Keine.');
+    if (!list.length) L.push(tr('None.'));
     for (const t of list) L.push(`- ${t.id} ${t.title} (${TYPE_LABEL[t.type]}, ${t.priority})${extra(t)}`);
     L.push('');
   };
-  sect('Erledigt', done, (t) => (t.completed ? `, am ${t.completed}` : ''));
-  sect('Neu angelegt', created);
-  sect('In Arbeit und Review', open.filter((t) => ['in-arbeit', 'review'].includes(t.status)), (t) => `, ${STATUS_LABEL[t.status]}`);
-  sect('Blockiert', open.filter((t) => isBlocked(t, byId)), (t) => `, wartet auf ${openBlockers(t, byId).join(', ')}`);
-  sect('Überfällig', open.filter(isOverdue), (t) => `, fällig ${t.due}`);
+  const due = (d) => `, ${tr('due {date}', { date: d })}`;
+  sect(tr('Done'), done, (t) => (t.completed ? tr(', on {date}', { date: t.completed }) : ''));
+  sect(tr('Newly created'), created);
+  sect(tr('In progress and review'), open.filter((t) => ['in-arbeit', 'review'].includes(t.status)), (t) => `, ${STATUS_LABEL[t.status]}`);
+  sect(tr('Blocked'), open.filter((t) => isBlocked(t, byId)), (t) => tr(', waiting for {list}', { list: openBlockers(t, byId).join(', ') }));
+  sect(tr('Overdue'), open.filter(isOverdue), (t) => due(t.due));
   const ms = milestoneProgress(config, all);
   if (ms.length) {
-    L.push('## Meilensteine', '');
-    for (const m of ms) L.push(`- ${m.id} ${m.title}: ${m.done}/${m.total} (${m.pct} %)${m.due ? `, fällig ${m.due}` : ''}`);
+    L.push(tr('## Milestones'), '');
+    for (const m of ms) L.push(`- ${m.id} ${m.title}: ${m.done}/${m.total} (${m.pct} %)${m.due ? due(m.due) : ''}`);
     L.push('');
   }
   const text = L.join('\n');
@@ -1725,7 +1744,7 @@ async function cmdReport() {
     const file = path.join(worksDir(root), 'reports', `${end}-bericht.md`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, text);
-    out(`Bericht gespeichert: ${file}`);
+    out(tr('Report saved: {file}', { file }));
   } else out(text);
 }
 
@@ -1745,7 +1764,7 @@ function cmdInstallHooks() {
   const doGit = flags.git || !flags.claude;
   const scope = flags.scope || 'user';
   if (doClaude && IS_PLUGIN && !flags.force) {
-    out('Claude Code Hooks: werden vom Plugin mitgeliefert und sind aktiv, solange das Plugin aktiviert ist. Nichts einzurichten.');
+    out(tr('Claude Code hooks: shipped with the plugin and active as long as the plugin is enabled. Nothing to set up.'));
     doClaude = false;
   }
   if (doClaude) {
@@ -1758,11 +1777,11 @@ function cmdInstallHooks() {
       const command = `node "${homeRel(path.join(SKILL_DIR, 'hooks', script))}"`;
       settings.hooks[event] = settings.hooks[event] || [];
       const present = settings.hooks[event].some((g) => (g.hooks || []).some((h) => String(h.command || '').includes(`hooks/${script}`)));
-      if (present) { out(`${event}: bereits eingerichtet`); return; }
+      if (present) { out(tr('{event}: already set up', { event })); return; }
       const group = { hooks: [{ type: 'command', command, timeout: 15 }] };
       if (matcher) group.matcher = matcher;
       settings.hooks[event].push(group);
-      out(`${event}: eingerichtet (${command})`);
+      out(tr('{event}: set up ({command})', { event, command }));
     };
     add('SessionStart', 'session-start.mjs', 'startup|resume|clear|compact');
     add('Stop', 'stop-reminder.mjs');
@@ -1772,11 +1791,11 @@ function cmdInstallHooks() {
     add('PostToolUse', 'post-tool.mjs');
     add('SubagentStop', 'subagent-stop.mjs');
     if (!flags['dry-run']) writeJson(file, settings);
-    out(`Claude Code Einstellungen: ${file}${flags['dry-run'] ? ' (Probelauf, nichts geschrieben)' : ''}`);
+    out(tr('Claude Code settings: {file}', { file }) + (flags['dry-run'] ? tr(' (dry run, nothing written)') : ''));
   }
   if (doGit) {
     const gitDir = run('git', ['rev-parse', '--git-dir'], { cwd: root });
-    if (!gitDir.ok) { out('Git: kein Repository, pre-commit Hook übersprungen.'); return; }
+    if (!gitDir.ok) { out(tr('Git: no repository, pre-commit hook skipped.')); return; }
     const hookFile = path.resolve(root, gitDir.stdout.trim(), 'hooks', 'pre-commit');
     const marker = '# works-doctor';
     // Im Plugin ändert sich der Installationspfad bei jedem Update, daher den aktuellen Pfad zur Laufzeit suchen.
@@ -1785,14 +1804,14 @@ function cmdInstallHooks() {
       : `  WORKS_CLI="${homeRel(path.join(SKILL_DIR, 'scripts', 'works.mjs'))}"\n`;
     const block = `${marker}\nif git diff --cached --name-only | grep -q '^\\.works/'; then\n${locate}`
       + '  if [ -n "$WORKS_CLI" ] && [ -f "$WORKS_CLI" ]; then\n'
-      + '    node "$WORKS_CLI" doctor --quiet || { echo "works doctor meldet Fehler in .works/. Commit abgebrochen."; exit 1; }\n'
-      + '  else\n    echo "works: CLI nicht gefunden, Prüfung übersprungen."\n  fi\nfi\n';
+      + `    node "$WORKS_CLI" doctor --quiet || { echo "${tr('works doctor reports errors in .works/. Commit aborted.')}"; exit 1; }\n`
+      + `  else\n    echo "${tr('works: CLI not found, check skipped.')}"\n  fi\nfi\n`;
     let cur = exists(hookFile) ? fs.readFileSync(hookFile, 'utf8') : '#!/bin/sh\n';
-    if (cur.includes(marker)) out('Git pre-commit: bereits eingerichtet');
+    if (cur.includes(marker)) out(tr('Git pre-commit: already set up'));
     else {
       cur = cur.replace(/\s*$/, '\n') + block;
       if (!flags['dry-run']) { fs.mkdirSync(path.dirname(hookFile), { recursive: true }); fs.writeFileSync(hookFile, cur); fs.chmodSync(hookFile, 0o755); }
-      out(`Git pre-commit: eingerichtet (${hookFile})`);
+      out(tr('Git pre-commit: set up ({file})', { file: hookFile }));
     }
   }
 }
@@ -1800,98 +1819,94 @@ function cmdInstallHooks() {
 // ---------- Hilfe ----------
 
 function cmdHelp() {
-  out(`works: Aufgabenverwaltung in .works/
-
-Einrichtung
+  out([
+    tr('works: task management in .works/'),
+    tr(`Setup
   init [--gitignore default|assets|all|none] [--prefix W]
   install-hooks [--claude] [--git] [--scope user|project|local] [--dry-run]
-  install-cli [--dir ordner] [--no-path] [--dry-run] [--uninstall]   Befehl works im Terminal, ohne Claude
-  version
-
-Erfassen
-  new --type <typ> --title "..." [--priority P1-P4] [--effort S|M|L|XL] [--risk niedrig|mittel|hoch]
-      [--due JJJJ-MM-TT] [--milestone M1] [--tags a,b] [--blocked-by W-1] [--blocks W-2] [--related W-3]
-      [--source text] [--incomplete] [--decisions] [--log-file pfad] [--status backlog]
-      [--goal ".." | --goal-file pfad] [--description ".." | --description-file pfad] [--criteria-file pfad]
-  idea "Text" [--tags a,b]          ideas                      promote I-001 [--type ...] [--priority ...]
+  install-cli [--dir folder] [--no-path] [--dry-run] [--uninstall]   works command in the terminal, without Claude
+  lang [code] [--project] [--reset]   show or change the language (en, de)
+  version`),
+    tr(`Capture
+  new --type <type> --title "..." [--priority P1-P4] [--effort S|M|L|XL] [--risk low|medium|high]
+      [--due YYYY-MM-DD] [--milestone M1] [--tags a,b] [--blocked-by W-1] [--blocks W-2] [--related W-3]
+      [--source text] [--incomplete] [--decisions] [--log-file path] [--status backlog]
+      [--goal ".." | --goal-file path] [--description ".." | --description-file path] [--criteria-file path]
+  idea "text" [--tags a,b]          ideas                      promote I-001 [--type ...] [--priority ...]
   scan [--create] [--marker FIXME,HACK] [--json]
-  gh-import [--state open] [--limit 100] [--dry-run]         gh-export <ID> [--dry-run]
-
-Ansehen
+  gh-import [--state open] [--limit 100] [--dry-run]         gh-export <ID> [--dry-run]`),
+    tr(`View
   list [--status ..] [--priority ..] [--type ..] [--tag ..] [--milestone M1] [--blocked] [--overdue] [--incomplete] [--all] [--json]
   show <ID> [--section "Name"]     next [--n 3]     status     index
   board [--open]                   board --serve [--detach] [--port 4747] [--host 127.0.0.1] [--open]
-                                   board --restart --share   im lokalen Netz teilen (Leselink mit Schlüssel)
-                                   board --restart --private wieder nur lokal
-  share [--rotate] [--owner]       Links zum Teilen anzeigen oder erneuern
-  export [--out datei.html] [--no-images] [--open-only]  Schnappschuss als eine HTML-Datei
-  export --json [--out datei.json] [--archive] [--images] [--designs] [--checks] [--open-only]  Sicherung als JSON
+                                   board --restart --share   share on the local network (read link with key)
+                                   board --restart --private local only again
+  share [--rotate] [--owner]       show or renew the sharing links
+  export [--out file.html] [--no-images] [--open-only]  snapshot as a single HTML file
+  export --json [--out file.json] [--archive] [--images] [--designs] [--checks] [--open-only]  backup as JSON
   board --status | --stop | --restart
   queue [list|add <ID> [--pos N]|remove <ID>|move <ID> <N>|order A,B,C|clear|set auto_next=true ...]
   sprint [start --title ..|add A,B|remove A|set capacity=24|close [--good ..] [--bad ..] [--change ..] [--next-capacity N]|list]
-  comments [<ID>]                  comment <ID> "Text" [--as Nutzer|Claude]
+  comments [<ID>]                  comment <ID> "text" [--as Nutzer|Claude]
   views | views delete "Name"      list --view "Name"
   template list|show <slug>|save --from <ID> [--name ..] [--scope user]|delete <slug>
-  new --template <slug> --field Name=Wert --text "Was passieren soll" [--criteria 2,3]
+  new --template <slug> --field Name=Value --text "What should happen" [--criteria 2,3]
   time [<ID>] [--mode measured|fixed]
-  checks [detect [--save]|set name="befehl"|remove name|run <ID>|record <ID> <name> --status ok|warn|fail|ack <ID> <name>]
+  checks [detect [--save]|set name="command"|remove name|run <ID>|record <ID> <name> --status ok|warn|fail|ack <ID> <name>]
   report --week [--summary ".."] [--send|--no-send]    report --settings enabled=true weekday=5 time=16:00 discord=true
   report --webhook https://discord.com/api/webhooks/..
-  discord [status|link <Code>|unlink|token|channel [name]|set k=v ..|test|start|stop|restart|disconnect]   Discord-Bot works: gemeinsam (link) oder eigener (token)
-  demo [--simulate] [--delay 6] [--open] [--port 4747] [--path ordner] | demo --remove
-  milestone list|add M1 --title ".." [--due ..]|set M1 status=erledigt
-
-Bearbeiten
-  section <ID> "Name" [--text ".." | --file pfad]     check <ID> <Nr> [--section ..] [--undo]
-  item <ID> "Text" [--section Akzeptanzkriterien] [--remove Nr]      idea-drop I-001 [--reason ..]
-  set <ID> feld=wert ...           log <ID> "Text"       question <ID> "Frage" | --resolve N [--answer ".."]
-  link <A> blocks|blocked-by|related <B>                  unlink <A> <beziehung> <B>
-  start <ID> [--git] [--force]     handoff [<ID>] [--text ".." | --file pfad]
+  discord [status|link <Code>|unlink|token|channel [name]|set k=v ..|test|start|stop|restart|disconnect]   Discord bot works: shared (link) or your own (token)
+  demo [--simulate] [--delay 6] [--open] [--port 4747] [--path folder] | demo --remove
+  milestone list|add M1 --title ".." [--due ..]|set M1 status=done`),
+    tr(`Edit
+  section <ID> "Name" [--text ".." | --file path]     check <ID> <no> [--section ..] [--undo]
+  item <ID> "text" [--section "Acceptance criteria"] [--remove no]      idea-drop I-001 [--reason ..]
+  set <ID> field=value ...         log <ID> "text"       question <ID> "question" | --resolve N [--answer ".."]
+  link <A> blocks|blocked-by|related <B>                  unlink <A> <relation> <B>
+  start <ID> [--git] [--force]     handoff [<ID>] [--text ".." | --file path]
   dod <ID>                         done <ID> [--run] [--confirm] [--force --reason ".."]
-  ship [<ID>] [--no-push] [--no-ci] [--no-update] [--no-open]   Abschluss in einem Rutsch: mergen, done, pushen, CI, Plugins, Board
+  ship [<ID>] [--no-push] [--no-ci] [--no-update] [--no-open]   finish in one go: merge, done, push, CI, plugins, board
   drop <ID> --reason ".."          reopen <ID> --reason ".." [--status backlog]
-  archive [<ID>...] [--all] [--older-than Tage]
-
-Assets und Entscheidungen
-  asset <ID> <pfad|inbox-datei> --desc ".." [--kind ist|vorher|nachher|referenz|mockup|skizze|fehler|diagramm]
+  archive [<ID>...] [--all] [--older-than days]`),
+    tr(`Assets and decisions
+  asset <ID> <path|inbox-file> --desc ".." [--kind current|before|after|reference|mockup|sketch|error|diagram]
         [--alt ".."] [--name ".."] [--move] [--compress] [--origin ".."]
-  shot [board|live|..|<ID>] | --url <adresse> [--widths 1440,390] [--themes light,dark] [--asset <ID> --kind nachher]
-                                   Screenshots mit Playwright (installiertes Chrome)
+  shot [board|live|..|<ID>] | --url <address> [--widths 1440,390] [--themes light,dark] [--asset <ID> --kind after]
+                                   screenshots with Playwright (installed Chrome)
   inbox [--json]                   compress [<ID>]
-  decisions <ID> [--add "Titel" --decision ".." --why ".." --rejected "A: Grund,B: Grund" --source ".."]
-  attach-doc <ID> <pfad> [--mode link|copy|move] [--label ".."]
-  design [show] <ID> [--json]      design direction <ID> --file richtung.md --colors "Grund #0F1420,Akzent #3DD6B5" --fonts "A,B"
+  decisions <ID> [--add "title" --decision ".." --why ".." --rejected "A: reason,B: reason" --source ".."]
+  attach-doc <ID> <path> [--mode link|copy|move] [--label ".."]
+  design [show] <ID> [--json]      design direction <ID> --file direction.md --colors "Base #0F1420,Accent #3DD6B5" --fonts "A,B"
   design add <ID> --name A --title ".." --file mockup.html [--note ..]    design brainstorm <ID> --file bs.md
-  design choose <ID> <Name> [--reason ..]                   design remove <ID> <Name>
-
-Auswertung
+  design choose <ID> <name> [--reason ..]                   design remove <ID> <name>`),
+    tr(`Reports
   commits <ID> [--write]           changelog [--since ..] [--milestone M1] [--version 1.2.0] [--write]
   report [--days 7] [--write]      doctor [--fix] [--strict] [--quiet]
-  undo [--list] [<key>]            Änderung aus dem Board zurücknehmen
-  ical [--out datei.ics] [--recurring]                     Termine als Kalenderdatei
-
-Projektwissen, Wiederkehrendes, GitHub, Übersicht
+  undo [--list] [<key>]            undo a change made in the board
+  ical [--out file.ics] [--recurring]                      dates as a calendar file`),
+    tr(`Project knowledge, recurring tasks, GitHub, overview
   know [list|search ..|add|propose] --area ".." --title ".." --text ".."   know accept|flag|edit|remove <kid>
   recur [list|add --title ".." --every daily|weekly|monthly|days:N [--weekday 1-7] [--nth 1-5] [--day 1-31]
-        [--template slug] [--due_days N] [--queue] [--sprint]|set R1 feld=wert|remove R1|run]
-  instruct <ID> "Text"             Anweisung, die Claude während der Arbeit liest
-  github [sync|status|set feld=wert ...] [--quiet]           Abgleich mit PRs, CI und Issues über gh
-  hub [--list] [--port 4740]       Übersicht über alle Projekte mit .works
-
-Dateien, Parallelarbeit, Import, Selbsttest
-  file <pfad> [--json]             Aufgaben, die diese Datei geändert haben, mit ihren Entscheidungen
-  files [<ID>] [--json]            Dateien einer Aufgabe und wo sie sonst noch geändert wurden
-  parallel plan [A,B,..] [--max 3] [--json]   Können die Aufgaben gleichzeitig laufen?
+        [--template slug] [--due_days N] [--queue] [--sprint]|set R1 field=value|remove R1|run]
+  instruct <ID> "text"             instruction that Claude reads while working
+  github [sync|status|set field=value ...] [--quiet]         sync with PRs, CI and issues via gh
+  hub [--list] [--port 4740]       overview of all projects with .works`),
+    tr(`Files, parallel work, import, self-test
+  file <path> [--json]             tasks that changed this file, with their decisions
+  files [<ID>] [--json]            files of a task and where else they were changed
+  parallel plan [A,B,..] [--max 3] [--json]   can the tasks run at the same time?
   parallel start A,B | prompt <ID> | status | finish <ID> [--merge] [--force] | abort <ID> [--force]
-  import <datei> [--format auto|trello|notion|linear|csv|xlsx|docx|md|json] [--map title=Spalte,..]
-         [--sheet Name] [--json] [--all] [--apply [--only 1,4 | --skip 3] [--status geplant] [--tags a,b]
+  import <file> [--format auto|trello|notion|linear|csv|xlsx|docx|md|json] [--map title=Column,..]
+         [--sheet Name] [--json] [--all] [--apply [--only 1,4 | --skip 3] [--status planned] [--tags a,b]
          [--include-done] [--keep-dups] [--include-archived]]
-  import <sicherung.json> [--apply [--mode merge|restore] [--only 1,4]]  works-Sicherung zusammenführen oder wiederherstellen
-  selftest [--browser] [--keep] [--verbose] [--only <text>]
-
-Typen: ${TYPES.join(', ')}
-Status: ${STATUSES.join(', ')}
-Prioritäten: ${PRIORITIES.map((p) => `${p} ${PRIO_LABEL[p]}`).join(', ')}`);
+  import <backup.json> [--apply [--mode merge|restore] [--only 1,4]]  merge or restore a works backup
+  selftest [--browser] [--keep] [--verbose] [--only <text>]`),
+    tr('Types: {types}\nStatus: {statuses}\nPriorities: {prios}', {
+      types: TYPES.join(', '),
+      statuses: tr('backlog, planned, in-progress, review, done, dropped'),
+      prios: PRIORITIES.map((p) => `${p} ${PRIO_LABEL[p]}`).join(', '),
+    }),
+  ].join('\n\n'));
 }
 
 // ---------- Sprint ----------
@@ -1906,12 +1921,12 @@ function cmdSprint() {
   config.sprints = sprintList(config);
   const cur = activeSprint(config);
   const save = () => { saveConfig(root, config); refresh(root); };
-  const need = () => { if (!cur) fail('Kein aktiver Sprint. Starten mit works sprint start --title ".." [--goal ".."]'); return cur; };
+  const need = () => { if (!cur) fail(tr('No active sprint. Start one with works sprint start --title ".." [--goal ".."]')); return cur; };
   if (sub === 'start') {
-    if (cur) fail(`Sprint ${cur.id} läuft noch bis ${cur.end}. Erst mit works sprint close abschließen.`);
+    if (cur) fail(tr('Sprint {id} runs until {end}. Close it first with works sprint close.', { id: cur.id, end: cur.end }));
     const days = parseInt(flags.days || set.length_days, 10);
     const start = flags.start && flags.start !== true ? String(flags.start) : today();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) fail('--start braucht das Format JJJJ-MM-TT.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) fail(tr('--start needs the format YYYY-MM-DD.'));
     const id = nextSprintId(config);
     const carry = flags.carry ? ((lastClosedSprint(config) || {}).carry || []) : [];
     const s = {
@@ -1921,31 +1936,32 @@ function cmdSprint() {
     };
     config.sprints.push(s);
     save();
-    out(`${s.id} ${s.title} läuft vom ${s.start} bis ${s.end}, Kapazität ${s.capacity} Punkte${s.tasks.length ? `, ${s.tasks.length} Aufgabe(n) übernommen` : ''}.`);
+    out(tr('{id} {title} runs from {start} to {end}, capacity {capacity} points{carried}.', { id: s.id, title: s.title, start: s.start, end: s.end, capacity: s.capacity, carried: s.tasks.length ? tr(', {n} task(s) carried over', { n: s.tasks.length }) : '' }));
   } else if (sub === 'add' || sub === 'remove') {
     const s = need();
     const ids = listFlag(pos.join(',')).map((x) => normalizeId(config, x));
-    if (!ids.length) fail(`Aufgaben angeben: works sprint ${sub} W-0001,W-0002`);
+    if (!ids.length) fail(tr('Name the tasks: works sprint {sub} W-0001,W-0002', { sub }));
     for (const id of ids) {
       const t = byId.get(id);
-      if (!t) fail(`Aufgabe ${id} nicht gefunden.`);
-      if (sub === 'add') { if (!OPEN_STATUSES.includes(t.status)) fail(`${id} ist ${STATUS_LABEL[t.status]}.`); if (!s.tasks.includes(id)) s.tasks.push(id); } else s.tasks = s.tasks.filter((x) => x !== id);
+      if (!t) fail(tr('Task {id} not found.', { id }));
+      if (sub === 'add') { if (!OPEN_STATUSES.includes(t.status)) fail(tr('{id} is {status}.', { id, status: STATUS_LABEL[t.status] })); if (!s.tasks.includes(id)) s.tasks.push(id); } else s.tasks = s.tasks.filter((x) => x !== id);
     }
     save();
     const st = sprintStats(config, s, tasks);
-    out(`${sub === 'add' ? 'Eingeplant' : 'Entfernt'}: ${ids.join(', ')}. ${st.planned} von ${st.capacity} Punkten verplant.`);
-    if (st.planned > st.capacity) out('Hinweis: Der Sprint ist überplant.');
+    const v = { ids: ids.join(', '), planned: st.planned, capacity: st.capacity };
+    out(sub === 'add' ? tr('Added to the sprint: {ids}. {planned} of {capacity} points planned.', v) : tr('Removed from the sprint: {ids}. {planned} of {capacity} points planned.', v));
+    if (st.planned > st.capacity) out(tr('Note: The sprint is over capacity.'));
   } else if (sub === 'set') {
     const s = need();
     for (const pair of pos) {
       const i = pair.indexOf('=');
       const k = pair.slice(0, i); const v = pair.slice(i + 1);
       if (k === 'capacity') s.capacity = Math.max(1, parseInt(v, 10) || s.capacity);
-      else if (k === 'end' || k === 'start') { if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) fail(`${k} braucht JJJJ-MM-TT.`); s[k] = v; } else if (k === 'title' || k === 'goal') s[k] = v.slice(0, 200);
-      else fail(`Unbekanntes Feld ${k}. Erlaubt: title, goal, start, end, capacity`);
+      else if (k === 'end' || k === 'start') { if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) fail(tr('{field} needs YYYY-MM-DD.', { field: k })); s[k] = v; } else if (k === 'title' || k === 'goal') s[k] = v.slice(0, 200);
+      else fail(tr('Unknown field {field}. Allowed: title, goal, start, end, capacity', { field: k }));
     }
     save();
-    out(`${s.id} gespeichert.`);
+    out(tr('{id} saved.', { id: s.id }));
   } else if (sub === 'close') {
     const s = need();
     const st = sprintStats(config, s, tasks);
@@ -1957,16 +1973,16 @@ function cmdSprint() {
     if (Object.keys(retro).length) s.retro = retro;
     if (flags['next-capacity']) config.sprint_settings = { ...(config.sprint_settings || {}), capacity: Math.max(1, parseInt(flags['next-capacity'], 10) || 20) };
     save();
-    out(`${s.id} abgeschlossen: ${st.done} von ${st.planned} Punkten geschafft.${s.carry.length ? ` Offen geblieben: ${s.carry.join(', ')}. Mit works sprint start --carry übernehmen.` : ''}`);
+    out(tr('{id} closed: {done} of {planned} points done.', { id: s.id, done: st.done, planned: st.planned }) + (s.carry.length ? tr(' Still open: {ids}. Carry them over with works sprint start --carry.', { ids: s.carry.join(', ') }) : ''));
   } else if (sub === 'list') {
-    if (!config.sprints.length) { out('Noch keine Sprints.'); return; }
-    for (const s of config.sprints) out(`${s.id} ${s.title} ${s.start} bis ${s.end} ${s.status}${s.result ? `, ${s.result.done}/${s.result.planned} Punkte` : ''}`);
+    if (!config.sprints.length) { out(tr('No sprints yet.')); return; }
+    for (const s of config.sprints) out(tr('{id} {title} {start} to {end} {status}', { id: s.id, title: s.title, start: s.start, end: s.end, status: s.status }) + (s.result ? tr(', {done}/{planned} points', { done: s.result.done, planned: s.result.planned }) : ''));
   } else {
-    if (!cur) { out(`Kein aktiver Sprint. Starten mit works sprint start --title ".." --goal ".." (Länge ${set.length_days} Tage, Kapazität ${set.capacity} Punkte, Punkte ${Object.entries(set.points).map(([k, v]) => `${k} ${v}`).join(', ')}).`); return; }
+    if (!cur) { out(tr('No active sprint. Start one with works sprint start --title ".." --goal ".." (length {days} days, capacity {capacity} points, points {points}).', { days: set.length_days, capacity: set.capacity, points: Object.entries(set.points).map(([k, v]) => `${k} ${v}`).join(', ') })); return; }
     const st = sprintStats(config, cur, tasks);
     if (flags.json) { out(JSON.stringify({ sprint: cur, stats: st }, null, 2)); return; }
-    out(`${cur.id} ${cur.title}, ${cur.start} bis ${cur.end}, Tag ${st.dayIndex} von ${st.days}${cur.goal ? `\nZiel: ${cur.goal}` : ''}`);
-    out(`Punkte: ${st.done} erledigt, ${st.working} in Arbeit, ${st.open} offen, ${st.planned} von ${st.capacity} verplant${st.unestimated ? ` (${st.unestimated} ohne Schätzung zählen als M)` : ''}`);
+    out(tr('{id} {title}, {start} to {end}, day {day} of {days}', { id: cur.id, title: cur.title, start: cur.start, end: cur.end, day: st.dayIndex, days: st.days }) + (cur.goal ? `\n${tr('Goal: {goal}', { goal: cur.goal })}` : ''));
+    out(tr('Points: {done} done, {working} in progress, {open} open, {planned} of {capacity} planned', { done: st.done, working: st.working, open: st.open, planned: st.planned, capacity: st.capacity }) + (st.unestimated ? tr(' ({n} without estimate count as M)', { n: st.unestimated }) : ''));
     for (const id of cur.tasks) { const t = byId.get(id); if (t) out(`  ${t.id} ${STATUS_LABEL[t.status].padEnd(9)} ${(t.effort || '-').padEnd(2)} ${pointsOf(t, set)} P  ${t.title}`); }
   }
 }
@@ -1983,12 +1999,12 @@ function cmdComment() {
   const config = loadConfig(root);
   const t = findTask(root, config, pos.shift());
   let text = flags.file && flags.file !== true ? readText(String(flags.file)) : flags.text && flags.text !== true ? String(flags.text) : pos.join(' ');
-  if (!text.trim()) fail('Text fehlt: works comment <ID> "..."');
+  if (!text.trim()) fail(tr('Text missing: works comment <ID> "..."'));
   const author = commentAuthor();
   try { addComment(t, author, text); } catch (e) { fail(e.message); }
   if (author === 'Claude') markRead(root, t);
   refresh(root);
-  out(`Kommentar an ${t.id} gespeichert (${author}).`);
+  out(tr('Comment on {id} saved ({author}).', { id: t.id, author }));
 }
 
 function cmdComments() {
@@ -1996,16 +2012,16 @@ function cmdComments() {
   const config = loadConfig(root);
   if (!pos.length || flags.unread) {
     const list = loadTasks(root, { archive: false }).map((t) => ({ t, n: unreadForClaude(root, t).length })).filter((x) => x.n);
-    if (!list.length) { out('Keine neuen Kommentare vom Nutzer.'); return; }
-    for (const x of list) out(`${x.t.id} ${x.t.title}: ${x.n} neu`);
+    if (!list.length) { out(tr('No new comments from the user.')); return; }
+    for (const x of list) out(tr('{id} {title}: {n} new', { id: x.t.id, title: x.t.title, n: x.n }));
     return;
   }
   const t = findTask(root, config, pos[0]);
   const list = loadComments(t);
   const unread = new Set(unreadForClaude(root, t, list).map((c) => c.at));
   if (flags.json) { out(JSON.stringify(list, null, 2)); return; }
-  if (!list.length) { out(`${t.id} hat noch keine Kommentare.`); return; }
-  for (const c of list) out(`\n${c.at.replace('T', ' ').slice(0, 16)} ${c.author}${unread.has(c.at) ? ' (neu)' : ''}\n${c.text}`);
+  if (!list.length) { out(tr('{id} has no comments yet.', { id: t.id })); return; }
+  for (const c of list) out(`\n${c.at.replace('T', ' ').slice(0, 16)} ${c.author}${unread.has(c.at) ? tr(' (new)') : ''}\n${c.text}`);
   if (process.env.WORKS_ACTOR !== 'Board') markRead(root, t);
 }
 
@@ -2018,32 +2034,32 @@ function cmdViews() {
   if (pos[0] === 'delete' || pos[0] === 'remove') {
     const name = pos.slice(1).join(' ');
     config.views = views.filter((v) => v.name !== name);
-    if (config.views.length === views.length) fail(`Ansicht "${name}" gibt es nicht.`);
+    if (config.views.length === views.length) fail(tr('View "{name}" does not exist.', { name }));
     saveConfig(root, config); refresh(root);
-    out(`Ansicht "${name}" gelöscht.`);
+    out(tr('View "{name}" deleted.', { name }));
     return;
   }
-  if (!views.length) { out('Keine gespeicherten Ansichten. Im Board unter den Filtern "Aktuelle Filter speichern".'); return; }
+  if (!views.length) { out(tr('No saved views. In the board, use "Save current filters" below the filters.')); return; }
   for (const v of views) out(`${v.name}: ${describeView(v)}`);
 }
 
 function describeView(v) {
   const f = v.filter || {};
   const parts = [];
-  if (f.prios && f.prios.length && f.prios.length < 4) parts.push(f.prios.join(' und '));
-  if (f.type) parts.push(`Typ ${f.type}`);
+  if (f.prios && f.prios.length && f.prios.length < 4) parts.push(f.prios.join(tr(' and ')));
+  if (f.type) parts.push(tr('type {type}', { type: f.type }));
   if (f.tag) parts.push(`#${f.tag}`);
-  if (f.ms) parts.push(`Meilenstein ${f.ms}`);
-  if (f.signal) parts.push({ blocked: 'nur blockierte', unblocked: 'ohne blockierte', overdue: 'überfällig', questions: 'mit offenen Fragen', incomplete: 'unvollständig' }[f.signal] || f.signal);
-  if (f.q) parts.push(`Suche "${f.q}"`);
-  if (v.view && v.view !== 'board') parts.push(`Ansicht ${v.view}`);
-  return parts.join(', ') || 'alle Aufgaben';
+  if (f.ms) parts.push(tr('milestone {ms}', { ms: f.ms }));
+  if (f.signal) parts.push({ blocked: tr('only blocked'), unblocked: tr('without blocked'), overdue: tr('overdue only'), questions: tr('with open questions'), incomplete: tr('incomplete only') }[f.signal] || f.signal);
+  if (f.q) parts.push(tr('search "{q}"', { q: f.q }));
+  if (v.view && v.view !== 'board') parts.push(tr('view {view}', { view: v.view }));
+  return parts.join(', ') || tr('all tasks');
 }
 
 // Wendet eine gespeicherte Ansicht im Terminal an (works list --view "Name").
 function applyView(config, list, byId, name) {
   const v = (config.views || []).find((x) => x.name.toLowerCase() === String(name).toLowerCase());
-  if (!v) fail(`Ansicht "${name}" gibt es nicht. works views zeigt alle.`);
+  if (!v) fail(tr('View "{name}" does not exist. works views shows all views.', { name }));
   const f = v.filter || {};
   return list.filter((t) => {
     if (f.prios && f.prios.length && !f.prios.includes(t.priority)) return false;
@@ -2068,32 +2084,32 @@ function cmdTemplate() {
   const sub = pos.shift() || 'list';
   if (sub === 'list') {
     const list = listTemplates(root);
-    if (!list.length) { out('Keine Vorlagen. Anlegen im Board oder mit works template save --from <ID> --name ".."'); return; }
-    for (const t of list) out(`${t.slug.padEnd(24)} ${t.name} (${TYPE_LABEL[t.type]}, ${t.fields.length} Felder, ${t.criteria.length} Kriterien, ${t.scope === 'user' ? 'alle Projekte' : 'Projekt'})`);
+    if (!list.length) { out(tr('No templates. Create one in the board or with works template save --from <ID> --name ".."')); return; }
+    for (const t of list) out(`${t.slug.padEnd(24)} ${tr('{name} ({type}, {fields} fields, {criteria} criteria, {scope})', { name: t.name, type: TYPE_LABEL[t.type], fields: t.fields.length, criteria: t.criteria.length, scope: t.scope === 'user' ? tr('all projects') : tr('this project') })}`);
   } else if (sub === 'show') {
     const t = findTemplate(root, String(pos[0] || ''));
-    if (!t) fail(`Vorlage ${pos[0]} nicht gefunden.`);
+    if (!t) fail(tr('Template {slug} not found.', { slug: pos[0] }));
     out(JSON.stringify(t, null, 2));
   } else if (sub === 'save') {
     let input;
     if (flags.file && flags.file !== true) input = JSON.parse(fs.readFileSync(String(flags.file), 'utf8'));
     else if (flags.from && flags.from !== true) input = templateFromTask(findTask(root, config, String(flags.from)));
-    else fail('Quelle fehlt: --from <ID> oder --file vorlage.json');
+    else fail(tr('Source missing: --from <ID> or --file template.json'));
     if (flags.name && flags.name !== true) { input.name = String(flags.name); delete input.slug; }
     try {
       const t = saveTemplate(root, input, flags.scope === 'user' ? 'user' : 'project');
-      out(`Vorlage gespeichert: ${t.slug} (${t.name}). Anlegen mit works new --template ${t.slug}`);
+      out(tr('Template saved: {slug} ({name}). Create tasks from it with works new --template {slug}', { slug: t.slug, name: t.name }));
     } catch (e) { fail(e.message); }
   } else if (sub === 'delete') {
     const n = deleteTemplate(root, String(pos[0] || ''));
-    out(n ? `Vorlage ${pos[0]} gelöscht.` : `Vorlage ${pos[0]} nicht gefunden.`);
-  } else fail('Unterbefehle: list, show <slug>, save --from <ID> | --file, delete <slug>');
+    out(n ? tr('Template {slug} deleted.', { slug: pos[0] }) : tr('Template {slug} not found.', { slug: pos[0] }));
+  } else fail(tr('Subcommands: list, show <slug>, save --from <ID> | --file, delete <slug>'));
 }
 
 // Neue Aufgabe aus einer Vorlage: works new --template slug --field Name=Wert --text "Was genau passieren soll"
 function newFromTemplate(root, config) {
   const tpl = findTemplate(root, String(flags.template));
-  if (!tpl) fail(`Vorlage ${flags.template} nicht gefunden. works template list zeigt alle.`);
+  if (!tpl) fail(tr('Template {slug} not found. works template list shows all templates.', { slug: flags.template }));
   const values = {};
   for (const f of [].concat(flags.field || [])) {
     const i = String(f).indexOf('=');
@@ -2124,37 +2140,37 @@ function cmdTime() {
   if (flags.today) {
     const u = liveUsage(root, config);
     if (flags.json) { out(JSON.stringify({ ...u.today, currency: u.currency })); return; }
-    out(`Heute: ${fmtTokens(u.today.tokens)} Tokens, geschätzt ${fmtCost(u.today.cost, u.currency)}`);
+    out(tr('Today: {tokens} tokens, estimated {cost}', { tokens: fmtTokens(u.today.tokens), cost: fmtCost(u.today.cost, u.currency) }));
     return;
   }
   if (flags.mode) {
-    if (!['measured', 'fixed'].includes(flags.mode)) fail('--mode measured oder fixed');
+    if (!['measured', 'fixed'].includes(flags.mode)) fail(tr('--mode measured or fixed'));
     config.effort_mode = flags.mode; saveConfig(root, config); refresh(root);
-    out(flags.mode === 'measured' ? 'Zeitleiste und Sprint rechnen jetzt mit den gemessenen Dauern.' : 'Zeitleiste und Sprint rechnen mit festen Werten.');
+    out(flags.mode === 'measured' ? tr('Timeline and sprint now use the measured durations.') : tr('Timeline and sprint use fixed values.'));
     return;
   }
   if (pos[0]) {
     const t = findTask(root, config, pos[0]);
     const tt = taskTime(root, t);
     if (flags.json) { out(JSON.stringify(tt, null, 2)); return; }
-    out(`${t.id} ${t.title}\nClaude aktiv: ${fmtDuration(tt.totalMs)} in ${tt.sessions.length} Sitzung(en)${tt.started ? `, gestartet am ${tt.started}` : ''}`);
+    out(`${t.id} ${t.title}\n${tr('Claude active: {duration} in {n} session(s)', { duration: fmtDuration(tt.totalMs), n: tt.sessions.length })}${tt.started ? tr(', started on {date}', { date: tt.started }) : ''}`);
     const u = taskUsage(root, config, t.id);
-    if (u.tokens) out(`Verbrauch: ${fmtTokens(u.tokens)} Tokens (Eingabe ${fmtTokens(u.in)}, Ausgabe ${fmtTokens(u.out)}, Cache ${fmtTokens(u.cw + u.cr)}), geschätzt ${fmtCost(u.cost, u.currency)}`);
-    out(`Tage je Status: ${Object.entries(tt.statusDays).map(([k, v]) => `${STATUS_LABEL[k] || k} ${v}`).join(', ') || 'keine'}`);
+    if (u.tokens) out(tr('Usage: {tokens} tokens (input {in}, output {out}, cache {cache}), estimated {cost}', { tokens: fmtTokens(u.tokens), in: fmtTokens(u.in), out: fmtTokens(u.out), cache: fmtTokens(u.cw + u.cr), cost: fmtCost(u.cost, u.currency) }));
+    out(tr('Days per status: {list}', { list: Object.entries(tt.statusDays).map(([k, v]) => `${STATUS_LABEL[k] || k} ${v}`).join(', ') || tr('none') }));
     for (const s of tt.sessions) out(`  ${new Date(s.start).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}  ${fmtDuration(s.ms).padEnd(12)} ${s.label}`);
     return;
   }
   const e = estimates(root, tasks, config);
   if (flags.json) { out(JSON.stringify(e, null, 2)); return; }
-  out(`Schätzung gegen tatsächliche Dauer (Kalendertage vom Start bis zum Abschluss), Modus: ${e.mode === 'measured' ? 'gemessen' : 'fest'}`);
-  for (const s of e.sizes) out(`  ${s.effort.padEnd(3)} geschätzt ${String(s.estimate).padStart(2)} Tage, gemessen ${s.avg === null ? 'noch keine Daten' : `${s.avg} Tage aus ${s.n} Aufgabe(n)`}`);
+  out(e.mode === 'measured' ? tr('Estimate vs. actual duration (calendar days from start to completion), mode: measured') : tr('Estimate vs. actual duration (calendar days from start to completion), mode: fixed'));
+  for (const s of e.sizes) out(`  ${s.effort.padEnd(3)} ${tr('estimated {est} days, measured {measured}', { est: String(s.estimate).padStart(2), measured: s.avg === null ? tr('no data yet') : tr('{avg} days from {n} task(s)', { avg: s.avg, n: s.n }) })}`);
   const pu = projectUsage(root, config, tasks);
   if (pu.total.tokens) {
-    out(`\nVerbrauch der letzten ${pu.days} Tage: ${fmtTokens(pu.total.tokens)} Tokens, geschätzt ${fmtCost(pu.total.cost, pu.currency)} (Preise in config.json unter prices)`);
-    for (const b of pu.byType) out(`  ${(TYPE_LABEL[b.type] || b.type).padEnd(16)} ${fmtTokens(b.tokens).padStart(9)}  ${fmtCost(b.cost, pu.currency)}  ${b.tasks} Aufgabe(n)`);
-    if (pu.top.length) out(`Am teuersten: ${pu.top.slice(0, 3).map((x) => `${x.id} ${fmtCost(x.cost, pu.currency)}`).join(', ')}`);
+    out(`\n${tr('Usage over the last {days} days: {tokens} tokens, estimated {cost} (prices in config.json under prices)', { days: pu.days, tokens: fmtTokens(pu.total.tokens), cost: fmtCost(pu.total.cost, pu.currency) })}`);
+    for (const b of pu.byType) out(`  ${(TYPE_LABEL[b.type] || b.type).padEnd(16)} ${fmtTokens(b.tokens).padStart(9)}  ${fmtCost(b.cost, pu.currency)}  ${tr('{n} task(s)', { n: b.tasks })}`);
+    if (pu.top.length) out(tr('Most expensive: {list}', { list: pu.top.slice(0, 3).map((x) => `${x.id} ${fmtCost(x.cost, pu.currency)}`).join(', ') }));
   }
-  if (e.worst.length) out(`Am längsten über der Schätzung: ${e.worst.map((w) => `${w.id} (${w.effort}, ${w.days} Tage)`).join(', ')}`);
+  if (e.worst.length) out(tr('Furthest over the estimate: {list}', { list: e.worst.map((w) => tr('{id} ({effort}, {days} days)', { id: w.id, effort: w.effort, days: w.days })).join(', ') }));
 }
 
 // ---------- Prüfungen ----------
@@ -2165,17 +2181,17 @@ async function cmdChecks() {
   const sub = pos.shift() || (flags.detect ? 'detect' : 'list');
   if (sub === 'detect') {
     const d = detectChecks(root);
-    out('Vorschlag aus dem Projekt:');
+    out(tr('Suggestion from the project:'));
     for (const [k, v] of Object.entries(d)) out(`  ${k.padEnd(10)} ${v}`);
-    if (flags.save) { config.checks = d; saveConfig(root, config); refresh(root); out('Gespeichert in .works/config.json unter checks.'); } else out('Erst nach Rückfrage beim Nutzer speichern: works checks detect --save');
+    if (flags.save) { config.checks = d; saveConfig(root, config); refresh(root); out(tr('Saved in .works/config.json under checks.')); } else out(tr('Save only after asking the user: works checks detect --save'));
   } else if (sub === 'set') {
     config.checks = configuredChecks(config);
     // --file: JSON {"name": "befehl"} oder {"name": {"cmd": "..", "cwd": ".."}}, leerer Wert entfernt. Nutzt das Board.
     if (flags.file && flags.file !== true) {
       let obj;
-      try { obj = JSON.parse(readText(String(flags.file))); } catch { fail('--file muss JSON sein, etwa {"test": {"cmd": "npm test", "cwd": "app"}}.'); }
+      try { obj = JSON.parse(readText(String(flags.file))); } catch { fail(tr('--file must be JSON, e.g. {"test": {"cmd": "npm test", "cwd": "app"}}.')); }
       for (const [k, v] of Object.entries(obj && typeof obj === 'object' ? obj : {})) {
-        if (!NAME_RE.test(k)) fail(`Ungültiger Name ${k}.`);
+        if (!NAME_RE.test(k)) fail(tr('Invalid name {name}.', { name: k }));
         const e = checkEntry(v);
         if (e) config.checks[k] = storedCheck(e); else delete config.checks[k];
       }
@@ -2185,19 +2201,19 @@ async function cmdChecks() {
     for (const pair of pos) {
       const i = pair.indexOf('=');
       const k = pair.slice(0, i); const v = pair.slice(i + 1).trim();
-      if (!NAME_RE.test(k)) fail(`Ungültiger Name ${k}.`);
+      if (!NAME_RE.test(k)) fail(tr('Invalid name {name}.', { name: k }));
       if (v) config.checks[k] = storedCheck({ cmd: v, cwd }); else delete config.checks[k];
     }
     saveConfig(root, config); refresh(root);
-    out(`Prüfungen: ${Object.keys(config.checks).join(', ') || 'keine'}`);
+    out(tr('Checks: {list}', { list: Object.keys(config.checks).join(', ') || tr('none') }));
   } else if (sub === 'remove') {
     config.checks = configuredChecks(config);
     for (const k of pos) delete config.checks[k];
     saveConfig(root, config); refresh(root);
-    out(`Prüfungen: ${Object.keys(config.checks).join(', ') || 'keine'}`);
+    out(tr('Checks: {list}', { list: Object.keys(config.checks).join(', ') || tr('none') }));
   } else if (sub === 'run') {
     const t = findTask(root, config, pos.shift());
-    if (!checksFor(config, t).length) fail('Keine Prüfungen eingerichtet. Vorschlag mit works checks detect.');
+    if (!checksFor(config, t).length) fail(tr('No checks set up. Get a suggestion with works checks detect.'));
     const data = await runChecks(root, config, t, { only: flags.only ? listFlag(flags.only) : null, onStart: (c) => out(`> ${c.name}: ${c.cmd}`) });
     printChecks(data);
     refresh(root);
@@ -2206,24 +2222,24 @@ async function cmdChecks() {
     const name = pos.shift();
     try { recordCheck(root, t, name, String(flags.status || 'ok'), flags.note && flags.note !== true ? String(flags.note) : ''); } catch (e) { fail(e.message); }
     refresh(root);
-    out(`${name} für ${t.id} eingetragen: ${flags.status || 'ok'}`);
+    out(tr('{name} recorded for {id}: {status}', { name, id: t.id, status: flags.status || 'ok' }));
   } else if (sub === 'ack') {
     const t = findTask(root, config, pos.shift());
     try { ackCheck(t, pos.shift(), flags.reason && flags.reason !== true ? String(flags.reason) : ''); } catch (e) { fail(e.message); }
     refresh(root);
-    out('Als bekannt markiert.');
+    out(tr('Marked as known.'));
   } else {
     const c = configuredChecks(config);
-    if (!Object.keys(c).length) { out('Keine Prüfungen eingerichtet. Vorschlag mit works checks detect, speichern nach Rückfrage mit --save.'); return; }
-    for (const [k, v] of Object.entries(c)) { const e = checkEntry(v); out(`  ${k.padEnd(10)} ${e.cmd}${e.cwd ? `  (im Ordner ${e.cwd})` : ''}`); }
+    if (!Object.keys(c).length) { out(tr('No checks set up. Get a suggestion with works checks detect, save it after asking with --save.')); return; }
+    for (const [k, v] of Object.entries(c)) { const e = checkEntry(v); out(`  ${k.padEnd(10)} ${e.cmd}${e.cwd ? `  ${tr('(in folder {cwd})', { cwd: e.cwd })}` : ''}`); }
     const by = config.checks_by_type || {};
-    for (const [ty, list] of Object.entries(by)) out(`  nur für ${ty}: ${list.join(', ') || 'keine'}`);
+    for (const [ty, list] of Object.entries(by)) out(`  ${tr('only for {type}: {list}', { type: ty, list: list.join(', ') || tr('none') })}`);
     if (pos[0]) { const t = findTask(root, config, pos[0]); const d = loadResults(t); if (d) printChecks(d); }
   }
 }
 
 function printChecks(data) {
-  const mark = { ok: 'ok', ack: 'ok, bekannt', warn: 'Fund', fail: 'FEHLER', manual: 'offen' };
+  const mark = { ok: 'ok', ack: tr('ok, known'), warn: tr('finding'), fail: tr('FAILED'), manual: tr('pending (manual)') };
   for (const [k, r] of Object.entries(data.results)) {
     out(`  ${k.padEnd(10)} ${(mark[r.status] || r.status).padEnd(12)} ${r.ms ? `${Math.round(r.ms / 1000)} s` : ''}${r.note ? `  ${r.note.split('\n')[0]}` : ''}`);
     if (r.status === 'fail' && r.output) out(r.output.split('\n').slice(-12).map((l) => `      ${l}`).join('\n'));
@@ -2236,40 +2252,40 @@ function cmdDesign() {
   const root = requireRoot();
   const config = loadConfig(root);
   const sub = ['direction', 'add', 'brainstorm', 'choose', 'remove', 'show'].includes(pos[0]) ? pos.shift() : 'show';
-  if (!pos[0]) fail('Aufgaben-ID fehlt. Beispiel: works design add W-0006 --name=A --file=mockup.html');
+  if (!pos[0]) fail(tr('Task ID missing. Example: works design add W-0006 --name=A --file=mockup.html'));
   const t = findTask(root, config, pos.shift());
   const file = flags.file && flags.file !== true ? path.resolve(String(flags.file)) : '';
   const str = (k) => (flags[k] && flags[k] !== true ? String(flags[k]) : '');
   try {
     if (sub === 'direction') {
       setDirection(t, { file, text: str('text'), source: str('source') || 'ui-ux-pro-max', colors: parseColors(str('colors')), fonts: listFlag(str('fonts')), notes: str('notes') });
-      addHistory(t, `Designrichtung angehängt${str('source') ? ` (${str('source')})` : ''}`); saveTask(t);
-      out(`Designrichtung für ${t.id} gespeichert.`);
+      addHistory(t, tr('Design direction attached') + (str('source') ? ` (${str('source')})` : '')); saveTask(t);
+      out(tr('Design direction for {id} saved.', { id: t.id }));
     } else if (sub === 'add') {
       const v = addVariant(t, { name: str('name') || pos.shift(), title: str('title'), file, source: str('source') || 'ui-ux-pro-max', note: str('note') });
-      addHistory(t, `Entwurf ${v.name} „${v.title}“ angehängt`); saveTask(t);
-      out(`Variante ${v.name} gespeichert: design/${v.file}. Der Nutzer wählt im Board unter Entwürfe, oder: works design choose ${t.id} ${v.name}`);
+      addHistory(t, tr('Design variant {name} “{title}” attached', { name: v.name, title: v.title })); saveTask(t);
+      out(tr('Variant {name} saved: design/{file}. The user chooses in the board under Design variants, or: works design choose {id} {name}', { name: v.name, file: v.file, id: t.id }));
       const refs = v.kind === 'html' ? localRefs(readText(file)) : [];
-      if (refs.length) out(`Achtung: Der Entwurf lädt lokale Dateien, die das Board nicht anzeigt (dort gelten nur data:, blob: und https): ${refs.slice(0, 5).join(', ')}${refs.length > 5 ? ` und ${refs.length - 5} weitere` : ''}. Im Board fehlen dadurch Styles, Schriften oder Bilder. Vorher einbetten, etwa mit dem Plugin mockups: node <mockups>/scripts/entwurf.mjs inline <datei> --variant ${v.name}`);
+      if (refs.length) out(tr('Warning: The design loads local files that the board does not show (only data:, blob: and https work there): {refs}{more}. Styles, fonts or images will be missing in the board. Embed them first, e.g. with the mockups plugin: node <mockups>/scripts/entwurf.mjs inline <file> --variant {name}', { refs: refs.slice(0, 5).join(', '), more: refs.length > 5 ? tr(' and {n} more', { n: refs.length - 5 }) : '', name: v.name }));
     } else if (sub === 'brainstorm') {
       addBrainstorm(t, { file, text: str('text'), source: str('source') || 'superpowers', title: str('title') });
-      addHistory(t, 'Brainstorming angehängt'); saveTask(t);
-      out(`Brainstorming an ${t.id} angehängt.`);
+      addHistory(t, tr('Brainstorming attached')); saveTask(t);
+      out(tr('Brainstorming attached to {id}.', { id: t.id }));
     } else if (sub === 'choose') {
       const name = pos.shift();
       const r = chooseVariant(t, name, str('reason'));
-      addHistory(t, `Entwurf ${name} „${r.variant.title}“ gewählt${str('reason') ? `. Grund: ${str('reason')}` : ''}`); saveTask(t);
-      out(`Variante ${name} für ${t.id} gewählt und in decisions.md festgehalten.`);
+      addHistory(t, tr('Design variant {name} “{title}” chosen', { name, title: r.variant.title }) + (str('reason') ? tr('. Reason: {reason}', { reason: str('reason') }) : '')); saveTask(t);
+      out(tr('Variant {name} chosen for {id} and recorded in decisions.md.', { name, id: t.id }));
     } else if (sub === 'remove') {
-      removeVariant(t, pos.shift()); out('Variante entfernt.');
+      removeVariant(t, pos.shift()); out(tr('Variant removed.'));
     } else {
       const d = loadDesign(t);
-      if (!d) { out(`${t.id} hat noch keine Entwürfe.${needsDesign(t) ? ' Das ist eine Gestaltungsaufgabe: UI UX Pro Max und Brainstorming nutzen, falls vorhanden, und mit works design anhängen.' : ''}`); return; }
+      if (!d) { out(tr('{id} has no design variants yet.', { id: t.id }) + (needsDesign(t) ? tr(' This is a design task: use UI UX Pro Max and brainstorming if available, and attach the results with works design.') : '')); return; }
       if (flags.json) { out(JSON.stringify(d, null, 2)); return; }
-      if (d.direction) out(`Richtung (${d.direction.source}): ${d.direction.colors.map((c) => `${c.name ? c.name + ' ' : ''}${c.hex}`).join(', ')}${d.direction.fonts.length ? `, Schrift ${d.direction.fonts.join(', ')}` : ''}. Datei design/${d.direction.file}`);
-      for (const v of d.variants) out(`Variante ${v.name}: ${v.title} (design/${v.file})${d.chosen && d.chosen.name === v.name ? '  GEWÄHLT' : ''}`);
+      if (d.direction) out(tr('Direction ({source}): {colors}{fonts}. File design/{file}', { source: d.direction.source, colors: d.direction.colors.map((c) => `${c.name ? c.name + ' ' : ''}${c.hex}`).join(', '), fonts: d.direction.fonts.length ? tr(', font {fonts}', { fonts: d.direction.fonts.join(', ') }) : '', file: d.direction.file }));
+      for (const v of d.variants) out(tr('Variant {name}: {title} (design/{file})', { name: v.name, title: v.title, file: v.file }) + (d.chosen && d.chosen.name === v.name ? tr('  CHOSEN') : ''));
       for (const b of d.brainstorm) out(`Brainstorming: design/${b.file} (${b.source})`);
-      out(d.chosen ? `Gewählt: ${d.chosen.name}${d.chosen.reason ? `, ${d.chosen.reason}` : ''}. Danach umsetzen.` : d.variants.length ? 'Noch keine Variante gewählt. Vor dem Umsetzen auf die Wahl des Nutzers warten oder nachfragen.' : '');
+      out(d.chosen ? tr('Chosen: {name}{reason}. Implement it next.', { name: d.chosen.name, reason: d.chosen.reason ? `, ${d.chosen.reason}` : '' }) : d.variants.length ? tr('No variant chosen yet. Wait for the user to choose, or ask, before implementing.') : '');
     }
   } catch (e) { fail(e.message); }
   refresh(root);
@@ -2282,11 +2298,11 @@ function cmdInstruct() {
   const config = loadConfig(root);
   const t = findTask(root, config, pos.shift());
   const text = flags.text && flags.text !== true ? String(flags.text) : pos.join(' ');
-  if (!text.trim()) fail('Text fehlt.');
+  if (!text.trim()) fail(tr('Text missing.'));
   addInstruction(root, t.id, text);
-  addComment(t, 'Nutzer', `Anweisung während der Arbeit: ${text}`);
+  addComment(t, 'Nutzer', tr('Instruction during work: {text}', { text }));
   refresh(root);
-  out('Anweisung gespeichert. Claude bekommt sie beim nächsten Werkzeugaufruf oder spätestens am Ende der Antwort.');
+  out(tr('Instruction saved. Claude gets it with the next tool call, or at the latest at the end of the reply.'));
 }
 
 // ---------- Projektwissen ----------
@@ -2299,22 +2315,22 @@ function cmdKnow() {
     if (sub === 'add' || sub === 'propose') {
       const text = str('file') ? fs.readFileSync(str('file'), 'utf8') : str('text');
       const e = addKnowledge(root, { area: str('area'), title: str('title') || pos.join(' '), text, by: process.env.WORKS_ACTOR === 'Board' ? 'Nutzer' : 'Claude', source: str('source'), proposal: sub === 'propose' });
-      out(sub === 'propose' ? `Vorschlag ${e.id} gespeichert. Der Nutzer übernimmt ihn im Board unter Wissen.` : `Eintrag ${e.id} gespeichert.`);
-    } else if (sub === 'accept') { updateKnowledge(root, pos[0], { status: 'ok' }); out('Übernommen.'); }
-    else if (sub === 'flag') { updateKnowledge(root, pos[0], { status: 'veraltet' }); out('Als möglicherweise veraltet markiert.'); }
+      out(sub === 'propose' ? tr('Proposal {id} saved. The user accepts it in the board under Knowledge.', { id: e.id }) : tr('Entry {id} saved.', { id: e.id }));
+    } else if (sub === 'accept') { updateKnowledge(root, pos[0], { status: 'ok' }); out(tr('Accepted.')); }
+    else if (sub === 'flag') { updateKnowledge(root, pos[0], { status: 'veraltet' }); out(tr('Marked as possibly outdated.')); }
     else if (sub === 'edit') {
       const patch = {};
       if (str('title')) patch.title = str('title');
       if (str('text') || str('file')) patch.text = str('file') ? fs.readFileSync(str('file'), 'utf8') : str('text');
       if (str('area')) patch.area = str('area');
       if (flags.ok) patch.status = 'ok';
-      updateKnowledge(root, pos[0], patch); out('Gespeichert.');
-    } else if (sub === 'remove' || sub === 'reject') { removeKnowledge(root, pos[0]); out('Entfernt.'); }
+      updateKnowledge(root, pos[0], patch); out(tr('Saved.'));
+    } else if (sub === 'remove' || sub === 'reject') { removeKnowledge(root, pos[0]); out(tr('Removed.')); }
     else {
       const q = (sub === 'search' ? pos.join(' ') : '').toLowerCase();
       const list = loadKnowledge(root).filter((e) => !q || `${e.title} ${e.text} ${e.area}`.toLowerCase().includes(q));
       if (flags.json) { out(JSON.stringify(list, null, 2)); return; }
-      if (!list.length) { out(q ? 'Nichts gefunden.' : 'Noch kein Projektwissen. Mit works know add --area ".." --title ".." --text ".." anlegen, Vorschläge mit works know propose.'); return; }
+      if (!list.length) { out(q ? tr('Nothing found.') : tr('No project knowledge yet. Add entries with works know add --area ".." --title ".." --text "..", proposals with works know propose.')); return; }
       let area = '';
       for (const e of list) {
         if (e.area !== area) { area = e.area; out(`\n## ${area}`); }
@@ -2334,7 +2350,7 @@ function recurRule(input, old = {}) {
   if (g('every') !== undefined) {
     const e = g('every');
     const m = e.match(/^(daily|weekly|monthly|days)(?::(\d+))?$/);
-    if (!m) fail('--every: daily, weekly, monthly oder days:N');
+    if (!m) fail(tr('--every: daily, weekly, monthly or days:N'));
     r.kind = m[1]; if (m[2]) r.interval = parseInt(m[2], 10);
   }
   for (const k of ['interval', 'weekday', 'nth', 'day', 'due_days']) if (g(k) !== undefined) r[k] = parseInt(g(k), 10) || undefined;
@@ -2345,8 +2361,8 @@ function recurRule(input, old = {}) {
   if (input.queue !== undefined) r.queue = input.queue === true || input.queue === 'true';
   if (input.sprint !== undefined) r.sprint = input.sprint === true || input.sprint === 'true';
   if (input.active !== undefined) r.active = !(input.active === 'false' || input.active === false);
-  if (!r.title) fail('--title fehlt.');
-  if (!KINDS.includes(r.kind)) fail('--every fehlt: daily, weekly, monthly oder days:N');
+  if (!r.title) fail(tr('--title missing.'));
+  if (!KINDS.includes(r.kind)) fail(tr('--every missing: daily, weekly, monthly or days:N'));
   return r;
 }
 
@@ -2359,7 +2375,7 @@ function runRecurringNow(root, { quiet = false } = {}) {
     if (blockedBy) {
       r.last = date;
       const prev = loadTasks(root).find((t) => t.id === blockedBy);
-      if (prev) { addHistory(prev, `Wiederkehrender Termin ${date} übersprungen, diese Aufgabe ist noch offen`); saveTask(prev); }
+      if (prev) { addHistory(prev, tr('Recurring date {date} skipped, this task is still open', { date })); saveTask(prev); }
       continue;
     }
     const opts = { title: fillTitle(r.title, date), type: r.type || 'chore', priority: r.priority || 'P3', status: r.status || 'geplant', source: `wiederkehrend:${r.id}` };
@@ -2377,7 +2393,7 @@ function runRecurringNow(root, { quiet = false } = {}) {
     const sp = activeSprint(config);
     if (r.sprint && sp) sp.tasks = [...new Set([...(sp.tasks || []), task.id])];
     made.push(task);
-    if (!quiet) out(`Wiederkehrend angelegt: ${task.id} ${task.title} (Regel ${r.id}, Termin ${date})`);
+    if (!quiet) out(tr('Recurring task created: {id} {title} (rule {rule}, date {date})', { id: task.id, title: task.title, rule: r.id, date }));
   }
   if (due.length) { saveConfig(root, config); refresh(root); }
   return made;
@@ -2392,25 +2408,25 @@ function cmdRecur() {
     const max = Math.max(0, ...config.recurring.map((r) => parseInt(String(r.id).slice(1), 10) || 0));
     const r = recurRule(flags, { id: `R${max + 1}`, active: true, status: 'geplant', start: today() });
     config.recurring.push(r); saveConfig(root, config); refresh(root);
-    out(`${r.id} ${r.title}: ${describe(r)}, nächste Termine ${upcoming(r, 3).join(', ')}`);
+    out(tr('{id} {title}: {rule}, next dates {dates}', { id: r.id, title: r.title, rule: describe(r), dates: upcoming(r, 3).join(', ') }));
   } else if (sub === 'set') {
     const id = String(pos.shift() || '').toUpperCase();
     const i = config.recurring.findIndex((r) => r.id === id);
-    if (i === -1) fail(`Regel ${id} nicht gefunden.`);
+    if (i === -1) fail(tr('Rule {id} not found.', { id }));
     config.recurring[i] = recurRule(flags, config.recurring[i]);
     saveConfig(root, config); refresh(root);
-    out(`${id} gespeichert: ${describe(config.recurring[i])}`);
+    out(tr('{id} saved: {rule}', { id, rule: describe(config.recurring[i]) }));
   } else if (sub === 'remove') {
     const id = String(pos.shift() || '').toUpperCase();
     config.recurring = config.recurring.filter((r) => r.id !== id);
     saveConfig(root, config); refresh(root);
-    out(`${id} entfernt.`);
+    out(tr('{id} removed.', { id }));
   } else if (sub === 'run') {
     const made = runRecurringNow(root);
-    if (!made.length) out('Heute ist nichts fällig.');
+    if (!made.length) out(tr('Nothing is due today.'));
   } else {
-    if (!config.recurring.length) { out('Keine wiederkehrenden Aufgaben. Anlegen: works recur add --title ".." --every monthly --weekday 1 --nth 1'); return; }
-    for (const r of config.recurring) out(`${r.id} ${r.active === false ? '(pausiert) ' : ''}${r.title}: ${describe(r)}, nächste ${upcoming(r, 1, r.last ? addDays(r.last, 1) : today())[0]}${r.lastTask ? `, zuletzt ${r.lastTask}` : ''}`);
+    if (!config.recurring.length) { out(tr('No recurring tasks. Create one: works recur add --title ".." --every monthly --weekday 1 --nth 1')); return; }
+    for (const r of config.recurring) out(tr('{id} {paused}{title}: {rule}, next {date}', { id: r.id, paused: r.active === false ? tr('(paused) ') : '', title: r.title, rule: describe(r), date: upcoming(r, 1, r.last ? addDays(r.last, 1) : today())[0] }) + (r.lastTask ? tr(', last {id}', { id: r.lastTask }) : ''));
   }
 }
 
@@ -2432,22 +2448,22 @@ function cmdGithub() {
       const i = pair.indexOf('='); const k = pair.slice(0, i); const v = pair.slice(i + 1);
       if (k === 'labels') s.labels = listFlag(v);
       else if (k in DEFAULT_SYNC && typeof DEFAULT_SYNC[k] === 'boolean') s[k] = ['true', '1', 'ja', 'an'].includes(v.toLowerCase());
-      else fail(`Unbekannte Einstellung ${k}. Erlaubt: ${Object.keys(DEFAULT_SYNC).join(', ')}`);
+      else fail(tr('Unknown setting {key}. Allowed: {list}', { key: k, list: Object.keys(DEFAULT_SYNC).join(', ') }));
     }
     config.github_sync = s; saveConfig(root, config);
-    out(`GitHub-Abgleich: ${s.enabled ? 'an' : 'aus'}`);
+    out(s.enabled ? tr('GitHub sync: on') : tr('GitHub sync: off'));
     return;
   }
   if (sub === 'status') {
     const st = syncState(root);
-    if (!st) { out('Noch kein Abgleich. works github sync'); return; }
-    out(`${st.repo}, zuletzt ${st.last}`);
+    if (!st) { out(tr('No sync yet. works github sync')); return; }
+    out(tr('{repo}, last {date}', { repo: st.repo, date: st.last }));
     for (const e of (st.events || []).slice(0, 15)) out(`  ${e.at.slice(0, 16).replace('T', ' ')}  ${e.text}`);
     return;
   }
   const r = syncGithub(root, { log: flags.quiet ? () => {} : (t) => out(t) });
-  if (r.skipped) { if (!flags.quiet) out(`GitHub-Abgleich übersprungen: ${r.skipped}.`); return; }
-  if (!flags.quiet) out(r.first ? `Erster Abgleich mit ${r.repo}: Stand gemerkt, ab jetzt werden Änderungen übernommen.` : r.events.length ? `${r.events.length} Änderung(en) aus ${r.repo} übernommen.` : `Nichts Neues aus ${r.repo}.`);
+  if (r.skipped) { if (!flags.quiet) out(tr('GitHub sync skipped: {reason}.', { reason: r.skipped })); return; }
+  if (!flags.quiet) out(r.first ? tr('First sync with {repo}: state saved, changes are applied from now on.', { repo: r.repo }) : r.events.length ? tr('{n} change(s) applied from {repo}.', { n: r.events.length, repo: r.repo }) : tr('Nothing new from {repo}.', { repo: r.repo }));
 }
 
 function cmdIcal() {
@@ -2456,13 +2472,13 @@ function cmdIcal() {
   const file = path.resolve(flags.out && flags.out !== true ? String(flags.out) : path.join(worksDir(root), 'reports', 'termine.ics'));
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
-  out(`Kalender gespeichert: ${file}. Läuft das Board, gibt es ihn auch zum Abonnieren unter /kalender.ics.`);
+  out(tr('Calendar saved: {file}. While the board is running, you can also subscribe to it at /kalender.ics.', { file }));
 }
 
 function cmdUndo() {
   const root = requireRoot();
-  if (flags.list) { const l = undoList(root); if (!l.length) out('Nichts zum Rückgängigmachen.'); for (const e of l.slice(0, 20)) out(`${e.key}  ${e.at.slice(0, 16).replace('T', ' ')}  ${e.label}`); return; }
-  try { const e = undo(root, pos[0]); refresh(root); out(`Rückgängig gemacht: ${e.label}`); } catch (e) { fail(e.message); }
+  if (flags.list) { const l = undoList(root); if (!l.length) out(tr('Nothing to undo.')); for (const e of l.slice(0, 20)) out(`${e.key}  ${e.at.slice(0, 16).replace('T', ' ')}  ${e.label}`); return; }
+  try { const e = undo(root, pos[0]); refresh(root); out(tr('Undone: {label}', { label: e.label })); } catch (e) { fail(e.message); }
 }
 
 // ---------- Screenshots mit Playwright (W-0024) ----------
@@ -2478,20 +2494,20 @@ async function cmdShot() {
   const list = (v, d) => String(v && v !== true ? v : d).split(',').map((s) => s.trim()).filter(Boolean);
   const widths = list(flags.widths, '1440,390').map(Number);
   const themes = list(flags.themes, 'light');
-  if (widths.some((w) => !(w >= 200 && w <= 4000)) || themes.some((t) => !['light', 'dark'].includes(t))) fail('--widths 200 bis 4000, --themes light oder dark.');
+  if (widths.some((w) => !(w >= 200 && w <= 4000)) || themes.some((t) => !['light', 'dark'].includes(t))) fail(tr('--widths 200 to 4000, --themes light or dark.'));
   const asset = flags.asset && flags.asset !== true ? findTask(root, config, String(flags.asset)).id : '';
   const outDir = path.resolve(flags.out && flags.out !== true ? String(flags.out) : root ? path.join(worksDir(root), '.tmp', 'shots') : 'shots');
   let url = flags.url && flags.url !== true ? String(flags.url) : '';
   let name; let prepare = null; let started = null; let task = null; let perShot = null;
   if (scenarioFile) {
-    if (!exists(scenarioFile)) fail(`Szenario nicht gefunden: ${scenarioFile}`);
+    if (!exists(scenarioFile)) fail(tr('Scenario not found: {file}', { file: scenarioFile }));
     const { loadScenario } = await import('./scenario.mjs');
     let sc;
     try { sc = await loadScenario(scenarioFile, { cli: OWN_CLI }); } catch (e) { fail(e.message.split('\n')[0]); }
     name = slugify(sc.name, 60) || 'szenario';
     perShot = sc.perShot;
   } else if (url) {
-    if (!/^(https?|file):/i.test(url)) { if (exists(url)) url = pathToFileURL(path.resolve(url)).href; else fail('--url braucht http(s)://, file:// oder einen vorhandenen Dateipfad.'); }
+    if (!/^(https?|file):/i.test(url)) { if (exists(url)) url = pathToFileURL(path.resolve(url)).href; else fail(tr('--url needs http(s)://, file:// or an existing file path.')); }
     name = slugify(url.replace(/^[a-z]+:\/+/i, '').replace(/[?#].*$/, ''), 40) || 'seite';
   } else {
     const target = String(pos[0] || 'board');
@@ -2501,7 +2517,7 @@ async function cmdShot() {
     if (!info) {
       startDetached(root, { cli: newestCli(), port: 0, host: '127.0.0.1', takeover: false });
       info = started = await waitForServer(root, null);
-      if (!info) fail('Board-Server startet nicht. Details in .works/server.log');
+      if (!info) fail(tr('Board server does not start. Details in .works/server.log'));
     }
     url = `http://127.0.0.1:${info.port}/`;
     name = task || view;
@@ -2513,7 +2529,7 @@ async function cmdShot() {
   const pw = loadPlaywright(root);
   if (!pw) {
     await stopStarted();
-    out('Playwright fehlt. Einmalig `npm install -g playwright` (lädt keine Browser, genutzt wird das installierte Chrome) oder NODE_PATH auf einen Ordner mit playwright setzen.');
+    out(tr('Playwright is missing. Run `npm install -g playwright` once (it downloads no browsers, the installed Chrome is used) or set NODE_PATH to a folder that contains playwright.'));
     process.exitCode = 2;
     return;
   }
@@ -2526,10 +2542,10 @@ async function cmdShot() {
     const desc = flags.desc && flags.desc !== true ? String(flags.desc) : `Screenshot ${name}`;
     for (const s of shots) {
       // Name mit Schema und Breite: Daran findet die Abnahme das passende Nachher-Bild (W-0030).
-      const r = spawnSync(process.execPath, [process.argv[1], 'asset', asset, s.file, `--kind=${kind}`, `--name=${name}-${s.theme}-${s.width}`, `--desc=${desc} (${s.width} px, ${s.theme === 'dark' ? 'dunkel' : 'hell'})`], { cwd: root, encoding: 'utf8', windowsHide: true });
-      if (r.status !== 0) fail(`Anhängen an ${asset} fehlgeschlagen: ${(r.stderr || r.stdout || '').trim().split('\n')[0]}`);
+      const r = spawnSync(process.execPath, [process.argv[1], 'asset', asset, s.file, `--kind=${kind}`, `--name=${name}-${s.theme}-${s.width}`, `--desc=${desc} (${s.theme === 'dark' ? tr('{width} px, dark', { width: s.width }) : tr('{width} px, light', { width: s.width })})`], { cwd: root, encoding: 'utf8', windowsHide: true });
+      if (r.status !== 0) fail(tr('Attaching to {id} failed: {error}', { id: asset, error: (r.stderr || r.stdout || '').trim().split('\n')[0] }));
     }
-    out(`${shots.length} ${shots.length === 1 ? 'Bild' : 'Bilder'} an ${asset} angehängt (Art: ${kind}).`);
+    out(shots.length === 1 ? tr('1 image attached to {id} (kind: {kind}).', { id: asset, kind }) : tr('{n} images attached to {id} (kind: {kind}).', { n: shots.length, id: asset, kind }));
   }
   if (shots.some((s) => s.problems.length)) process.exitCode = 1;
 }
@@ -2539,14 +2555,14 @@ async function cmdShot() {
 function cmdFile() {
   const root = requireRoot();
   const config = loadConfig(root);
-  if (!pos[0]) fail('Datei fehlt. Beispiel: works file src/commands/backup.ts');
+  if (!pos[0]) fail(tr('File missing. Example: works file src/commands/backup.ts'));
   const list = tasksForFile(root, config, pos[0]);
   if (flags.json) { out(JSON.stringify(list, null, 2)); return; }
-  if (!list.length) { out(`Keine Aufgabe hat ${pos[0]} geändert (Commits mit Aufgaben-ID oder Edits während einer aktiven Aufgabe).`); return; }
+  if (!list.length) { out(tr('No task changed {file} (commits with a task ID or edits during an active task).', { file: pos[0] })); return; }
   for (const x of list) {
     out(`${x.id}  ${STATUS_LABEL[x.status] || x.status || '?'}  ${x.title}`);
-    out(`        ${[x.commits ? `${x.commits} Commit${x.commits === 1 ? '' : 's'}` : '', x.edits ? `${x.edits} Edit${x.edits === 1 ? '' : 's'}` : '', x.last ? `zuletzt ${String(x.last).slice(0, 10)}` : ''].filter(Boolean).join(', ')}`);
-    for (const d of x.decisions) out(`        Entscheidung ${d}`);
+    out(`        ${[x.commits ? `${x.commits} Commit${x.commits === 1 ? '' : 's'}` : '', x.edits ? `${x.edits} Edit${x.edits === 1 ? '' : 's'}` : '', x.last ? tr('last {date}', { date: String(x.last).slice(0, 10) }) : ''].filter(Boolean).join(', ')}`);
+    for (const d of x.decisions) out(`        ${tr('Decision {decision}', { decision: d })}`);
   }
 }
 
@@ -2556,8 +2572,8 @@ function cmdFiles() {
   const t = findTask(root, config, pos[0] || loadState(root).active);
   const r = filesForTask(root, config, t.id);
   if (flags.json) { out(JSON.stringify(r, null, 2)); return; }
-  if (!r.files.length) { out(`${t.id}: noch keine Dateien bekannt.`); return; }
-  for (const f of r.files) out(`${f.file}${r.others[f.file] ? `   auch in ${r.others[f.file].join(', ')}` : ''}`);
+  if (!r.files.length) { out(tr('{id}: no files known yet.', { id: t.id })); return; }
+  for (const f of r.files) out(`${f.file}${r.others[f.file] ? `   ${tr('also in {ids}', { ids: r.others[f.file].join(', ') })}` : ''}`);
 }
 
 // ---------- Import ----------
@@ -2568,23 +2584,23 @@ function importPreview(root, file, opts = {}) {
   const mapping = {};
   for (const pair of listFlag(opts.map)) { const i = pair.indexOf('='); if (i > 0) mapping[pair.slice(0, i).trim()] = pair.slice(i + 1).trim(); }
   const fmt = opts.format && opts.format !== true ? String(opts.format) : 'auto';
-  if (!FORMATS.includes(fmt)) fail(`Unbekanntes Format ${fmt}. Möglich: ${FORMATS.join(', ')}`);
+  if (!FORMATS.includes(fmt)) fail(tr('Unknown format {format}. Possible: {list}', { format: fmt, list: FORMATS.join(', ') }));
   const r = parseImport(file, { format: fmt, mapping, sheet: opts.sheet && opts.sheet !== true ? String(opts.sheet) : '', includeArchived: !!opts['include-archived'] });
   const existing = loadTasks(root);
   const bySource = new Map(existing.filter((t) => String(t.source || '').startsWith('import:')).map((t) => [String(t.source), t.id]));
   for (const c of r.candidates) {
     c.source = `import:${r.format}${c.key ? `:${String(c.key).slice(0, 60)}` : ''}`;
-    if (c.key && bySource.has(c.source)) { c.dup = bySource.get(c.source); c.dupKind = 'schon importiert'; continue; }
+    if (c.key && bySource.has(c.source)) { c.dup = bySource.get(c.source); c.dupKind = tr('already imported'); continue; }
     let best = null;
     for (const t of existing) {
       const sc = similarity({ title: c.title, tags: c.tags, text: c.description }, { title: t.title, tags: t.tags, text: getSection(t._body, 'Beschreibung') || '' });
       if (sc >= 0.85 && (!best || sc > best.sc)) best = { id: t.id, sc };
     }
-    if (best) { c.dup = best.id; c.dupKind = `${Math.round(best.sc * 100)} % ähnlich`; }
+    if (best) { c.dup = best.id; c.dupKind = tr('{pct} % similar', { pct: Math.round(best.sc * 100) }); }
   }
   // Doppelte Einträge innerhalb der Datei
   const seen = new Map();
-  for (const c of r.candidates) { const k = c.title.toLowerCase(); if (seen.has(k) && !c.dup) { c.dup = `#${seen.get(k)}`; c.dupKind = 'doppelt in der Datei'; } else seen.set(k, c.n); }
+  for (const c of r.candidates) { const k = c.title.toLowerCase(); if (seen.has(k) && !c.dup) { c.dup = `#${seen.get(k)}`; c.dupKind = tr('duplicate in the file'); } else seen.set(k, c.n); }
   return r;
 }
 
@@ -2605,38 +2621,39 @@ function importBackupCli(root, text, file) {
   let d;
   try { d = readBackup(text); } catch (e) { fail(e.message); }
   const mode = flags.mode && flags.mode !== true ? String(flags.mode) : 'merge';
-  if (!['merge', 'restore'].includes(mode)) fail('--mode ist merge (Zusammenführen) oder restore (Wiederherstellen).');
+  if (!['merge', 'restore'].includes(mode)) fail(tr('--mode is merge (combine) or restore (replace).'));
   const cmp = compareBackup(root, d);
+  const count = (n) => (n === 1 ? tr('1 task') : tr('{n} tasks', { n }));
   if (!flags.apply) {
-    out(`works-Sicherung aus ${d.project || 'unbekanntem Projekt'} vom ${String(d.exported || '').slice(0, 16).replace('T', ' ')}: ${d.tasks.length} ${d.tasks.length === 1 ? 'Aufgabe' : 'Aufgaben'}.`);
-    out(`${cmp.counts.neu} neu, ${cmp.counts.geaendert} geändert, ${cmp.counts.gleich} gleich, ${cmp.counts.nurHier} nur hier.`);
+    out(tr('works backup of {project} from {date}: {count}.', { project: d.project || tr('an unknown project'), date: String(d.exported || '').slice(0, 16).replace('T', ' '), count: count(d.tasks.length) }));
+    out(tr('{new} new, {changed} changed, {same} unchanged, {here} only here.', { new: cmp.counts.neu, changed: cmp.counts.geaendert, same: cmp.counts.gleich, here: cmp.counts.nurHier }));
     for (const i of cmp.items) {
       if (i.kind === 'gleich') continue;
       const ch = (i.changes || []).map((c) => (c.from !== undefined ? `${c.label} ${c.from || '–'} → ${c.to || '–'}` : c.label)).join(', ');
-      out(`${i.kind === 'neu' ? '+' : '~'} ${String(i.n).padStart(3)}  ${i.id}${i.localId && i.localId !== i.id ? ` (hier ${i.localId})` : ''}  ${i.title}${ch ? `  [${ch}]` : ''}`);
+      out(`${i.kind === 'neu' ? '+' : '~'} ${String(i.n).padStart(3)}  ${i.id}${i.localId && i.localId !== i.id ? ` ${tr('(here {id})', { id: i.localId })}` : ''}  ${i.title}${ch ? `  [${ch}]` : ''}`);
     }
-    for (const t of cmp.onlyHere) out(`  nur hier  ${t.id}  ${t.title}`);
-    out(`\nZusammenführen: works import ${file} --apply  (Auswahl mit --only 1,4)`);
-    out(`Wiederherstellen, ersetzt den Stand und sichert ihn vorher: works import ${file} --apply --mode=restore`);
+    for (const t of cmp.onlyHere) out(`  ${tr('only here')}  ${t.id}  ${t.title}`);
+    out(`\n${tr('Merge: works import {file} --apply  (pick with --only 1,4)', { file })}`);
+    out(tr('Restore, replaces the current state after backing it up: works import {file} --apply --mode=restore', { file }));
     return;
   }
   if (mode === 'restore') {
     const r = restoreBackup(root, d);
-    snapshotRestore(root, { label: `Wiederhergestellt aus ${d.project || 'einer Sicherung'} (${r.tasks} Aufgaben)`, backup: r.backup });
+    snapshotRestore(root, { label: tr('Restored from {source} ({n} tasks)', { source: d.project || tr('a backup'), n: r.tasks }), backup: r.backup });
     refresh(root);
-    out(`Wiederhergestellt: ${r.tasks} ${r.tasks === 1 ? 'Aufgabe' : 'Aufgaben'}. Der vorherige Stand liegt in ${r.backup}. Rückgängig mit works undo.`);
+    out(tr('Restored: {count}. The previous state is in {backup}. Undo with works undo.', { count: count(r.tasks), backup: r.backup }));
     return;
   }
   const only = flags.only ? listFlag(flags.only).map(Number) : null;
   const r = mergeBackup(root, d, { only, snapshot: (o) => snapshot(root, o) });
   refresh(root);
-  out(`Zusammengeführt: ${r.created.length} neu${r.created.length ? ` (${r.created.join(', ')})` : ''}, ${r.updated.length} übernommen${r.updated.length ? ` (${r.updated.join(', ')})` : ''}. Rückgängig mit works undo.`);
+  out(tr('Merged: {created} new{createdIds}, {updated} updated{updatedIds}. Undo with works undo.', { created: r.created.length, createdIds: r.created.length ? ` (${r.created.join(', ')})` : '', updated: r.updated.length, updatedIds: r.updated.length ? ` (${r.updated.join(', ')})` : '' }));
 }
 
 function cmdImport() {
   const root = requireRoot();
   const file = pos[0];
-  if (!file || !exists(file)) fail('Datei fehlt oder nicht gefunden. Beispiel: works import trello.json [--apply]');
+  if (!file || !exists(file)) fail(tr('File missing or not found. Example: works import trello.json [--apply]'));
   if (/\.json$/i.test(file)) {
     const text = readText(file);
     let isBackup = false;
@@ -2648,16 +2665,19 @@ function cmdImport() {
   const pick = importSelection(r, flags);
   if (flags.json && !flags.apply) { out(JSON.stringify({ format: r.format, mapping: r.mapping || null, header: r.header || null, sheets: r.sheets || null, sheet: r.sheet || null, candidates: r.candidates, selected: pick.map((c) => c.n) }, null, 2)); return; }
   if (!flags.apply) {
-    out(`Format: ${r.format}${r.sheet ? `, Tabelle ${r.sheet}${r.sheets && r.sheets.length > 1 ? ` (weitere: ${r.sheets.filter((x) => x !== r.sheet).join(', ')})` : ''}` : ''}. ${r.candidates.length} ${r.candidates.length === 1 ? 'Eintrag' : 'Einträge'} gefunden, ${pick.length} ${pick.length === 1 ? 'würde' : 'würden'} angelegt.`);
-    if (r.mapping) out(`Spalten: ${Object.entries(r.mapping).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+    const sheet = r.sheet ? tr(', sheet {sheet}', { sheet: r.sheet }) + (r.sheets && r.sheets.length > 1 ? tr(' (others: {list})', { list: r.sheets.filter((x) => x !== r.sheet).join(', ') }) : '') : '';
+    const found = r.candidates.length === 1 ? tr('1 entry found') : tr('{n} entries found', { n: r.candidates.length });
+    const would = pick.length === 1 ? tr('1 would be created') : tr('{n} would be created', { n: pick.length });
+    out(tr('Format: {format}{sheet}. {found}, {would}.', { format: r.format, sheet, found, would }));
+    if (r.mapping) out(tr('Columns: {list}', { list: Object.entries(r.mapping).map(([k, v]) => `${k}=${v}`).join(', ') }));
     for (const c of r.candidates.slice(0, flags.all ? 2000 : 60)) {
-      const flagsTxt = [c.status && c.status !== 'backlog' ? c.status : '', c.priority, c.effort, c.due ? `fällig ${c.due}` : '', c.tags.length ? '#' + c.tags.join(' #') : '', c.criteria.length ? `${c.criteria.length} Kriterien` : ''].filter(Boolean).join(', ');
+      const flagsTxt = [c.status && c.status !== 'backlog' ? c.status : '', c.priority, c.effort, c.due ? tr('due {date}', { date: c.due }) : '', c.tags.length ? '#' + c.tags.join(' #') : '', c.criteria.length ? tr('{n} criteria', { n: c.criteria.length }) : ''].filter(Boolean).join(', ');
       out(`${pick.includes(c) ? '+' : '-'} ${String(c.n).padStart(3)}  ${c.type.padEnd(8)} ${c.title}${flagsTxt ? `  (${flagsTxt})` : ''}${c.dup ? `  [${c.dupKind}: ${c.dup}]` : ''}`);
     }
-    if (r.candidates.length > 60 && !flags.all) out(`… ${r.candidates.length - 60} weitere, alle mit --all`);
+    if (r.candidates.length > 60 && !flags.all) out(tr('… {n} more, all with --all', { n: r.candidates.length - 60 }));
     const done = r.candidates.filter((c) => ['erledigt', 'verworfen'].includes(c.status)).length;
-    if (done && !flags['include-done']) out(`${done} erledigte oder verworfene werden übersprungen, übernehmen mit --include-done.`);
-    out(`\nAnlegen mit: works import ${file} --apply${flags.format && flags.format !== true ? ` --format=${flags.format}` : ''}${flags.map ? ` --map="${flags.map}"` : ''}  (Auswahl mit --only 1,4,7 oder --skip 3, Standardspalte mit --status geplant, zusätzliche Tags mit --tags)`);
+    if (done && !flags['include-done']) out(tr('{n} done or dropped are skipped, include them with --include-done.', { n: done }));
+    out(`\n${tr('Create with: works import {file} --apply{extra}  (pick with --only 1,4,7 or --skip 3, default column with --status geplant, extra tags with --tags)', { file, extra: `${flags.format && flags.format !== true ? ` --format=${flags.format}` : ''}${flags.map ? ` --map="${flags.map}"` : ''}` })}`);
     return;
   }
   const config = loadConfig(root);
@@ -2679,14 +2699,14 @@ function cmdImport() {
     for (const x of (c.criteria || []).filter((y) => y.done)) body = body.replace(`- [ ] ${x.text}`, `- [x] ${x.text}`);
     fresh._body = body;
     if (status === 'erledigt') fresh.completed = today();
-    addHistory(fresh, `Importiert aus ${r.format} (${c.origin})${was !== status ? `, dort ${STATUS_LABEL[was] || was}` : ''}`);
+    addHistory(fresh, tr('Imported from {format} ({origin})', { format: r.format, origin: c.origin }) + (was !== status ? tr(', there {status}', { status: STATUS_LABEL[was] || was }) : ''));
     saveTask(fresh, { touch: false });
     created.push(fresh.id);
   }
   refresh(root);
-  out(created.length ? `Importiert: ${created.length} Aufgabe${created.length === 1 ? '' : 'n'} (${created[0]}${created.length > 1 ? ` bis ${created[created.length - 1]}` : ''}).` : 'Nichts importiert.');
+  out(created.length ? tr('Imported: {count} ({range}).', { count: created.length === 1 ? tr('1 task') : tr('{n} tasks', { n: created.length }), range: created[0] + (created.length > 1 ? tr(' to {id}', { id: created[created.length - 1] }) : '') }) : tr('Nothing imported.'));
   const inc = created.length ? loadTasks(root).filter((t) => created.includes(t.id) && t.incomplete).length : 0;
-  if (inc) out(`${inc} davon ohne Beschreibung und Kriterien, als unvollständig markiert.`);
+  if (inc) out(tr('{n} of them without description and criteria, marked as incomplete.', { n: inc }));
 }
 
 // ---------- Parallelarbeit ----------
@@ -2700,48 +2720,48 @@ function cmdParallel() {
     if (sub === 'plan') {
       const p = planParallel(root, { ids: ids(), max: flags.max });
       if (flags.json) { out(JSON.stringify(p, null, 2)); return; }
-      const head = { parallel: 'Empfehlung: parallel mit Agenten', nacheinander: 'Empfehlung: nacheinander in dieser Sitzung', unsicher: 'Unsicher: den Nutzer fragen, bevor Agenten starten' }[p.verdict];
+      const head = { parallel: tr('Recommendation: in parallel with agents'), nacheinander: tr('Recommendation: one after another in this session'), unsicher: tr('Unsure: ask the user before starting agents') }[p.verdict];
       out(head);
       for (const r of p.reasons) out(`- ${r}`);
       if (p.lanes.length && p.verdict !== 'nacheinander') {
-        out('\nBahnen:');
-        for (const l of p.lanes) out(`  ${l.id}  ${l.effort || '-'}  ${l.title}${l.files.length ? `\n        Dateien: ${l.files.slice(0, 5).join(', ')}` : ''}`);
+        out(`\n${tr('Lanes:')}`);
+        for (const l of p.lanes) out(`  ${l.id}  ${l.effort || '-'}  ${l.title}${l.files.length ? `\n        ${tr('Files: {list}', { list: l.files.slice(0, 5).join(', ') })}` : ''}`);
       }
-      if (p.later.length) out(`\nDanach: ${p.later.map((x) => x.id).join(', ')}`);
-      if (p.skipped.length) { out('\nNicht für Agenten geeignet:'); for (const x of p.skipped.slice(0, 10)) out(`  ${x.id}  ${x.why.join(', ')}`); }
-      if (p.running.length) out(`\nLaufen schon parallel: ${p.running.join(', ')}`);
-      if (p.verdict === 'parallel') out(`\nStarten: works parallel start ${p.lanes.map((l) => l.id).join(',')}, dann je Bahn einen Agenten mit dem Auftrag aus works parallel prompt <ID>.`);
-      if (p.verdict === 'unsicher') out('\nDem Nutzer die Gründe nennen und fragen: parallel starten oder nacheinander arbeiten?');
+      if (p.later.length) out(`\n${tr('Then: {ids}', { ids: p.later.map((x) => x.id).join(', ') })}`);
+      if (p.skipped.length) { out(`\n${tr('Not suitable for agents:')}`); for (const x of p.skipped.slice(0, 10)) out(`  ${x.id}  ${x.why.join(', ')}`); }
+      if (p.running.length) out(`\n${tr('Already running in parallel: {ids}', { ids: p.running.join(', ') })}`);
+      if (p.verdict === 'parallel') out(`\n${tr('Start: works parallel start {ids}, then one agent per lane with the brief from works parallel prompt <ID>.', { ids: p.lanes.map((l) => l.id).join(',') })}`);
+      if (p.verdict === 'unsicher') out(`\n${tr('Tell the user the reasons and ask: start in parallel or work one after another?')}`);
       return;
     }
     if (sub === 'start') {
       const list = ids();
-      if (!list.length) fail('IDs fehlen. Beispiel: works parallel start W-0012,W-0015');
+      if (!list.length) fail(tr('IDs missing. Example: works parallel start W-0012,W-0015'));
       const all = loadTasks(root);
       const started = [];
       for (const id of list) {
         const t = all.find((x) => x.id === id);
-        if (!t) fail(`Aufgabe ${id} nicht gefunden.`);
-        if (isBlocked(t, byIdMap(all)) && !flags.force) fail(`${id} ist blockiert. Mit --force bewusst übergehen.`);
-        if (['erledigt', 'verworfen'].includes(t.status)) fail(`${id} ist ${t.status}.`);
-        if (t.status === 'review' && !flags.force) fail(`${id} ist in Review. Mit --force trotzdem parallel weiterarbeiten.`);
+        if (!t) fail(tr('Task {id} not found.', { id }));
+        if (isBlocked(t, byIdMap(all)) && !flags.force) fail(tr('{id} is blocked. Use --force to override this deliberately.', { id }));
+        if (['erledigt', 'verworfen'].includes(t.status)) fail(tr('{id} is {status}.', { id, status: t.status }));
+        if (t.status === 'review' && !flags.force) fail(tr('{id} is in review. Use --force to continue in parallel anyway.', { id }));
         const lane = startLane(root, t);
         const old = t.status;
         t.status = 'in-arbeit';
         t.branch = lane.branch;
-        addHistory(t, `Parallel gestartet im Worktree ${path.basename(lane.path)}${old !== 'in-arbeit' ? ` (Status: ${old} → in-arbeit)` : ''}`);
+        addHistory(t, tr('Parallel start in worktree {worktree}', { worktree: path.basename(lane.path) }) + (old !== 'in-arbeit' ? ` (Status: ${old} → in-arbeit)` : ''));
         saveTask(t);
         started.push(lane);
       }
       refresh(root);
-      for (const l of started) out(`${l.task}: Worktree ${l.path}, Branch ${l.branch}`);
-      out(`\nJetzt je Bahn einen Agenten starten, gleichzeitig. Auftrag: works parallel prompt <ID>. Danach works parallel status und works parallel finish <ID>.`);
+      for (const l of started) out(tr('{id}: worktree {path}, branch {branch}', { id: l.task, path: l.path, branch: l.branch }));
+      out(`\n${tr('Now start one agent per lane, all at the same time. Brief: works parallel prompt <ID>. Then works parallel status and works parallel finish <ID>.')}`);
       return;
     }
     if (sub === 'prompt') {
       const t = findTask(root, config, pos[0]);
       const lane = laneOf(root, t.id);
-      if (!lane) fail(`${t.id} läuft nicht parallel. Erst works parallel start ${t.id}.`);
+      if (!lane) fail(tr('{id} is not running in parallel. Run works parallel start {id} first.', { id: t.id }));
       out(lanePrompt(root, t, lane, path.join(SKILL_DIR, 'scripts', 'works.mjs')));
       return;
     }
@@ -2749,11 +2769,11 @@ function cmdParallel() {
       const t = findTask(root, config, pos[0]);
       const r = finishLane(root, t.id, { merge: !!flags.merge, force: !!flags.force });
       const fresh = findTask(root, config, t.id);
-      if (fresh.status === 'in-arbeit') { fresh.status = 'review'; addHistory(fresh, 'Parallele Arbeit beendet (Status: in-arbeit → review)'); }
-      else addHistory(fresh, `Parallele Arbeit beendet${r.merged ? `, ${r.lane.branch} gemergt` : ''}`);
+      if (fresh.status === 'in-arbeit') { fresh.status = 'review'; addHistory(fresh, tr('Parallel work finished (Status: in-arbeit → review)')); }
+      else addHistory(fresh, tr('Parallel work finished') + (r.merged ? tr(', {branch} merged', { branch: r.lane.branch }) : ''));
       saveTask(fresh);
       refresh(root);
-      out(`${t.id}: Worktree entfernt.${r.merged ? ` ${r.lane.branch} ist in ${r.lane.base} gemergt.` : ` Branch ${r.lane.branch} bleibt mit ${r.lane.ahead} Commit${r.lane.ahead === 1 ? '' : 's'} für Review oder PR.`} Abschließen weiter mit works done ${t.id}.`);
+      out(tr('{id}: worktree removed.{detail} Finish with works done {id}.', { id: t.id, detail: r.merged ? tr(' {branch} is merged into {base}.', { branch: r.lane.branch, base: r.lane.base }) : tr(' Branch {branch} stays with {commits} for review or PR.', { branch: r.lane.branch, commits: `${r.lane.ahead} Commit${r.lane.ahead === 1 ? '' : 's'}` }) }));
       return;
     }
     if (sub === 'abort') {
@@ -2761,22 +2781,22 @@ function cmdParallel() {
       const r = abortLane(root, t.id, { force: !!flags.force });
       const fresh = findTask(root, config, t.id);
       if (fresh.status === 'in-arbeit') fresh.status = 'geplant';
-      addHistory(fresh, `Parallele Arbeit abgebrochen${r.branchKept ? `, Branch ${r.lane.branch} bleibt` : ''}`);
+      addHistory(fresh, tr('Parallel work aborted') + (r.branchKept ? tr(', branch {branch} kept', { branch: r.lane.branch }) : ''));
       saveTask(fresh);
       refresh(root);
-      out(`${t.id}: abgebrochen.${r.branchKept ? ` Branch ${r.lane.branch} mit ${r.lane.ahead} Commits bleibt erhalten.` : ''}`);
+      out(tr('{id}: aborted.', { id: t.id }) + (r.branchKept ? tr(' Branch {branch} with {n} commits is kept.', { branch: r.lane.branch, n: r.lane.ahead }) : ''));
       return;
     }
     const lanes = loadLanes(root).map((l) => laneInfo(root, l));
     if (flags.json) { out(JSON.stringify(lanes, null, 2)); return; }
     const here = laneLink();
-    if (here) out(`Dieser Ordner ist der Worktree von ${here.task}.`);
-    if (!lanes.length) { out('Keine parallelen Aufgaben. Prüfen mit works parallel plan.'); return; }
+    if (here) out(tr('This folder is the worktree of {id}.', { id: here.task }));
+    if (!lanes.length) { out(tr('No parallel tasks. Check with works parallel plan.')); return; }
     const all = loadTasks(root);
     for (const l of lanes) {
       const t = all.find((x) => x.id === l.task);
       out(`${l.task}  ${t ? STATUS_LABEL[t.status] : '?'}  ${t ? t.title : ''}`);
-      out(`        ${l.branch}, ${l.ahead} Commit${l.ahead === 1 ? '' : 's'}, ${l.dirty ? `${l.dirty} Dateien offen` : 'sauber'}${l.status !== 'aktiv' ? `, ${l.status}` : ''}${l.exists ? '' : ', Worktree fehlt'}`);
+      out(`        ${l.branch}, ${l.ahead} Commit${l.ahead === 1 ? '' : 's'}, ${l.dirty ? tr('{n} files uncommitted', { n: l.dirty }) : tr('clean')}${l.status !== 'aktiv' ? `, ${l.status}` : ''}${l.exists ? '' : tr(', worktree missing')}`);
     }
   } catch (e) { fail(e.message); }
 }
@@ -2785,17 +2805,17 @@ async function cmdInstallCli() {
   const { installCli, uninstallCli } = await import('./cli-install.mjs');
   if (flags.uninstall || flags.remove) {
     const r = uninstallCli({ dir: flags.dir && flags.dir !== true ? String(flags.dir) : undefined, dryRun: !!flags['dry-run'] });
-    out(r.length ? `Entfernt${flags['dry-run'] ? ' (Probelauf)' : ''}:\n${r.map((x) => `  ${x}`).join('\n')}` : 'Der Befehl works war nicht eingerichtet.');
+    out(r.length ? `${tr('Removed')}${flags['dry-run'] ? tr(' (dry run)') : ''}:\n${r.map((x) => `  ${x}`).join('\n')}` : tr('The works command was not set up.'));
     return;
   }
   const r = installCli({ dir: flags.dir && flags.dir !== true ? String(flags.dir) : undefined, path: !flags['no-path'], dryRun: !!flags['dry-run'] });
-  out(`Befehl works eingerichtet${flags['dry-run'] ? ' (Probelauf, nichts geschrieben)' : ''}.`);
+  out(tr('works command set up{dry}.', { dry: flags['dry-run'] ? tr(' (dry run, nothing written)') : '' }));
   for (const n of r.notes) out(`  ${n}`);
-  if (r.pathChanged) out(`  PATH ergänzt in: ${r.pathChanged}`);
+  if (r.pathChanged) out(`  ${tr('PATH extended in: {file}', { file: r.pathChanged })}`);
   out('');
-  if (r.onPath) out('Ab sofort in jedem Ordner: works board --serve --open, works new --title "...", works hub, works help');
-  else out(`Neues Terminal öffnen${process.platform === 'win32' ? '' : ` oder einmal: export PATH="${r.shimDir}:$PATH"`}. Danach in jedem Ordner: works board --serve --open, works new --title "...", works hub, works help`);
-  out('Das Startscript nimmt immer die neueste installierte works-Version, auch nach Plugin-Updates. Entfernen mit works install-cli --uninstall.');
+  if (r.onPath) out(tr('From now on, in any folder: works board --serve --open, works new --title "...", works hub, works help'));
+  else out(tr('Open a new terminal{alt}. Then, in any folder: works board --serve --open, works new --title "...", works hub, works help', { alt: process.platform === 'win32' ? '' : tr(' or run once: export PATH="{dir}:$PATH"', { dir: r.shimDir }) }));
+  out(tr('The launcher always uses the newest installed works version, even after plugin updates. Remove it with works install-cli --uninstall.'));
 }
 
 function cmdVersion() {
@@ -3098,5 +3118,5 @@ const commands = {
 };
 
 const fn = commands[cmd];
-if (!fn) fail(`Unbekannter Befehl "${cmd}". \`works help\` zeigt alle Befehle.`);
+if (!fn) fail(tr('Unknown command "{cmd}". `works help` shows all commands.', { cmd }));
 Promise.resolve(fn()).catch((e) => fail(e.stack || e.message));

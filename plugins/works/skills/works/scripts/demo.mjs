@@ -5,6 +5,7 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { exists, loadTasks, saveTask, today } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), 'works.mjs');
 
@@ -13,7 +14,7 @@ function w(root, args, actor = '') {
     cwd: root, encoding: 'utf8', env: { ...process.env, WORKS_ACTOR: actor }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   }).trim();
 }
-function newId(out) { return (out.match(/Angelegt: (\S+)/) || [])[1]; }
+function newId(out) { return (out.match(/(?:Angelegt|Created): (\S+)/) || [])[1]; }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Einfache Bildschirmskizzen als SVG, damit die Karten echte Vorschaubilder zeigen.
@@ -208,20 +209,20 @@ function backdate(root) {
 // Spielt nacheinander Änderungen vor, wie Claude sie während der Arbeit macht.
 export async function simulate(root, tasks, { delay = 6000, log = console.log } = {}) {
   const steps = [
-    ['Claude startet die Arbeit an der Bracket-Ansicht', ['start', tasks.bracket]],
-    ['Ein Akzeptanzkriterium wird abgehakt', ['check', tasks.bracket, '1']],
-    ['Claude notiert eine Frage an dich', ['question', tasks.bracket, '--text=Soll das eigene Team auch in der Desktop-Ansicht hervorgehoben werden?']],
-    ['Wartungsmodus geht in die Prüfung', ['set', tasks.maint, 'status=review']],
-    ['Eine neue Aufgabe entsteht aus einem Fund im Code', ['new', '--type=bug', '--title=Bracket bricht bei Teamnamen über 24 Zeichen', '--priority=P2', '--effort=S', '--tags=ui,webseite']],
-    ['Priorität wird angehoben', ['set', tasks.apply, 'priority=P1', '--reason=Wird vor dem Livegang gebraucht']],
-    ['Rollen-Listen werden nach Prüfung abgeschlossen', ['done', tasks.roles, '--confirm', '--force', '--reason=Demo: letzter Punkt wird nach dem Livegang erledigt']],
-    ['Die geplante Login-Aufgabe wird gestartet', ['start', tasks.login]],
-    ['Claude schreibt eine Übergabe', ['handoff', tasks.login, '--text=OAuth2 App angelegt. Nächster Schritt: Callback-Route in src/routes/auth.ts.']],
-    ['Ein Spike wird verworfen', ['drop', tasks.redis, '--reason=Entscheidung für einen verwalteten Redis-Dienst']],
+    [tr('Claude starts working on the bracket view'), ['start', tasks.bracket]],
+    [tr('An acceptance criterion is checked off'), ['check', tasks.bracket, '1']],
+    [tr('Claude notes a question for you'), ['question', tasks.bracket, '--text=Soll das eigene Team auch in der Desktop-Ansicht hervorgehoben werden?']],
+    [tr('Maintenance mode goes into review'), ['set', tasks.maint, 'status=review']],
+    [tr('A new task comes from a finding in the code'), ['new', '--type=bug', '--title=Bracket bricht bei Teamnamen über 24 Zeichen', '--priority=P2', '--effort=S', '--tags=ui,webseite']],
+    [tr('Priority is raised'), ['set', tasks.apply, 'priority=P1', '--reason=Wird vor dem Livegang gebraucht']],
+    [tr('Role lists are completed after review'), ['done', tasks.roles, '--confirm', '--force', '--reason=Demo: letzter Punkt wird nach dem Livegang erledigt']],
+    [tr('The planned login task is started'), ['start', tasks.login]],
+    [tr('Claude writes a handoff'), ['handoff', tasks.login, '--text=OAuth2 App angelegt. Nächster Schritt: Callback-Route in src/routes/auth.ts.']],
+    [tr('A spike is dropped'), ['drop', tasks.redis, '--reason=Entscheidung für einen verwalteten Redis-Dienst']],
   ];
   for (const [text, args] of steps) {
     await sleep(delay);
-    try { w(root, args); log(`  ${text}`); } catch (e) { log(`  ${text}: übersprungen (${String(e.stderr || e.message).split('\n')[0]})`); }
+    try { w(root, args); log(`  ${text}`); } catch (e) { log(`  ${tr('{step}: skipped ({msg})', { step: text, msg: String(e.stderr || e.message).split('\n')[0] })}`); }
   }
 }
 

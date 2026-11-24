@@ -38,7 +38,7 @@ function lastLog(t) {
 
 // Erster Start laut Verlauf, für die Zeitleiste.
 function startedOf(t) {
-  const m = (getSection(t._body, 'Verlauf') || '').match(/^- (\d{4}-\d{2}-\d{2}): Gestartet/m);
+  const m = (getSection(t._body, 'Verlauf') || '').match(/^- (\d{4}-\d{2}-\d{2}): (?:Gestartet|Started)/m);
   return m ? m[1] : '';
 }
 

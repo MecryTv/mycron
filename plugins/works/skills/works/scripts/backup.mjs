@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { worksDir, loadConfig, loadTasks, readText, readJson, writeJson, exists, formatId, idNumber, slugify, parseFrontmatter, serializeFrontmatter, sectionRegex } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 export const FORMAT = 'works-board';
 const VERSION = 1;
@@ -74,26 +75,26 @@ export function exportBoard(root, { closed = true, archive = false, comments = t
 // Prüft eine Sicherung, bevor irgendetwas geschrieben wird. Wirft mit verständlicher Meldung.
 export function readBackup(text) {
   let d;
-  try { d = JSON.parse(text); } catch { throw new Error('Die Datei ist kein gültiges JSON.'); }
-  if (!d || d.format !== FORMAT) throw new Error('Das ist keine works-Sicherung (format "works-board" fehlt).');
-  if (d.version !== VERSION) throw new Error(`Sicherung in Version ${d.version}, unterstützt wird Version ${VERSION}.`);
-  if (!Array.isArray(d.tasks)) throw new Error('Die Sicherung enthält keine Aufgabenliste.');
+  try { d = JSON.parse(text); } catch { throw new Error(tr('The file is not valid JSON.')); }
+  if (!d || d.format !== FORMAT) throw new Error(tr('This is not a works backup (format "works-board" is missing).'));
+  if (d.version !== VERSION) throw new Error(tr('Backup in version {version}, version {supported} is supported.', { version: d.version, supported: VERSION }));
+  if (!Array.isArray(d.tasks)) throw new Error(tr('The backup contains no task list.'));
   const ids = new Set();
   for (const [i, x] of d.tasks.entries()) {
-    const where = `Aufgabe ${i + 1}`;
-    if (!x || !ID_RE.test(String(x.id || ''))) throw new Error(`${where}: ungültige ID.`);
-    if (ids.has(x.id)) throw new Error(`${where}: ID ${x.id} doppelt.`);
+    const n = i + 1;
+    if (!x || !ID_RE.test(String(x.id || ''))) throw new Error(tr('Task {n}: invalid ID.', { n }));
+    if (ids.has(x.id)) throw new Error(tr('Task {n}: ID {id} appears twice.', { n, id: x.id }));
     ids.add(x.id);
-    if (x.dir !== undefined && !(DIR_RE.test(String(x.dir)) && String(x.dir).startsWith(x.id + '-'))) throw new Error(`${where}: ungültiger Ordnername.`);
-    if (!x.files || typeof x.files['task.md'] !== 'string') throw new Error(`${where}: task.md fehlt.`);
-    for (const k of Object.keys(x.files)) if (!TEXT.includes(k) || typeof x.files[k] !== 'string') throw new Error(`${where}: unerwartete Datei ${k}.`);
-    for (const [k, v] of Object.entries(x.binary || {})) if (!BIN_RE.test(k) || k.includes('..') || typeof v !== 'string') throw new Error(`${where}: ungültiger Dateipfad ${k}.`);
+    if (x.dir !== undefined && !(DIR_RE.test(String(x.dir)) && String(x.dir).startsWith(x.id + '-'))) throw new Error(tr('Task {n}: invalid folder name.', { n }));
+    if (!x.files || typeof x.files['task.md'] !== 'string') throw new Error(tr('Task {n}: task.md is missing.', { n }));
+    for (const k of Object.keys(x.files)) if (!TEXT.includes(k) || typeof x.files[k] !== 'string') throw new Error(tr('Task {n}: unexpected file {file}.', { n, file: k }));
+    for (const [k, v] of Object.entries(x.binary || {})) if (!BIN_RE.test(k) || k.includes('..') || typeof v !== 'string') throw new Error(tr('Task {n}: invalid file path {file}.', { n, file: k }));
   }
-  for (const k of ['knowledge', 'ideas']) if (d[k] !== undefined && typeof d[k] !== 'string') throw new Error(`${k} ist kein Text.`);
+  for (const k of ['knowledge', 'ideas']) if (d[k] !== undefined && typeof d[k] !== 'string') throw new Error(tr('{key} is not text.', { key: k }));
   return d;
 }
 
-const LABEL = { status: 'Status', priority: 'Priorität', title: 'Titel' };
+const LABEL = () => ({ status: 'Status', priority: tr('Priority'), title: tr('Title') });
 
 function changesOf(t, x, noHistory) {
   const same = (a, b) => lf(a || '').replace(/^updated:.*$/m, '').trim() === lf(b || '').replace(/^updated:.*$/m, '').trim();
@@ -103,10 +104,11 @@ function changesOf(t, x, noHistory) {
   if (!diff.length) return [];
   const theirs = parseFrontmatter(lf(x.files['task.md'])).data || {};
   const out = [];
-  for (const k of Object.keys(LABEL)) if (String(t[k] || '') !== String(theirs[k] || '')) out.push({ field: k, label: LABEL[k], from: String(t[k] || ''), to: String(theirs[k] || '') });
-  if (diff.includes('comments.md')) out.push({ field: 'comments', label: 'Kommentare' });
-  if (diff.includes('decisions.md')) out.push({ field: 'decisions', label: 'Entscheidungen' });
-  if (!out.length) out.push({ field: 'content', label: 'Inhalt' });
+  const label = LABEL();
+  for (const k of Object.keys(label)) if (String(t[k] || '') !== String(theirs[k] || '')) out.push({ field: k, label: label[k], from: String(t[k] || ''), to: String(theirs[k] || '') });
+  if (diff.includes('comments.md')) out.push({ field: 'comments', label: tr('Comments') });
+  if (diff.includes('decisions.md')) out.push({ field: 'decisions', label: tr('Decisions') });
+  if (!out.length) out.push({ field: 'content', label: tr('Content') });
   return out;
 }
 
@@ -170,7 +172,8 @@ export function mergeBackup(root, d, { only = null, snapshot = null } = {}) {
   const cmp = compareBackup(root, d);
   const chosen = cmp.items.filter((i) => i.kind !== 'gleich' && (!only || only.includes(i.n)));
   const config = loadConfig(root);
-  const undoKey = snapshot ? snapshot({ label: `Import aus ${d.project || 'einer Sicherung'}: ${chosen.length} ${chosen.length === 1 ? 'Aufgabe' : 'Aufgaben'}`, ids: chosen.filter((i) => i.localId).map((i) => i.localId), config: true }) : null;
+  const lv = { from: d.project || tr('a backup'), n: chosen.length };
+  const undoKey = snapshot ? snapshot({ label: chosen.length === 1 ? tr('Import from {from}: {n} task', lv) : tr('Import from {from}: {n} tasks', lv), ids: chosen.filter((i) => i.localId).map((i) => i.localId), config: true }) : null;
   let next = Math.max(config.next_id || 1, maxLocalId(root) + 1);
   const map = new Map();
   for (const i of cmp.items) if (i.localId) map.set(i.id, i.localId);

@@ -8,6 +8,7 @@ import { findRoot, loadConfig, loadTask, worksDir } from '../scripts/lib.mjs';
 import { recordActivity, takeInstructions, instructionText, callTarget, stampSteps, taskDirOf } from '../scripts/live.mjs';
 import { recordEdit, editHint } from '../scripts/files.mjs';
 import { loadLanes } from '../scripts/parallel.mjs';
+import { language, setLanguage } from '../scripts/i18n.mjs';
 
 let input = {};
 try {
@@ -17,6 +18,7 @@ try {
 try {
   const root = findRoot(input.cwd || process.cwd());
   if (root) {
+    setLanguage(language(root));
     const config = loadConfig(root);
     const ti = input.tool_input || {};
     const { task, lane } = callTarget(root, input);

@@ -6,8 +6,9 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   worksDir, readJson, writeJson, exists, loadTasks, loadConfig, isBlocked, getSection, stripComments,
-  checkboxes, openQuestions, OPEN_STATUSES, slugify, BRANCH_PREFIX,
+  checkboxes, openQuestions, OPEN_STATUSES, slugify, BRANCH_PREFIX, sectionTitle,
 } from './lib.mjs';
+import { tr } from './i18n.mjs';
 import { taskFiles } from './files.mjs';
 import { loadDesign, needsDesign } from './design.mjs';
 import { knowledgeSummary } from './knowledge.mjs';
@@ -61,11 +62,13 @@ export function planParallel(root, { ids = [], max } = {}) {
 
   // Git-Voraussetzungen
   const inside = git(root, ['rev-parse', '--is-inside-work-tree']);
-  if (!inside.ok) return { verdict: 'nacheinander', reasons: ['Kein Git-Repository. Parallelarbeit braucht Worktrees.'], lanes: [], skipped: [], pairs: [] };
+  if (!inside.ok) return { verdict: 'nacheinander', reasons: [tr('Not a Git repository. Parallel work needs worktrees.')], lanes: [], skipped: [], pairs: [] };
   const head = git(root, ['rev-parse', '--verify', 'HEAD']);
-  if (!head.ok) return { verdict: 'nacheinander', reasons: ['Das Repository hat noch keinen Commit.'], lanes: [], skipped: [], pairs: [] };
+  if (!head.ok) return { verdict: 'nacheinander', reasons: [tr('The repository has no commit yet.')], lanes: [], skipped: [], pairs: [] };
   const dirty = (git(root, ['status', '--porcelain', '--untracked-files=no']).out || '').split('\n').filter((l) => l.trim() && !/\s\.works\//.test(l));
-  if (dirty.length) notes.push(`${dirty.length} geänderte Datei${dirty.length === 1 ? '' : 'en'} sind nicht committet. Worktrees starten vom letzten Commit und sehen diese Änderungen nicht.`);
+  if (dirty.length) notes.push(dirty.length === 1
+    ? tr('{n} changed file is not committed. Worktrees start from the last commit and do not see these changes.', { n: 1 })
+    : tr('{n} changed files are not committed. Worktrees start from the last commit and do not see these changes.', { n: dirty.length }));
 
   // Kandidaten: angegebene IDs, sonst Warteschlange, Sprint und die besten Vorschläge.
   let cand = ids.length ? ids.map((id) => byId.get(id)).filter(Boolean) : [];
@@ -81,12 +84,12 @@ export function planParallel(root, { ids = [], max } = {}) {
   for (const t of cand) {
     const why = [];
     if (!OPEN_STATUSES.includes(t.status) || t.status === 'review') why.push(`Status ${t.status}`);
-    if (laneIds.has(t.id)) why.push('läuft schon parallel');
-    if (isBlocked(t, byId)) why.push('blockiert');
-    if (t.incomplete) why.push('unvollständig, braucht Angaben vom Nutzer');
-    if (openQuestions(t).length) why.push('offene Fragen');
-    if (!checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '').total && ['feature', 'bug', 'design', 'refactor'].includes(t.type)) why.push('keine Akzeptanzkriterien');
-    if (needsDesign(t)) { const d = loadDesign(t); if (!d || !d.chosen) why.push('Gestaltung ohne gewählten Entwurf'); }
+    if (laneIds.has(t.id)) why.push(tr('already running in parallel'));
+    if (isBlocked(t, byId)) why.push(tr('blocked'));
+    if (t.incomplete) why.push(tr('incomplete, needs details from the user'));
+    if (openQuestions(t).length) why.push(tr('open questions'));
+    if (!checkboxes(getSection(t._body, 'Akzeptanzkriterien') || '').total && ['feature', 'bug', 'design', 'refactor'].includes(t.type)) why.push(tr('no acceptance criteria'));
+    if (needsDesign(t)) { const d = loadDesign(t); if (!d || !d.chosen) why.push(tr('design without a chosen variant')); }
     if (why.length) { if (ids.length || ok.length < limit * 2) skipped.push({ id: t.id, title: t.title, why }); continue; }
     ok.push(t);
   }
@@ -106,15 +109,15 @@ export function planParallel(root, { ids = [], max } = {}) {
     const a = ok[i]; const b = ok[j];
     const A = info.get(a.id); const B = info.get(b.id);
     let level = 'frei'; const why = [];
-    if (dependsOn(a, b) || dependsOn(b, a) || (a.blocks || []).includes(b.id) || (b.blocks || []).includes(a.id)) { level = 'hart'; why.push('hängen voneinander ab'); }
+    if (dependsOn(a, b) || dependsOn(b, a) || (a.blocks || []).includes(b.id) || (b.blocks || []).includes(a.id)) { level = 'hart'; why.push(tr('depend on each other')); }
     const sameFiles = A.files.filter((f) => B.files.includes(f));
-    if (sameFiles.length) { level = 'hart'; why.push(`gleiche Dateien: ${sameFiles.slice(0, 3).join(', ')}`); }
+    if (sameFiles.length) { level = 'hart'; why.push(tr('same files: {list}', { list: sameFiles.slice(0, 3).join(', ') })); }
     if (level !== 'hart') {
       const sameDirs = [...A.dirs].filter((d) => B.dirs.has(d));
       const sameTags = (a.tags || []).filter((x) => (b.tags || []).includes(x));
-      if (sameDirs.length) { level = 'weich'; why.push(`gleicher Ordner: ${sameDirs.slice(0, 2).join(', ')}`); }
-      else if (!A.files.length && !B.files.length && sameTags.length) { level = 'weich'; why.push(`gleicher Bereich (#${sameTags.join(', #')}), keine Dateien bekannt`); }
-      if ((a.related || []).includes(b.id) || (b.related || []).includes(a.id)) { level = 'weich'; why.push('als verwandt markiert'); }
+      if (sameDirs.length) { level = 'weich'; why.push(tr('same folder: {list}', { list: sameDirs.slice(0, 2).join(', ') })); }
+      else if (!A.files.length && !B.files.length && sameTags.length) { level = 'weich'; why.push(tr('same area (#{tags}), no files known', { tags: sameTags.join(', #') })); }
+      if ((a.related || []).includes(b.id) || (b.related || []).includes(a.id)) { level = 'weich'; why.push(tr('marked as related')); }
     }
     pairs.push({ a: a.id, b: b.id, level, why });
   }
@@ -133,16 +136,16 @@ export function planParallel(root, { ids = [], max } = {}) {
   let verdict;
   if (lanesPick.length < 2) {
     verdict = 'nacheinander';
-    reasons.unshift(ok.length < 2 ? 'Weniger als zwei Aufgaben sind für einen Agenten startklar.' : 'Die startklaren Aufgaben hängen voneinander ab oder ändern dieselben Dateien.');
+    reasons.unshift(ok.length < 2 ? tr('Fewer than two tasks are ready for an agent.') : tr('The ready tasks depend on each other or change the same files.'));
   } else if (lanesPick.every((t) => (EFF[t.effort] || 2) < minEff) && lanesPick.length < 3) {
     verdict = 'nacheinander';
-    reasons.unshift('Die Aufgaben sind klein. Nacheinander ist schneller als Worktrees und Agenten aufzusetzen.');
+    reasons.unshift(tr('The tasks are small. One after another is faster than setting up worktrees and agents.'));
   } else if (weak.length || dirty.length) {
     verdict = 'unsicher';
-    for (const p of weak) reasons.push(`${p.a} und ${p.b}: ${p.why.join(', ')}`);
+    for (const p of weak) reasons.push(tr('{a} and {b}: {why}', { a: p.a, b: p.b, why: p.why.join(', ') }));
   } else {
     verdict = 'parallel';
-    reasons.unshift(`${lanesPick.length} Aufgaben ohne gemeinsame Dateien oder Abhängigkeiten, zusammen etwa Aufwand ${effort}.`);
+    reasons.unshift(tr('{n} tasks without shared files or dependencies, about effort {effort} in total.', { n: lanesPick.length, effort }));
   }
   return {
     verdict, reasons, lanes: lanesPick.map((t) => ({ id: t.id, title: t.title, effort: t.effort || '', files: info.get(t.id).files.slice(0, 8) })),
@@ -154,15 +157,15 @@ export function planParallel(root, { ids = [], max } = {}) {
 // immer die .works des Hauptprojekts nutzt.
 export function startLane(root, t) {
   const config = loadConfig(root);
-  if (laneOf(root, t.id)) throw new Error(`${t.id} läuft schon parallel.`);
+  if (laneOf(root, t.id)) throw new Error(tr('{id} is already running in parallel.', { id: t.id }));
   const base = (git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).out || '').trim() || 'HEAD';
   const branch = branchFor(t);
   const dir = path.join(lanesDir(root, config), `${t.id}-${slugify(t.title, 24)}`);
-  if (exists(dir)) throw new Error(`Ordner ${dir} existiert schon. Mit works parallel abort ${t.id} aufräumen.`);
+  if (exists(dir)) throw new Error(tr('Folder {dir} already exists. Clean up with works parallel abort {id}.', { dir, id: t.id }));
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   const has = git(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).ok;
   const r = git(root, has ? ['worktree', 'add', dir, branch] : ['worktree', 'add', '-b', branch, dir, 'HEAD']);
-  if (!r.ok) throw new Error(`git worktree add fehlgeschlagen: ${r.err}`);
+  if (!r.ok) throw new Error(tr('git worktree add failed: {err}', { err: r.err }));
   fs.writeFileSync(path.join(dir, LINK_FILE), JSON.stringify({ root, task: t.id, branch }, null, 2) + '\n');
   // .works.link nie committen: gilt für alle Worktrees über info/exclude im gemeinsamen Git-Ordner.
   const common = (git(root, ['rev-parse', '--git-common-dir']).out || '.git').trim();
@@ -193,21 +196,21 @@ export function setLaneStatus(root, id, status, extra = {}) {
 // Worktree entfernen. merge: Branch mit --no-ff in den Basis-Branch des Hauptprojekts übernehmen.
 export function finishLane(root, id, { merge = false, force = false } = {}) {
   const lane = laneOf(root, id);
-  if (!lane) throw new Error(`${id} läuft nicht parallel.`);
+  if (!lane) throw new Error(tr('{id} is not running in parallel.', { id }));
   const li = laneInfo(root, lane);
-  if (li.exists && li.dirty && !force) throw new Error(`Im Worktree von ${id} sind ${li.dirty} Dateien nicht committet (${lane.path}). Erst committen oder mit --force verwerfen.`);
+  if (li.exists && li.dirty && !force) throw new Error(tr('In the worktree of {id}, {n} files are not committed ({path}). Commit them first or discard them with --force.', { id, n: li.dirty, path: lane.path }));
   let merged = false;
   if (merge) {
-    if (!li.ahead) throw new Error(`${lane.branch} hat keine neuen Commits gegenüber ${lane.base}.`);
+    if (!li.ahead) throw new Error(tr('{branch} has no new commits compared to {base}.', { branch: lane.branch, base: lane.base }));
     const cur = (git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).out || '').trim();
-    if (cur !== lane.base) throw new Error(`Das Hauptprojekt steht auf ${cur}, nicht auf ${lane.base}. Erst wechseln oder ohne --merge abschließen.`);
+    if (cur !== lane.base) throw new Error(tr('The main project is on {cur}, not on {base}. Switch first or finish without --merge.', { cur, base: lane.base }));
     const dirtyMain = (git(root, ['status', '--porcelain', '--untracked-files=no']).out || '').split('\n').filter((l) => l.trim() && !/\s\.works\//.test(l));
-    if (dirtyMain.length) throw new Error('Im Hauptprojekt gibt es nicht committete Änderungen. Erst committen oder stashen.');
+    if (dirtyMain.length) throw new Error(tr('The main project has uncommitted changes. Commit or stash them first.'));
     const m = git(root, ['merge', '--no-ff', '--no-edit', lane.branch], { timeout: 60000 });
     if (!m.ok) {
       git(root, ['merge', '--abort']);
       setLaneStatus(root, id, 'konflikt');
-      throw new Error(`Merge von ${lane.branch} hat Konflikte und wurde abgebrochen. Der Worktree bleibt bestehen. Konflikt im Worktree lösen (git merge ${lane.base}) und erneut versuchen.`);
+      throw new Error(tr('Merge of {branch} has conflicts and was aborted. The worktree stays. Resolve the conflict in the worktree (git merge {base}) and try again.', { branch: lane.branch, base: lane.base }));
     }
     merged = true;
   }
@@ -216,7 +219,7 @@ export function finishLane(root, id, { merge = false, force = false } = {}) {
     if (!r.ok) {
       try { fs.rmSync(path.join(lane.path, LINK_FILE), { force: true }); } catch { /* egal */ }
       const r2 = git(root, ['worktree', 'remove', '--force', lane.path]);
-      if (!r2.ok) throw new Error(`Worktree ließ sich nicht entfernen: ${r2.err}`);
+      if (!r2.ok) throw new Error(tr('The worktree could not be removed: {err}', { err: r2.err }));
     }
   }
   git(root, ['worktree', 'prune']);
@@ -228,9 +231,9 @@ export function finishLane(root, id, { merge = false, force = false } = {}) {
 // Abbrechen: Worktree weg, Branch nur löschen, wenn er keine eigenen Commits hat.
 export function abortLane(root, id, { force = false } = {}) {
   const lane = laneOf(root, id);
-  if (!lane) throw new Error(`${id} läuft nicht parallel.`);
+  if (!lane) throw new Error(tr('{id} is not running in parallel.', { id }));
   const li = laneInfo(root, lane);
-  if (li.exists && li.dirty && !force) throw new Error(`Im Worktree sind ${li.dirty} Dateien nicht committet. Mit --force trotzdem verwerfen.`);
+  if (li.exists && li.dirty && !force) throw new Error(tr('In the worktree, {n} files are not committed. Discard them anyway with --force.', { n: li.dirty }));
   if (li.exists) git(root, ['worktree', 'remove', '--force', lane.path]);
   git(root, ['worktree', 'prune']);
   let branchKept = true;
@@ -248,35 +251,37 @@ export function lanePrompt(root, t, lane, cli) {
   const know = knowledgeSummary(root, 1500);
   const d = needsDesign(t) ? loadDesign(t) : null;
   const w = `node "${cli}"`;
+  const v = { w, id: t.id, path: lane.path, branch: lane.branch, base: lane.base };
+  const list = (items) => items.map((c, i) => `${i + 1}. [${c.done ? 'x' : ' '}] ${c.text}`).join('\n');
   return [
-    `Du arbeitest allein an der Aufgabe ${t.id} „${t.title}“ (${t.type}, ${t.priority}${t.effort ? `, Aufwand ${t.effort}` : ''}).`,
-    `Andere Agenten arbeiten gleichzeitig an anderen Aufgaben in eigenen Worktrees. Bleib strikt in deinem.`,
+    tr('You work alone on task {id} "{title}" ({info}).', { id: t.id, title: t.title, info: `${t.type}, ${t.priority}${t.effort ? `, ${tr('effort {effort}', { effort: t.effort })}` : ''}` }),
+    tr('Other agents work on other tasks at the same time in their own worktrees. Stay strictly in yours.'),
     '',
-    '## Arbeitsort',
+    `## ${tr('Where you work')}`,
     `- Worktree: ${lane.path}`,
-    `- Branch: ${lane.branch} (abgezweigt von ${lane.base})`,
-    `- Jeden Befehl mit \`cd "${lane.path}" && ...\` beginnen und nur Dateien unter diesem Ordner lesen und ändern. Absolute Pfade verwenden.`,
-    `- Das works CLI: \`${w} <befehl>\`. Im Worktree schreibt es automatisch in die Aufgaben des Hauptprojekts.`,
+    tr('- Branch: {branch} (branched off {base})', v),
+    tr('- Start every command with `cd "{path}" && ...` and only read and change files below this folder. Use absolute paths.', v),
+    tr('- The works CLI: `{w} <command>`. In the worktree it automatically writes to the tasks of the main project.', v),
     '',
-    '## Aufgabe',
-    desc || '(keine Beschreibung)',
-    crit.length ? `\n## Akzeptanzkriterien\n${crit.map((c, i) => `${i + 1}. [${c.done ? 'x' : ' '}] ${c.text}`).join('\n')}` : '',
-    plan.length ? `\n## Umsetzungsplan\n${plan.map((c, i) => `${i + 1}. [${c.done ? 'x' : ' '}] ${c.text}`).join('\n')}` : '',
-    hand ? `\n## Letzte Übergabe\n${hand.slice(0, 1500)}` : '',
-    d && d.chosen ? `\n## Gewählter Entwurf\nVariante ${d.chosen.name}. Details: ${w} design show ${t.id}` : '',
-    know ? `\n## Projektwissen\n${know}\nDetails: ${w} know search <Begriff>` : '',
+    `## ${tr('Task')}`,
+    desc || tr('(no description)'),
+    crit.length ? `\n## ${sectionTitle('Akzeptanzkriterien', t._body)}\n${list(crit)}` : '',
+    plan.length ? `\n## ${sectionTitle('Umsetzungsplan', t._body)}\n${list(plan)}` : '',
+    hand ? `\n## ${tr('Last handoff')}\n${hand.slice(0, 1500)}` : '',
+    d && d.chosen ? `\n## ${sectionTitle('Gewählter Entwurf', t._body)}\n${tr('Variant {name}. Details: {w} design show {id}', { ...v, name: d.chosen.name })}` : '',
+    know ? `\n## ${tr('Project knowledge')}\n${know}\n${tr('Details: {w} know search <term>', v)}` : '',
     '',
-    '## Regeln',
-    `1. Zuerst \`${w} show ${t.id}\` lesen. Die Beschreibung und Kommentare des Nutzers sind verbindlich.`,
-    `2. Nicht ausführen: works start, works done, works init, works board, works parallel, git push, git merge, git checkout eines anderen Branches.`,
-    `3. Fortschritt festhalten: \`${w} check ${t.id} <Nr>\` für erfüllte Kriterien, \`${w} check ${t.id} <Nr> --section=Umsetzungsplan\` für Schritte, \`${w} log ${t.id} "..."\` für wichtige Schritte.`,
-    `4. Commits im Branch mit der ID, zum Beispiel \`feat(${t.id}): ...\`. Am Ende darf nichts uncommittet bleiben.`,
-    `5. Ist etwas unklar oder musst du eine Entscheidung treffen, die der Nutzer treffen sollte: \`${w} question ${t.id} "..."\`, nicht raten, und mit dieser Frage als Ergebnis zurückkommen.`,
+    `## ${tr('Rules')}`,
+    tr('1. First read `{w} show {id}`. The description and the comments by the user are binding.', v),
+    tr('2. Do not run: works start, works done, works init, works board, works parallel, git push, git merge, git checkout of another branch.'),
+    tr('3. Record progress: `{w} check {id} <no>` for met criteria, `{w} check {id} <no> --section=Umsetzungsplan` for steps, `{w} log {id} "..."` for important steps.', v),
+    tr('4. Commits in the branch carry the ID, for example `feat({id}): ...`. Nothing may stay uncommitted at the end.', v),
+    tr('5. If something is unclear or you have to make a decision the user should make: `{w} question {id} "..."`, do not guess, and come back with this question as the result.', v),
     checksFor(loadConfig(root), t).length
-      ? `6. Prüfungen mit \`${w} checks run ${t.id}\` ausführen (sie laufen in diesem Worktree). Fehler und Funde beheben und erneut prüfen. Skill-Prüfungen selbst ausführen und mit \`${w} checks record ${t.id} <name> --status=ok|warn|fail --note="..."\` eintragen.`
-      : `6. Tests und Prüfungen des Projekts im Worktree ausführen, soweit vorhanden.`,
-    `7. Zum Schluss: \`${w} handoff ${t.id} --text "..."\` (Stand, was offen ist), dann \`${w} set ${t.id} status=review --reason="Agent fertig"\`.`,
-    '',
-    'Antworte am Ende mit: was umgesetzt ist, welche Kriterien erfüllt sind, Commits, offene Punkte oder Fragen.',
-  ].filter((x) => x !== null && x !== '').join('\n').replace(/\n(## |Antworte)/g, '\n\n$1');
+      ? tr('6. Run the checks with `{w} checks run {id}` (they run in this worktree). Fix errors and findings and check again. Run skill checks yourself and record them with `{w} checks record {id} <name> --status=ok|warn|fail --note="..."`.', v)
+      : tr('6. Run the tests and checks of the project in the worktree, if there are any.'),
+    tr('7. At the end: `{w} handoff {id} --text "..."` (state, what is open), then `{w} set {id} status=review --reason="Agent done"`.', v),
+    // Leerzeile davor über \n, weil leere Einträge unten herausfallen.
+    `\n${tr('Reply at the end with: what is implemented, which criteria are met, commits, open points or questions.')}`,
+  ].filter((x) => x !== null && x !== '').join('\n').replace(/\n(## )/g, '\n\n$1');
 }

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { worksDir, readJson, writeJson, exists } from './lib.mjs';
 import { timeFile } from './timelog.mjs';
+import { tr } from './i18n.mjs';
 
 // Preise in US-Dollar je Million Tokens. Nur Schätzwerte, in config.json unter prices anpassbar.
 // Cache schreiben kostet 1,25 mal, Cache lesen 0,1 mal den Eingabepreis, sofern nicht anders angegeben.
@@ -162,10 +163,11 @@ export function liveUsage(root, config) {
 }
 
 export function fmtTokens(n) {
-  if (n >= 1e6) return `${(n / 1e6).toFixed(1).replace('.', ',')} Mio`;
+  if (n >= 1e6) { const [a, b] = (n / 1e6).toFixed(1).split('.'); return tr('{a}.{b} M', { a, b }); }
   if (n >= 1e3) return `${Math.round(n / 1e3)} k`;
   return String(n);
 }
 export function fmtCost(v, cur = 'USD') {
-  return `${v < 0.1 && v > 0 ? v.toFixed(3) : v.toFixed(2)} ${cur === 'USD' ? '$' : cur}`.replace('.', ',');
+  const [a, b] = (v < 0.1 && v > 0 ? v.toFixed(3) : v.toFixed(2)).split('.');
+  return cur === 'USD' ? tr('${a}.{b}', { a, b }) : tr('{a}.{b} {cur}', { a, b, cur });
 }

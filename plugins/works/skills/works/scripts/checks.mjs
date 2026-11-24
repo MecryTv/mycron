@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { exists, readJson, writeJson, worksDir } from './lib.mjs';
+import { tr } from './i18n.mjs';
 
 const TIMEOUT_MS = 10 * 60 * 1000;
 const TAIL = 4000;
@@ -36,8 +37,8 @@ function checkCwd(dir, c) {
   if (!c.cwd) return { dir };
   const abs = path.resolve(dir, c.cwd);
   const rel = path.relative(dir, abs);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) return { error: `Arbeitsordner ${c.cwd} liegt außerhalb des Projekts.` };
-  if (!exists(abs)) return { error: `Arbeitsordner ${c.cwd} fehlt.` };
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return { error: tr('Working folder {dir} is outside the project.', { dir: c.cwd }) };
+  if (!exists(abs)) return { error: tr('Working folder {dir} is missing.', { dir: c.cwd }) };
   return { dir: abs };
 }
 
@@ -110,7 +111,7 @@ function runOne(root, cmd) {
     let buf = '';
     const add = (d) => { buf += d; if (buf.length > TAIL * 4) buf = buf.slice(-TAIL * 2); };
     child.stdout.on('data', add); child.stderr.on('data', add);
-    const timer = setTimeout(() => { child.kill('SIGTERM'); buf += '\n[abgebrochen nach 10 Minuten]'; }, TIMEOUT_MS);
+    const timer = setTimeout(() => { child.kill('SIGTERM'); buf += `\n[${tr('aborted after 10 minutes')}]`; }, TIMEOUT_MS);
     child.on('close', (code) => {
       clearTimeout(timer);
       resolve({ ok: code === 0, ms: Date.now() - started, output: buf.replace(/\x1b\[[0-9;]*m/g, '').slice(-TAIL) });
@@ -136,7 +137,7 @@ export async function runChecks(root, config, task, { only = null, onStart = nul
   for (const c of list) {
     if (c.skill) {
       // Skill-Prüfungen führt Claude aus und trägt sie ein. Ein altes Ergebnis gilt nur für denselben Stand.
-      if (!results[c.name] || results[c.name].fingerprint !== workFingerprint(dir)) results[c.name] = { status: 'manual', cmd: c.cmd, note: `Claude führt ${c.cmd.slice(6)} aus und trägt das Ergebnis mit works checks record ${task.id} ${c.name} ein.` };
+      if (!results[c.name] || results[c.name].fingerprint !== workFingerprint(dir)) results[c.name] = { status: 'manual', cmd: c.cmd, note: tr('Claude runs {skill} and records the result with works checks record {id} {name}.', { skill: c.cmd.slice(6), id: task.id, name: c.name }) };
       continue;
     }
     if (onStart) onStart(c);
@@ -159,8 +160,8 @@ export async function runChecks(root, config, task, { only = null, onStart = nul
 }
 
 export function recordCheck(root, task, name, status, note) {
-  if (!NAME_RE.test(name)) throw new Error('Ungültiger Name der Prüfung.');
-  if (!['ok', 'warn', 'fail'].includes(status)) throw new Error('Status muss ok, warn oder fail sein.');
+  if (!NAME_RE.test(name)) throw new Error(tr('Invalid check name.'));
+  if (!['ok', 'warn', 'fail'].includes(status)) throw new Error(tr('Status must be ok, warn or fail.'));
   const fp = workFingerprint(checkDir(root, task));
   const data = loadResults(task) || { at: new Date().toISOString(), fingerprint: fp, results: {} };
   data.results[name] = { status, cmd: (data.results[name] || {}).cmd || '', note: String(note || '').slice(0, 2000), fingerprint: fp, at: new Date().toISOString() };
@@ -170,10 +171,10 @@ export function recordCheck(root, task, name, status, note) {
 
 export function ackCheck(task, name, reason) {
   const data = loadResults(task);
-  if (!data || !data.results[name]) throw new Error(`Für ${name} gibt es kein Ergebnis.`);
+  if (!data || !data.results[name]) throw new Error(tr('There is no result for {name}.', { name }));
   const r = data.results[name];
-  if (r.status !== 'warn') throw new Error('Nur Funde mit Status warn lassen sich als bekannt markieren.');
-  data.results[name] = { ...r, status: 'ack', note: `${r.note || ''}${reason ? `\nAls bekannt markiert: ${reason}` : '\nAls bekannt markiert.'}`.trim() };
+  if (r.status !== 'warn') throw new Error(tr('Only findings with status warn can be marked as known.'));
+  data.results[name] = { ...r, status: 'ack', note: `${r.note || ''}\n${reason ? tr('Marked as known: {reason}', { reason }) : tr('Marked as known.')}`.trim() };
   writeJson(resultFile(task), data);
   return data;
 }
@@ -190,19 +191,19 @@ export function checkItems(root, config, task) {
   const codeChanged = (r) => (r.fp || data.fingerprint) !== fp;
   const stale = !data || (fp && (cmds.length ? cmds.some((c) => data.results[c.name] && codeChanged(data.results[c.name])) : data.fingerprint !== fp)) || cmdChanged || cmds.some((c) => !data.results[c.name]);
   const items = [];
-  if (stale) items.push({ ok: false, text: 'Automatische Prüfungen sind auf dem aktuellen Stand gelaufen', detail: `works checks run ${task.id}` });
+  if (stale) items.push({ ok: false, text: tr('Automatic checks ran on the current state'), detail: `works checks run ${task.id}` });
   else {
     for (const c of list) {
       const r = data.results[c.name];
       const st = r ? r.status : 'missing';
-      const label = { ok: 'bestanden', ack: 'Fund als bekannt markiert', warn: 'Fund, Entscheidung nötig', fail: 'fehlgeschlagen', manual: 'noch nicht eingetragen', missing: 'nicht gelaufen' }[st];
-      items.push({ ok: st === 'ok' || st === 'ack', text: `Prüfung ${c.name}`, detail: label + (r && r.note && st !== 'ok' ? `: ${r.note.split('\n')[0].slice(0, 160)}` : '') });
+      const label = { ok: tr('passed'), ack: tr('finding marked as known'), warn: tr('finding, decision needed'), fail: tr('failed'), manual: tr('not recorded yet'), missing: tr('did not run') }[st];
+      items.push({ ok: st === 'ok' || st === 'ack', text: tr('Check {name}', { name: c.name }), detail: label + (r && r.note && st !== 'ok' ? `: ${r.note.split('\n')[0].slice(0, 160)}` : '') });
     }
   }
   // CI aus GitHub zählt mit, auch wenn sie nicht in config.checks steht.
   if (data && data.results.ci && !list.some((c) => c.name === 'ci')) {
     const r = data.results.ci;
-    items.push({ ok: r.status === 'ok' || r.status === 'ack', text: 'Prüfung ci', detail: r.status === 'ok' ? 'GitHub CI grün' : (r.note || 'GitHub CI fehlgeschlagen').slice(0, 160) });
+    items.push({ ok: r.status === 'ok' || r.status === 'ack', text: tr('Check {name}', { name: 'ci' }), detail: r.status === 'ok' ? tr('GitHub CI green') : (r.note || tr('GitHub CI failed')).slice(0, 160) });
     list.push({ name: 'ci', cmd: 'GitHub CI', skill: true });
   }
   return { items, state: { stale, at: data ? data.at : null, results: data ? data.results : {}, list } };

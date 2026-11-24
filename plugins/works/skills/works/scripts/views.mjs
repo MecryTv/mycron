@@ -12,6 +12,7 @@ import { unreadForClaude } from './comments.mjs';
 import { checkItems } from './checks.mjs';
 import { knowledgeSummary, loadKnowledge } from './knowledge.mjs';
 import { designSummary } from './design.mjs';
+import { tr } from './i18n.mjs';
 
 export function byIdMap(tasks) {
   return new Map(tasks.map((t) => [t.id, t]));
@@ -23,19 +24,19 @@ export function taskLink(root, t) {
 
 function flags(t, byId) {
   const f = [];
-  if (OPEN_STATUSES.includes(t.status) && isBlocked(t, byId)) f.push(`blockiert durch ${openBlockers(t, byId).join(', ')}`);
-  if (isOverdue(t)) f.push(`überfällig seit ${t.due}`);
-  if (t.incomplete) f.push('unvollständig');
+  if (OPEN_STATUSES.includes(t.status) && isBlocked(t, byId)) f.push(tr('blocked by {list}', { list: openBlockers(t, byId).join(', ') }));
+  if (isOverdue(t)) f.push(tr('overdue since {due}', { due: t.due }));
+  if (t.incomplete) f.push(tr('incomplete'));
   const q = openQuestions(t).length;
-  if (q) f.push(`${q} offene Frage${q > 1 ? 'n' : ''}`);
+  if (q) f.push(q > 1 ? tr('{n} open questions', { n: q }) : tr('{n} open question', { n: q }));
   return f.join(', ');
 }
 
 function table(root, list, byId, cols = ['id', 'title', 'type', 'priority', 'status', 'effort', 'due', 'milestone', 'hint']) {
-  if (!list.length) return '_Keine Einträge._\n';
+  if (!list.length) return `${tr('_No entries._')}\n`;
   const head = {
-    id: 'ID', title: 'Titel', type: 'Typ', priority: 'Prio', status: 'Status',
-    effort: 'Aufwand', due: 'Fällig', milestone: 'Meilenstein', hint: 'Hinweise', completed: 'Erledigt am',
+    id: 'ID', title: tr('Title'), type: tr('Type'), priority: 'Prio', status: 'Status',
+    effort: tr('Effort'), due: tr('Due'), milestone: tr('Milestone'), hint: tr('Notes'), completed: tr('Completed on'),
   };
   const lines = [`| ${cols.map((c) => head[c]).join(' | ')} |`, `|${cols.map(() => '---').join('|')}|`];
   for (const t of list) {
@@ -83,36 +84,36 @@ export function generateIndex(root) {
   const out = [];
 
   out.push('# Works\n');
-  out.push(`> Automatisch erzeugt am ${nowStamp()} durch \`works index\`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.\n`);
+  out.push(`> ${tr('Generated on {stamp} by `works index`. Do not edit by hand. Content belongs in the task.md of the respective task.', { stamp: nowStamp() })}\n`);
 
   const cnt = (s) => open.filter((t) => t.status === s).length;
-  out.push('## Überblick\n');
-  out.push('| Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |');
+  out.push(`## ${tr('Overview')}\n`);
+  out.push(`| ${[STATUS_LABEL.backlog, STATUS_LABEL.geplant, STATUS_LABEL['in-arbeit'], STATUS_LABEL.review, tr('Blocked'), tr('Overdue'), STATUS_LABEL.erledigt, STATUS_LABEL.verworfen].join(' | ')} |`);
   out.push('|---|---|---|---|---|---|---|---|');
   out.push(`| ${cnt('backlog')} | ${cnt('geplant')} | ${cnt('in-arbeit')} | ${cnt('review')} | ${open.filter((t) => isBlocked(t, byId)).length} | ${open.filter(isOverdue).length} | ${done.length} | ${all.filter((t) => t.status === 'verworfen').length} |\n`);
 
   const prioLine = ['P1', 'P2', 'P3', 'P4'].map((p) => `${p} ${PRIO_LABEL[p]}: ${open.filter((t) => t.priority === p).length}`).join(' · ');
-  out.push(`Offen nach Priorität: ${prioLine}\n`);
+  out.push(`${tr('Open by priority: {list}', { list: prioLine })}\n`);
 
   if (state.active && byId.get(state.active)) {
     const a = byId.get(state.active);
-    out.push('## Aktive Aufgabe\n');
-    out.push(`${taskLink(root, a)} ${mdEscape(a.title)} (${STATUS_LABEL[a.status] || a.status})${state.last_handoff ? `, letzte Übergabe ${state.last_handoff}` : ''}\n`);
+    out.push(`## ${tr('Active task')}\n`);
+    out.push(`${taskLink(root, a)} ${mdEscape(a.title)} (${STATUS_LABEL[a.status] || a.status})${state.last_handoff ? tr(', last handoff {date}', { date: state.last_handoff }) : ''}\n`);
   }
 
-  out.push('## Kritisch (P1)\n');
+  out.push(`## ${tr('Critical (P1)')}\n`);
   out.push(table(root, open.filter((t) => t.priority === 'P1'), byId));
 
-  out.push('## In Arbeit und Review\n');
+  out.push(`## ${tr('In progress and review')}\n`);
   out.push(table(root, open.filter((t) => ['in-arbeit', 'review'].includes(t.status)), byId));
 
-  out.push('## Geplant und Backlog\n');
+  out.push(`## ${tr('Planned and backlog')}\n`);
   out.push(table(root, open.filter((t) => ['geplant', 'backlog'].includes(t.status)), byId));
 
   const ms = milestoneProgress(config, all);
   if (ms.length) {
-    out.push('## Meilensteine\n');
-    out.push('| ID | Titel | Fällig | Status | Fortschritt |');
+    out.push(`## ${tr('Milestones')}\n`);
+    out.push(`| ID | ${tr('Title')} | ${tr('Due')} | Status | ${tr('Progress')} |`);
     out.push('|---|---|---|---|---|');
     for (const m of ms) {
       out.push(`| ${m.id} | ${mdEscape(m.title)} | ${m.due || ''} | ${m.status || 'offen'} | ${m.done}/${m.total} (${m.pct} %) |`);
@@ -122,28 +123,28 @@ export function generateIndex(root) {
 
   const blocked = open.filter((t) => isBlocked(t, byId));
   if (blocked.length) {
-    out.push('## Blockiert\n');
-    for (const t of blocked) out.push(`- ${taskLink(root, t)} ${mdEscape(t.title)}: wartet auf ${openBlockers(t, byId).join(', ')}`);
+    out.push(`## ${tr('Blocked')}\n`);
+    for (const t of blocked) out.push(`- ${taskLink(root, t)} ${mdEscape(t.title)}: ${tr('waiting for {list}', { list: openBlockers(t, byId).join(', ') })}`);
     out.push('');
   }
 
   const overdue = open.filter(isOverdue);
   if (overdue.length) {
-    out.push('## Überfällig\n');
-    for (const t of overdue) out.push(`- ${taskLink(root, t)} ${mdEscape(t.title)}: fällig am ${t.due}`);
+    out.push(`## ${tr('Overdue')}\n`);
+    for (const t of overdue) out.push(`- ${taskLink(root, t)} ${mdEscape(t.title)}: ${tr('due on {date}', { date: t.due })}`);
     out.push('');
   }
 
   const incomplete = open.filter((t) => t.incomplete);
   if (incomplete.length) {
-    out.push('## Unvollständig erfasst\n');
-    for (const t of incomplete) out.push(`- ${taskLink(root, t)} ${mdEscape(t.title)}${t.source ? ` (Quelle: ${t.source})` : ''}`);
+    out.push(`## ${tr('Incomplete entries')}\n`);
+    for (const t of incomplete) out.push(`- ${taskLink(root, t)} ${mdEscape(t.title)}${t.source ? ` (${tr('source: {source}', { source: t.source })})` : ''}`);
     out.push('');
   }
 
   const withQ = open.filter((t) => openQuestions(t).length);
   if (withQ.length) {
-    out.push('## Offene Fragen\n');
+    out.push(`## ${tr('Open questions')}\n`);
     for (const t of withQ) {
       out.push(`- ${taskLink(root, t)} ${mdEscape(t.title)}`);
       for (const q of openQuestions(t)) out.push(`  - ${q.text}`);
@@ -153,17 +154,17 @@ export function generateIndex(root) {
 
   const debt = open.filter((t) => t.type === 'debt');
   if (debt.length) {
-    out.push('## Technische Schulden\n');
+    out.push(`## ${tr('Technical debt')}\n`);
     out.push(table(root, debt, byId, ['id', 'title', 'priority', 'status', 'effort', 'due']));
   }
 
   const recent = [...done].sort((a, b) => String(b.completed || b.updated).localeCompare(String(a.completed || a.updated))).slice(0, 10);
-  out.push('## Zuletzt erledigt\n');
+  out.push(`## ${tr('Recently done')}\n`);
   out.push(table(root, recent, byId, ['id', 'title', 'type', 'priority', 'completed']));
 
   const ideas = ideaCount(root);
-  out.push('## Ideen\n');
-  out.push(`${ideas} offene Idee${ideas === 1 ? '' : 'n'} in [ideas.md](ideas.md).\n`);
+  out.push(`## ${tr('Ideas')}\n`);
+  out.push(`${ideas === 1 ? tr('{n} open idea in [ideas.md](ideas.md).', { n: ideas }) : tr('{n} open ideas in [ideas.md](ideas.md).', { n: ideas })}\n`);
 
   const content = out.join('\n').replace(/\n{3,}/g, '\n\n');
   fs.writeFileSync(path.join(worksDir(root), 'WORKS.md'), content);
@@ -186,21 +187,21 @@ export function nextCandidates(root, n = 3) {
       const reasons = [];
       let score = (4 - prioRank(t.priority)) * 100;
       reasons.push(`${t.priority} ${PRIO_LABEL[t.priority] || ''}`.trim());
-      if (t.status === 'geplant') { score += 30; reasons.push('bereits eingeplant'); }
-      if (isOverdue(t)) { score += 80; reasons.push(`überfällig seit ${t.due}`); } else if (t.due) {
+      if (t.status === 'geplant') { score += 30; reasons.push(tr('already planned')); }
+      if (isOverdue(t)) { score += 80; reasons.push(tr('overdue since {due}', { due: t.due })); } else if (t.due) {
         const d = daysBetween(today(), String(t.due));
-        if (d <= 7) { score += 40 - d * 3; reasons.push(`fällig in ${d} Tag${d === 1 ? '' : 'en'}`); }
+        if (d <= 7) { score += 40 - d * 3; reasons.push(d === 1 ? tr('due in {n} day', { n: d }) : tr('due in {n} days', { n: d })); }
       }
       const unblocks = all.filter((o) => (o.blocked_by || []).includes(t.id) && OPEN_STATUSES.includes(o.status)).length;
-      if (unblocks) { score += unblocks * 25; reasons.push(`gibt ${unblocks} Aufgabe${unblocks > 1 ? 'n' : ''} frei`); }
+      if (unblocks) { score += unblocks * 25; reasons.push(unblocks > 1 ? tr('unblocks {n} tasks', { n: unblocks }) : tr('unblocks {n} task', { n: unblocks })); }
       score += (3 - effortRank(t.effort)) * 8;
-      if (t.effort) reasons.push(`Aufwand ${t.effort}`);
-      if (t.risk === 'hoch') { score -= 5; reasons.push('Risiko hoch'); }
-      if (t.incomplete) { score -= 40; reasons.push('erst vervollständigen'); }
+      if (t.effort) reasons.push(tr('effort {effort}', { effort: t.effort }));
+      if (t.risk === 'hoch') { score -= 5; reasons.push(tr('high risk')); }
+      if (t.incomplete) { score -= 40; reasons.push(tr('complete it first')); }
       // Die Warteschlange des Nutzers hat Vorrang vor der berechneten Reihenfolge.
-      if (inSprint.has(t.id)) { score += 1000; reasons.unshift(`im Sprint ${sprint.id}`); }
+      if (inSprint.has(t.id)) { score += 1000; reasons.unshift(tr('in sprint {id}', { id: sprint.id })); }
       const qi = queue.indexOf(t.id);
-      if (qi !== -1) { score += 100000 - qi * 100; reasons.unshift(`Warteschlange Platz ${qi + 1}`); }
+      if (qi !== -1) { score += 100000 - qi * 100; reasons.unshift(tr('queue position {n}', { n: qi + 1 })); }
       return { task: t, score, reasons, queued: qi !== -1 };
     })
     .sort((a, b) => b.score - a.score || idNumber(a.task.id) - idNumber(b.task.id))
@@ -214,14 +215,14 @@ export function dodCheck(root, config, task) {
   const auto = [];
   const body = task._body;
   const crit = checkboxes(getSection(body, 'Akzeptanzkriterien') || '');
-  if (crit.total === 0) auto.push({ ok: false, text: 'Akzeptanzkriterien sind definiert', detail: 'Abschnitt ist leer' });
-  else auto.push({ ok: crit.done === crit.total, text: 'Alle Akzeptanzkriterien sind abgehakt', detail: `${crit.done}/${crit.total}` });
+  if (crit.total === 0) auto.push({ ok: false, text: tr('Acceptance criteria are defined'), detail: tr('section is empty') });
+  else auto.push({ ok: crit.done === crit.total, text: tr('All acceptance criteria are checked'), detail: `${crit.done}/${crit.total}` });
 
   const q = openQuestions(task);
-  auto.push({ ok: q.length === 0, text: 'Keine offenen Fragen', detail: q.length ? q.map((x) => x.text).join('; ') : '' });
+  auto.push({ ok: q.length === 0, text: tr('No open questions'), detail: q.length ? q.map((x) => x.text).join('; ') : '' });
 
   const plan = checkboxes(getSection(body, 'Umsetzungsplan') || getSection(body, 'Checkliste') || getSection(body, 'Vorgehen') || '');
-  if (plan.total) auto.push({ ok: plan.done === plan.total, text: 'Umsetzungsschritte abgeschlossen', detail: `${plan.done}/${plan.total}` });
+  if (plan.total) auto.push({ ok: plan.done === plan.total, text: tr('Implementation steps completed'), detail: `${plan.done}/${plan.total}` });
 
   const tags = task.tags || [];
   const needsShots = task.type === 'design' || tags.includes('ui');
@@ -229,27 +230,29 @@ export function dodCheck(root, config, task) {
     const imgs = imageLinks(getSection(body, 'Assets') || '').map((i) => i.src.toLowerCase());
     const hasBefore = imgs.some((s) => /-(vorher|ist)(-\d+)?\.\w+$/.test(s));
     const hasAfter = imgs.some((s) => /-nachher(-\d+)?\.\w+$/.test(s));
-    auto.push({ ok: hasBefore && hasAfter, text: 'Vorher und Nachher Screenshots vorhanden', detail: `vorher: ${hasBefore ? 'ja' : 'nein'}, nachher: ${hasAfter ? 'ja' : 'nein'}` });
+    const yes = (b) => (b ? tr('yes') : tr('no'));
+    auto.push({ ok: hasBefore && hasAfter, text: tr('Before and after screenshots exist'), detail: tr('before: {before}, after: {after}', { before: yes(hasBefore), after: yes(hasAfter) }) });
   }
   if (task.type === 'design' || tags.includes('ui')) {
     const dec = path.join(task._dir, 'decisions.md');
     const filled = exists(dec) && hasContent(getSection(readText(dec), 'Entscheidungen') || '');
-    auto.push({ ok: filled, text: 'decisions.md enthält Entscheidungen', detail: exists(dec) ? '' : 'Datei fehlt' });
+    auto.push({ ok: filled, text: tr('decisions.md contains decisions'), detail: exists(dec) ? '' : tr('file is missing') });
   }
-  if (task.type === 'bug') auto.push({ ok: hasContent(getSection(body, 'Ursache')), text: 'Ursache ist dokumentiert', detail: '' });
+  if (task.type === 'bug') auto.push({ ok: hasContent(getSection(body, 'Ursache')), text: tr('Root cause is documented'), detail: '' });
   if (task.type === 'spike') {
-    auto.push({ ok: hasContent(getSection(body, 'Ergebnisse')), text: 'Ergebnisse sind dokumentiert', detail: '' });
-    auto.push({ ok: hasContent(getSection(body, 'Empfehlung')), text: 'Empfehlung ist dokumentiert', detail: '' });
+    auto.push({ ok: hasContent(getSection(body, 'Ergebnisse')), text: tr('Results are documented'), detail: '' });
+    auto.push({ ok: hasContent(getSection(body, 'Empfehlung')), text: tr('Recommendation is documented'), detail: '' });
   }
-  if (task.type === 'refactor') auto.push({ ok: hasContent(getSection(body, 'Rollback')), text: 'Rollback ist beschrieben', detail: '' });
-  if (task.type === 'debt') auto.push({ ok: hasContent(getSection(body, 'Rückzahlung')), text: 'Rückzahlung ist beschrieben', detail: '' });
+  if (task.type === 'refactor') auto.push({ ok: hasContent(getSection(body, 'Rollback')), text: tr('Rollback is described'), detail: '' });
+  if (task.type === 'debt') auto.push({ ok: hasContent(getSection(body, 'Rückzahlung')), text: tr('Repayment is described'), detail: '' });
 
   const chk = checkItems(root, config, task);
   auto.push(...chk.items);
 
   const manual = [...(config.dod.global || []), ...((config.dod.by_type || {})[task.type] || [])];
   for (const tag of tags) manual.push(...((config.dod.by_tag || {})[tag] || []));
-  return { auto, manual: [...new Set(manual)], commands: config.dod.commands || [], checks: chk.state };
+  // Punkte aus config.json: Standardwerte stehen englisch im Katalog, eigene Texte bleiben, wie sie sind.
+  return { auto, manual: [...new Set(manual.map((m) => tr(m)))], commands: config.dod.commands || [], checks: chk.state };
 }
 
 // ---------- Session-Zusammenfassung ----------
@@ -261,47 +264,48 @@ export function sessionSummary(root, { maxHandoff = 1500 } = {}) {
   const byId = byIdMap(all);
   const open = sortTasks(all.filter((t) => OPEN_STATUSES.includes(t.status)));
   const lines = [];
-  lines.push(`[works] Dieses Projekt verwaltet Aufgaben in .works/ (${open.length} offen). Vor Arbeit an Aufgaben den works Skill laden.`);
+  lines.push(tr('[works] This project manages tasks in .works/ ({n} open). Load the works skill before working on tasks.', { n: open.length }));
+  const more = (n) => (n > 0 ? ` ${tr('and {n} more', { n })}` : '');
   const p1 = open.filter((t) => t.priority === 'P1');
-  if (p1.length) lines.push(`Offene P1 Kritisch: ${p1.map((t) => `${t.id} ${t.title} (${STATUS_LABEL[t.status]})`).join('; ')}`);
+  if (p1.length) lines.push(tr('Open P1 Critical: {list}', { list: p1.map((t) => `${t.id} ${t.title} (${STATUS_LABEL[t.status]})`).join('; ') }));
   const p2 = open.filter((t) => t.priority === 'P2');
-  if (p2.length) lines.push(`Offene P2 Hoch: ${p2.slice(0, 5).map((t) => `${t.id} ${t.title}`).join('; ')}${p2.length > 5 ? ` und ${p2.length - 5} weitere` : ''}`);
+  if (p2.length) lines.push(tr('Open P2 High: {list}', { list: p2.slice(0, 5).map((t) => `${t.id} ${t.title}`).join('; ') + more(p2.length - 5) }));
   const overdue = open.filter(isOverdue);
-  if (overdue.length) lines.push(`Überfällig: ${overdue.map((t) => `${t.id} (${t.due})`).join(', ')}`);
+  if (overdue.length) lines.push(tr('Overdue: {list}', { list: overdue.map((t) => `${t.id} (${t.due})`).join(', ') }));
   const queued = queueOf(config).map((id) => byId.get(id)).filter((t) => t && OPEN_STATUSES.includes(t.status));
   if (queued.length) {
     const qs = config.queue_settings || {};
-    lines.push(`Warteschlange des Nutzers (hat Vorrang vor works next): ${queued.slice(0, 6).map((t, i) => `${i + 1}. ${t.id} ${t.title}`).join('; ')}${queued.length > 6 ? ` und ${queued.length - 6} weitere` : ''}.`
-      + (qs.auto_next ? ` Nach einem Abschluss die nächste startbare Aufgabe daraus beginnen${qs.ask_before ? ', vorher kurz beim Nutzer nachfragen' : ''}.` : ''));
+    lines.push(tr('Queue of the user (takes precedence over works next): {list}.', { list: queued.slice(0, 6).map((t, i) => `${i + 1}. ${t.id} ${t.title}`).join('; ') + more(queued.length - 6) })
+      + (qs.auto_next ? ` ${qs.ask_before ? tr('After finishing a task, start the next startable task from it, check briefly with the user first.') : tr('After finishing a task, start the next startable task from it.')}` : ''));
   }
   const know = knowledgeSummary(root);
   if (know) lines.push(know);
   const proposals = loadKnowledge(root).filter((e) => e.status === 'vorschlag').length;
-  if (proposals) lines.push(`${proposals === 1 ? 'Ein Vorschlag' : `${proposals} Vorschläge`} für das Projektwissen ${proposals === 1 ? 'wartet' : 'warten'} auf den Nutzer.`);
+  if (proposals) lines.push(proposals === 1 ? tr('One proposal for the project knowledge is waiting for the user.') : tr('{n} proposals for the project knowledge are waiting for the user.', { n: proposals }));
   const designOpen = open.filter((t) => { const d = designSummary(t); return d && d.variants && !d.chosen; });
-  if (designOpen.length) lines.push(`Entwürfe ohne Wahl des Nutzers: ${designOpen.map((t) => t.id).join(', ')}. Erst nach der Wahl umsetzen.`);
+  if (designOpen.length) lines.push(tr('Design variants without a choice by the user: {ids}. Implement only after the choice.', { ids: designOpen.map((t) => t.id).join(', ') }));
   const sprintLine = sprintSummaryLine(config, all);
   if (sprintLine) lines.push(sprintLine);
   const unread = open.map((t) => ({ t, n: unreadForClaude(root, t).length })).filter((x) => x.n);
-  if (unread.length) lines.push(`Neue Kommentare vom Nutzer: ${unread.map((x) => `${x.t.id} (${x.n})`).join(', ')}. Mit works comments <ID> lesen und mit works comment <ID> "..." antworten.`);
+  if (unread.length) lines.push(tr('New comments from the user: {list}. Read them with works comments <ID> and reply with works comment <ID> "...".', { list: unread.map((x) => `${x.t.id} (${x.n})`).join(', ') }));
   const active = state.active && byId.get(state.active);
   if (active && OPEN_STATUSES.includes(active.status)) {
-    lines.push(`Aktive Aufgabe: ${active.id} ${active.title} (${STATUS_LABEL[active.status]}), Datei: .works/${relFromWorks(root, active._file)}`);
+    lines.push(tr('Active task: {id} {title} ({status}), file: .works/{file}', { id: active.id, title: active.title, status: STATUS_LABEL[active.status], file: relFromWorks(root, active._file) }));
     let h = stripComments(getSection(active._body, 'Übergabe') || '').trim();
     if (h) {
-      if (h.length > maxHandoff) h = h.slice(0, maxHandoff) + '\n[gekürzt, vollständig in der task.md]';
-      lines.push(`Übergabe:\n${h}`);
+      if (h.length > maxHandoff) h = h.slice(0, maxHandoff) + `\n[${tr('shortened, complete in the task.md')}]`;
+      lines.push(tr('Handoff:\n{text}', { text: h }));
     }
     const q = openQuestions(active);
-    if (q.length) lines.push(`Offene Fragen an den Nutzer: ${q.map((x) => x.text).join('; ')}`);
+    if (q.length) lines.push(tr('Open questions for the user: {list}', { list: q.map((x) => x.text).join('; ') }));
   } else {
     const inWork = open.filter((t) => t.status === 'in-arbeit');
-    if (inWork.length) lines.push(`In Arbeit: ${inWork.map((t) => `${t.id} ${t.title}`).join('; ')}`);
+    if (inWork.length) lines.push(tr('In progress: {list}', { list: inWork.map((t) => `${t.id} ${t.title}`).join('; ') }));
   }
   const inbox = path.join(worksDir(root), 'inbox');
   if (exists(inbox)) {
     const files = fs.readdirSync(inbox).filter((f) => !f.startsWith('.'));
-    if (files.length) lines.push(`Inbox enthält ${files.length} Datei${files.length > 1 ? 'en' : ''}, die noch einer Aufgabe zugeordnet werden muss.`);
+    if (files.length) lines.push(files.length > 1 ? tr('The inbox contains {n} files that still need to be assigned to a task.', { n: files.length }) : tr('The inbox contains {n} file that still needs to be assigned to a task.', { n: files.length }));
   }
   return lines.join('\n');
 }
