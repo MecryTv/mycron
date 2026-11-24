@@ -363,9 +363,6 @@ export async function channelsOf(cfg = loadDiscordConfig()) {
   } catch (e) { throw new Error(`Kanäle nicht lesbar: ${explain(e, false)}`); }
 }
 
-// Dashboard und Hinweise in einen anderen Kanal („Hierher verschieben“). Gemeinsamer Bot: erst die Kopplung beim
-// Dienst umziehen. Der laufende Bot liest config.json bei jedem Durchgang, legt das Dashboard im neuen Kanal an und
-// löscht das alte (dashboards in discord-bot.mjs), ohne Neustart. list: schon gelesene Kanäle (channelsOf).
 // Kanal aus der Liste vom Bot, in den er schreiben darf; sonst ein Fehler mit Grund.
 function writable(list, cid) {
   const hit = list.guilds.flatMap((g) => g.channels.map((c) => ({ ...c, guild: g }))).find((c) => c.id === cid);
@@ -375,14 +372,17 @@ function writable(list, cid) {
 }
 
 // Kanal je Projekt (W-0046): neu gesetzte Kanäle (noch ohne Namen) gegen die Liste vom Bot prüfen und benennen.
-// Ohne neue fragt works Discord nicht.
+// Ohne neue fragt works Discord nicht; beim gemeinsamen Bot gelten eigene Kanäle ohnehin nicht.
 export async function checkProjectChannels(cfg) {
-  const fresh = Object.values(cfg.projects).filter((p) => p.channel_id && !p.channel_name);
+  const fresh = isShared(cfg) ? [] : Object.values(cfg.projects).filter((p) => p.channel_id && !p.channel_name);
   if (!fresh.length) return;
   const list = await channelsOf(cfg);
   for (const p of fresh) p.channel_name = writable(list, p.channel_id).name;
 }
 
+// Dashboard und Hinweise in einen anderen Kanal („Hierher verschieben“). Gemeinsamer Bot: erst die Kopplung beim
+// Dienst umziehen. Der laufende Bot liest config.json bei jedem Durchgang, legt das Dashboard im neuen Kanal an und
+// löscht das alte (dashboards in discord-bot.mjs), ohne Neustart. list: schon gelesene Kanäle (channelsOf).
 export async function moveChannel(id, list = null) {
   const cid = String(id || '');
   if (!/^\d{1,25}$/.test(cid)) throw new Error('Kein Kanal gewählt.');

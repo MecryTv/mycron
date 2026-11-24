@@ -3580,7 +3580,7 @@
     }
 
     // Schalter nach J2 (W-0046); ausgeschaltet wird die Liste blass (CSS über :has).
-    const pCmds = () => sw('commands', 'Befehle und Knöpfe erlauben', s.mode === 'shared' ? 'Nur du, wer gekoppelt hat. Die Antworten siehst nur du.' : 'Nur du, als Besitzer der Bot-Anwendung. Die Antworten siehst nur du.') +
+    const pCmds = () => sw('commands', 'Befehle und Knöpfe erlauben', s.mode === 'shared' ? 'Nur du, als die Person, die /works verbinden ausgeführt hat. Die Antworten siehst nur du.' : 'Nur du, als Besitzer der Bot-Anwendung. Die Antworten siehst nur du.') +
       '<div class="dc-cmdl">' + s.commands.map((c) => '<div><code>' + esc(c.cmd) + '</code><span>' + esc(c.text) + '</span></div>').join('') + '<div><code>Knöpfe</code><span>Annehmen, Zurück an Claude, Anweisung an Claude, Neue Aufgabe, Bug ansehen</span></div></div>' +
       '<p class="dc-hint">Ausgeschaltet zeigt works keine Knöpfe am Dashboard und an neuen Nachrichten' + (s.mode === 'shared' ? ' und antwortet auf /works nur mit einem kurzen Hinweis' : ' und meldet /works auf dem Server ab') + '. Freigaben für Werkzeuge erteilst du weiter in Claude Code.</p>';
     const pPrivacy = () => sw('privacy.commands', 'Befehle aus Freigaben zeigen', 'Können Pfade, Adressen oder Geheimnisse enthalten') + sw('privacy.costs', 'Kosten zeigen', 'Tageskosten im Dashboard, Kosten je Aufgabe im Review') +
