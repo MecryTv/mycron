@@ -1828,7 +1828,15 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   });
 
   // W-0046: Schalter Befehle und Knöpfe, Kanal je Projekt; beides wirkt beim laufenden Bot ohne Neustart.
-  const projDash = (ch, name = 'projekt') => fake.inChannel(ch).filter((m) => isDash(m.embeds[0]) && m.pinned && (m.embeds[0].description || '').includes(`**${name}**`)).pop();
+  // botDash(ch): das Dashboard, das der Bot in diesem Kanal führt (state.json), null ohne; undefined, solange state.json
+  // gerade nicht lesbar ist. Frühere Schritte lassen Dashboards zurück, die der Bot nicht mehr anfasst (403).
+  const botDash = (ch) => {
+    let st;
+    try { st = JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')); } catch { return undefined; }
+    const id = ((st.dash || {})[ch] || {}).message_id;
+    return (id && fake.messages.get(id)) || null;
+  };
+  const withProj = (m) => !!m && (m.embeds[0].description || '').includes('**projekt**');
   const cmdPuts = () => fake.requests.filter((q) => q.method === 'PUT' && /^\/applications\/\d+\/guilds\/1\/commands$/.test(q.path));
   await step('Discord: Schalter Befehle und Knöpfe und Kanal je Projekt ohne Neustart (W-0046)', async () => {
     const dm = await import(pathToFileURL(path.join(HERE, 'discord.mjs')).href);
@@ -1842,6 +1850,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     let r = await wa(['discord', 'set', 'commands=vielleicht'], { extraEnv: denv, ok: false });
     expect(r.code !== 0, 'commands=vielleicht angenommen');
     const { call } = await boardFor();
+    let key = '';
     try {
       if (!(await call('GET', '/api/discord')).ready) { await call('POST', '/api/discord', { op: 'token', token: DTOKEN }); await call('POST', '/api/discord', { op: 'move', channel_id: '11' }); }
       // Aus: der eigene Bot meldet /works für den Server ab (PUT mit leerer Liste), auch ohne Gateway.
@@ -1852,8 +1861,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const pid = botPid();
       await dwait(() => cmdPuts().length > puts && JSON.stringify(cmdPuts().pop().body) === '[]', '/works abgemeldet (PUT mit leerer Liste)');
       // Keine Knöpfe und kein Auswahlmenü am Dashboard und an neuen Nachrichten.
-      const d = await dwait(() => projDash('11'), 'Dashboard mit projekt in #works');
-      await dwait(() => !projDash('11').components.length, 'Dashboard ohne Knöpfe');
+      const d = await dwait(() => { const x = botDash('11'); return withProj(x) && x; }, 'Dashboard mit projekt in #works');
+      await dwait(() => { const x = botDash('11'); return x && !x.components.length; }, 'Dashboard ohne Knöpfe');
       const bug = (w(['new', '--type=bug', '--title=Rot ohne Knöpfe', '--priority=P3']).out.match(/W-\d+/) || [])[0];
       w(['discord', 'emit', 'ci', `--json=${JSON.stringify({ ok: false, sha: 'beef0046aa11', failed: 1, total: 2, bug })}`], { extraEnv: denv });
       const ci = await dwait(() => findMsg((e) => e.title === 'CI rot für beef004'), 'CI-Nachricht bei ausgeschaltetem Schalter');
@@ -1870,13 +1879,13 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         // Wieder an, ohne Neustart: /works registriert, Auswahlmenü und Knöpfe am Dashboard.
         await call('POST', '/api/discord', { op: 'set', values: { commands: 'an' } });
         await dwait(() => (fake.guildCommands.get('1') || []).length === 1, '/works wieder registriert');
-        await dwait(() => projDash('11').components.some((x) => x.components.some((c) => c.type === 3)), 'Auswahlmenü wieder am Dashboard');
+        await dwait(() => { const x = botDash('11'); return x && x.components.some((r0) => r0.components.some((c) => c.type === 3)); }, 'Auswahlmenü wieder am Dashboard');
       } else await call('POST', '/api/discord', { op: 'set', values: { commands: 'an' } });
       // Kanal je Projekt beim eigenen Bot: nur Kanäle, in die der Bot schreiben darf.
       s = await call('GET', '/api/discord');
       const here = s.projects.find((p) => p.here);
       expect(here.channel_id === '', `Projekt hat schon einen eigenen Kanal: ${JSON.stringify(here)}`);
-      const key = `project.${here.rid}.channel`;
+      key = `project.${here.rid}.channel`;
       r = await call('POST', '/api/discord', { op: 'set', values: { [key]: '16' } }, false);
       expect(r.status === 400 && /senden/.test(r.error), `Kanal ohne Schreibrecht angenommen: ${r.status} ${r.error}`);
       r = await call('POST', '/api/discord', { op: 'set', values: { [key]: '99' } }, false);
@@ -1886,18 +1895,19 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(own.channel_id === '15' && own.channel_name === 'dev', `Kanal je Projekt nicht gespeichert: ${JSON.stringify(own)}`);
       expect(s.projects.find((p) => p.here).channel === '#dev', `Stand nennt den Kanal nicht: ${JSON.stringify(s.projects)}`);
       // Das Projekt steht im Dashboard seines Kanals, im alten nicht mehr; die Vorschau nennt den Kanal des Projekts.
-      await dwait(() => projDash('15'), 'projekt im Dashboard von #dev');
-      await dwait(() => !projDash('11'), 'projekt nicht mehr im Dashboard von #works');
+      await dwait(() => withProj(botDash('15')), 'projekt im Dashboard von #dev');
+      await dwait(() => { const x = botDash('11'); return x !== undefined && !withProj(x); }, 'projekt nicht mehr im Dashboard von #works');
+      expect(!withProj(fake.messages.get(d.id)), 'altes Dashboard in #works nennt projekt noch');
       const pv = await call('POST', '/api/discord', { op: 'preview', type: 'perm' });
       expect(pv.channel === 'dev', `Vorschau nennt #${pv.channel}`);
       // Zurück in den Standardkanal mit works discord set.
       await wa(['discord', 'set', `${key}=`], { extraEnv: denv });
       expect(!dcfg().projects[here.rid].channel_id, 'Kanal je Projekt nicht zurückgesetzt');
-      await dwait(() => projDash('11') && !fake.inChannel('15').some((m) => isDash(m.embeds[0])), 'projekt zurück im Dashboard von #works');
+      await dwait(() => withProj(botDash('11')) && !fake.inChannel('15').some((m) => isDash(m.embeds[0])), 'projekt zurück im Dashboard von #works');
       expect(botPid() === pid, 'Bot für Schalter oder Kanal neu gestartet');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
     } finally {
-      await wa(['discord', 'set', 'commands=an'], { extraEnv: denv, ok: false });
+      await wa(['discord', 'set', 'commands=an', ...(key ? [`${key}=`] : [])], { extraEnv: denv, ok: false });
       await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
       w(['board', '--stop'], { ok: false });
     }
