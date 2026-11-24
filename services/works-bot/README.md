@@ -141,6 +141,8 @@ The message routes mirror the Discord routes works uses, so works needs no secon
 | `DELETE /v1/channels/:id/messages/:mid` | Delete an own message (the channel cleans itself up) |
 | `GET /v1/inbox?wait=s&ack=ids` | Commands and clicks for this device, long poll up to 25 s. `ack` confirms the ids of the last answer; unconfirmed ones come again |
 | `POST /v1/interactions/:id/reply` | Answer one of them (only once, only the own) |
+| `GET /v1/guild/channels` | Text channels of the linked server by category, with `can` (the bot may view, send and embed) and `missing` |
+| `POST /v1/link/channel {channel_id}` | Move the link to another channel of the same server, only one the bot can post in. Own messages in the channels left behind stay editable and deletable, so the device can remove its old dashboard |
 
 Every route except `/health`, `/v1/info` and `POST /v1/link` needs `Authorization: Bearer <device key>`.
 

@@ -113,7 +113,11 @@ Befehle und Knöpfe (W-0037, Entwurf HS): `/works help` (hilfe), `status`, `task
 
 So kommen Klicks an: Der eigene Bot registriert `/works` für den Server des Kanals und bekommt Klicks über sein Gateway (ab Node 22, sonst gibt es keine Knöpfe). Beim gemeinsamen Bot antwortet der Dienst sofort vorläufig, öffnet Dialoge selbst und legt die Anfrage in eine Inbox des Geräts, das die Nachricht geschrieben hat (Befehle: das zuletzt aktive Gerät des Aufrufers im Kanal). Der lokale Bot holt sie mit Long-Poll ab, bestätigt sie mit der nächsten Abfrage (sonst kommen sie noch einmal) und antwortet über den Dienst; das Token der Interaktion bleibt im Dienst. Ist das Gerät aus, sagt der Dienst das nach 10 s; läuft dort ein works ohne Befehle, rät er zum Update.
 
-Protokoll in `~/.works/discord/bot.log` (ohne Token). Die Einstellungen im Board kommen mit W-0038.
+Protokoll in `~/.works/discord/bot.log` (ohne Token).
+
+Einstellungen im Board (W-0038, Entwurf J2): Werkzeuge, „Discord-Bot“ öffnet einen Dialog mit den Reitern Verbindung, Projekte, Ereignisse (an und @ je Ereignis, Ruhezeit, Verzögerungen, Frist zum Löschen), Befehle und Datenschutz, rechts eine Vorschau der Nachricht wie in Discord und wie sie auf dem Sperrbildschirm erscheint. Die Vorschau rechnet schon mit den ungespeicherten Änderungen; Speichern schreibt `config.json` mit denselben Schlüsseln wie `works discord set`. Beim ersten Mal führt der Reiter Verbindung durch die Wahl nach Entwurf R: gemeinsamer Bot mit Code oder eigener Bot mit Token. Das Token steht in einem Passwortfeld, das nach dem Speichern leer wird; Token, Schlüssel und Code kommen in keiner Antwort des Boards vor, gezeigt wird nur `…abcd`. Token, Code und Trennen gehen nur direkt am Rechner, nicht über einen geteilten Link.
+
+Kanalwahl (Entwurf K): Der Reiter Verbindung liest Server und Textkanäle live vom Bot, nach Kategorie. Ob der Bot in einem Kanal schreiben darf, rechnet works wie Discord aus Rollen und Overwrites (sehen, senden, Links einbetten); Kanäle ohne dieses Recht sind ausgegraut, mit Grund. Beim gemeinsamen Bot sind es die Kanäle des gekoppelten Servers, der Dienst prüft das Recht selbst. „Hierher verschieben“ setzt `channel_id` (beim gemeinsamen Bot zieht vorher der Dienst die Kopplung um). Der laufende Bot liest `config.json` bei jedem Durchgang, legt das Dashboard im neuen Kanal an, heftet es an und löscht das alte. Einen Neustart braucht weder das noch eine andere Einstellung. Im Terminal geht es mit `works discord channel`, für beide Wege.
 
 ## Playwright und Browser-Werkzeuge
 
