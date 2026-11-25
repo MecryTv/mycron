@@ -1790,7 +1790,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
           await p.waitForSelector('#live.off', { timeout: 15000 }); await layout('Getrennt', [1880, 1720]);
           if (shots) { await p.setViewportSize({ width: 1880, height: 900 }); await p.screenshot({ path: path.join(shots, 'kopfleiste-getrennt-light-1880.png'), clip: { x: 0, y: 0, width: 1880, height: 120 } }); }
         } catch { errs.push('Getrennt: Verbindungsanzeige wechselt nicht auf getrennt'); }
-        // Ohne Chip steht wieder der ganze Verbindungstext da und nichts überdeckt die Reiter.
+        // Ohne Chip bekommt der Verbindungstext den Platz zurück; auch dann überdeckt nichts die Reiter.
         await p.evaluate(() => { document.querySelector('#busy').hidden = true; document.querySelector('#busyWrap').hidden = true; });
         await layout('Ohne Chip', [1880, 1720], false);
         if (shots) { await p.setViewportSize({ width: 1880, height: 900 }); await p.screenshot({ path: path.join(shots, 'kopfleiste-ohne-chip-light-1880.png'), clip: { x: 0, y: 0, width: 1880, height: 120 } }); }
