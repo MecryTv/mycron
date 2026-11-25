@@ -2188,6 +2188,35 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  // W-0058: Nach dem Push von ship kommen der ship-Schritt und die Annahme des Reviews im selben Durchgang. Fallen beide
+  // in dieselbe Millisekunde, muss die Karte den späteren zeigen (angenommen), nicht den zuerst angelegten Eintrag.
+  await step('Discord: Karte zeigt bei gleicher Zeit den späteren Schritt (W-0058)', async () => {
+    const botM = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
+    const b = new botM.Bot({ rest: {}, log: () => {} });
+    b.state.cards = {}; b.state.queue = []; b.state.msgs = {}; b.state.open = {}; b.state.history = [];
+    const rid = '0123456789abcdef';
+    b.state.projects = { [rid]: { name: 'p', root: '', snap: null, recent: [] } };
+    const cfg = botM.normalizeConfig({});
+    const iso = (ms) => new Date(ms).toISOString();
+    const realNow = Date.now;
+    let now = realNow();
+    Date.now = () => now;
+    try {
+      const rv = { type: 'review', id: 'W-1', project: 'p', state: 'open', at: iso(now) };
+      b.upsert(`review:${rid}:W-1:1`, rv, rid, cfg);
+      now += 5;
+      const ship = { type: 'ship', id: 'W-1', project: 'p', status: 'run', steps: [], started: iso(now) };
+      b.upsert(`ship:${rid}:W-1:b1`, ship, rid, cfg);
+      now += 5;
+      // Push und Annahme in derselben Millisekunde, in der Reihenfolge des Bots (outbox, dann Vergleich der Aufgaben).
+      b.upsert(`ship:${rid}:W-1:b1`, { ...ship, steps: [{ step: 'push', ok: true, sha: 'abc1234def', workflows: 0 }] }, rid, cfg);
+      b.upsert(`review:${rid}:W-1:1`, { ...rv, state: 'accepted', at: iso(now) }, rid, cfg);
+      const key = `card:${rid}:W-1`;
+      const desc = b.cardMessage(key, b.state.cards[key], cfg).body.embeds[0].description || '';
+      expect(/angenommen/.test(desc), `Karte zeigt nicht die Annahme: ${desc.slice(0, 200)}`);
+    } finally { Date.now = realNow; }
+  });
+
   await step('Discord: Status des Bots übersteht eine Gateway-Fortsetzung (W-0047)', async () => {
     if (!hasWs) return;
     // Ein Status, der sich ändert, während das Gateway neu verbindet, muss nach RESUMED nachkommen (kein Identify).

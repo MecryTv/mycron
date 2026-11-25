@@ -1,14 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-25 16:09 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-25 16:38 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 7 | 0 | 0 | 0 | 0 | 0 | 51 | 0 |
+| 7 | 0 | 1 | 0 | 0 | 0 | 51 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 4 · P3 Mittel: 2 · P4 Niedrig: 1
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 5 · P3 Mittel: 2 · P4 Niedrig: 1
+
+## Aktive Aufgabe
+
+[W-0058](tasks/W-0058-ci-rot-works-selbsttest-schritt/task.md) CI rot: works Selbsttest, Schritt Selbsttest (In Arbeit), letzte Übergabe 2026-11-25 16:38
 
 ## Kritisch (P1)
 
@@ -16,7 +20,9 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-_Keine Einträge._
+| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
+|---|---|---|---|---|---|---|---|---|
+| [W-0058](tasks/W-0058-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest | Bug | P2 Hoch | In Arbeit |  |  |  |  |
 
 ## Geplant und Backlog
 
@@ -25,7 +31,7 @@ _Keine Einträge._
 | [W-0053](tasks/W-0053-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest mit Browser, Selbsttest | Bug | P2 Hoch | Backlog |  |  |  |  |
 | [W-0056](tasks/W-0056-discord-status-des-bots-allgemein-statt/task.md) | Discord: Status des Bots allgemein statt aufgabenbezogen | Bug | P2 Hoch | Backlog | S |  |  |  |
 | [W-0057](tasks/W-0057-offenes-board-wechselt-immer-sofort-zum/task.md) | Offenes Board wechselt immer sofort zum Hub, wenn ein weiteres startet | Feature | P2 Hoch | Backlog | S |  |  |  |
-| [W-0058](tasks/W-0058-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest | Bug | P2 Hoch | Backlog |  |  |  |  |
+| [W-0059](tasks/W-0059-live-hintergrundbefehle-und-ihr-ende-im/task.md) | Live: Hintergrundbefehle und ihr Ende im Board anzeigen | Feature | P2 Hoch | Backlog | M |  |  |  |
 | [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) | Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden | Feature | P3 Mittel | Backlog |  |  |  | unvollständig |
 | [W-0055](tasks/W-0055-kopfleiste-im-board-live-anzeige-von/task.md) | Kopfleiste im Board: Live-Anzeige von Claude bei langem Text kaputt | Bug | P3 Mittel | Backlog | S |  |  |  |
 | [W-0052](tasks/W-0052-works-checks-record-ohne-namen-traegt/task.md) | works checks record ohne Namen trägt Prüfung undefined ein | Bug | P4 Niedrig | Backlog | S |  |  |  |

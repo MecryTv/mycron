@@ -657,7 +657,10 @@ export class Bot {
       const c = this.state.cards[qk] || (this.state.cards[qk] = { rid, id: ev.id, entries: {} });
       const prev = c.entries[key];
       resend = !prev && waiting(ev);
-      c.entries[key] = { ...ev, t0: (prev && prev.t0) || ev.since || ev.started || ev.at || new Date().toISOString(), u: Date.now() };
+      // u streng steigend (W-0058): Zwei Einträge im selben Durchgang (ship-Schritt und Annahme nach dem Push) dürfen
+      // nicht gleich alt sein, sonst entscheidet die Reihenfolge im Objekt, welcher Zustand auf der Karte steht.
+      this.lastU = Math.max(Date.now(), (this.lastU || 0) + 1);
+      c.entries[key] = { ...ev, t0: (prev && prev.t0) || ev.since || ev.started || ev.at || new Date().toISOString(), u: this.lastU };
       if (ev.title) c.title = ev.title;
       if (ev.project) c.project = ev.project;
       // ponytail: höchstens 40 Einträge je Karte, die ältesten erledigten fallen raus (Achse und Verlauf bleiben lesbar).
