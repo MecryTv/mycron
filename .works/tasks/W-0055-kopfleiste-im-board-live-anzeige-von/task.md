@@ -3,7 +3,7 @@ id: W-0055
 title: "Kopfleiste im Board: Live-Anzeige von Claude bei langem Text kaputt"
 type: bug
 priority: P3
-status: backlog
+status: in-arbeit
 effort: S
 risk:
 created: 2026-11-24
@@ -11,7 +11,7 @@ updated: 2026-11-25
 due:
 completed:
 milestone:
-branch:
+branch: fix/w-0055-kopfleiste-im-board-live
 tags: [ui, board]
 blocked_by: []
 blocks: []
@@ -72,3 +72,4 @@ Art: vorher · Hinzugefügt: 2026-11-24
 - 2026-11-25: Entwurf C „Eigene Zeile bei Platzmangel“ angehängt
 - 2026-11-25: Entwürfe A bis C mit Fable 5.2 gestaltet, auf Basis des echten board.css. Befund: .brand hat min-width 0, die Pille white-space nowrap ohne Schrumpfen, deshalb ragt sie über die Reiter; der Zeitkasten ist span.num aus lvSince(), das Leerzeichen vor dem Komma kommt aus join(', '). Wartet auf die Wahl des Nutzers.
 - 2026-11-25: Entwurf B „Kompakter Chip mit Popover“ gewählt. Grund: Nutzer am 2026-11-25: Beide B
+- 2026-11-25: Parallel gestartet im Worktree W-0055-kopfleiste-im-board (Status: backlog → in-arbeit)

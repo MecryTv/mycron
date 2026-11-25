@@ -60,9 +60,9 @@ readServer prüfte nur, ob die PID lebt, nicht, ob dahinter ein works-Board stec
 liveServer() in server-control.mjs fragt /tabs auf dem Port der server.json: Antwortet dort kein works-Board (Verbindung abgelehnt oder fremde Antwort), fällt die Datei weg und kein Prozess wird angefasst; nur bei einer Zeitüberschreitung gilt der Server als unserer. Genutzt von works board, works shot, refreshServers (Sitzungsstart) und ship. waitForServer nimmt nur die server.json des gerade gestarteten Prozesses. Regressionstest „Board: fremde PID in server.json wird nicht beendet (W-0062)“.
 
 ## Akzeptanzkriterien
-- [ ] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
-- [ ] Regressionstest deckt den Fall ab oder der Verzicht ist begründet
-- [ ] 
+- [x] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
+- [x] Regressionstest deckt den Fall ab oder der Verzicht ist begründet
+- [ ]
 
 ## Betroffene Dateien
 
@@ -72,8 +72,14 @@ liveServer() in server-control.mjs fragt /tabs auf dem Port der server.json: Ant
 ## Offene Fragen
 
 ## Übergabe
+Stand: 2026-11-25 20:09
+
+Fix: liveServer prüft über /tabs, ob auf dem Port der server.json wirklich ein works-Board antwortet (works board, works shot, Sitzungsstart, ship); waitForServer nimmt nur die server.json des gestarteten Prozesses. Regressionstest mit fremdem Prozess. Tests: mit Browser 67/67, ohne WebSocket 58/58.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
 - 2026-11-25: Gestartet (Status: backlog → in-arbeit)
 - 2026-11-25: Beziehung: related W-0053
+- 2026-11-25: Akzeptanzkriterien: "Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
+- 2026-11-25: Übergabe aktualisiert

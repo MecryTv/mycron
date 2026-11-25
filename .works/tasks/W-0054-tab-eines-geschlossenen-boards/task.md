@@ -3,7 +3,7 @@ id: W-0054
 title: Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden
 type: feature
 priority: P3
-status: backlog
+status: in-arbeit
 effort:
 risk:
 created: 2026-11-24
@@ -11,7 +11,7 @@ updated: 2026-11-25
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0054-tab-eines-geschlossenen
 tags: [board, hub]
 blocked_by: []
 blocks: []
@@ -39,10 +39,11 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] Erkennen: Endet das Board eines Tabs, fragt der Tab die anderen laufenden Boards (/boards aus dem letzten Stand), ob dort schon ein works-Tab offen ist (/tabs, nur Zahl; dafür CORS nur für http://127.0.0.1:* und localhost)
-- [ ] Ist einer offen: window.close() versuchen; klappt das nicht (von Hand geöffnete Tabs darf eine Seite nicht schließen), statt eines zweiten Hubs eine schlichte Seite „Board beendet“ zeigen: Hinweis, dass der Hub schon in einem anderen Tab offen ist, Knopf „Hier den Hub öffnen“
-- [ ] Ist keiner offen: wie bisher zum Hub oder zum verbliebenen Board
-- [ ] Selbsttest (Browser): zwei Tabs, Board B endet, am Ende nur ein Hub-Tab; Doku board.md beide Sprachen
+- [ ] Selbsttests zuerst (rot): works board --stop schickt den offenen Tabs vorher event: ended, --restart nicht; im Browser: Tab an Board B, B wird gestoppt, die Karte „… ist beendet“ erscheint, Titel „Beendet · …“, kein Sprung zum Hub, bei 390 px kein seitliches Scrollen
+- [ ] Server: works board --stop (auch „Stoppen“ im Hub) kündigt das Ende über POST /api/hub {op:'end'} an, bevor es den Server beendet (unter Windows hart, ohne SIGTERM). Der Server zählt über /tabs der anderen laufenden Boards die offenen Tabs und Hub-Tabs, nennt einen anderen Hub und holt dort ein Einmal-Ticket für den Neustart, dann event: ended an alle Tabs. Ein Neustart (--restart, neue Version, Übergabe) sendet nichts; bricht nur die Verbindung ab, bleibt alles wie bisher (Neuverbinden, verwaister Tab W-0029)
+- [ ] Board (Entwurf B): bei ended Verbindung zu, Neuladen gesperrt, kein Sprung zum Hub; window.close() versuchen, ist der Tab danach noch offen, die ruhige Karte über dem grauen, unscharfen Board zeigen: „Hier den Hub öffnen“ nur, wenn ein anderes Board läuft, „<Projekt> wieder starten“ über dessen Hub mit dem Ticket, sonst Hinweis auf works board --serve; Satz zum anderen Tab nur, wenn er stimmt; Strg+W bzw. ⌘W, auf Touch ohne Tastenkürzel; Titel „Beendet · <Projekt>“, graues Favicon
+- [ ] Hub: #start=<Ticket> startet das Board und zeigt es im selben Tab; Hub-Seiten zählen unter /tabs zusätzlich als hubs
+- [ ] Texte in de.json, Doku board.md in beiden Sprachen
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -72,3 +73,6 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 - 2026-11-25: Entwürfe A bis C (Fable 5.2) angehängt; Tab-Titel „Beendet · mycron“ mit grauem Symbol in allen drei. Wartet auf die Wahl des Nutzers.
 - 2026-11-25: Entwurf B „Ruhige Karte in der Mitte“ gewählt. Grund: Nutzer am 2026-11-25: Beide B
 - 2026-11-25: Priorität: P3 → P3; incomplete: true → false
+- 2026-11-25: Parallel gestartet im Worktree W-0054-tab-eines-geschlossenen (Status: backlog → in-arbeit)
+- 2026-11-25: Abschnitt Umsetzungsplan aktualisiert
+- 2026-11-25: Umsetzungsplan an Entwurf B angepasst. Geprüft: Ein Tab am beendeten Board kann /boards anderer Boards nicht lesen und deren API nicht aufrufen (anderer Port = andere Herkunft, kein CORS, API prüft Origin und Token). Deshalb holt der stoppende Server die Angaben und ein Einmal-Ticket, der Neustart läuft über den Hub des anderen Boards im selben Tab.
