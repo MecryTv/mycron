@@ -1488,8 +1488,10 @@ function releaseLock() {
 }
 
 // stop.req nennt die PID, die gehen soll. Beim Versionswechsel läuft der neue Bot schon und darf nicht mit gehen.
+// Eine leere (halb geschriebene oder übrige) stop.req meint keinen Bot (W-0061): Sonst beendete sich ein neuer Bot
+// gleich nach dem Start, und works discord start meldete „Bot startet nicht“.
 function stopRequested() {
-  try { const want = fs.readFileSync(dfile('stop.req'), 'utf8').trim(); return !want || Number(want) === process.pid; } catch { return false; }
+  try { const want = fs.readFileSync(dfile('stop.req'), 'utf8').trim(); return !!want && Number(want) === process.pid; } catch { return false; }
 }
 
 export async function runBot() {

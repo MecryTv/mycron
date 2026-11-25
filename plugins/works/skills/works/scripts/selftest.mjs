@@ -1804,6 +1804,19 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  // W-0061: Eine leere stop.req (halb geschrieben oder übrig) hält einen neuen Bot nicht vom Start ab; stop.req nennt
+  // immer die PID, die gehen soll.
+  await step('Discord: Start trotz leerer stop.req (W-0061)', async () => {
+    const req = path.join(ddir, 'stop.req');
+    fs.writeFileSync(req, '');
+    try {
+      has((await wa(['discord', 'start'], { extraEnv: denv })).out, 'gestartet', 'Start mit leerer stop.req');
+    } finally {
+      await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+      try { fs.unlinkSync(req); } catch { /* weg */ }
+    }
+  });
+
   await step('Discord: Befehle und Knöpfe nur für den Besitzer, Antworten nur für ihn (W-0037)', async () => {
     const ui = await import(pathToFileURL(path.join(HERE, 'discord-ui.mjs')).href);
     const { loadTasks } = await import('./lib.mjs');

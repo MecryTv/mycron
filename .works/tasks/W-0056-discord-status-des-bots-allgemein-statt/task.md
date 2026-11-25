@@ -3,7 +3,7 @@ id: W-0056
 title: "Discord: Status des Bots allgemein statt aufgabenbezogen"
 type: bug
 priority: P2
-status: in-arbeit
+status: review
 effort: S
 risk:
 created: 2026-11-25
@@ -59,8 +59,8 @@ Der Status war seit W-0044 als „das Wichtigste über alle Projekte“ gebaut: 
 - Der neue Status des gemeinsamen Bots erscheint erst nach einem Neustart des Dienstes auf dem VPS (`git pull && docker compose up -d --build`). Deployt wurde nichts.
 
 ## Akzeptanzkriterien
-- [ ] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
-- [ ] Regressionstest deckt den Fall ab oder der Verzicht ist begründet
+- [x] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
+- [x] Regressionstest deckt den Fall ab oder der Verzicht ist begründet
 - [x] Der Status des Bots nennt keine Aufgaben-ID mehr
 - [x] Der Status nennt keine Projektnamen und passt für viele Nutzer, etwa „x Leute nutzen works“ (Zahl beim gemeinsamen Bot aus dem Dienst)
 
@@ -77,6 +77,9 @@ Der Status war seit W-0044 als „das Wichtigste über alle Projekte“ gebaut: 
 ## Offene Fragen
 
 ## Übergabe
+Stand: 2026-11-25 17:50
+
+Fertig im Branch fix/w-0056-discord-status-des-bots (Commit ca07d38), nicht gemergt. Eigener Bot: Status nur noch Zahlen wie die Panel-Zusammenfassung („2 warten auf dich · 1 arbeitet“, „1 arbeitet“, sonst „N Projekte im Blick“), gemeinsame Funktion countParts in discord-bot.mjs. Gemeinsamer Bot (services/works-bot/server.mjs): ab zwei verschiedenen Discord-Nutzern mit funktionierender Kopplung „n people use works“, mit WORKS_BOT_LANG=de „n Leute nutzen works“, darunter „/works help“; höchstens alle 5 Minuten neu. Für den Nutzer: Der neue Status des gemeinsamen Bots erscheint erst nach einem Neustart des Dienstes auf dem VPS (git pull && docker compose up -d --build); für die deutsche Form WORKS_BOT_LANG=de in die .env. Der eigene Bot zeigt den neuen Status erst mit einem Plugin-Update. Tests: Discord-Schnelltest 17/17, voll ohne WebSocket 53/53, mit Browser 60/60, Diensttest bestanden. Offen: Merge, Neustart des Dienstes.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
@@ -88,3 +91,8 @@ Der Status war seit W-0044 als „das Wichtigste über alle Projekte“ gebaut: 
 - 2026-11-25: Entscheidung Sprache: Der Status des gemeinsamen Bots gilt für alle Server gleich, daher eine Sprache über WORKS_BOT_LANG (de oder en), Standard en. Für „n Leute nutzen works“ WORKS_BOT_LANG=de in die .env des Dienstes. Neu gesetzt höchstens alle 5 Minuten, geprüft jede Minute; sichtbar erst nach einem Neustart des Dienstes auf dem VPS.
 - 2026-11-25: Akzeptanzkriterien: "Der Status des Bots nennt keine Aufgaben-ID mehr" abgehakt
 - 2026-11-25: Akzeptanzkriterien: "Der Status nennt keine Projektnamen und passt für viele Nutzer, etwa „x Leute nutzen works“ (Zahl beim gemeinsamen Bot aus dem Dienst)" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
+- 2026-11-25: Tests: Schnelltest Discord 17/17, voller Selbsttest ohne WebSocket 53/53, mit Browser 60/60, services/works-bot/test.mjs bestanden (zweimal). Vorher rot: Diensttest wartete vergeblich auf „2 people use works“.
+- 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
