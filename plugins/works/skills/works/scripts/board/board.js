@@ -2656,6 +2656,8 @@
     if (a && a.busy && a.current) times.push(Date.parse(a.current.at) + lvTtl(a.current));
     if (a && a.lanes) for (const e of Object.values(a.lanes)) times.push(Date.parse(e.at) + lvTtl(e));
     for (const t of tasks) if (t.checks && t.checks.running) times.push(Date.parse(t.checks.runningSince) + 11 * 60000);
+    // Befehle im Hintergrund (W-0059): fertige verschwinden eine Stunde nach dem Ende, verwaiste nach zwölf Stunden.
+    for (const x of (a && a.background) || []) times.push(x.state === 'running' ? Date.parse(x.at) + 12 * 3600000 : (Date.parse(x.end) || Date.parse(x.at)) + 3600000);
     const future = times.filter((x) => x > Date.now());
     return future.length ? Math.min(...future) + 1000 : Infinity;
   }
@@ -2952,6 +2954,28 @@
     return h + '<details class="lv-all" data-out="' + esc(t.id + ':alle') + '"><summary>' + tr('Show all {n} checks', { n: items.length }) + '</summary>' + lvAllList(t) + '</details>';
   }
 
+  // Befehle im Hintergrund (W-0059): Claude hat sie mit run_in_background gestartet, das Werkzeug ist längst zurück.
+  // Stand und Exit-Code liest der Server aus dem Ende der Ausgabedatei. Gleiche Zeilen wie bei den Prüfungen.
+  function lvBgHtml() {
+    const list = (meta.activity && meta.activity.background) || [];
+    if (!list.length) return '';
+    const running = list.filter((x) => x.state === 'running').length;
+    const failed = list.filter((x) => x.state === 'done' && x.code !== null && x.code !== 0).length;
+    const row = (x) => {
+      const done = x.state === 'done';
+      const st = x.state === 'running' ? 'running' : done && x.code === 0 ? 'ok' : done && x.code !== null ? 'bad' : '';
+      const ic = { running: '', ok: '✓', bad: '×' }[st] ?? (done ? '–' : '?');
+      const dur = done && x.end ? ', ' + lvMs(Math.max(0, Date.parse(x.end) - Date.parse(x.at))) : '';
+      const right = x.state === 'running' ? tr('running {time}', { time: lvSince(x.at, 'sec') })
+        : done ? (x.code !== null ? tr('Exit code {code}', { code: Number(x.code) }) : tr('ended, exit code unknown')) + dur
+          : tr('state unknown, started at {time}', { time: lvTime(x.at) });
+      return '<li class="ck ' + st + '"><div class="ck-row"><span class="ck-ic" aria-hidden="true">' + ic + '</span>' + (x.task ? '<span class="ck-name">' + esc(x.task) + '</span>' : '') +
+        '<span class="' + (x.cmd ? 'mono muted ' : '') + 'ck-cmd" title="' + esc(x.what) + '">' + esc(x.what) + '</span><span class="muted num ck-ms">' + right + '</span></div></li>';
+    };
+    return '<div class="lv-head"><h2>' + tr('In the background') + '</h2><span class="meta">' + [running ? tr('{n} running', { n: running }) : '', failed ? tr('{n} failed', { n: failed }) : ''].filter(Boolean).join(', ') + '</span></div>' +
+      '<div class="lv-body" data-lv-bg><ul class="checks">' + list.map(row).join('') + '</ul></div>';
+  }
+
   function lvChecksHtml(list, focusId) {
     // Ohne Ergebnis abgeschlossene Aufgaben haben nichts zu zeigen.
     const groups = list.filter((t) => t.checks && phaseOf(t) !== 'queue' && !(t.status === 'erledigt' && !lvChecks(t).finished));
@@ -3086,11 +3110,12 @@
     const runList = (rest.length ? '<ul class="lv-run">' + rest.map(lvRow).join('') + '</ul>' : '') +
       (done.length ? '<details class="lv-fold"' + (foldOpen || done.some((t) => t.id === focusId) ? ' open' : '') + '><summary>' + lvSi('ok') + '<span><b>' + done.length + '</b> ' + tr('done today') + '</span>' +
         '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary><ul class="lv-mini">' + done.map(lvMini).join('') + '</ul></details>' : '');
+    const bg = lvBgHtml();
     box.innerHTML = '<section class="lv-sum" aria-label="' + tr('Overview') + '">' + lvTilesHtml(list) + '</section>' +
       '<div class="lv-grid"><section class="lv-panel lv-runbox" aria-label="' + tr('Tasks today') + '"><div class="lv-head"><h2>' + tr('Today') + '</h2><span class="meta">' + (list.length === 1 ? tr('1 task') : tr('{n} tasks', { n: list.length })) + '</span></div>' +
       (list.length ? runList : '<p class="lv-empty">' + tr('No tasks for today.') + '</p>') + '</section>' +
       '<section class="lv-panel lv-focus" aria-label="' + tr('Selected task') + '">' + lvFocusHtml(ft, list) + '</section>' +
-      '<section class="lv-panel lv-checks" aria-label="' + tr('Checks') + '">' + lvChecksHtml(list, focusId) + '</section></div>';
+      '<section class="lv-panel lv-checks" aria-label="' + (bg ? tr('Background commands and checks') : tr('Checks')) + '">' + bg + lvChecksHtml(list, focusId) + '</section></div>';
     $$('details.lv-ckg', box).forEach((d) => { const b = $('summary b', d); if (b && openGroups.includes(b.textContent)) d.open = true; });
     $$('details[data-out]', box).forEach((d) => { if (openOut.includes(d.dataset.out)) d.open = true; });
     const ni = $('#lvInstr', box);

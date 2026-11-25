@@ -2,10 +2,11 @@
 // Claude Code PostToolUse Hook: meldet dem Live-Board, was Claude gerade tut, merkt sich geänderte Dateien
 // je Aufgabe, weist auf frühere Arbeit an derselben Datei hin und reicht Anweisungen aus dem Board weiter.
 // Werkzeugaufrufe in einem Worktree einer parallelen Aufgabe zählen für diese Aufgabe.
+// Ein Befehl mit run_in_background läuft weiter, wenn das Werkzeug zurückkommt: Er landet zusätzlich unter background.
 import fs from 'node:fs';
 import path from 'node:path';
 import { findRoot, loadConfig, loadTask, worksDir } from '../scripts/lib.mjs';
-import { recordActivity, takeInstructions, instructionText, callTarget, stampSteps, taskDirOf } from '../scripts/live.mjs';
+import { recordActivity, recordBackground, takeInstructions, instructionText, callTarget, stampSteps, taskDirOf } from '../scripts/live.mjs';
 import { recordEdit, editHint } from '../scripts/files.mjs';
 import { loadLanes } from '../scripts/parallel.mjs';
 import { language, setLanguage } from '../scripts/i18n.mjs';
@@ -26,6 +27,7 @@ try {
     if (config.live_activity !== false) {
       const failed = input.tool_response && (input.tool_response.is_error || input.tool_response.error);
       recordActivity(root, task, input.tool_name || '', ti, !failed, lane ? lane.path : '', { agent: input.agent_id || '' });
+      recordBackground(root, task, input.tool_name || '', ti, input.tool_response, input.session_id || '');
       // Uhrzeit frisch abgehakter Schritte festhalten, auch wenn gerade kein Board läuft.
       const dir = task && taskDirOf(root, task);
       if (dir) { try { stampSteps(root, [loadTask(path.join(worksDir(root), 'tasks', dir))]); } catch { /* nicht kritisch */ } }

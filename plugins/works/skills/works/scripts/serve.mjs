@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { worksDir, run, openInBrowser } from './lib.mjs';
 import { tr, language, setLanguage } from './i18n.mjs';
 import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
+import { loadActivity, backgroundOf } from './live.mjs';
 import { generateIndex } from './views.mjs';
 import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload, backupPreview, setLang } from './api.mjs';
 import { buildIcal } from './ical.mjs';
@@ -53,6 +54,9 @@ export function signature(root) {
     }
   }
   try { parts.push(fs.readdirSync(path.join(wd, 'templates')).map((f) => f + statPart(path.join(wd, 'templates', f))).join(',')); } catch { /* keine Vorlagen */ }
+  // Befehle im Hintergrund (W-0059): ihr Ende ändert nur die Ausgabedatei unter <tmp>/claude, nicht .works.
+  // Es zählt der Stand, nicht jede neue Zeile der Ausgabe, sonst lädt das Board bei gesprächigen Befehlen jede Sekunde neu.
+  try { parts.push(backgroundOf(loadActivity(root)).map((e) => `${e.id}:${e.state}:${e.code}`).join(',')); } catch { /* beim nächsten Mal */ }
   return parts.join('|');
 }
 

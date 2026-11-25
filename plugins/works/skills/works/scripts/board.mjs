@@ -14,7 +14,7 @@ import { loadComments } from './comments.mjs';
 import { effortDays, staleTasks } from './timelog.mjs';
 import { configuredChecks, checksFor, loadResults, flakyOf, trendOf } from './checks.mjs';
 import { designSummary } from './design.mjs';
-import { loadActivity, pendingInstructions, stampSteps } from './live.mjs';
+import { loadActivity, pendingInstructions, stampSteps, backgroundOf } from './live.mjs';
 import { loadKnowledge } from './knowledge.mjs';
 import { loadLanes } from './parallel.mjs';
 import { liveUsage } from './usage.mjs';
@@ -108,7 +108,8 @@ export function boardData(root) {
     today: day,
     staleDays: config.handoff_stale_days === undefined ? 3 : Number(config.handoff_stale_days) || 0,
     usage: { currency: usage.currency, today: usage.today },
-    activity: (() => { const a = loadActivity(root); return a ? { busy: !!a.busy, current: a.current || null, recent: a.recent || [], since: a.since || '', idleSince: a.idleSince || '', lanes: a.lanes || {} } : null; })(),
+    // background: Befehle im Hintergrund mit Stand aus ihrer Ausgabedatei (W-0059), ohne Pfad.
+    activity: (() => { const a = loadActivity(root); return a ? { busy: !!a.busy, current: a.current || null, recent: a.recent || [], since: a.since || '', idleSince: a.idleSince || '', lanes: a.lanes || {}, background: backgroundOf(a) } : null; })(),
     lanes: loadLanes(root).map((l) => ({ task: l.task, branch: l.branch, dir: path.basename(l.path), started: l.started, status: l.status })),
     instructions: pendingInstructions(root).map((x) => ({ task: x.task, text: x.text, at: x.at })),
     knowledgeProposals: loadKnowledge(root).filter((e) => e.status === 'vorschlag').length,

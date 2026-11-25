@@ -1,0 +1,38 @@
+{
+  "direction": null,
+  "variants": [
+    {
+      "name": "A",
+      "title": "Leiste wie bei verwaisten Tabs",
+      "file": "A-leiste-wie-bei-verwaisten-tabs.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Graue Leiste oben mit Hinweis, Hier den Hub öffnen und mycron wieder starten; darunter der letzte Stand ausgegraut und gesperrt",
+      "at": "2026-11-25 19:40"
+    },
+    {
+      "name": "B",
+      "title": "Ruhige Karte in der Mitte",
+      "file": "B-ruhige-karte-in-der-mitte.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Board grau und unscharf dahinter, Karte mycron ist beendet mit zwei Sätzen, beiden Knöpfen und Strg+W-Hinweis",
+      "at": "2026-11-25 19:40"
+    },
+    {
+      "name": "C",
+      "title": "Schlichte Seite statt Board",
+      "file": "C-schlichte-seite-statt-board.html",
+      "kind": "html",
+      "source": "ui-ux-pro-max",
+      "note": "Nur noch Kopfzeile mit grauem Punkt Beendet, ein Satz und die Knöpfe; kein alter Stand mehr",
+      "at": "2026-11-25 19:40"
+    }
+  ],
+  "brainstorm": [],
+  "chosen": {
+    "name": "B",
+    "at": "2026-11-25 19:43",
+    "reason": "Nutzer am 2026-11-25: Beide B"
+  }
+}
