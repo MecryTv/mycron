@@ -96,3 +96,4 @@ Fertig im Branch fix/w-0056-discord-status-des-bots (Commit ca07d38), nicht geme
 - 2026-11-25: Tests: Schnelltest Discord 17/17, voller Selbsttest ohne WebSocket 53/53, mit Browser 60/60, services/works-bot/test.mjs bestanden (zweimal). Vorher rot: Diensttest wartete vergeblich auf „2 people use works“.
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
+- 2026-11-25: Parallele Arbeit beendet
