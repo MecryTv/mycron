@@ -150,3 +150,4 @@ Offen: Board-Vorschau zeigt weiter die Einzelnachricht statt der Karte. /works v
 - 2026-11-25: Vier Funde der Code-Durchsicht behoben (01cca0e, d0f8d90, 7d25ab7), je Fund zuerst ein roter Test. Danach Schnelltest 21/21, ohne WebSocket 51/51, mit Browser 58/58 (zweiter Lauf; im ersten einmal 'Unexpected end of JSON input' im Browser-Dialog-Test, weil config.json nicht atomar geschrieben wird), Dienst-Test grün.
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Abschließende Prüfung nach den vier Fixes: Selbsttest mit Browser 58/58, ohne WebSocket 51/51, works-bot grün.
+- 2026-11-25: Parallele Arbeit beendet
