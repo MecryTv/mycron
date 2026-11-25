@@ -121,7 +121,7 @@ try {
   assert.equal(dash.attachments[0].filename, 'works.png');
   assert.equal(dash.attachments[0].data.subarray(1, 4).toString(), 'PNG', 'image is no PNG');
   assert.ok(dash.components.flatMap((x) => x.components).some((c) => c.custom_id === 'w:proj::'), 'select menu dropped by the service');
-  // The shared bot is one for everybody: its status shows the help, not a project.
+  // The shared bot is one for everybody: its status shows the help, not a project (one person linked so far).
   assert.match(JSON.stringify(fake.gateway.identifies[0].presence || {}), /\/works help/);
   await wa(['new', '--type=chore', '--title=Neuer Stand']);
   await sleep(2500);
@@ -204,6 +204,9 @@ try {
   // A second person with an own device in the same channel: each command goes to the device of whoever typed it.
   // That device never asked for its inbox (an older works), so the service suggests an update instead of "off".
   const key88 = await linkKey({ user: '88' });
+  // W-0056: from two people on, the status counts the people with a working link; no project, no task.
+  const status = () => (((fake.gateway.presence || {}).activities || [])[0] || {}).state || '';
+  await wait(() => status() === '2 people use works', `status with two people (${status()})`);
   a = await ask({ sub: 'tasks' }, 'owner command with a second device in the channel');
   assert.doesNotMatch(JSON.stringify(a.data), /Nicht für dich/, 'command of the owner went to the other device');
   assert.match(JSON.stringify(a.data), /projekt/);
@@ -235,6 +238,8 @@ try {
   }
   assert.equal((await api('DELETE', `/v1/channels/11/messages/${keepMsg.body.id}`, null, keyE)).status, 204, 'channel message pushed out by answers');
   assert.equal((await api('DELETE', '/v1/link', null, keyE)).status, 200);
+  // Back to one person: the status is the help again.
+  await wait(() => status() === '/works help', `help as status with one person (${status()})`);
   // Device off: the service says so instead of leaving Discord waiting.
   await wa(['discord', 'stop']);
   a = await ask({ sub: 'tasks' }, 'answer for a device that is off');
@@ -348,14 +353,23 @@ try {
 
   // Restart behind a proxy: links survive; the code limit counts the address the proxy appended (last entry).
   const key5 = await linkKey({ channel: '12', user: '55' });
+  // Each person once, broken links not at all: 55, and 66 with two devices, are two people (key2 of 88 is broken).
+  const key6 = await linkKey({ channel: '12', user: '66' });
+  await linkKey({ channel: '12', user: '66' });
+  await wait(() => status() === '2 people use works', `status with two people on three working links (${status()})`);
   // Wrong codes from one address: blocked after five attempts (last, because it blocks this test's address).
   let last = 0;
   for (let i = 0; i < 6; i++) last = (await api('POST', '/v1/link', { code: 'ZZZZ-ZZZZ', device: 'x' })).status;
   assert.equal(last, 429, 'no limit for wrong codes');
   await stopService();
-  startService({ TRUST_PROXY: '1' });
+  // After a restart the status comes with the identify, in the language of WORKS_BOT_LANG.
+  const ids0 = fake.gateway.identifies.length;
+  startService({ TRUST_PROXY: '1', WORKS_BOT_LANG: 'de' });
   await healthy();
+  const idf = await wait(() => fake.gateway.identifies[ids0], 'identify after the restart');
+  assert.equal(((idf.presence || {}).activities || [])[0].state, '2 Leute nutzen works', JSON.stringify(idf.presence));
   assert.equal((await api('GET', '/v1/users/@me', null, key5)).status, 200, 'link lost on restart');
+  assert.equal((await api('GET', '/v1/users/@me', null, key6)).status, 200, 'link lost on restart');
   for (let i = 0; i < 6; i++) last = (await api('POST', '/v1/link', { code: 'ZZZZ-ZZZZ' }, null, { 'x-forwarded-for': `198.51.100.${i}, 203.0.113.7` })).status;
   assert.equal(last, 429, 'spoofed first X-Forwarded-For entry bypasses the limit');
   assert.equal((await api('POST', '/v1/link', { code: 'ZZZZ-ZZZZ' }, null, { 'x-forwarded-for': '203.0.113.8' })).status, 400, 'other address blocked');

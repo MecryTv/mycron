@@ -54,9 +54,9 @@ Wunsch des Nutzers am 2026-11-25 (nach W-0049): Ist ein Board offen und startet 
 - [x] Soll der Wechsel zum Hub warten, solange im Board ungespeicherte Eingaben offen sind (etwa ein angefangener Abschnitt oder Kommentar)? Heute springt der Tab sofort, wie schon bei W-0049, und die Eingabe geht verloren. Vorschlag: warten bis gespeichert oder verworfen, wie beim Neuladen nach einem Update. Antwort: Ja, warten bis gespeichert oder verworfen, wie beim Neuladen nach einem Update. Verlorene Eingaben wären ein Fehler. Entschieden von Claude nach der Vorgabe des Nutzers vom 2026-11-25, solche Dinge selbst zu entscheiden.
 
 ## Übergabe
-Stand: 2026-11-25 18:06
+Stand: 2026-11-25 18:34
 
-Umgesetzt in Commit 9345506 (Branch feature/w-0057-offenes-board-wechselt-immer). Der neue Board-Server meldet sich nach dem Start bei allen anderen laufenden Boards (sendTabsToHub in hub.mjs, aufgerufen in serve.mjs nach listen, nicht bei takeover); deren offene works-Tabs bekommen event: hub und wechseln zum Hub, auch mit ?from=hub. Der umgeleitete Start (W-0049) schickt die Tabs immer zum Hub, ohne offenen Tab öffnet nur --open den Hub; showHub in works.mjs ist weg. Die 5-s-Abfrage in board.js vergleicht Kennungen: Ausgangsstand ist die erste Abfrage (der frisch geöffnete Tab bleibt), ein Board, das binnen 2 min zurück ist, gilt als Neustart. ?from=hub steht noch in den Hub-Links, wirkt aber nicht mehr. Doku: references/board.md, de/board.md, cli.md, de/cli.md. Tests: zwei neue Selbsttest-Schritte (Stream-Tab, Playwright), alle Läufe grün. Offen: Frage zu ungespeicherten Eingaben; works shot zählt als Start (wie jeder Start). Nichts gemergt, nichts gepusht.
+Zwei Commits im Branch feature/w-0057-offenes-board-wechselt-immer: 9345506 (neuer Server schickt offene Tabs der anderen Boards per event: hub zum Hub, nicht bei takeover; umgeleiteter Start immer; 5-s-Abfrage über Kennungen mit Ausgangsstand und 2-min-Neustartfenster) und der Folge-Commit (Wechsel wartet bei ungespeicherter Eingabe bis Speichern oder Verwerfen, gemeinsamer Mechanismus whenSaved mit dem Update-Neuladen, das jetzt ebenfalls nach Verwerfen läuft). Doku in references/board.md, de/board.md, cli.md, de/cli.md. Tests grün: voll mit Browser 63/63, ohne WebSocket 54/54, schnell 7/7. Offen: ?from=hub steht noch in den Hub-Links ohne Wirkung (für W-0054 belassen); works shot zählt als Start wie jeder andere. Nichts gemergt oder gepusht.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
@@ -73,3 +73,5 @@ Umgesetzt in Commit 9345506 (Branch feature/w-0057-offenes-board-wechselt-immer)
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
 - 2026-11-25: Frage 1 geklärt: Ja, warten bis gespeichert oder verworfen, wie beim Neuladen nach einem Update. Verlorene Eingaben wären ein Fehler. Entschieden von Claude nach der Vorgabe des Nutzers vom 2026-11-25, solche Dinge selbst zu entscheiden.
+- 2026-11-25: Nach Antwort des Nutzers: Wechsel zum Hub wartet bei ungespeicherter Eingabe bis Speichern oder Verwerfen. Umgesetzt über denselben Mechanismus wie das Update-Neuladen (whenSaved/runWhenSaved ersetzt updateWaiting); Prüfung nach run() und jede Sekunde, damit Verwerfen zählt (gilt jetzt auch fürs Update-Neuladen). Hub-Wechsel geht vor einem wartenden Neuladen. Neuer Browser-Schritt war vorher rot. Tests: W-0057-Schritte mit Browser 3/3, schnell 7/7, voll mit Browser 63/63, ohne WebSocket 54/54. Zwischendurch rot nur im Teillauf --only, weil dort im Projekt keine Karte lag (Testaufbau, behoben).
+- 2026-11-25: Übergabe aktualisiert

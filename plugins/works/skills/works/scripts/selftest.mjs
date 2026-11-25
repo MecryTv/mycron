@@ -1930,7 +1930,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const many = img.dashboardPng({ ...data, projects: Array.from({ length: 9 }, (_, i) => ({ ...data.projects[0], name: `p${i}` })), tracks: { ...data.tracks, rows: Array.from({ length: 9 }, () => data.tracks.rows[0]) } });
     expect(many.length < 256 * 1024 && many.readUInt32BE(20) < 1000, `Bild mit vielen Projekten zu groß: ${many.length} Bytes, ${many.readUInt32BE(20)} px hoch`);
     // Ohne Prozess: Aufräumen löscht eine Nachricht je Durchgang (der gemeinsame Bot erlaubt 60 in der Minute),
-    // der Status nennt das zuletzt wartende Projekt, die Zeile nennt bei einer Freigabe die Aufgabe.
+    // der Status zählt nur über alle Projekte (W-0056), die Zeile nennt bei einer Freigabe die Aufgabe.
     const botM = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
     const uiM = await import(pathToFileURL(path.join(HERE, 'discord-ui.mjs')).href);
     let dels = 0;
@@ -2042,8 +2042,36 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(x.state.queue.length === 1 && !x.state.queue[0].card && x.state.queue[0].ev.state === 'accepted' && !x.state.cards['card:r:W-5'], `alter Eintrag wurde zur Karte: ${JSON.stringify(x.state.queue)}`);
     }
     const snapOf = (name, since) => ({ root: 'x', name, snap: { name, tasks: {}, perm: { since, tool: 'Bash' }, perms: [], busy: true, active: { id: 'W-9', title: 'Probe' } } });
-    b.state.projects = { r1: snapOf('alt', '2026-01-01T10:00:00.000Z'), r2: snapOf('neu', '2026-06-01T10:00:00.000Z') };
-    expect(b.statusLine(botM.normalizeConfig({})) === 'neu wartet auf deine Freigabe', `Status: ${b.statusLine(botM.normalizeConfig({}))}`);
+    // Status des Bots (W-0056): nur Zahlen wie die Zusammenfassung im Panel, ohne Projektnamen und Aufgaben-ID.
+    // Wartet auf dich zählt Freigaben und „fertig und wartet“, arbeitet nur ohne Freigabe.
+    const idleOf = (name) => ({ root: 'x', name, snap: { name, tasks: {}, perms: [], busy: false, idleSince: '2026-06-01T11:00:00.000Z', active: { id: 'W-5', title: 'Fertig' } } });
+    const busyOf = (name) => ({ root: 'x', name, snap: { name, tasks: {}, perms: [], busy: true, since: '2026-06-01T12:00:00.000Z', active: { id: 'W-4', title: 'Läuft' } } });
+    const calmOf = (name) => ({ root: 'x', name, snap: { name, tasks: {}, perms: [] } });
+    const cfg0 = botM.normalizeConfig({});
+    const statusCases = [
+      [{ r1: snapOf('alt', '2026-01-01T10:00:00.000Z'), r2: idleOf('neu'), r3: busyOf('drei') }, '2 warten auf dich · 1 arbeitet', '2 waiting for you · 1 working'],
+      [{ r1: snapOf('alt', '2026-01-01T10:00:00.000Z'), r2: snapOf('neu', '2026-06-01T10:00:00.000Z') }, '2 warten auf dich', '2 waiting for you'],
+      [{ r2: idleOf('neu') }, '1 wartet auf dich', '1 waiting for you'],
+      [{ r3: busyOf('drei') }, '1 arbeitet', '1 working'],
+      [{ r3: busyOf('drei'), r4: busyOf('vier') }, '2 arbeiten', '2 working'],
+      [{ a: calmOf('eins'), b2: calmOf('zwei'), c: calmOf('drei') }, '3 Projekte im Blick', 'watching 3 projects'],
+      [{ a: calmOf('eins') }, '1 Projekt im Blick', 'watching 1 project'],
+    ];
+    const langSt = process.env.WORKS_LANG;
+    try {
+      for (const [projects, de, en] of statusCases) {
+        b.state.projects = projects;
+        const names = Object.values(projects).map((p) => p.name);
+        for (const [lang, want] of [['de', de], ['en', en]]) {
+          process.env.WORKS_LANG = lang;
+          const line = b.statusLine(cfg0);
+          expect(line === want, `Status (${lang}): ${line}, erwartet ${want}`);
+          expect(!/W-\d/.test(line), `Status nennt eine Aufgabe: ${line}`);
+          expect(!names.some((n) => line.includes(n)), `Status nennt ein Projekt: ${line}`);
+        }
+      }
+    } finally { if (langSt === undefined) delete process.env.WORKS_LANG; else process.env.WORKS_LANG = langSt; }
+    b.state.projects = { r1: snapOf('alt', '2026-01-01T10:00:00.000Z') };
     expect(botM.stateOf(b.state.projects.r1.snap, botM.normalizeConfig({}), (de) => de)[1].includes('W-9'), 'Freigabe ohne Aufgabe');
     // Daten für das Panel-Bild (W-0050): Ampel und Aufgabe je Projekt, Spur nur mit den letzten 24 Stunden in der
     // Farbe der Art, Woche mit heute.
@@ -2093,9 +2121,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         expect(nd.type === 9 && nd.data.components.length === 3, `Dialog ohne Projektfeld: ${JSON.stringify(nd.data && nd.data.components)}`);
         has(JSON.stringify((await ask({ type: 5, customId: nd.data.custom_id, messageId: d.m.id, fields: { title: 'Aus dem Dashboard', priority: 'p3', project: 'projekt' } }, 'Neue Aufgabe aus dem Dashboard')).data), 'angelegt');
         expect(loadTasks(proj).some((t) => t.title === 'Aus dem Dashboard' && t.priority === 'P3'), 'Aufgabe aus dem Dashboard fehlt');
-        // Status des Bots: was gerade wichtig ist.
+        // Status des Bots: wie viele warten oder arbeiten, ohne Projekt und Aufgabe (W-0056).
         hook('permission.mjs', { cwd: proj, session_id: 's-p', tool_name: 'Bash', tool_input: { command: 'ls' } });
-        await dwait(() => /projekt wartet auf deine Freigabe/.test(JSON.stringify(fake.gateway.presence || {})), 'Status des Bots bei einer Freigabe');
+        const pres = await dwait(() => { const s = ((fake.gateway.presence || {}).activities || [])[0]; return s && /\d+ warte[tn] auf dich/.test(s.state) ? s.state : null; }, 'Status des Bots bei einer Freigabe');
+        expect(!/W-\d/.test(pres) && !/projekt/i.test(pres), `Status nennt Projekt oder Aufgabe: ${pres}`);
         hook('stop-reminder.mjs', { cwd: proj, session_id: 's-p' });
       }
       // Aufräumen mit kurzer Frist: Infos verschwinden, Offenes bleibt bis zur Erledigung, das Dashboard bleibt.

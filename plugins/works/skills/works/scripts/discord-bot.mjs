@@ -147,16 +147,22 @@ export function projectLineOf(s, ci, cfg, t) {
   return `${dot} **${cut(s.name, 80)}** ${text}${ci && !ci.ok ? ' · 🔴 CI' : ''}`;
 }
 
+// Wie viele Projekte auf dich warten (Freigabe oder fertig) und wie viele arbeiten, ohne Namen: Anfang der
+// Zusammenfassung im Panel und Status des Bots (W-0056).
+function countParts(list, t) {
+  const wait = list.filter((p) => p.snap.perm || (!p.snap.busy && p.snap.idleSince)).length;
+  const work = list.filter((p) => p.snap.busy && !p.snap.perm).length;
+  return [wait ? t(`${wait} ${wait === 1 ? 'wartet' : 'warten'} auf dich`, `${wait} waiting for you`) : '', work ? t(`${work} ${work === 1 ? 'arbeitet' : 'arbeiten'}`, `${work} working`) : ''].filter(Boolean);
+}
+
 // Zusammenfassung oben im Panel (P2): wartet, arbeitet, heute erledigt, Kosten des Tages über alle Projekte nur mit
 // privacy.costs (je Währung summiert).
 function summaryLine(list, cfg, t) {
-  const wait = list.filter((p) => p.snap.perm || (!p.snap.busy && p.snap.idleSince)).length;
-  const work = list.filter((p) => p.snap.busy && !p.snap.perm).length;
   const done = list.reduce((s, p) => s + ((p.snap.today && p.snap.today.done) || 0), 0);
   const sums = {};
   for (const p of list) { const d = p.snap.today || {}; if (d.value > 0) sums[d.currency || 'USD'] = (sums[d.currency || 'USD'] || 0) + d.value; }
   const cost = cfg.privacy.costs ? Object.entries(sums).map(([c, v]) => fmtCost(v, c, language(null))).join(' + ') : '';
-  return [wait ? t(`${wait} ${wait === 1 ? 'wartet' : 'warten'} auf dich`, `${wait} waiting for you`) : '', work ? t(`${work} ${work === 1 ? 'arbeitet' : 'arbeiten'}`, `${work} working`) : '', t(`heute ${done} erledigt`, `${done} done today`), cost].filter(Boolean).join(' · ');
+  return [...countParts(list, t), t(`heute ${done} erledigt`, `${done} done today`), cost].filter(Boolean).join(' · ');
 }
 
 const WEEKDAY = [['SO', 'SUN'], ['MO', 'MON'], ['DI', 'TUE'], ['MI', 'WED'], ['DO', 'THU'], ['FR', 'FRI'], ['SA', 'SAT']];
@@ -1097,17 +1103,13 @@ export class Bot {
     }
   }
 
-  // Status des Bots (eigener Bot): das Wichtigste über alle Projekte, je Art das jüngste; höchstens alle 20 s neu.
+  // Status des Bots (eigener Bot, W-0056): nur Zahlen über alle Projekte wie die Zusammenfassung im Panel, ohne
+  // Projektnamen und Aufgaben, etwa „2 warten auf dich · 1 arbeitet“; sonst die Zahl der Projekte. Höchstens alle 20 s neu.
   statusLine(cfg) {
     const t = langOf();
     const all = this.liveProjects(cfg);
-    const newest = (list, at) => list.sort((x, y) => String(at(y)).localeCompare(String(at(x))))[0];
-    const perm = newest(all.filter((p) => p.snap.perm), (p) => p.snap.perm.since);
-    if (perm) return t(`${perm.snap.name} wartet auf deine Freigabe`, `${perm.snap.name} is waiting for your approval`);
-    const idle = newest(all.filter((p) => !p.snap.busy && p.snap.idleSince), (p) => p.snap.idleSince);
-    if (idle) return t(`${idle.snap.name} wartet auf dich`, `${idle.snap.name} is waiting for you`);
-    const busy = newest(all.filter((p) => p.snap.busy && p.snap.active), (p) => p.snap.since);
-    if (busy) return t(`arbeitet an ${busy.snap.active.id} (${busy.snap.name})`, `working on ${busy.snap.active.id} (${busy.snap.name})`);
+    const parts = countParts(all, t);
+    if (parts.length) return parts.join(' · ');
     return t(`${all.length} ${all.length === 1 ? 'Projekt' : 'Projekte'} im Blick`, `watching ${all.length} ${all.length === 1 ? 'project' : 'projects'}`);
   }
 
@@ -1550,7 +1552,7 @@ export async function runBot() {
     // Schreibende Aktionen aus Discord laufen über die Board-API; der Verlauf zeigt sie mit [Discord].
     process.env.WORKS_API_ACTOR = 'Discord';
     const bot = new Bot({ rest, log, shared: cred.shared, interactive: cred.shared || hasWebSocket() });
-    // Status des Bots (W-0044) nur beim eigenen Bot: Der gemeinsame ist einer für alle.
+    // Status des Bots (W-0044) nur beim eigenen Bot: Der gemeinsame ist einer für alle, seinen Status setzt der Dienst.
     if (!cred.shared && hasWebSocket()) bot.setStatus = (text) => { if (gw) gw.setStatus(text); };
     // Gemeinsamer Bot: Befehle und Klicks holt das Gerät beim Dienst ab (es hat kein Gateway). Der Dienst hält die
     // Anfrage offen, bis etwas kommt; ein Dienst ohne Inbox (ältere Version) wird nur selten gefragt.
