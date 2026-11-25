@@ -11,7 +11,7 @@ updated: 2026-11-25
 due:
 completed:
 milestone:
-branch:
+branch: fix/w-0053-ci-rot-works-selbsttest
 tags: []
 blocked_by: []
 blocks: []
@@ -71,9 +71,16 @@ Selbsttest: Board merkt sich seinen Port: Neustart ohne --port, belegter Port we
 ## Offene Fragen
 
 ## Übergabe
+Stand: 2026-11-25 19:04
+
+Diagnose im Selbsttest (Schritt „Board merkt sich seinen Port“) eingebaut und lokal nach main gemergt, geht mit dem nächsten ship hoch. Browser-Teil des ursprünglichen Fehlers war die halbe Datei aus writeJson (W-0060, behoben). Offen: einmaliger macOS-Fehler; tritt er wieder auf, die Meldung mit Blocker, server.json und server.log auswerten.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
 - 2026-11-25: Annotationen der beiden roten Jobs (85ecc2a) gelesen: Der Browser-Job scheiterte an „Unexpected end of JSON input“, das ist die halbe Datei aus writeJson und mit W-0060 behoben. Offen bleibt nur macOS: „Belegter letzter Port nicht ausgewichen: Live-Board läuft: http://127.0.0.1:48488/“, einmal in sechs CI-Läufen, seither grün. Lokal nicht nachzustellen; die Ursache ist aus den Annotationen nicht zu erkennen.
 - 2026-11-25: Priorität: P2 → P4
 - 2026-11-25: Nutzer: Diagnose in den Test einbauen (server.json und Ende von server.log bei einem Fehler) und auf P4, bis es wieder auftritt.
+- 2026-11-25: Gestartet (Status: backlog → in-arbeit)
+- 2026-11-25: Diagnose eingebaut (test(W-0053) auf main): Bei einem Fehler nennt der Port-Schritt Blocker-Zustand, server.json und die letzten 8 Zeilen von server.log. Aufgabe bleibt offen (P4), bis der Fehler wieder auftritt; dann die Meldung aus der CI auswerten.
+- 2026-11-25: Status: in-arbeit → backlog (Grund: Diagnose eingebaut, wartet auf erneutes Auftreten)
+- 2026-11-25: Übergabe aktualisiert

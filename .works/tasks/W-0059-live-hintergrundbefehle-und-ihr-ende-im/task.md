@@ -3,7 +3,7 @@ id: W-0059
 title: "Live: Hintergrundbefehle und ihr Ende im Board anzeigen"
 type: feature
 priority: P2
-status: backlog
+status: in-arbeit
 effort: M
 risk:
 created: 2026-11-25
@@ -11,7 +11,7 @@ updated: 2026-11-25
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0059-live-hintergrundbefehle-und
 tags: [board, live]
 blocked_by: []
 blocks: []
@@ -59,3 +59,4 @@ Wunsch des Nutzers am 2026-11-25: Läuft bei Claude etwas im Hintergrund (Bash m
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
 - 2026-11-25: Priorität: P3 → P2; incomplete: true → false
+- 2026-11-25: Parallel gestartet im Worktree W-0059-live-hintergrundbefehle (Status: backlog → in-arbeit)
