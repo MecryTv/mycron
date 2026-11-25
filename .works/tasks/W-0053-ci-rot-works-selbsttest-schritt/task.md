@@ -15,7 +15,7 @@ branch: fix/w-0053-ci-rot-works-selbsttest
 tags: []
 blocked_by: []
 blocks: []
-related: []
+related: [W-0062]
 source: ci-watch
 incomplete: false
 ---
@@ -84,3 +84,4 @@ Diagnose im Selbsttest (Schritt „Board merkt sich seinen Port“) eingebaut un
 - 2026-11-25: Diagnose eingebaut (test(W-0053) auf main): Bei einem Fehler nennt der Port-Schritt Blocker-Zustand, server.json und die letzten 8 Zeilen von server.log. Aufgabe bleibt offen (P4), bis der Fehler wieder auftritt; dann die Meldung aus der CI auswerten.
 - 2026-11-25: Status: in-arbeit → backlog (Grund: Diagnose eingebaut, wartet auf erneutes Auftreten)
 - 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Beziehung: W-0062 related

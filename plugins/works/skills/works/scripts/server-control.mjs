@@ -108,6 +108,30 @@ export function clearServer(root, pid) {
   if (info && info.pid === pid) { try { fs.unlinkSync(serverFile(root)); } catch { /* weg */ } }
 }
 
+// W-0062: Antwortet auf dem Port aus server.json wirklich ein works-Board? Windows vergibt PIDs schnell neu: Eine
+// veraltete server.json kann einen fremden, lebenden Prozess nennen, den works sonst beenden würde. Nur eine
+// abgelehnte Verbindung oder eine fremde Antwort heißt „nein“; antwortet der Server bloß langsam, gilt er als unserer.
+export async function isWorksServer(info) {
+  const h = !info.host || info.host === '0.0.0.0' || info.host === '::' ? '127.0.0.1' : info.host;
+  try {
+    const r = await fetch(`http://${h}:${info.port}/tabs`, { signal: AbortSignal.timeout(3000) });
+    if (r.status === 403) return true; // works, aber nicht von hier aus erreichbar (--host mit fester Adresse)
+    if (!r.ok) return false;
+    const j = await r.json().catch(() => null);
+    return !!j && typeof j.tabs === 'number';
+  } catch (e) { return e.name === 'TimeoutError' || e.name === 'AbortError'; }
+}
+
+// Laufender Board-Server dieses Projekts, geprüft (W-0062): Eine server.json ohne works-Board auf ihrem Port ist
+// veraltet und fällt weg, ohne dass der Prozess hinter ihrer PID angefasst wird.
+export async function liveServer(root) {
+  const info = readServer(root);
+  if (!info) return null;
+  if (await isWorksServer(info)) return info;
+  clearServer(root, info.pid);
+  return null;
+}
+
 // Ergänzt fehlende Einträge in .works/.gitignore, damit lokale Dateien nicht im Repo landen.
 export function ensureGitignore(root, entries) {
   const file = path.join(worksDir(root), '.gitignore');
@@ -195,7 +219,7 @@ export function startDetached(root, { cli = newestCli(), port = 4747, host = '12
 export async function refreshServers(root) {
   const cli = newestCli();
   const current = cliVersion(cli);
-  const info = readServer(root);
+  const info = await liveServer(root);
   const notes = [];
   if (info) {
     if (info.version !== current) {

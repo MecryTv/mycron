@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readJson, exists, loadState } from './lib.mjs';
-import { readServer, stopProcess, clearServer, newestCli, OWN_CLI } from './server-control.mjs';
+import { liveServer, stopProcess, clearServer, newestCli, OWN_CLI } from './server-control.mjs';
 import { emit } from './discord.mjs';
 import { tr } from './i18n.mjs';
 
@@ -95,7 +95,8 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
   if (dirty.length) stop(tr('Uncommitted changes (?? = new file):\n{list}\nCommit, discard or add them to .gitignore first, then run ship again.', { list: dirty.join('\n') }));
 
   // 3. Board stoppen. Es startet am Ende mit der neuen Version auf demselben Port, bei einem Abbruch sofort.
-  const board = readServer(root);
+  // Geprüft (W-0062): nur ein Board, das auf seinem Port wirklich antwortet, nie ein fremder Prozess mit alter PID.
+  const board = await liveServer(root);
   if (board) { await stopProcess(board.pid); clearServer(root, board.pid); log(`ok  ${tr('Board stopped (port {port})', { port: board.port })}`); }
   const restartBoard = () => {
     if (!board) return;
