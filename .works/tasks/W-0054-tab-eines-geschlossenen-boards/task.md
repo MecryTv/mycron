@@ -93,3 +93,4 @@ Offen: Hub-Seite eines gestoppten Boards (Tab auf B/hub) folgt weiter W-0032 und
 - 2026-11-25: Umgesetzt (Commit 8034cc8): works board --stop kündigt das Ende an, Tabs bekommen event: ended, Karte nach Entwurf B, Neustart über Einmal-Ticket im Hub eines anderen Boards. Ergänzt: Der beendete Tab wird wieder live, sobald sein Board auf demselben Port zurück ist (W-0031, sonst öffnete works board --open morgens einen zweiten Tab); Ursache einer roten Prüfung war der Socket, den Node nach dem Ende von der Antwort löst, deshalb schließt der Server ihn selbst. Selbsttest voll: 69/69 mit Browser, 59/59 ohne WebSocket.
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
+- 2026-11-25: Parallele Arbeit beendet
