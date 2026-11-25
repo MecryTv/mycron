@@ -640,6 +640,20 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     has(fs.readFileSync(path.join(proj, '.works', '.gitignore'), 'utf8'), 'steps.json', '.works/.gitignore');
   });
 
+  // W-0052: works checks record ohne Namen (etwa mit --help) endet mit Fehler und Nutzungszeile und schreibt nichts,
+  // statt eine Prüfung „undefined“ einzutragen.
+  await step('Prüfungen: record ohne Namen schreibt nichts (W-0052)', () => {
+    const dir = path.join(proj, '.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')));
+    const file = path.join(dir, 'checks.json');
+    const before = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+    for (const args of [['checks', 'record', 'W-0001'], ['checks', 'record', 'W-0001', '--help']]) {
+      const r = w(args, { ok: false });
+      expect(r.code !== 0, `works ${args.join(' ')} ohne Fehler: ${r.out}`);
+      has(r.err, 'works checks record <ID> <name>', `Nutzungszeile bei works ${args.join(' ')}`);
+    }
+    expect((fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null) === before, `checks.json verändert: ${fs.existsSync(file) ? fs.readFileSync(file, 'utf8').slice(0, 200) : ''}`);
+  });
+
   await step('Live: Zwischenstand der Prüfungen', () => {
     const dir = path.join('.works', 'tasks', fs.readdirSync(path.join(proj, '.works', 'tasks')).find((d) => d.startsWith('W-0001-')));
     fs.writeFileSync(path.join(proj, 'peek.js'), "process.stdout.write(require('fs').readFileSync(process.argv[2], 'utf8'))\n");
@@ -1787,6 +1801,19 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     } finally {
       fake.forbidEdit = false;
       await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+    }
+  });
+
+  // W-0061: Eine leere stop.req (halb geschrieben oder übrig) hält einen neuen Bot nicht vom Start ab; stop.req nennt
+  // immer die PID, die gehen soll.
+  await step('Discord: Start trotz leerer stop.req (W-0061)', async () => {
+    const req = path.join(ddir, 'stop.req');
+    fs.writeFileSync(req, '');
+    try {
+      has((await wa(['discord', 'start'], { extraEnv: denv })).out, 'gestartet', 'Start mit leerer stop.req');
+    } finally {
+      await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
+      try { fs.unlinkSync(req); } catch { /* weg */ }
     }
   });
 

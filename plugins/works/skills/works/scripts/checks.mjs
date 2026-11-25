@@ -160,7 +160,8 @@ export async function runChecks(root, config, task, { only = null, onStart = nul
 }
 
 export function recordCheck(root, task, name, status, note) {
-  if (!NAME_RE.test(name)) throw new Error(tr('Invalid check name.'));
+  // Ohne Namen wurde aus undefined der Name „undefined“ (W-0052): RegExp.test wandelt in einen Text um.
+  if (typeof name !== 'string' || !NAME_RE.test(name)) throw new Error(tr('Invalid check name.'));
   if (!['ok', 'warn', 'fail'].includes(status)) throw new Error(tr('Status must be ok, warn or fail.'));
   const fp = workFingerprint(checkDir(root, task));
   const data = loadResults(task) || { at: new Date().toISOString(), fingerprint: fp, results: {} };

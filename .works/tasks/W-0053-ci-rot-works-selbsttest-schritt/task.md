@@ -2,12 +2,12 @@
 id: W-0053
 title: "CI rot: works Selbsttest, Schritt Selbsttest mit Browser, Selbsttest"
 type: bug
-priority: P2
+priority: P4
 status: backlog
 effort:
 risk:
 created: 2026-11-24
-updated: 2026-11-24
+updated: 2026-11-25
 due:
 completed:
 milestone:
@@ -74,3 +74,6 @@ Selbsttest: Board merkt sich seinen Port: Neustart ohne --port, belegter Port we
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
+- 2026-11-25: Annotationen der beiden roten Jobs (85ecc2a) gelesen: Der Browser-Job scheiterte an „Unexpected end of JSON input“, das ist die halbe Datei aus writeJson und mit W-0060 behoben. Offen bleibt nur macOS: „Belegter letzter Port nicht ausgewichen: Live-Board läuft: http://127.0.0.1:48488/“, einmal in sechs CI-Läufen, seither grün. Lokal nicht nachzustellen; die Ursache ist aus den Annotationen nicht zu erkennen.
+- 2026-11-25: Priorität: P2 → P4
+- 2026-11-25: Nutzer: Diagnose in den Test einbauen (server.json und Ende von server.log bei einem Fehler) und auf P4, bis es wieder auftritt.
