@@ -1,18 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-25 08:25 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-25 08:31 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 5 | 0 | 1 | 0 | 0 | 0 | 50 | 0 |
+| 5 | 0 | 0 | 1 | 0 | 0 | 50 | 0 |
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 3 · P3 Mittel: 2 · P4 Niedrig: 1
 
 ## Aktive Aufgabe
 
-[W-0050](tasks/W-0050-discord-nachrichten-nach-10-s-loeschen/task.md) Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard (In Arbeit), letzte Übergabe 2026-11-24 22:51
+[W-0050](tasks/W-0050-discord-nachrichten-nach-10-s-loeschen/task.md) Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard (Review), letzte Übergabe 2026-11-25 08:26
 
 ## Kritisch (P1)
 
@@ -22,7 +22,7 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0050](tasks/W-0050-discord-nachrichten-nach-10-s-loeschen/task.md) | Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard | Feature | P2 Hoch | In Arbeit | M |  |  |  |
+| [W-0050](tasks/W-0050-discord-nachrichten-nach-10-s-loeschen/task.md) | Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard | Feature | P2 Hoch | Review | M |  |  |  |
 
 ## Geplant und Backlog
 
