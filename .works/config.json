@@ -124,9 +124,7 @@
     "days": 7
   },
   "handoff_stale_days": 3,
-  "queue": [
-    "W-0050"
-  ],
+  "queue": [],
   "queue_settings": {
     "auto_next": false,
     "skip_blocked": true,

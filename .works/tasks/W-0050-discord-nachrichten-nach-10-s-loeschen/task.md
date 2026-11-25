@@ -3,13 +3,13 @@ id: W-0050
 title: "Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard"
 type: feature
 priority: P2
-status: review
+status: erledigt
 effort: M
 risk:
 created: 2026-11-24
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: feature/w-0050-discord-nachrichten-nach-10-s
 tags: [discord]
@@ -76,17 +76,7 @@ Art: nachher · Hinzugefügt: 2026-11-25
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-25 15:53
-
-Fertig zur Abnahme, Status review. Alle 10 Kriterien und 8 Planschritte abgehakt, Branch feature/w-0050-discord-nachrichten-nach-10-s, nichts uncommittet.
-
-Umgesetzt (Commits 392bc5a bis aa605b2): cleanup.seconds statt cleanup.hours, Karte je Aufgabe nach I3 mit Bild und neuem Ereignis start, Verlauf (state.history, Knopf Verlauf, /works verlauf), Panel nach P2 (Text und Bild), Doku und Hilfe.
-
-Funde der Code-Durchsicht behoben (je Fund erst ein roter Test): 01cca0e prune rechnet ab der Erledigung statt ab dem Posten, und ein altes cleanup.hours=0 bleibt nie löschen. d0f8d90 Karten warten nur auf Schritte, deren Schlüssel noch in state.open steht (liveCard); ein neuer Schritt im selben Slot löst den älteren auf; eine im Review gelöschte Aufgabe löst ihr Review auf; ein weggefallenes Projekt räumt offene Schritte und Timer weg. 7d25ab7 ein alter Eintrag ohne Karte in der Warteschlange bleibt Einzelnachricht.
-
-Tests nach den Fixes: Schnelltest 21/21, Selbsttest ohne WebSocket 51/51 (231 s), mit Browser 58/58 (376 s) im zweiten Lauf, services/works-bot/test.mjs alle Prüfungen. Im ersten Browser-Lauf war der Schritt „Dialog Discord-Bot im Browser (W-0038)“ einmal rot mit „Unexpected end of JSON input“: Der Test liest config.json, während das Board sie schreibt; writeJson in lib.mjs schreibt nicht atomar (vorher schon so, nicht Teil von W-0050).
-
-Offen: Board-Vorschau zeigt weiter die Einzelnachricht statt der Karte. /works verlauf beim gemeinsamen Bot erst nach Neustart des Dienstes (Knopf geht sofort). Karten offener Aufgaben bleiben, auch eine P1 im Backlog. Eine Karte, deren Aufgabe gelöscht wurde, zeigt bis zum Löschen als Zustand „In Arbeit“ (Rückfall ohne Status). writeJson nicht atomar (siehe oben).
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -151,3 +141,4 @@ Offen: Board-Vorschau zeigt weiter die Einzelnachricht statt der Karte. /works v
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Abschließende Prüfung nach den vier Fixes: Selbsttest mit Browser 58/58, ohne WebSocket 51/51, works-bot grün.
 - 2026-11-25: Parallele Arbeit beendet
+- 2026-11-25: Abgeschlossen (Status: review → erledigt), DoD bestätigt
