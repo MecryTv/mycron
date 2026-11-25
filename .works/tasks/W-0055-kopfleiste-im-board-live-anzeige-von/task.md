@@ -77,6 +77,14 @@ Umgesetzt nach Entwurf B „Kompakter Chip mit Popover“ (board.js `renderBusy(
 Beschreibung: Kopfleiste des Boards: Live-Anzeige „Claude arbeitet an W-0050, seit 1 min , 1 Agent“ drückt gegen die Ansichtswahl, Zeit als eigenes Kästchen, Leerzeichen vor dem Komma
 Art: vorher · Hinzugefügt: 2026-11-24
 
+![Nachher, 1440 hell: Kopfleiste mit kompaktem Chip „W-0001 · 12 Min](assets/2026-11-25-nachher-1440-hell-kopfleiste-mit-nachher.png)
+Beschreibung: Nachher, 1440 hell: Kopfleiste mit kompaktem Chip „W-0001 · 12 Min.“ und Agenten-Plakette, Popover offen mit Aufgabe, zwei parallelen Agenten, letztem Schritt und Zur Live-Ansicht; Reiter und Suche frei
+Art: nachher · Hinzugefügt: 2026-11-25
+
+![Nachher, 390 dunkel: Kopfleiste auf dem Handy mit Chip, ohne seitliches Scrollen](assets/2026-11-25-nachher-390-dunkel-kopfleiste-auf-dem-nachher.png)
+Beschreibung: Nachher, 390 dunkel: Kopfleiste auf dem Handy mit Chip, ohne seitliches Scrollen
+Art: nachher · Hinzugefügt: 2026-11-25
+
 ## Offene Fragen
 
 ## Übergabe
@@ -101,3 +109,5 @@ Fertig zur Abnahme. Umgesetzt nach Entwurf B in board.js (renderBusy, fitTop), b
 - 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
 - 2026-11-25: Entscheidung E1 dokumentiert: Neben dem Chip nur der Verbindungspunkt
 - 2026-11-25: Parallele Arbeit beendet
+- 2026-11-25: Asset hinzugefügt: assets/2026-11-25-nachher-1440-hell-kopfleiste-mit-nachher.png (nachher)
+- 2026-11-25: Asset hinzugefügt: assets/2026-11-25-nachher-390-dunkel-kopfleiste-auf-dem-nachher.png (nachher)
