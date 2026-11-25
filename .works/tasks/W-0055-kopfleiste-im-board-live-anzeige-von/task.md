@@ -7,7 +7,7 @@ status: backlog
 effort: S
 risk:
 created: 2026-11-24
-updated: 2026-11-24
+updated: 2026-11-25
 due:
 completed:
 milestone:
@@ -67,3 +67,7 @@ Art: vorher · Hinzugefügt: 2026-11-24
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
 - 2026-11-24: Asset hinzugefügt: assets/2026-11-24-kopfleiste-des-boards-live-anzeige-vorher.png (vorher)
+- 2026-11-25: Entwurf A „Kürzen mit Tooltip“ angehängt
+- 2026-11-25: Entwurf B „Kompakter Chip mit Popover“ angehängt
+- 2026-11-25: Entwurf C „Eigene Zeile bei Platzmangel“ angehängt
+- 2026-11-25: Entwürfe A bis C mit Fable 5.2 gestaltet, auf Basis des echten board.css. Befund: .brand hat min-width 0, die Pille white-space nowrap ohne Schrumpfen, deshalb ragt sie über die Reiter; der Zeitkasten ist span.num aus lvSince(), das Leerzeichen vor dem Komma kommt aus join(', '). Wartet auf die Wahl des Nutzers.
