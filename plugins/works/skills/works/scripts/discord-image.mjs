@@ -36,20 +36,21 @@ export const GLYPHS = {
   Ä: '.#.#.......###.#...#######...##...#', Ö: '.#.#.......###.#...##...##...#.###.', Ü: '.#.#......#...##...##...##...#.###.',
 };
 
-function raster(h) {
+// k: Faktor der Schrift (Standard S), für große Zahlen etwa 3.
+function raster(h, bg = BG) {
   const px = Buffer.alloc(W * h * 3);
   const rect = (x, y, w, hh, c) => {
     for (let yy = Math.max(0, y); yy < Math.min(h, y + hh); yy++) {
       for (let xx = Math.max(0, x); xx < Math.min(W, x + w); xx++) { const i = (yy * W + xx) * 3; px[i] = c >> 16; px[i + 1] = (c >> 8) & 255; px[i + 2] = c & 255; }
     }
   };
-  rect(0, 0, W, h, BG);
-  const text = (x, y, s, c) => {
+  rect(0, 0, W, h, bg);
+  const text = (x, y, s, c, k = S) => {
     let cx = x;
     for (const ch of s) {
       const g = GLYPHS[ch] || GLYPHS['?'];
-      for (let r = 0; r < 7; r++) for (let col = 0; col < 5; col++) if (g[r * 5 + col] === '#') rect(cx + col * S, y + r * S, S, S, c);
-      cx += 6 * S;
+      for (let r = 0; r < 7; r++) for (let col = 0; col < 5; col++) if (g[r * 5 + col] === '#') rect(cx + col * k, y + r * k, k, k, c);
+      cx += 6 * k;
     }
   };
   return { px, rect, text };
@@ -57,7 +58,9 @@ function raster(h) {
 
 // Großbuchstaben, ß wird SS; was die Schrift nicht kennt, wird zu ?. Auf n Zeichen gekürzt.
 const fit = (s, n) => { const u = [...String(s ?? '').toUpperCase().replace(/\s+/g, ' ')].map((ch) => (GLYPHS[ch] ? ch : '?')); return u.length > n ? `${u.slice(0, n - 1).join('')}.` : u.join(''); };
-const width = (s) => [...s].length * 6 * S - S;
+const width = (s, k = S) => [...s].length * 6 * k - k;
+const pad2 = (n) => String(n).padStart(2, '0');
+const hhmm = (ms) => { const d = new Date(ms); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 
 // CRC32 für die PNG-Blöcke (zlib.crc32 gibt es erst ab Node 22.2).
 const CRC = new Int32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c; });
@@ -130,5 +133,47 @@ export function dashboardPng({ projects = [], days = [], labels = {} } = {}) {
     const l = fit(d.label, 3);
     text(x + 22 - Math.floor(width(l) / 2), baseY + 10, l, MUTED);
   });
+  return png(px, h);
+}
+
+// Bild einer Karte je Aufgabe (W-0050, Entwurf I3): links die Zeitachse der Aufgabe vom ersten Ereignis bis end
+// (jetzt oder, wenn erledigt, das letzte Ereignis), Ereignisse als Quadrate, Wartezeiten als Strich bis zur Antwort,
+// Uhrzeiten darunter; rechts Minuten, Schritte und Kriterien; darunter die Legende. Farben wie im Entwurf.
+// events: [{ at, until, color }] in ms (until 0: kein Strich), right: Zeilen der rechten Spalte, die erste groß,
+// legend: [[Text, Farbe]].
+const I3 = { bg: 0x1e1f2a, lane: 0x262938, grid: 0x343748, text: 0xe9eaf2, muted: 0x9aa0b8 };
+export function cardPng({ start = 0, end = 0, events = [], right = [], legend = [] } = {}) {
+  const top = 14;
+  const big = fit(right[0] || '', 8);
+  const small = right.slice(1, 3).map((s) => fit(s, 16));
+  const rw = Math.max(width(big, 3), ...small.map((s) => width(s)), 0);
+  const x0 = 16;
+  const x1 = W - 16 - rw - 24;
+  const ty = top + 26; // Uhrzeiten
+  const sy = top + 21 + 10; // Zeilen unter der großen Zahl
+  const ly = Math.max(ty + 14, sy + small.length * 22 - 8) + 16; // Legende
+  const h = ly + 14 + 14;
+  const { px, rect, text } = raster(h, I3.bg);
+  rect(x0, top, x1 - x0, 20, I3.lane);
+  for (let k = 1; k < 6; k++) rect(x0 + Math.round(((x1 - x0) * k) / 6), top, 1, 20, I3.grid);
+  const span = Math.max(1, end - start);
+  const xOf = (t) => x0 + 10 + Math.round(Math.max(0, Math.min(1, (t - start) / span)) * (x1 - x0 - 20));
+  for (const e of events) if (e.until > e.at) rect(xOf(e.at), top + 8, Math.max(2, xOf(e.until) - xOf(e.at)), 4, e.color);
+  for (const e of events) rect(xOf(e.at) - 6, top + 4, 12, 12, e.color);
+  // Uhrzeiten: die erste und die letzte, dazwischen nur, wo Platz ist; am Rand bündig statt mittig.
+  const times = [...new Set(events.map((e) => e.at))].sort((a, b) => a - b).map((at) => {
+    const s = hhmm(at); const w = width(s);
+    return { s, w, x: Math.max(x0, Math.min(x1 - w, xOf(at) - Math.floor(w / 2))) };
+  });
+  const shown = times.slice(0, 1);
+  const last = times.length > 1 ? times[times.length - 1] : null;
+  for (const t of times.slice(1, -1)) { const p = shown[shown.length - 1]; if (t.x >= p.x + p.w + 12 && (!last || t.x + t.w + 12 <= last.x)) shown.push(t); }
+  if (last && last.x >= shown[shown.length - 1].x + shown[shown.length - 1].w + 12) shown.push(last);
+  for (const t of shown) text(t.x, ty, t.s, I3.muted);
+  // Rechte Spalte, rechtsbündig.
+  text(W - 16 - width(big, 3), top - 1, big, I3.text, 3);
+  small.forEach((s, i) => text(W - 16 - width(s), sy + i * 22, s, I3.muted));
+  let lx = x0;
+  for (const [l, c] of legend) { const s = fit(l, 20); rect(lx, ly + 2, 10, 10, c); text(lx + 16, ly, s, I3.muted); lx += 16 + width(s) + 22; }
   return png(px, h);
 }

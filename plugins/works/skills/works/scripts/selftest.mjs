@@ -1413,6 +1413,21 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   // (nach einem 403 bleibt das alte stehen, der Bot legt ein neues an).
   const isDash = (e) => /^works · \d+ Projekte?$/.test((e && e.title) || '');
   const dashOf = (name) => embedsOf().filter(({ e }) => isDash(e) && (e.description || '').includes(`**${name}**`)).pop();
+  // Karte je Aufgabe (W-0050): eine Nachricht, deren Titel mit der ID beginnt (erledigt mit ✓ davor); der Zustand
+  // steht in der Beschreibung. cardSays(id, re): die Karte, wenn ihr Zustand passt.
+  const isCardOf = (id) => (e) => new RegExp(`^(✓ )?${id}( |$)`).test((e && e.title) || '');
+  const cardsOf = (id, ch = '11') => embedsOf(ch).filter(({ e }) => isCardOf(id)(e));
+  const cardOf = (id, ch) => cardsOf(id, ch).pop();
+  const cardSays = (id, re, ch) => { const c = cardOf(id, ch); return c && re.test(c.e.description || '') ? c : null; };
+  const descOf = (mid) => { const m = fake.messages.get(mid); return m ? (m.embeds[0] || {}).description || '' : null; };
+  // Der Bot kennt die Aufgabe schon (Stand in state.json): erst dann zählt ein Wechsel auf in Arbeit als Start.
+  const botKnows = (id) => { try { return Object.values(JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')).projects || {}).some((p) => p.snap && p.snap.tasks && p.snap.tasks[id]); } catch { return false; } };
+  const newStarted = async (args) => {
+    const id = (w(['new', ...args]).out.match(/W-\d+/) || [])[0];
+    await dwait(() => botKnows(id), `Bot kennt ${id}`);
+    w(['start', id, '--force']);
+    return id;
+  };
   let dprobe = '';
 
   await step('Discord: Einrichtung, Token nur lokal und nie in der Ausgabe', async () => {
@@ -1484,8 +1499,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       // Mehrere Änderungen kurz nacheinander: höchstens wenige Bearbeitungen, am Ende der neue Stand.
       // Eigene, frische Aufgabe: Im vollen Selbsttest sind die ersten Aufgaben schon in Arbeit oder erledigt.
       const before = st.m.edits;
-      dprobe = (w(['new', '--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0];
-      w(['start', dprobe, '--force']);
+      dprobe = await newStarted(['--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']);
       for (let i = 0; i < 5; i++) w(['log', dprobe, `Schritt ${i}`]);
       await dwait(() => (dashOf('projekt').e.description || '').includes(dprobe), `Dashboard zeigt ${dprobe}`);
       await new Promise((res) => setTimeout(res, 800));
@@ -1499,57 +1513,63 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     } catch (e) { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); throw e; }
   });
 
-  await step('Discord: Ereignisse mit Feldern, Erwähnung nur bei @, Erledigtes wird bearbeitet', async () => {
+  await step('Discord: Karte je Aufgabe, Erwähnung nur bei @, wartende Schritte kommen neu nach unten (W-0050)', async () => {
     // Eigenständig: Ist ein Schritt davor gescheitert, startet dieser den Bot selbst und legt seine Aufgabe an.
     await wa(['discord', 'start'], { extraEnv: denv, ok: false });
-    if (!dprobe) { dprobe = (w(['new', '--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0]; w(['start', dprobe, '--force']); }
+    if (!dprobe) dprobe = await newStarted(['--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']);
     try {
-      // Review: still, mit Kriterien.
+      // Start auf in Arbeit: die Karte der Aufgabe, still, mit Bild.
+      const st = await dwait(() => cardSays(dprobe, /In Arbeit/), 'Karte In Arbeit');
+      expect(st.m.flags & 4096 && !st.m.content.includes('<@'), 'Start nicht still');
+      expect(st.e.image && st.e.image.url === 'attachment://works.png' && st.m.attachments.some((a) => a.filename === 'works.png' && a.data.subarray(1, 4).toString() === 'PNG'), `Kartenbild fehlt: ${JSON.stringify(st.m.attachments.map((a) => a.filename))}`);
+      has(st.e.title, 'Discord-Probe', 'Titel der Aufgabe in der Karte');
+      // Review: wartet auf dich, kommt also neu nach unten; still, mit Kriterien; die alte Fassung ist weg.
       w(['set', dprobe, 'status=review']);
-      const rv = await dwait(() => findMsg((e) => e.title === `${dprobe} im Review`), 'Nachricht Im Review');
+      const rv = await dwait(() => { const c = cardSays(dprobe, /Im Review/); return c && c.m.id !== st.m.id ? c : null; }, 'Karte Im Review neu geschickt');
+      await dwait(() => !fake.messages.has(st.m.id), 'alte Fassung der Karte gelöscht');
       expect(rv.m.flags & 4096, 'Review nicht still');
       expect(!rv.m.content.includes('<@'), 'Review erwähnt');
-      expect((rv.e.fields || []).some((f) => f.name === 'Kriterien'), 'Feld Kriterien fehlt');
-      // Freigabe: Erwähnung, Befehl ausgeblendet.
-      const known = new Set(fake.messages.keys());
+      has(rv.e.description, 'Kriterien', 'Kriterien in der Zustandszeile');
+      // Freigabe: dieselbe Karte neu mit Erwähnung, Befehl ausgeblendet.
       hook('permission.mjs', { cwd: proj, session_id: 's-d', tool_name: 'Bash', tool_input: { command: 'echo geheim-4711' } });
-      const pm = await dwait(() => findMsg((e, m) => e.title === 'Wartet auf deine Freigabe' && !known.has(m.id)), 'Nachricht Freigabe');
+      const pm = await dwait(() => { const c = cardSays(dprobe, /Wartet auf deine Freigabe/); return c && c.m.id !== rv.m.id ? c : null; }, 'Karte mit Freigabe');
       has(pm.m.content, '<@4242>', 'Erwähnung');
       expect(pm.m.allowed_mentions && JSON.stringify(pm.m.allowed_mentions.users) === '["4242"]', `allowed_mentions: ${JSON.stringify(pm.m.allowed_mentions)}`);
       expect(!(pm.m.flags & 4096), 'Freigabe still');
       expect(!JSON.stringify(pm.m).includes('geheim-4711'), 'Befehl trotz Datenschutz gezeigt');
-      // Freigabe erledigt: dieselbe Nachricht wird grau, ohne Erwähnung im Text.
+      expect(cardsOf(dprobe).length === 1, `${cardsOf(dprobe).length} Karten für ${dprobe}`);
+      // Freigabe erledigt, Claude fertig: die Karte wartet wieder auf dich und kommt erneut nach unten.
       hook('stop-reminder.mjs', { cwd: proj, session_id: 's-d' });
-      await dwait(() => /beantwortet/.test(fake.messages.get(pm.m.id).embeds[0].title || ''), 'Freigabe als beantwortet bearbeitet');
-      // Fertig und wartet: nach setIdle, Verzögerung 0.
-      const fin = await dwait(() => findMsg((e) => e.title === 'Claude ist fertig und wartet auf dich'), 'Nachricht fertig');
+      const fin = await dwait(() => { const c = cardSays(dprobe, /fertig und wartet auf dich/); return c && c.m.id !== pm.m.id ? c : null; }, 'Karte fertig und wartet');
       has(fin.m.content, '<@4242>');
+      // Neue Anfrage: dieselbe Nachricht wird bearbeitet, die Karte zeigt wieder das offene Review, ohne Erwähnung.
       hook('prompt-submit.mjs', { cwd: proj, session_id: 's-d', prompt: 'weiter' });
-      await dwait(() => /weiter/i.test(fake.messages.get(fin.m.id).embeds[0].title || ''), 'Fertig-Nachricht nach neuer Anfrage bearbeitet');
-      // Review angenommen: Review-Nachricht wird grün bearbeitet statt einer neuen.
+      await dwait(() => /Im Review/.test(descOf(fin.m.id) || '') && !fake.messages.get(fin.m.id).content.includes('<@'), 'Karte nach neuer Anfrage bearbeitet');
+      // Angenommen: dieselbe Nachricht, erledigt mit ✓, ohne Knöpfe.
       w(['done', dprobe, '--confirm', '--force', '--reason=Selbsttest']);
-      await dwait(() => /angenommen/.test(fake.messages.get(rv.m.id).embeds[0].title || ''), 'Review als angenommen bearbeitet');
-      // Neue P1.
+      await dwait(() => /angenommen/.test(descOf(fin.m.id) || '') && /^✓ /.test(fake.messages.get(fin.m.id).embeds[0].title), 'Karte angenommen');
+      expect(cardsOf(dprobe).length === 1, 'mehr als eine Karte nach dem Abschluss');
+      // Neue P1: Karte der neuen Aufgabe.
       w(['new', '--type=bug', '--title=Server brennt', '--priority=P1']);
-      await dwait(() => findMsg((e) => /Neue P1/.test(e.title || '') && /Server brennt/.test(JSON.stringify(e))), 'Nachricht Neue P1');
+      await dwait(() => findMsg((e) => /Server brennt/.test(e.title || '') && /Neue P1/.test(e.description || '')), 'Karte Neue P1');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
     } catch (e) { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); throw e; }
   });
 
-  await step('Discord: works ship als eine Nachricht, CI rot mit Bug, Wochenbericht', async () => {
+  await step('Discord: works ship in der Karte der Aufgabe, CI rot mit Bug, Wochenbericht', async () => {
     await wa(['discord', 'start'], { extraEnv: denv, ok: false });
     try {
       const emit = (type, data) => w(['discord', 'emit', type, `--json=${JSON.stringify(data)}`], { extraEnv: denv });
       emit('ship', { id: 'W-0001', step: 'start', run: 'r1' });
-      const sh = await dwait(() => findMsg((e) => e.title === 'W-0001 wird ausgeliefert'), 'ship-Nachricht');
+      const sh = await dwait(() => cardSays('W-0001', /Wird ausgeliefert/), 'ship in der Karte');
       emit('ship', { id: 'W-0001', step: 'merge', run: 'r1' });
       emit('ship', { id: 'W-0001', step: 'push', sha: 'abcdef1234567', run: 'r1' });
       emit('ship', { id: 'W-0001', step: 'ci', ok: true, workflows: 3, run: 'r1' });
       emit('ship', { id: 'W-0001', step: 'done', run: 'r1' });
-      await dwait(() => fake.messages.get(sh.m.id).embeds[0].title === 'W-0001 ausgeliefert', 'ship-Nachricht abgeschlossen');
-      const d = fake.messages.get(sh.m.id).embeds[0].description;
-      expect((d.match(/✓/g) || []).length >= 3, `Schritte nicht abgehakt: ${d}`);
-      expect(fake.inChannel('11').filter((m) => /W-0001 (wird )?ausgeliefert/.test((m.embeds[0] || {}).title || '')).length === 1, 'ship als mehrere Nachrichten');
+      await dwait(() => /ausgeliefert abcdef1 · CI grün/.test(descOf(sh.m.id) || ''), 'ship in der Karte abgeschlossen');
+      expect(/^✓ W-0001/.test(fake.messages.get(sh.m.id).embeds[0].title), `ausgelieferte Karte ohne ✓: ${fake.messages.get(sh.m.id).embeds[0].title}`);
+      has(fake.messages.get(sh.m.id).embeds[0].footer.text, 'Min.', 'Minuten in der Fußzeile');
+      expect(cardsOf('W-0001').length === 1, 'ship als mehrere Nachrichten');
       emit('ci', { ok: false, sha: 'feedbeef1234', failed: 2, total: 6, job: 'test (windows)', error: 'AssertionError: expected 3 to be 4', bug: 'W-0099', url: 'https://github.com/a/b/actions/runs/1' });
       const ci = await dwait(() => findMsg((e) => e.title === 'CI rot für feedbee'), 'CI-Nachricht');
       has(JSON.stringify(ci.e.fields), 'W-0099', 'Bug im Feld');
@@ -1601,7 +1621,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const pidFile = path.join(ddir, 'bot.pid');
     const readPid = () => { try { return JSON.parse(fs.readFileSync(pidFile, 'utf8')); } catch { return null; } };
     const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
-    const p1Msgs = (title) => fake.inChannel('11').filter((m) => /Neue P1/.test((m.embeds[0] || {}).title || '') && ((m.embeds[0] || {}).description || '').includes(title));
+    // Neue P1 als Karte (W-0050): Titel der Aufgabe im Titel, Neue P1 in der Zustandszeile.
+    const p1Msgs = (title) => fake.inChannel('11').filter((m) => /Neue P1/.test((m.embeds[0] || {}).description || '') && ((m.embeds[0] || {}).title || '').includes(title));
     const ob = path.join(ddir, 'outbox');
     const obCount = () => (fs.existsSync(ob) ? fs.readdirSync(ob).filter((f) => f.endsWith('.json')).length : 0);
     // Wochenbericht: die Vorschau mit --no-send legt nichts für den Bot ab (Bot ist hier aus).
@@ -1640,7 +1661,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const actF = path.join(proj, '.works', 'activity.json');
       // Aufgabe, die schon im Review ist, wenn der Bot sie zum ersten Mal sieht (W-0039: langsame Runner).
       const direct = nid(w(['new', '--type=chore', '--title=Direkt im Review', '--status', 'review']).out);
-      await dwait(() => findMsg((e) => e.title === `${direct} im Review`), 'Review einer neuen Aufgabe');
+      await dwait(() => cardSays(direct, /Im Review/), 'Review einer neuen Aufgabe');
       const lane = nid(w(['new', '--type=chore', '--title=Bahn-Aufgabe']).out);
       const since = new Date().toISOString();
       const act = JSON.parse(fs.readFileSync(actF, 'utf8'));
@@ -1652,12 +1673,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       lanesNow.lanes = [...(lanesNow.lanes || []), { task: lane, branch: 'feature/bahn', path: path.join(base, 'bahn'), started: since, status: 'läuft' }];
       fs.writeFileSync(lanesF, JSON.stringify(lanesNow));
       fs.writeFileSync(actF, JSON.stringify(act));
-      const lp = await dwait(() => findMsg((e) => e.title === 'Wartet auf deine Freigabe' && JSON.stringify(e.fields || []).includes(lane)), 'Freigabe aus der Bahn');
+      const lp = await dwait(() => cardSays(lane, /Wartet auf deine Freigabe/), 'Freigabe aus der Bahn in der Karte der Aufgabe');
       has(lp.m.content, '<@4242>', 'Erwähnung bei Freigabe aus der Bahn');
       const act2 = JSON.parse(fs.readFileSync(actF, 'utf8'));
       act2.lanes[lane] = { at: new Date().toISOString(), task: lane, tool: 'Bash', verb: 'Führt aus', what: 'npm test', ok: true, lane: true };
       fs.writeFileSync(actF, JSON.stringify(act2));
-      await dwait(() => /beantwortet/.test(fake.messages.get(lp.m.id).embeds[0].title || ''), 'Freigabe aus der Bahn beantwortet');
+      await dwait(() => { const d = descOf(lp.m.id); return d !== null && !/Wartet auf deine Freigabe/.test(d) && !fake.messages.get(lp.m.id).content; }, 'Freigabe aus der Bahn beantwortet');
       if (lanesBefore === null) fs.unlinkSync(lanesF); else fs.writeFileSync(lanesF, lanesBefore);
       // Verzögerte Freigabe überlebt einen Neustart des Bots.
       await wa(['discord', 'set', 'delay.perm=3'], { extraEnv: denv });
@@ -1666,7 +1687,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       await sleep(700);
       await wa(['discord', 'stop'], { extraEnv: denv });
       await wa(['discord', 'start'], { extraEnv: denv });
-      const np = await dwait(() => findMsg((e, m) => e.title === 'Wartet auf deine Freigabe' && m.content.includes('(Read)')), 'Freigabe nach Neustart', 12000);
+      const np = await dwait(() => findMsg((e, m) => /Wartet auf deine Freigabe/.test(`${e.title} ${e.description}`) && m.content.includes('(Read)')), 'Freigabe nach Neustart', 12000);
       expect(np, 'Freigabe nach Neustart fehlt');
       await wa(['discord', 'set', 'delay.perm=0'], { extraEnv: denv });
       hook('prompt-submit.mjs', { cwd: proj, session_id: 's-n', prompt: 'weiter' });
@@ -1711,23 +1732,27 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         // ship: Während des Laufs keine Ereignisse; danach zählt der Vergleich mit dem Stand vor ship.
         const sid = nid(w(['new', '--type=chore', '--title=Ship-Probe'], { cwd: bp }).out);
         w(['set', sid, 'status=review'], { cwd: bp });
-        const rv = await dwait(() => findMsg((e) => e.title === `${sid} im Review`), 'Review Ship-Probe');
+        const rv = await dwait(() => cardSays(sid, /Im Review/), 'Review Ship-Probe');
         const emitB = (data) => w(['discord', 'emit', 'ship', `--json=${JSON.stringify({ id: sid, run: 'b1', ...data })}`], { cwd: bp, extraEnv: denv });
         emitB({ step: 'start' });
         // Erst weiter, wenn der Bot den Start verarbeitet hat (feste Pausen reichen auf langsamen Runnern nicht).
-        await dwait(() => findMsg((e) => e.title === `${sid} wird ausgeliefert`), 'ship-Start verarbeitet');
+        await dwait(() => /Wird ausgeliefert/.test(descOf(rv.m.id) || ''), 'ship-Start in der Karte verarbeitet');
         w(['done', sid, '--confirm', '--force', '--reason=Selbsttest'], { cwd: bp });
         w(['new', '--type=bug', '--title=Während-ship', '--priority=P1'], { cwd: bp });
         await sleep(800);
         expect(!p1Msgs('Während-ship').length, 'Ereignis während ship gemeldet');
         // Nach dem Push sind die Git-Schritte vorbei: Der Bot taut auf, auch wenn ship noch auf die CI wartet.
         emitB({ step: 'push', sha: 'abc1234def' });
-        await dwait(() => /angenommen/.test(fake.messages.get(rv.m.id).embeds[0].title || ''), 'Review nach dem Push angenommen');
+        await dwait(() => /angenommen/.test(descOf(rv.m.id) || ''), 'Review nach dem Push angenommen');
         await dwait(() => p1Msgs('Während-ship').length, 'P1 aus der Zeit von ship nach dem Push gemeldet');
         emitB({ step: 'done' });
+        await dwait(() => /ausgeliefert abc1234/.test(descOf(rv.m.id) || ''), 'Karte ausgeliefert');
         await sleep(600);
         expect(p1Msgs('Während-ship').length === 1, 'P1 aus ship doppelt');
-        expect(!findMsg((e) => e.title === `✓ ${sid} erledigt`), 'Ausgelieferte Aufgabe zusätzlich als erledigt gemeldet');
+        // Ausgeliefert, nicht zusätzlich als erledigt: kein Eintrag done in der Karte.
+        const card = (JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')).cards || {})[`card:${rootIdOf(bp)}:${sid}`];
+        expect(card && !Object.keys(card.entries).some((k) => k.startsWith('done:')), `Ausgelieferte Aufgabe zusätzlich als erledigt gemeldet: ${JSON.stringify(card && Object.keys(card.entries))}`);
+        expect(cardsOf(sid).length === 1, `${cardsOf(sid).length} Karten für ${sid}`);
       }
       expect(!fs.readdirSync(ddir).some((f) => f.endsWith('.tmp')), 'Halbe Zwischendateien im Discord-Ordner');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
@@ -1742,7 +1767,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const { loadTasks } = await import('./lib.mjs');
     // Gemeinsames Modul: Befehle englisch mit deutscher Übersetzung, Dialoge zu Knöpfen, custom_id-Schema.
     const own = ui.commands()[0];
-    expect(own.options.map((o) => o.name).join() === 'help,status,tasks,new,instruct', `Unterbefehle: ${own.options.map((o) => o.name)}`);
+    expect(own.options.map((o) => o.name).join() === 'help,status,tasks,new,instruct,history', `Unterbefehle: ${own.options.map((o) => o.name)}`);
+    expect(own.options.find((o) => o.name === 'history').name_localizations.de === 'verlauf', 'Übersetzung verlauf fehlt');
     expect(own.options.find((o) => o.name === 'tasks').name_localizations.de === 'aufgaben', 'Übersetzung fehlt');
     expect(ui.commands({ shared: true })[0].options.some((o) => o.name === 'link'), 'link fehlt beim gemeinsamen Bot');
     expect(JSON.stringify(ui.parseCid('w:acc:0123456789abcdef:W-0012')) === '{"act":"acc","rid":"0123456789abcdef","id":"W-0012"}', 'parseCid');
@@ -1754,7 +1780,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     await wa(['discord', 'start'], { extraEnv: denv, ok: false });
     try {
       const cmds = await dwait(() => fake.guildCommands.get('1'), 'Befehle für Server 1 registriert');
-      expect(cmds[0].name === 'works' && cmds[0].options.length === 5, `Befehle: ${JSON.stringify(cmds).slice(0, 200)}`);
+      expect(cmds[0].name === 'works' && cmds[0].options.length === 6, `Befehle: ${JSON.stringify(cmds).slice(0, 200)}`);
       // w() blockiert diesen Prozess und damit das Fake-Gateway; der Bot verbindet sich dann neu, und ein Klick in
       // dieser Lücke geht verloren (echtes Discord liefert ihn nach). Kommt keine Eingangsbestätigung, noch einmal.
       const send = async (opts, what) => {
@@ -1792,7 +1818,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       has(fs.readFileSync(path.join(proj, '.works', 'instructions.json'), 'utf8'), 'Bitte zuerst die Tests.', 'Anweisung gespeichert');
       // Review mit Knöpfen. Zurück an Claude öffnet einen Dialog, die Begründung landet als Kommentar.
       w(['set', created.id, 'status=review']);
-      const rv = await dwait(() => findMsg((e) => e.title === `${created.id} im Review`), 'Review-Nachricht');
+      const rv = await dwait(() => cardSays(created.id, /Im Review/), 'Karte im Review');
       const btns = rv.m.components.flatMap((r) => r.components);
       const acc = btns.find((b) => /^w:acc:/.test(b.custom_id || '')); const ret = btns.find((b) => /^w:ret:/.test(b.custom_id || ''));
       expect(acc && ret, `Knöpfe fehlen: ${JSON.stringify(btns)}`);
@@ -1806,19 +1832,19 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       has(JSON.stringify(a.data), 'Claude', 'Bestätigung');
       expect(task(created.id).status === 'in-arbeit', 'Aufgabe nicht zurück in Arbeit');
       has(fs.readFileSync(path.join(task(created.id)._dir, 'comments.md'), 'utf8'), 'Das Handy-Bild fehlt.', 'Begründung als Kommentar');
-      await dwait(() => !fake.messages.get(rv.m.id).components.length, 'Knöpfe nach der Rückgabe weg');
+      await dwait(() => !fake.messages.get(rv.m.id).components.length && /Zurückgegeben/.test(descOf(rv.m.id)), 'Knöpfe nach der Rückgabe weg');
       // Annehmen mit erfüllter DoD: erledigt, die Review-Nachricht wird grün und verliert die Knöpfe.
       const pid = (w(['new', '--type=chore', '--title=Abnahme-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0];
       w(['check', pid, '1', '--section=Akzeptanzkriterien']); w(['set', pid, 'status=review']);
-      const rv2 = await dwait(() => findMsg((e) => e.title === `${pid} im Review`), 'Review-Nachricht 2');
+      const rv2 = await dwait(() => cardSays(pid, /Im Review/), 'Karte im Review 2');
       const acc2 = rv2.m.components.flatMap((r) => r.components).find((b) => /^w:acc:/.test(b.custom_id || ''));
       has(JSON.stringify((await ask({ type: 3, customId: acc2.custom_id, messageId: rv2.m.id }, 'Annehmen')).data), 'angenommen');
       expect(task(pid).status === 'erledigt', `Nicht erledigt: ${task(pid).status}`);
-      await dwait(() => /angenommen/.test(fake.messages.get(rv2.m.id).embeds[0].title || '') && !fake.messages.get(rv2.m.id).components.length, 'Review-Nachricht angenommen, ohne Knöpfe');
+      await dwait(() => /angenommen/.test(descOf(rv2.m.id) || '') && !fake.messages.get(rv2.m.id).components.length, 'Karte angenommen, ohne Knöpfe');
       // Fertig und wartet: Knopf Anweisung an Claude öffnet einen Dialog für die aktive Aufgabe.
       w(['start', created.id, '--force']);
       hook('prompt-submit.mjs', { cwd: proj, session_id: 's-k', prompt: 'los' }); hook('stop-reminder.mjs', { cwd: proj, session_id: 's-k' });
-      const fin = await dwait(() => findMsg((e, m) => e.title === 'Claude ist fertig und wartet auf dich' && m.components.length), 'Fertig-Nachricht mit Knopf');
+      const fin = await dwait(() => { const c = cardSays(created.id, /fertig und wartet auf dich/); return c && c.m.components.length ? c : null; }, 'Karte fertig mit Knopf');
       const ins = fin.m.components.flatMap((r) => r.components).find((b) => /^w:ins:/.test(b.custom_id || ''));
       const dlg2 = await ask({ type: 3, customId: ins.custom_id, messageId: fin.m.id }, 'Dialog Anweisung');
       expect(dlg2.type === 9, 'Anweisung ohne Dialog');
@@ -1856,6 +1882,44 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     b.state.queue = []; b.state.open = {};
     await b.cleanup(botM.normalizeConfig({}));
     expect(dels === 1, `${dels} Löschungen in einem Durchgang`);
+    // Karte je Aufgabe ohne Prozess (W-0050): ein Eintrag je Schlüssel, ein neuer wartender schickt die Karte neu,
+    // der Zustand kommt aus dem jüngsten Eintrag, das Bild ist ein kleines PNG in 640 px, eine erledigte Karte
+    // verschwindet nach der Frist samt ihrem Stand.
+    const cfgC = botM.normalizeConfig({ quiet: { on: false } });
+    const kb = new botM.Bot({ rest: { del: async () => {} }, log: () => {} });
+    const task7 = { id: 'W-7', title: 'Karte', status: 'in-arbeit', crit: [1, 2], steps: [2, 5] };
+    Object.assign(kb.state, { msgs: {}, queue: [], open: {}, cards: {}, history: [], projects: { r: { name: 'p', root: 'x', snap: { name: 'p', tasks: { 'W-7': task7 } } } } });
+    const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
+    const ck = 'card:r:W-7';
+    kb.upsert('start:r:W-7:1', { type: 'start', project: 'p', id: 'W-7', title: 'Karte', state: 'open', at: ago(20) }, 'r', cfgC);
+    expect(kb.state.queue.length === 1 && kb.state.queue[0].key === ck && !kb.state.queue[0].resend, `Start: ${JSON.stringify(kb.state.queue)}`);
+    kb.state.queue = [];
+    kb.upsert('perm:r:main:x', { type: 'perm', project: 'p', id: 'W-7', title: 'Karte', tool: 'Bash', since: ago(5), state: 'open', at: ago(4) }, 'r', cfgC);
+    expect(kb.state.queue.length === 1 && kb.state.queue[0].key === ck && kb.state.queue[0].resend, `Freigabe schickt die Karte nicht neu: ${JSON.stringify(kb.state.queue)}`);
+    let cb = botM.renderCard(kb.state.cards[ck], cfgC, { owner: '1', task: task7 });
+    has(cb.embeds[0].description, 'Wartet auf deine Freigabe'); has(cb.content, '<@1>'); has(cb.embeds[0].title, 'W-7 Karte');
+    kb.state.queue = [];
+    kb.upsert('perm:r:main:x', { ...kb.state.cards[ck].entries['perm:r:main:x'], state: 'resolved', until: ago(1) }, 'r', cfgC);
+    expect(kb.state.queue.length === 1 && !kb.state.queue[0].resend, 'beantwortete Freigabe schickt die Karte neu');
+    cb = botM.renderCard(kb.state.cards[ck], cfgC, { owner: '1', task: task7 });
+    has(cb.embeds[0].description, 'In Arbeit'); expect(!cb.content, `Erwähnung nach der Freigabe: ${cb.content}`);
+    expect(Object.keys(kb.state.cards[ck].entries).length === 2, 'Eintrag der Freigabe doppelt');
+    const cdata = botM.cardImageData(kb.state.cards[ck], task7, Date.now());
+    has(cdata.right.join(' '), 'SCHRITTE 2/5'); has(cdata.right.join(' '), 'KRITERIEN 1/2'); has(cdata.right[0], '20 MIN');
+    expect(cdata.events.length === 2 && cdata.events[1].until > cdata.events[1].at, `Ereignisse im Bild: ${JSON.stringify(cdata.events)}`);
+    const cpng = img.cardPng(cdata);
+    expect(cpng.subarray(1, 4).toString() === 'PNG' && cpng.length < 50 * 1024 && cpng.readUInt32BE(16) === 640, `Kartenbild: ${cpng.length} Bytes, ${cpng.readUInt32BE(16)} px breit`);
+    expect(Buffer.compare(cpng, img.cardPng(cdata)) === 0, 'Kartenbild nicht gleich bei gleichen Daten');
+    kb.state.msgs[ck] = { channel_id: '11', message_id: '9', at: ago(60), done: 0 };
+    kb.state.queue = [];
+    await kb.cleanup(botM.normalizeConfig({ cleanup: { seconds: 1 } }));
+    expect(kb.state.msgs[ck] && !kb.state.msgs[ck].done, 'Karte einer offenen Aufgabe gilt als erledigt');
+    task7.status = 'erledigt';
+    await kb.cleanup(botM.normalizeConfig({ cleanup: { seconds: 1 } }));
+    expect(kb.state.msgs[ck] && kb.state.msgs[ck].done, 'erledigte Karte ohne Zeitpunkt der Erledigung');
+    kb.state.msgs[ck].done = Date.now() - 5000;
+    await kb.cleanup(botM.normalizeConfig({ cleanup: { seconds: 1 } }));
+    expect(!kb.state.msgs[ck] && !kb.state.cards[ck], 'erledigte Karte nach der Frist nicht samt Stand gelöscht');
     const snapOf = (name, since) => ({ root: 'x', name, snap: { name, tasks: {}, perm: { since, tool: 'Bash' }, perms: [], busy: true, active: { id: 'W-9', title: 'Probe' } } });
     b.state.projects = { r1: snapOf('alt', '2026-01-01T10:00:00.000Z'), r2: snapOf('neu', '2026-06-01T10:00:00.000Z') };
     expect(b.statusLine(botM.normalizeConfig({})) === 'neu wartet auf deine Freigabe', `Status: ${b.statusLine(botM.normalizeConfig({}))}`);
@@ -1911,7 +1975,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const info = await dwait(() => findMsg((e) => e.title === 'Kurzlebig'), 'Info-Nachricht');
       const rid = (w(['new', '--type=chore', '--title=Offen im Review', '--criteria=Ja']).out.match(/W-\d+/) || [])[0];
       w(['check', rid, '1', '--section=Akzeptanzkriterien']); w(['set', rid, 'status=review']);
-      const rv = await dwait(() => findMsg((e) => e.title === `${rid} im Review`), 'offenes Review');
+      const rv = await dwait(() => cardSays(rid, /Im Review/), 'Karte im offenen Review');
       await dwait(() => !fake.messages.has(info.m.id), 'Info-Nachricht nach der Frist gelöscht');
       await new Promise((res) => setTimeout(res, 2500));
       expect(fake.messages.has(rv.m.id), 'offenes Review gelöscht');
@@ -2003,6 +2067,20 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(bot.isQuiet(q, new Date(2026, 0, 1, 23, 30)) && bot.isQuiet(q, new Date(2026, 0, 1, 6, 59)) && !bot.isQuiet(q, new Date(2026, 0, 1, 7, 0)), 'Ruhezeit falsch');
     const m = bot.renderEvent({ type: 'perm', project: 'p', id: 'W-1', tool: 'Bash' }, q, { owner: '1', now: new Date(2026, 0, 1, 23, 30) });
     expect(!m.content.includes('<@') && m.flags & 4096, 'Erwähnung in der Ruhezeit');
+    // Karte (W-0050): lange Titel, Fragen und Projektnamen passen in die Grenzen, Links bleiben entschärft, Datenschutz
+    // gilt auch hier, in der Ruhezeit keine Erwähnung.
+    const at = new Date().toISOString();
+    const card = { rid: '0123456789abcdef', id: 'W-1', project: long, title: '[klick](https://evil.example) ' + long, entries: {
+      a: { type: 'start', id: 'W-1', state: 'open', t0: at, u: 1 }, b: { type: 'question', id: 'W-1', text: long, q: 1, state: 'open', t0: at, u: 2 },
+      c: { type: 'perm', id: 'W-1', tool: long, what: 'geheim-4711', since: at, state: 'open', t0: at, u: 3 } } };
+    const cm = bot.renderCard(card, cfg, { owner: '1', interactive: true, task: { status: 'in-arbeit', crit: [1, 3], cost: '9,99 $' } });
+    for (const e of cm.embeds) expect(!embedProblems(e).length, `Karte zu lang: ${embedProblems(e)}`);
+    expect(cm.content.length <= 2000 && !JSON.stringify(cm).includes('geheim-4711'), 'Karte zu lang oder mit Befehl');
+    expect(!/(^|[^\\])\[klick\]\(/.test(cm.embeds[0].title), `Link in der Karte nicht entschärft: ${cm.embeds[0].title.slice(0, 80)}`);
+    const cq = bot.renderCard(card, q, { owner: '1', now: new Date(2026, 0, 1, 23, 30), task: { status: 'in-arbeit' } });
+    expect(!cq.content.includes('<@') && cq.flags & 4096, 'Erwähnung der Karte in der Ruhezeit');
+    const cp = JSON.stringify(bot.renderCard({ ...card, title: 'Geheimer Titel', entries: { a: card.entries.a, b: { ...card.entries.b, text: 'Geheime Frage' } } }, priv, { task: { status: 'in-arbeit', cost: '9,99 $' } }));
+    expect(!cp.includes('Geheimer Titel') && !cp.includes('9,99') && !cp.includes('Geheime Frage'), 'Titel, Frage oder Kosten der Karte trotz Datenschutz');
     // Ohne Einrichtung startet weder das Board noch der Sitzungsstart einen Bot.
     const home2 = path.join(base, 'home-ohne-discord'); fs.mkdirSync(home2, { recursive: true });
     const env2 = { HOME: home2, USERPROFILE: home2 };

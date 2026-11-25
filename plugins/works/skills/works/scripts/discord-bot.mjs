@@ -4,6 +4,8 @@
 // Nachrichten nach Entwurf F2: Felder, Erledigtes wird nachträglich bearbeitet, nur Erwähnungen klingeln.
 // Dauerhaft im Kanal steht nur das Dashboard nach D3 (W-0044), eines je Kanal für alle Projekte; alles andere
 // löscht der Bot nach der Frist (cleanup.seconds), offene Nachrichten erst nach ihrer Erledigung.
+// Je Aufgabe genau eine Karte nach Entwurf I3 (W-0050), die bei jedem Schritt bearbeitet wird; braucht sie dich,
+// kommt sie neu nach unten. Alles Gesendete steht im Verlauf (state.history), den Knopf und /works verlauf zeigen.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -17,7 +19,7 @@ import { dfile, discordDir, loadDiscordConfig, normalizeConfig, credential, read
 import { Rest, Gateway, hasWebSocket } from './discord-api.mjs';
 import { tr, useCatalog, who, subOf, parseCid, cid, MODAL, modalFor, modalValues, helpMessage, ephemeral, notOwner, commandsOff, commands } from './discord-ui.mjs';
 import { language, catalog, normLang, setLanguage } from './i18n.mjs';
-import { dashboardPng } from './discord-image.mjs';
+import { dashboardPng, cardPng } from './discord-image.mjs';
 
 export { normalizeConfig };
 
@@ -31,6 +33,9 @@ const FAST = process.env.WORKS_DISCORD_FAST === '1';
 const TICK = FAST ? 100 : 2000;
 const STATUS_MIN = FAST ? 300 : 10000;
 const IMAGE_MIN = FAST ? 1000 : 300000; // Bild höchstens alle 5 Minuten neu zeichnen
+// Kartenbild ohne neues Ereignis (Minuten, Achse bis jetzt) höchstens alle 5 Minuten, auch im Testtakt: sonst
+// bearbeitet der Bot laufende Karten dauernd und schreibt state.json ohne Grund neu.
+const CARD_IMAGE_MIN = 300000;
 const PRESENCE_MIN = FAST ? 200 : 20000;
 const RETRY = FAST ? 200 : 15000;
 // W-0051: so lange darf .works/config.json fehlen (Branch-Wechsel), bevor ein Projekt aus Panel und state.json fällt.
@@ -238,6 +243,9 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date(), rid = '', i
       e = { color: COLOR.done, title: t(`${ev.id} im Review`, `${ev.id} in review`), fields: [...(cfg.privacy.titles && ev.title ? [field(t('Aufgabe', 'Task'), cut(ev.title, 200))] : []), field(t('Kriterien', 'Criteria'), ev.crit && ev.crit[1] ? t(`${ev.crit[0]} von ${ev.crit[1]}`, `${ev.crit[0]} of ${ev.crit[1]}`) : t('keine', 'none')), ...(cfg.privacy.costs && ev.cost ? [field(t('Kosten', 'Costs'), ev.cost)] : [])], footer: { text: acts ? t('Abnehmen hier, im Board oder mit works done', 'Accept here, in the board or with works done') : t('Abnehmen im Board oder mit works done', 'Accept in the board or with works done') } };
       if (acts) actions = [...act(3, t('Annehmen', 'Accept'), cid('acc', rid, ev.id)), ...act(2, t('Zurück an Claude', 'Back to Claude'), cid('ret', rid, ev.id))];
       break;
+    case 'start':
+      e = { color: COLOR.run, title: t(`${ev.id} gestartet`, `${ev.id} started`), description: cfg.privacy.titles ? cut(ev.title, 200) : '' };
+      break;
     case 'returned':
       e = { color: COLOR.need, title: t(`${ev.id} zurückgegeben`, `${ev.id} returned`), description: cfg.privacy.titles ? cut(ev.title, 200) : '' };
       break;
@@ -299,7 +307,143 @@ const RECENT = {
   perm: (e, t) => t('Freigabe angefragt', 'Approval requested'), idle: (e, t) => t('Claude fertig', 'Claude done'), question: (e, t) => t(`Frage zu ${e.id}`, `Question about ${e.id}`), review: (e, t) => t(`${e.id} im Review`, `${e.id} in review`),
   returned: (e, t) => t(`${e.id} zurückgegeben`, `${e.id} returned`), done: (e, t) => t(`${e.id} erledigt`, `${e.id} done`), p1: (e, t) => t(`Neue P1 ${e.id}`, `New P1 ${e.id}`), queue_empty: (e, t) => t('Warteschlange leer', 'Queue empty'),
   ci_red: (e, t) => t(`CI rot ${sha7(e.sha)}`, `CI red ${sha7(e.sha)}`), ci_green: (e, t) => t(`CI grün ${sha7(e.sha)}`, `CI green ${sha7(e.sha)}`), report_week: (e) => cut(e.title, 80), report_day: (e) => cut(e.title, 80),
+  start: (e, t) => t(`${e.id} gestartet`, `${e.id} started`),
 };
+
+// ---------- Karte je Aufgabe (W-0050, Entwurf I3) ----------
+
+// Ereignisse mit Aufgabe gehen in die Karte der Aufgabe; WAITS warten auf dich, solange sie offen sind.
+const CARD = new Set(['start', 'perm', 'idle', 'question', 'review', 'returned', 'done', 'p1', 'ship']);
+const WAITS = new Set(['perm', 'idle', 'question', 'review']);
+const isOpen = (ev) => !ev.state || ev.state === 'open';
+const waiting = (ev) => WAITS.has(ev.type) && isOpen(ev);
+// Art einer Nachricht für Kartenbild, Spuren im Panel und Verlauf: wartet auf dich, CI rot, Arbeit und Auslieferung,
+// Ergebnis. Je Art Farbe und Symbol.
+const KIND = { wait: [0xe8a33d, '⏳'], red: [0xf23f43, '✕'], ship: [0x5865f2, '⬆'], result: [0x23a55a, '✓'] };
+const kindOf = (ev) => (['perm', 'idle', 'question', 'p1'].includes(ev.type) ? 'wait'
+  : ev.type === 'ci_red' || (ev.type === 'ship' && ev.status === 'fail') ? 'red'
+    : ['ship', 'start', 'returned', 'queue_empty'].includes(ev.type) ? 'ship' : 'result');
+const msOf = (iso, d) => { const v = Date.parse(iso); return Number.isNaN(v) ? d : v; };
+const entriesOf = (card) => Object.values(card.entries || {}).sort((a, b) => String(a.t0).localeCompare(String(b.t0)));
+// Zeitspanne der Aufgabe: erster Eintrag bis zum letzten Ereignis (auch Antwort, Annahme, Ende der Auslieferung).
+const spanOf = (list, now) => ({
+  start: Math.min(now, ...list.map((e) => msOf(e.t0, now))),
+  last: Math.max(0, ...list.map((e) => Math.max(msOf(e.t0, 0), msOf(e.until, 0), msOf(e.ended, 0)))),
+});
+// Dauer kurz wie im Entwurf: 41 Min., 2 Std. 5 Min., 3 Tage.
+const dur = (ms, t) => {
+  const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 1) return t('unter 1 Min.', 'under 1 min');
+  if (m < 60) return t(`${m} Min.`, `${m} min`);
+  if (m < 2880) return t(`${Math.floor(m / 60)} Std.${m % 60 ? ` ${m % 60} Min.` : ''}`, `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`);
+  return t(`${Math.round(m / 1440)} Tage`, `${Math.round(m / 1440)} days`);
+};
+
+// Zustand der Karte: der jüngste offene wartende Eintrag, sonst der zuletzt geänderte (u). Eine erledigte oder
+// verworfene Aufgabe ohne offenen Eintrag ist erledigt, außer während works ship. task: Stand der Aufgabe aus dem
+// Snapshot (status, crit, steps). tone: need, review, run, red, done.
+function cardState(card, task, cfg, t) {
+  const list = Object.values(card.entries || {});
+  const newest = (l) => (l.length ? l.reduce((a, b) => ((b.u || 0) >= (a.u || 0) ? b : a)) : null);
+  const last = newest(list);
+  let w = newest(list.filter(waiting));
+  // Eine Auslieferung, die nach dem Review begonnen hat, zeigt die Karte statt des offenen Reviews.
+  if (w && w.type === 'review' && last && last.type === 'ship') w = null;
+  const cur = w || last || {};
+  const crit = task.crit && task.crit[1] ? task.crit : cur.crit;
+  const since = (iso) => (rel(iso) ? t(` · seit ${rel(iso)}`, ` · since ${rel(iso)}`) : '');
+  const started = newest(list.filter((e) => e.type === 'start'));
+  let s = null;
+  if (w && w.type === 'perm') {
+    const tool = `${cut(w.tool || t('Werkzeug', 'tool'), 60)}${cfg.privacy.commands && w.what ? `: ${cut(w.what, 200)}` : ''}`;
+    s = ['need', t(`Wartet auf deine Freigabe · ${tool}${since(w.since)}`, `Waiting for your approval · ${tool}${since(w.since)}`)];
+  } else if (w && w.type === 'idle') s = ['need', t(`Claude ist fertig und wartet auf dich${since(w.since)}`, `Claude is done and waiting for you${since(w.since)}`)];
+  else if (w && w.type === 'question') s = ['need', cfg.privacy.titles && w.text ? t(`Frage an dich: ${cut(w.text, 300)}`, `Question for you: ${cut(w.text, 300)}`) : t('Frage an dich, im Board ansehen', 'Question for you, see the board')];
+  else if (w) s = ['review', crit && crit[1] ? (crit[0] >= crit[1] ? t('Im Review · alle Kriterien erfüllt', 'In review · all criteria met') : t(`Im Review · ${crit[0]} von ${crit[1]} Kriterien`, `In review · ${crit[0]} of ${crit[1]} criteria`)) : t('Im Review', 'In review')];
+  else if (cur.type === 'ship') {
+    const push = (cur.steps || []).find((x) => x.step === 'push');
+    const ci = (cur.steps || []).find((x) => x.step === 'ci');
+    if (cur.status === 'done') s = ['done', `${t('Erledigt · ausgeliefert', 'Done · shipped')}${push && push.sha ? ` ${sha7(push.sha)}` : ''}${ci ? (ci.ok ? t(' · CI grün', ' · CI green') : t(' · CI rot', ' · CI red')) : ''}`];
+    else if (cur.status === 'fail') s = ['red', `${t('Auslieferung angehalten', 'Shipping stopped')}${cur.note ? `: ${cut(cur.note, 200)}` : ''}`];
+    else {
+      const steps = (cur.steps || []).map((x) => `${x.ok === false ? '✗' : '✓'} ${(SHIP_STEP[x.step] || (() => x.step))(x, t)}`).join(', ');
+      s = ['run', `${t('Wird ausgeliefert', 'Being shipped')}${steps ? ` · ${steps}` : ''}`];
+    }
+  } else if (cur.type === 'review' && cur.state === 'accepted') s = ['done', t('Erledigt · angenommen', 'Done · accepted')];
+  else if (cur.type === 'done') s = ['done', t('Erledigt', 'Done')];
+  else if (cur.type === 'returned' || cur.type === 'review') s = ['run', t('Zurückgegeben, wieder in Arbeit', 'Returned, back in progress')];
+  else if (cur.type === 'p1' && !['in-arbeit', 'review', 'erledigt', 'verworfen'].includes(task.status)) s = ['red', t('Neue P1', 'New P1')];
+  else if (cur.type === 'start') s = ['run', t(`In Arbeit${since(cur.t0)}`, `In progress${since(cur.t0)}`)];
+  if (!s || (!w && cur.type !== 'ship' && s[0] !== 'done' && ['erledigt', 'verworfen'].includes(task.status))) {
+    s = task.status === 'erledigt' ? ['done', t('Erledigt', 'Done')] : task.status === 'verworfen' ? ['done', t('Verworfen', 'Discarded')]
+      : task.status === 'review' ? ['review', t('Im Review', 'In review')] : ['backlog', 'geplant'].includes(task.status) ? ['run', t('Offen', 'Open')]
+        : ['run', t(`In Arbeit${since(started && started.t0)}`, `In progress${since(started && started.t0)}`)];
+  }
+  return { tone: s[0], line: s[1], w };
+}
+
+const TONE = { need: ['🟠', COLOR.need], review: ['🟢', COLOR.done], run: ['🔵', COLOR.run], red: ['🔴', COLOR.red], done: ['', COLOR.gone] };
+
+// Karte einer Aufgabe: Projekt, Aufgabe (✓ wenn erledigt), Zustandszeile, Bild works.png nach I3, Fußzeile.
+// task: { title, status, crit, steps, cost } aus dem Snapshot; waits: die Karte bleibt stehen (Aufgabe offen oder ein
+// Eintrag wartet), sonst nennt die Fußzeile die Frist. Erwähnung wie bei renderEvent: nur der jüngste offene
+// wartende Eintrag mit @, außerhalb der Ruhezeit; sie klingelt nur, wenn die Karte neu geschickt wird.
+export function renderCard(card, cfg, { owner = '', now = new Date(), interactive = false, lang = '', task = {}, waits = true } = {}) {
+  const t = langOf(lang);
+  const { tone, line, w } = cardState(card, task, cfg, t);
+  const list = entriesOf(card);
+  const p = cut(card.project || '', 100);
+  const acts = interactive && card.rid;
+  const cost = cfg.privacy.costs && task.cost ? task.cost : '';
+  let actions = [];
+  if (acts && w && w.type === 'review') actions = [...act(3, t('Annehmen', 'Accept'), cid('acc', card.rid, card.id)), ...act(2, t('Zurück an Claude', 'Back to Claude'), cid('ret', card.rid, card.id))];
+  else if (acts && w && w.type === 'idle') actions = act(1, t('Anweisung an Claude', 'Instruction for Claude'), cid('ins', card.rid, card.id));
+  const ship = [...list].reverse().find((e) => e.type === 'ship');
+  const links = ship && /^https:\/\//.test(ship.commitUrl || '') ? [[t('Commit auf GitHub', 'Commit on GitHub'), ship.commitUrl]] : [];
+  const keep = Number(cfg.cleanup && cfg.cleanup.seconds) || 0;
+  const { start, last } = spanOf(list, now.getTime());
+  const foot = tone === 'done' ? [dur(last - start, t), cost, !waits && keep ? t(`verschwindet in ${dur(keep * 1000, t)}`, `disappears in ${dur(keep * 1000, t)}`) : '']
+    : w && w.type === 'perm' ? [t('Freigeben in Claude Code', 'Approve in Claude Code')]
+      : w && w.type === 'question' ? [t('Antworten in Claude Code oder im Board', 'Answer in Claude Code or the board')]
+        : tone === 'review' ? [cost, acts ? t('Abnehmen hier, im Board oder mit works done', 'Accept here, in the board or with works done') : t('Abnehmen im Board oder mit works done', 'Accept in the board or with works done')]
+          : [cost];
+  const which = w && w.type === 'perm' ? cut(w.tool || t('Werkzeug', 'tool'), 40) : '';
+  const text = !w ? '' : w.type === 'perm' ? t(`${p} wartet auf deine Freigabe (${which})`, `${p} is waiting for your approval (${which})`)
+    : w.type === 'idle' ? t(`${p}: Claude ist fertig und wartet auf dich`, `${p}: Claude is done and waiting for you`)
+      : w.type === 'question' ? t(`${p}: Frage zu ${card.id}`, `${p}: question about ${card.id}`) : '';
+  const at = !!text && !!owner && !!(cfg.events[w.type] && cfg.events[w.type].at) && !isQuiet(cfg, now);
+  const [dot, color] = TONE[tone];
+  const e = { color, title: cut(`${tone === 'done' ? '✓ ' : ''}${label(cfg, card.id, card.title || task.title)}`, 256), description: trimTo(`${dot ? `${dot} ` : ''}**${line}**`, 4000), image: { url: 'attachment://works.png' } };
+  if (p) e.author = { name: p };
+  const ft = foot.filter(Boolean).join(' · ');
+  if (ft) e.footer = { text: trimTo(ft, 2048) };
+  return {
+    content: at ? `<@${owner}> ${trimTo(text, 1800)}` : '',
+    embeds: [fit(e)],
+    components: row(links, actions),
+    allowed_mentions: at ? { parse: [], users: [owner] } : { parse: [] },
+    flags: at ? 0 : SILENT,
+  };
+}
+
+// Daten für das Kartenbild (discord-image.mjs, cardPng): Ereignisse auf der Achse vom ersten Eintrag bis jetzt, bei
+// einer erledigten Karte bis zum letzten Ereignis; offene Wartezeiten laufen bis zum Ende der Achse. Rechts Minuten,
+// Schritte (Umsetzungsplan) und Kriterien, Texte in der globalen Sprache.
+export function cardImageData(card, task = {}, now = Date.now(), t = langOf(), cfg = normalizeConfig({})) {
+  const list = entriesOf(card);
+  const done = cardState(card, task, cfg, t).tone === 'done';
+  const { start, last } = spanOf(list, now);
+  const end = done ? Math.max(start, last) : Math.max(now, last);
+  const events = list.map((e) => ({ at: msOf(e.t0, now), until: WAITS.has(e.type) ? (isOpen(e) ? end : msOf(e.until, 0)) : 0, color: KIND[kindOf(e)][0] }));
+  const m = Math.max(0, Math.round((end - start) / 60000));
+  const big = m < 100 ? `${m} MIN` : m < 2880 ? t(`${Math.floor(m / 60)} STD`, `${Math.floor(m / 60)} H`) : t(`${Math.floor(m / 1440)} TAGE`, `${Math.floor(m / 1440)} DAYS`);
+  const pair = (de, en, x) => (x && x[1] ? t(`${de} ${x[0]}/${x[1]}`, `${en} ${x[0]}/${x[1]}`) : '');
+  return {
+    start, end, events,
+    right: [big, pair('SCHRITTE', 'STEPS', task.steps), pair('KRITERIEN', 'CRITERIA', task.crit)].filter(Boolean),
+    legend: [['START/SHIP', KIND.ship[0]], [t('WARTET AUF DICH', 'WAITING FOR YOU'), KIND.wait[0]], ['TESTS/REVIEW', KIND.result[0]]],
+  };
+}
 
 // ---------- Stand eines Projekts ----------
 
@@ -336,14 +480,19 @@ function tasksPart(root) {
   const all = loadTasks(root);
   const live = all.filter((t) => !t._archived);
   const byId = new Map(live.map((t) => [t.id, t]));
-  const crit = (t) => { const c = checkboxes(getSection(t._body, 'Akzeptanzkriterien') || ''); return [c.done, c.total]; };
+  const count = (heading) => (t) => { const c = checkboxes(getSection(t._body, heading) || ''); return [c.done, c.total]; };
+  const crit = count('Akzeptanzkriterien');
+  // Schritte für das Kartenbild (W-0050): Umsetzungsplan.
+  const steps = count('Umsetzungsplan');
   const tasks = {};
   for (const t of live) {
     const q = openQuestions(t);
-    tasks[t.id] = { id: t.id, title: t.title, status: t.status, priority: t.priority, q: q.length, lastQ: q.length ? q[q.length - 1].text : '', source: t.source || '', crit: crit(t) };
+    tasks[t.id] = { id: t.id, title: t.title, status: t.status, priority: t.priority, q: q.length, lastQ: q.length ? q[q.length - 1].text : '', source: t.source || '', crit: crit(t), steps: steps(t) };
   }
   const st = loadState(root);
   let active = st.active && byId.get(st.active);
+  // Woran Claude zuletzt war, auch im Review (W-0050): dorthin gehört „fertig und wartet“ wie die Freigabe.
+  const focus = active && OPEN_STATUSES.includes(active.status) ? active : null;
   if (!active || active.status !== 'in-arbeit') active = live.find((t) => t.status === 'in-arbeit');
   const queueIds = queueOf(config).filter((id) => byId.has(id) && OPEN_STATUSES.includes(byId.get(id).status));
   // Als Nächstes: Warteschlange ohne das, was schon läuft; sonst die wichtigsten offenen Aufgaben.
@@ -361,6 +510,7 @@ function tasksPart(root) {
       name: path.basename(root),
       tasks,
       active: active ? { id: active.id, title: active.title, crit: crit(active) } : null,
+      focus: focus || active ? { id: (focus || active).id, title: (focus || active).title } : null,
       queueIds,
       queue: nextList.slice(0, 2).map((t) => ({ id: t.id, title: t.title })),
       progress: { done: counted.filter((t) => t.status === 'erledigt').length, wip: live.filter((t) => ['in-arbeit', 'review'].includes(t.status)).length, total: counted.length },
@@ -393,7 +543,8 @@ export function snapshotOf(root, cache = null) {
     perm: perms[0] || null,
     perms,
     // Kosten stehen in Kanalnachrichten: Format der globalen Sprache.
-    today: { done: part.doneToday, cost: usage.today.cost > 0 ? fmtCost(usage.today.cost, usage.currency, language(null)) : '' },
+    // value und currency: Summe über alle Projekte im Panel (W-0050).
+    today: { done: part.doneToday, cost: usage.today.cost > 0 ? fmtCost(usage.today.cost, usage.currency, language(null)) : '', value: usage.today.cost || 0, currency: usage.currency },
     costs: Object.fromEntries(Object.entries(usage.byTask).filter(([, v]) => v.cost > 0).map(([k, v]) => [k, fmtCost(v.cost, usage.currency, language(null))])),
   };
 }
@@ -407,7 +558,8 @@ function commitUrl(root, sha) {
 
 // ---------- Bot ----------
 
-const emptyState = () => ({ projects: {}, msgs: {}, queue: [], open: {}, ships: {}, ci: {}, frozen: {}, sent: {}, dash: {} });
+// cards: Karte je Aufgabe (W-0050) unter card:<rid>:<id> mit Einträgen je ursprünglichem Schlüssel; history: Verlauf.
+const emptyState = () => ({ projects: {}, msgs: {}, queue: [], open: {}, ships: {}, ci: {}, frozen: {}, sent: {}, dash: {}, cards: {}, history: [] });
 const DAY = 86400000;
 
 export class Bot {
@@ -427,6 +579,8 @@ export class Bot {
     // Bild je Kanal (nur im Speicher: nach einem Neustart wird es neu gezeichnet und das Dashboard einmal bearbeitet,
     // so fällt auch ein gelöschtes Dashboard auf). setStatus: Status des Bots, nur mit Gateway.
     this.images = new Map();
+    // Bild je Karte (W-0050), ebenfalls nur im Speicher: { sig, at, png }.
+    this.cardImgs = new Map();
     this.setStatus = null; this.statusText = null; this.statusAt = 0;
     this.retryAt = 0;
     this.dirty = false;
@@ -456,10 +610,83 @@ export class Bot {
   }
 
   // Nachricht anlegen oder bearbeiten. Eine spätere Fassung derselben Nachricht ersetzt eine noch wartende.
+  // Ereignisse mit Aufgabe (W-0050) werden ein Eintrag der Karte card:<rid>:<id>, die als Ganzes rausgeht; ein neuer
+  // wartender Eintrag schickt sie neu (resend), damit Discord benachrichtigt. Eine Nachricht, die schon als einzelne
+  // verschickt ist (vor W-0050), bleibt einzeln.
   upsert(key, ev, rid, cfg) {
-    this.state.queue = this.state.queue.filter((q) => q.key !== key);
-    this.state.queue.push({ key, ev, rid, channel_id: this.channelFor(rid, cfg) });
+    this.remember(key, ev, rid);
+    let qk = key;
+    let resend = false;
+    if (rid && ev.id && CARD.has(ev.type) && !this.state.msgs[key]) {
+      qk = `card:${rid}:${ev.id}`;
+      const c = this.state.cards[qk] || (this.state.cards[qk] = { rid, id: ev.id, entries: {} });
+      const prev = c.entries[key];
+      resend = !prev && waiting(ev);
+      c.entries[key] = { ...ev, t0: (prev && prev.t0) || ev.since || ev.started || ev.at || new Date().toISOString(), u: Date.now() };
+      if (ev.title) c.title = ev.title;
+      if (ev.project) c.project = ev.project;
+      // ponytail: höchstens 40 Einträge je Karte, die ältesten erledigten fallen raus (Achse und Verlauf bleiben lesbar).
+      const keys = Object.keys(c.entries);
+      for (const k of keys.slice(0, Math.max(0, keys.length - 40))) if (!waiting(c.entries[k])) delete c.entries[k];
+    }
+    const old = this.state.queue.find((q) => q.key === qk);
+    this.state.queue = this.state.queue.filter((q) => q !== old);
+    const channel_id = this.channelFor(rid, cfg);
+    this.state.queue.push(qk === key ? { key, ev, rid, channel_id } : { key: qk, card: true, resend: resend || !!(old && old.resend), rid, channel_id });
     this.dirty = true;
+  }
+
+  // Verlauf (W-0050): die neueste Fassung je Nachricht oder Karteneintrag mit dem Zeitpunkt des Ereignisses, neueste
+  // zuerst, höchstens 7 Tage und 300 Einträge; steht in state.json und übersteht so einen Neustart.
+  remember(key, ev, rid) {
+    const h = this.state.history || [];
+    const i = h.findIndex((x) => x.k === key);
+    const at = i >= 0 ? h[i].at : ev.since || ev.started || ev.at || new Date().toISOString();
+    if (i >= 0) h.splice(i, 1);
+    h.push({ k: key, rid, at, ev: { ...ev } });
+    const old = Date.now() - 7 * DAY;
+    this.state.history = h.filter((x) => msOf(x.at, 0) > old).sort((a, b) => msOf(b.at, 0) - msOf(a.at, 0)).slice(0, 300);
+  }
+
+  // Stand der Aufgabe einer Karte aus dem Snapshot des Projekts, leer, wenn es sie (dort) nicht mehr gibt.
+  taskOf(c) {
+    const pr = this.state.projects[c.rid];
+    const x = pr && pr.snap && pr.snap.tasks && pr.snap.tasks[c.id];
+    const cost = pr && pr.snap && pr.snap.costs ? pr.snap.costs[c.id] || '' : '';
+    return x ? { title: x.title, status: x.status, crit: x.crit, steps: x.steps, cost } : { cost };
+  }
+
+  // Die Karte bleibt stehen, solange ein Eintrag auf dich wartet oder die Aufgabe offen ist.
+  cardWaits(c) { return Object.values(c.entries || {}).some(waiting) || OPEN_STATUSES.includes(this.taskOf(c).status); }
+  // Aktiv: Achse und Minuten laufen, das Bild wird alle 5 Minuten neu gezeichnet.
+  cardActive(c) { return Object.values(c.entries || {}).some(waiting) || ['in-arbeit', 'review'].includes(this.taskOf(c).status); }
+
+  // Körper und Bild einer Karte; das Bild neu bei geänderten Einträgen oder Aufgabe, sonst höchstens alle 5 Minuten.
+  cardMessage(key, c, cfg) {
+    const task = this.taskOf(c);
+    const waits = this.cardWaits(c);
+    const body = renderCard(c, cfg, { owner: cfg.owner_id, interactive: this.interactive, task, waits });
+    const now = Date.now();
+    const sha = (x) => crypto.createHash('sha1').update(JSON.stringify(x)).digest('hex');
+    const sig = sha({ e: c.entries, s: task.steps, c: task.crit, st: task.status, l: language(null) });
+    let img = this.cardImgs.get(key);
+    if (!img || img.sig !== sig || now - img.at >= CARD_IMAGE_MIN) {
+      img = { sig, at: now, png: cardPng(cardImageData(c, task, now, langOf(), cfg)) };
+      this.cardImgs.set(key, img);
+    }
+    return { body, waits, files: [{ name: 'works.png', type: 'image/png', data: img.png }], hash: sha({ body, at: img.at }) };
+  }
+
+  // Laufende Karten alle 5 Minuten neu zeichnen (Minuten, Achse bis jetzt), auch ohne neues Ereignis.
+  refreshCards() {
+    for (const [k, m] of Object.entries(this.state.msgs)) {
+      const c = k.startsWith('card:') ? this.state.cards[k] : null;
+      if (!c || m.done || !this.cardActive(c)) continue;
+      const img = this.cardImgs.get(k);
+      if (img && Date.now() - img.at < CARD_IMAGE_MIN) continue;
+      if (this.state.queue.some((q) => q.key === k)) continue;
+      this.state.queue.push({ key: k, card: true, rid: c.rid, channel_id: m.channel_id });
+    }
   }
 
   event(rid, type, data, cfg, key = `${type}:${rid}:${data.id || ''}:${Date.now()}:${crypto.randomBytes(2).toString('hex')}`) {
@@ -560,11 +787,14 @@ export class Bot {
         const slot = `review:${rid}:${t.id}`;
         const op = this.state.open[slot];
         const accepted = t.status === 'erledigt';
-        if (op) { this.upsert(op.key, { ...op.ev, state: accepted ? 'accepted' : 'returned', at: new Date().toISOString() }, rid, cfg); delete this.state.open[slot]; }
+        const now = new Date().toISOString();
+        if (op) { this.upsert(op.key, { ...op.ev, state: accepted ? 'accepted' : 'returned', at: now, until: now }, rid, cfg); delete this.state.open[slot]; }
         delete (this.state.sent[rid] || {})[`review:${t.id}`];
         if (accepted) { this.once(rid, `done:${t.id}`); this.addRecent(rid, langOf()(`${t.id} angenommen`, `${t.id} accepted`)); }
         else if (OPEN_STATUSES.includes(t.status)) this.event(rid, 'returned', base, cfg);
       } else if (o.status !== 'erledigt' && t.status === 'erledigt' && !this.shipping(rid, t.id) && this.once(rid, `done:${t.id}`)) this.event(rid, 'done', base, cfg);
+      // W-0050: Wechsel auf in Arbeit beginnt die Karte; zurück aus dem Review meldet schon returned.
+      if (t.status === 'in-arbeit' && !['in-arbeit', 'review'].includes(o.status)) this.event(rid, 'start', base, cfg);
       if (t.q > o.q && this.once(rid, `question:${t.id}:${String(t.lastQ).slice(0, 80)}`)) {
         const r = this.event(rid, 'question', { ...base, text: t.lastQ, q: t.q }, cfg);
         if (r) this.state.open[`question:${rid}:${t.id}`] = { ...r, rid };
@@ -582,7 +812,8 @@ export class Bot {
       this.schedule(`perm:${rid}:${p.slot}`, `perm:${rid}:${p.slot}:${p.since}`, rid, 'perm', this.permData(p, next), Date.now() + cfg.delays.perm * 1000);
     }
     if (!next.busy && next.idleSince && (prev.busy || prev.idleSince !== next.idleSince)) {
-      const act = next.active ? { id: next.active.id, title: next.active.title } : {};
+      const a = next.focus || next.active;
+      const act = a ? { id: a.id, title: a.title } : {};
       this.schedule(`idle:${rid}`, `idle:${rid}:${next.idleSince}`, rid, 'idle', { ...act, since: next.idleSince }, Date.now() + cfg.delays.idle * 1000);
     }
   }
@@ -601,7 +832,8 @@ export class Bot {
       }
       const slot = `idle:${rid}`;
       if (!s.busy && s.idleSince && !this.state.open[slot] && !this.timers.has(slot) && fresh(s.idleSince, cfg.delays.idle)) {
-        const act = s.active ? { id: s.active.id, title: s.active.title } : {};
+        const a = s.focus || s.active;
+        const act = a ? { id: a.id, title: a.title } : {};
         this.schedule(slot, `${slot}:${s.idleSince}`, rid, 'idle', { ...act, since: s.idleSince }, Date.parse(s.idleSince) + cfg.delays.idle * 1000);
       }
     }
@@ -663,18 +895,31 @@ export class Bot {
   async flush(cfg) {
     while (this.state.queue.length && Date.now() >= this.retryAt) {
       const op = this.state.queue[0];
-      const known = this.state.msgs[op.key];
-      // done: seit wann die Nachricht erledigt ist (ab da läuft die Frist zum Löschen); 0, solange sie auf dich wartet.
-      const waits = (!op.ev.state || op.ev.state === 'open') && ['perm', 'idle', 'question', 'review'].includes(op.ev.type);
+      let known = this.state.msgs[op.key];
+      const card = op.card ? this.state.cards[op.key] : null;
       try {
-        const body = renderEvent(op.ev, cfg, { owner: cfg.owner_id, rid: op.rid, interactive: this.interactive });
-        if (known) {
-          await this.rest.patch(`/channels/${known.channel_id}/messages/${known.message_id}`, { content: body.content, embeds: body.embeds, components: body.components, allowed_mentions: body.allowed_mentions });
-          known.done = waits ? 0 : known.done || Date.now();
-        } else {
-          const ch = op.channel_id || this.channelFor(op.rid, cfg);
-          const m = await this.rest.post(`/channels/${ch}/messages`, body);
-          this.state.msgs[op.key] = { channel_id: ch, message_id: m.id, at: new Date().toISOString(), done: waits ? 0 : Date.now() };
+        // Karte (W-0050) mit Bild; eine schon aufgeräumte Karte gibt es nicht mehr.
+        const m = card ? this.cardMessage(op.key, card, cfg) : op.card ? null
+          : { body: renderEvent(op.ev, cfg, { owner: cfg.owner_id, rid: op.rid, interactive: this.interactive }), waits: waiting(op.ev) };
+        if (m) {
+          // done: seit wann die Nachricht erledigt ist (ab da läuft die Frist zum Löschen); 0, solange sie wartet.
+          const { body, waits, files, hash } = m;
+          const attachments = files ? { attachments: [{ id: 0, filename: 'works.png' }] } : {};
+          // Neuer wartender Eintrag: alte Fassung löschen, die Karte kommt neu nach unten und benachrichtigt.
+          if (known && op.resend) {
+            if (!await this.remove(known.channel_id, known.message_id)) return;
+            delete this.state.msgs[op.key];
+            known = undefined;
+          }
+          if (known) {
+            if (!hash || known.h !== hash) await this.rest.patch(`/channels/${known.channel_id}/messages/${known.message_id}`, { content: body.content, embeds: body.embeds, components: body.components, allowed_mentions: body.allowed_mentions, ...attachments }, files);
+            known.done = waits ? 0 : known.done || Date.now();
+            if (hash) known.h = hash;
+          } else {
+            const ch = op.channel_id || this.channelFor(op.rid, cfg);
+            const r = await this.rest.post(`/channels/${ch}/messages`, { ...body, ...attachments }, files);
+            this.state.msgs[op.key] = { channel_id: ch, message_id: r.id, at: new Date().toISOString(), done: waits ? 0 : Date.now(), ...(hash ? { h: hash } : {}) };
+          }
         }
       } catch (e) {
         if (e.retry) { this.retryAt = Date.now() + RETRY; this.log(e.message); return; }
@@ -765,7 +1010,13 @@ export class Bot {
   // Aufräumen (W-0044): Nachrichten nach der Frist löschen, gezählt ab ihrer Erledigung; wartende bleiben. Eine je
   // Durchgang (30 in der Minute): Der gemeinsame Bot erlaubt 60, und nach einer langen Pause laufen viele Fristen
   // gleichzeitig ab. Einträge von vor W-0044 haben kein done: erledigt ab dem Senden.
+  // Karten (W-0050): erledigt, sobald kein Eintrag mehr wartet und die Aufgabe nicht mehr offen ist, auch ohne neues
+  // Ereignis (verworfen, gelöscht, Projekt weg); gelöscht samt ihrem Stand.
   async cleanup(cfg) {
+    for (const [k, v] of Object.entries(this.state.msgs)) {
+      const c = k.startsWith('card:') ? this.state.cards[k] : null;
+      if (c && !v.done && !this.cardWaits(c)) { v.done = Date.now(); this.dirty = true; }
+    }
     const secs = Number(cfg.cleanup && cfg.cleanup.seconds) || 0;
     if (secs <= 0) return;
     const limit = Date.now() - secs * 1000;
@@ -778,6 +1029,8 @@ export class Bot {
       n++;
       if (!await this.remove(v.channel_id, v.message_id)) return;
       delete this.state.msgs[k];
+      delete this.state.cards[k];
+      this.cardImgs.delete(k);
       this.dirty = true;
     }
   }
@@ -824,7 +1077,12 @@ export class Bot {
     const now = Date.now();
     // Gemerkte Nachrichten bleiben, bis das Aufräumen sie gelöscht hat (spätestens Frist plus eine Woche).
     const keep = ((Number(cfg && cfg.cleanup && cfg.cleanup.seconds) || 0) * 1000) + 7 * DAY;
-    for (const [k, v] of Object.entries(this.state.msgs)) if (Date.parse(v.at) < now - keep && !Object.values(this.state.open).some((o) => o.key === k)) delete this.state.msgs[k];
+    // Karten einer offenen Aufgabe bleiben, solange sie dauert (W-0050).
+    for (const [k, v] of Object.entries(this.state.msgs)) if (Date.parse(v.at) < now - keep && !Object.values(this.state.open).some((o) => o.key === k) && !(this.state.cards[k] && this.cardWaits(this.state.cards[k]))) delete this.state.msgs[k];
+    // Karten ohne Nachricht und ohne ausstehendes Senden (verworfen, längst aufgeräumt) braucht niemand mehr.
+    for (const k of Object.keys(this.state.cards)) if (!this.state.msgs[k] && !this.state.queue.some((q) => q.key === k)) { delete this.state.cards[k]; this.cardImgs.delete(k); }
+    const old = now - 7 * DAY;
+    this.state.history = (this.state.history || []).filter((x) => msOf(x.at, 0) > old);
     for (const [k, v] of Object.entries(this.state.ships)) if (Date.parse(v.ended || v.started) < now - DAY) delete this.state.ships[k];
     for (const m of Object.values(this.state.sent)) for (const [k, t] of Object.entries(m)) if (now - t > DAY) delete m[k];
   }
@@ -850,6 +1108,7 @@ export class Bot {
     this.forget(present);
     if (!this.restored) this.restoreTimers(cfg);
     this.fireTimers(cfg);
+    this.refreshCards();
     if (this.dirty) this.save();
     for (const f of done) { try { fs.unlinkSync(f); } catch { /* schon weg */ } }
     await this.flush(cfg);
