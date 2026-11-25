@@ -3,13 +3,13 @@ id: W-0057
 title: Offenes Board wechselt immer sofort zum Hub, wenn ein weiteres startet
 type: feature
 priority: P2
-status: review
+status: erledigt
 effort: S
 risk:
 created: 2026-11-25
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: feature/w-0057-offenes-board-wechselt-immer
 tags: [board, hub]
@@ -54,9 +54,7 @@ Wunsch des Nutzers am 2026-11-25 (nach W-0049): Ist ein Board offen und startet 
 - [x] Soll der Wechsel zum Hub warten, solange im Board ungespeicherte Eingaben offen sind (etwa ein angefangener Abschnitt oder Kommentar)? Heute springt der Tab sofort, wie schon bei W-0049, und die Eingabe geht verloren. Vorschlag: warten bis gespeichert oder verworfen, wie beim Neuladen nach einem Update. Antwort: Ja, warten bis gespeichert oder verworfen, wie beim Neuladen nach einem Update. Verlorene Eingaben wären ein Fehler. Entschieden von Claude nach der Vorgabe des Nutzers vom 2026-11-25, solche Dinge selbst zu entscheiden.
 
 ## Übergabe
-Stand: 2026-11-25 18:34
-
-Zwei Commits im Branch feature/w-0057-offenes-board-wechselt-immer: 9345506 (neuer Server schickt offene Tabs der anderen Boards per event: hub zum Hub, nicht bei takeover; umgeleiteter Start immer; 5-s-Abfrage über Kennungen mit Ausgangsstand und 2-min-Neustartfenster) und der Folge-Commit (Wechsel wartet bei ungespeicherter Eingabe bis Speichern oder Verwerfen, gemeinsamer Mechanismus whenSaved mit dem Update-Neuladen, das jetzt ebenfalls nach Verwerfen läuft). Doku in references/board.md, de/board.md, cli.md, de/cli.md. Tests grün: voll mit Browser 63/63, ohne WebSocket 54/54, schnell 7/7. Offen: ?from=hub steht noch in den Hub-Links ohne Wirkung (für W-0054 belassen); works shot zählt als Start wie jeder andere. Nichts gemergt oder gepusht.
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
@@ -76,3 +74,4 @@ Zwei Commits im Branch feature/w-0057-offenes-board-wechselt-immer: 9345506 (neu
 - 2026-11-25: Nach Antwort des Nutzers: Wechsel zum Hub wartet bei ungespeicherter Eingabe bis Speichern oder Verwerfen. Umgesetzt über denselben Mechanismus wie das Update-Neuladen (whenSaved/runWhenSaved ersetzt updateWaiting); Prüfung nach run() und jede Sekunde, damit Verwerfen zählt (gilt jetzt auch fürs Update-Neuladen). Hub-Wechsel geht vor einem wartenden Neuladen. Neuer Browser-Schritt war vorher rot. Tests: W-0057-Schritte mit Browser 3/3, schnell 7/7, voll mit Browser 63/63, ohne WebSocket 54/54. Zwischendurch rot nur im Teillauf --only, weil dort im Projekt keine Karte lag (Testaufbau, behoben).
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Parallele Arbeit beendet
+- 2026-11-25: Abgeschlossen (Status: review → erledigt), DoD bestätigt
