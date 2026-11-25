@@ -92,7 +92,7 @@ Then in Discord, in the channel works should post to: `/works link` (shown as `/
 
 ## Operation
 
-- Update: `git pull && docker compose up -d --build`
+- Update: `git pull && docker compose up -d --build`. The service registers `/works` when it starts, so new subcommands of the works plugin (such as `/works history` from W-0050) appear only after this restart; buttons work without it.
 - Logs: `docker compose logs -f works-bot`. They contain no tokens, keys or message contents.
 - Backup: the volume `works-bot-data` (`links.json`). Without it, every device has to link again.
 - Revoke: in Discord `/works unlink` in the channel (all devices there), or `works discord unlink` on a computer. `/works help` lists the linked devices of a server, broken ones marked.
@@ -112,7 +112,7 @@ Then in Discord, in the channel works should post to: `/works link` (shown as `/
 | Discord bans | Discord bans an IP after 10 000 answers with 401, 403 or 429 in 10 minutes. The service paces all calls (40 per second) and pauses posting for everyone above 5 000 such answers. |
 | Mentions | Only the user who ran `/works link`, never `@everyone` or roles. |
 | Commands and buttons | Only the user who ran `/works link` may use them; everyone else gets a refusal. Clicks go to the device that wrote the message, commands to the device of whoever typed them in the channel that was active last. Devices may only attach buttons and select menus with the works scheme (`w:…`), so a click can never reach another device. The interaction token stays in the service; answers are visible only to the person who clicked. |
-| Files | Only the dashboard image: one PNG of at most 256 KB per message, sent as base64 in JSON and passed on to Discord. |
+| Files | Only the images of the dashboard and the task cards: one PNG of at most 256 KB per message, sent as base64 in JSON and passed on to Discord. |
 | Contents | Messages pass through, nothing is stored except which message belongs to which key (30 days). |
 
 ## Limits
@@ -122,7 +122,7 @@ Then in Discord, in the channel works should post to: `/works link` (shown as `/
 
 ## Commands and buttons
 
-`/works help`, `link` and `unlink` are answered by the service. `status`, `tasks`, `new` and `instruct` and every click go to a device: the service answers Discord at once with a deferred reply (Discord waits only 3 seconds) and puts the request into the device's inbox. Dialogs (back to Claude, instruction, new task) cannot be deferred, the service opens them itself; the device gets the answer from the dialog. works fetches its inbox with a long poll and answers through the service. If no device fetches a request within 10 seconds, the service tells the user that the computer seems to be off, or that works there needs an update if that device never asked for its inbox.
+`/works help`, `link` and `unlink` are answered by the service. `status`, `tasks`, `new`, `instruct` and `history` and every click go to a device: the service answers Discord at once with a deferred reply (Discord waits only 3 seconds) and puts the request into the device's inbox. Dialogs (back to Claude, instruction, new task) cannot be deferred, the service opens them itself; the device gets the answer from the dialog. works fetches its inbox with a long poll and answers through the service. If no device fetches a request within 10 seconds, the service tells the user that the computer seems to be off, or that works there needs an update if that device never asked for its inbox.
 
 ## API
 

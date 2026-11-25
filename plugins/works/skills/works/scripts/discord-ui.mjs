@@ -14,6 +14,8 @@ export const DOCS = 'https://github.com/MecryTv/mycron/blob/main/plugins/works/s
 // custom_id an Knöpfen und Dialogen: w:<aktion>:<projekt>:<aufgabe>. Projekt ist die rootId (16 hex), Aufgabe eine ID
 // wie W-0037, beides darf fehlen. Aktionen: acc annehmen, ret zurück an Claude, ins Anweisung, new neue Aufgabe,
 // bug Bug ansehen. Antworten aus einem Dialog tragen die Aktion mit m (retm, insm, newm).
+// Verlauf (W-0050): hist Seite, histv Eintrag ansehen, histp Projekt, histr Zeitraum; der dritte Teil trägt dort
+// Zeitraum und Seite (d-0: 24 Stunden, Seite 0; t 3 Tage, w 7 Tage).
 export const CID_RE = /^w:([a-z]{2,8}):([0-9a-f]{0,16}):([A-Za-z]{1,10}-\d{1,6})?$/;
 export const MODAL = new Set(['ret', 'ins', 'new']);
 export const cid = (act, rid = '', id = '') => `w:${act}:${rid || ''}:${id || ''}`;
@@ -56,6 +58,7 @@ export function commands({ shared = false } = {}) {
       project(),
       opt(3, 'task', 'aufgabe', 'Task ID, otherwise the task in progress', 'Aufgaben-ID, sonst die Aufgabe in Arbeit', { max_length: 20 }),
     ] }),
+    opt(1, 'history', 'verlauf', 'Recent messages by project and period, only for you', 'Letzte Nachrichten nach Projekt und Zeitraum, nur für dich', { options: [project()] }),
   ];
   if (shared) {
     subs.push(opt(1, 'link', 'verbinden', 'Get a one-time code to link works to this channel', 'Einmaligen Code erzeugen, um works mit diesem Kanal zu koppeln'));
@@ -75,6 +78,7 @@ export function helpMessage({ locale, shared = false, devices = null } = {}) {
     [c('tasks', 'aufgaben'), t('Offene Aufgaben nach Priorität', 'Open tasks by priority')],
     [c('new', 'neu'), t('Aufgabe notieren (Titel, Priorität)', 'Note a task (title, priority)')],
     [c('instruct', 'anweisung'), t('Anweisung an Claude, kommt beim nächsten Schritt an', 'Instruction for Claude, arrives with the next step')],
+    [c('history', 'verlauf'), t('Letzte Nachrichten nach Projekt und Zeitraum, nur für dich', 'Recent messages by project and period, only for you')],
   ];
   if (shared) {
     lines.push([c('link', 'verbinden'), t('works mit diesem Kanal koppeln (Server verwalten)', 'Link works to this channel (Manage Server)')]);
@@ -82,7 +86,8 @@ export function helpMessage({ locale, shared = false, devices = null } = {}) {
   }
   const fields = [
     { name: t('Befehle', 'Commands'), value: lines.map(([k, v]) => `\`${k}\` ${v}`).join('\n'), inline: false },
-    { name: t('Knöpfe', 'Buttons'), value: t('Annehmen, Zurück an Claude, Anweisung an Claude, Bug ansehen. Nur du kannst sie benutzen.', 'Accept, Back to Claude, Instruction for Claude, View bug. Only you can use them.'), inline: false },
+    { name: t('Knöpfe', 'Buttons'), value: t('Annehmen, Zurück an Claude, Anweisung an Claude, Bug ansehen, Verlauf. Nur du kannst sie benutzen.', 'Accept, Back to Claude, Instruction for Claude, View bug, History. Only you can use them.'), inline: false },
+    { name: t('Karten', 'Cards'), value: t('Je Aufgabe eine Nachricht, die bei jedem Schritt bearbeitet wird. Braucht sie dich, kommt sie neu nach unten.', 'One message per task, edited at every step. When it needs you, it moves down as a new message.'), inline: false },
     { name: t('Klingeln', 'Pings'), value: t('Nur wenn Claude dich braucht, nachts still.', 'Only when Claude needs you, quiet at night.'), inline: true },
     { name: t('Datenschutz', 'Privacy'), value: t('Befehle aus Freigaben nie, Kosten abschaltbar.', 'Never commands from approvals, costs can be hidden.'), inline: true },
     { name: t('Einstellungen', 'Settings'), value: t('Im Board unter Werkzeuge · Discord-Bot oder mit `works discord set`.', 'In the board under Tools · Discord bot or with `works discord set`.'), inline: false },

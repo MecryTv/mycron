@@ -27,14 +27,14 @@ export const INVITE_PERMISSIONS = String((1n << 10n) | (1n << 11n) | (1n << 14n)
 // Ereignisse: on = senden, at = mit Erwähnung (klingelt). Gruppen wie im Entwurf J2, Namen für das Board in eventNames.
 export const EVENT_GROUPS = [
   ['need', ['perm', 'idle', 'question']],
-  ['results', ['review', 'shipped', 'done', 'returned']],
+  ['results', ['start', 'review', 'shipped', 'done', 'returned']],
   ['ci', ['ci_red', 'ci_green']],
   ['plan', ['p1', 'queue_empty', 'report_day', 'report_week']],
 ];
 const eventNames = () => ({
   need: tr('Claude needs you'), results: tr('Results'), ci: 'CI', plan: tr('Planning and reports'),
   perm: tr('Approval waiting'), idle: tr('Done, waiting for you'), question: tr('Question asked'),
-  review: tr('In review'), shipped: tr('Shipped'), done: tr('Done without ship'), returned: tr('Returned'),
+  start: tr('Task started'), review: tr('In review'), shipped: tr('Shipped'), done: tr('Done without ship'), returned: tr('Returned'),
   ci_red: tr('Red, bug created'), ci_green: tr('Green again'),
   p1: tr('New P1'), queue_empty: tr('Queue empty'), report_day: tr('End-of-day report'), report_week: tr('Weekly report'),
 });
@@ -55,15 +55,21 @@ export const DEFAULTS = {
   quiet: { on: true, from: '22:00', to: '07:00' },
   privacy: { commands: false, costs: true, ci_error: true, titles: true },
   delays: { perm: 30, idle: 120 },
-  // Aufräumen (W-0044): Nachrichten außer dem Dashboard nach so vielen Stunden löschen, offene erst nach der Erledigung. 0: nie.
-  cleanup: { hours: 24 },
+  // Aufräumen (W-0044, W-0050): Nachrichten außer dem Dashboard nach so vielen Sekunden löschen; Karten und Offenes
+  // erst ab ihrer Erledigung. 0: nie.
+  cleanup: { seconds: 3600 },
 };
 
 export function normalizeConfig(c = {}) {
   const src = c && typeof c === 'object' ? c : {};
   const out = { ...DEFAULTS, ...src };
   out.events = Object.fromEntries(Object.entries(DEFAULTS.events).map(([k, v]) => [k, { ...v, ...((src.events || {})[k] || {}) }]));
-  for (const k of ['quiet', 'privacy', 'delays', 'cleanup']) out[k] = { ...DEFAULTS[k], ...(src[k] || {}) };
+  for (const k of ['quiet', 'privacy', 'delays']) out[k] = { ...DEFAULTS[k], ...(src[k] || {}) };
+  // Nur noch Sekunden (W-0050): eine alte Frist cleanup.hours gilt nicht mehr, dann der Standard; nur „nie löschen“
+  // (hours 0 ohne seconds) bleibt nie löschen.
+  const cl = src.cleanup || {};
+  const sec = cl.seconds === undefined && cl.hours === 0 ? 0 : Number(cl.seconds);
+  out.cleanup = { seconds: Number.isInteger(sec) && sec >= 0 ? sec : DEFAULTS.cleanup.seconds };
   out.projects = { ...(src.projects || {}) };
   return out;
 }
@@ -238,10 +244,10 @@ export function applySetting(cfg, key, value) {
     if (b === 'from' || b === 'to') { if (!TIME.test(value)) throw new Error(tr('{key}: time as HH:MM.', { key })); cfg.quiet[b] = value; return; }
   }
   if (a === 'privacy' && b in DEFAULTS.privacy && parts.length === 2) { cfg.privacy[b] = bool(value); return; }
-  if (a === 'cleanup' && b === 'hours' && parts.length === 2) {
-    const n = Number(String(value).replace(',', '.'));
-    if (!Number.isFinite(n) || n < 0 || n > 720) throw new Error(tr('{key}: hours from 0 (never delete) to 720.', { key }));
-    cfg.cleanup.hours = n; return;
+  if (a === 'cleanup' && b === 'seconds' && parts.length === 2) {
+    const n = Number(String(value).trim() || 'x');
+    if (!Number.isInteger(n) || n < 0 || n > 2592000) throw new Error(tr('{key}: whole seconds from 0 (never delete) to 2592000 (30 days).', { key }));
+    cfg.cleanup.seconds = n; return;
   }
   if (a === 'events' && b in DEFAULTS.events) {
     if (parts.length === 2) { cfg.events[b].on = bool(value); return; }
@@ -260,7 +266,7 @@ export function applySetting(cfg, key, value) {
     cfg.projects[b] = p;
     return;
   }
-  throw new Error(tr('Unknown setting {key}. Possible: {list}', { key, list: 'autostart, auto_enroll, commands, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, cleanup.hours, event.<name>[.at], project.<id>, project.<id>.channel' }));
+  throw new Error(tr('Unknown setting {key}. Possible: {list}', { key, list: 'autostart, auto_enroll, commands, service, delay.perm, delay.idle, quiet.on, quiet.from, quiet.to, privacy.commands|costs|ci_error|titles, cleanup.seconds, event.<name>[.at], project.<id>, project.<id>.channel' }));
 }
 
 // ---------- Einrichtung, Kanalwahl und Stand: gemeinsam für CLI und Board (W-0038) ----------

@@ -1413,6 +1413,22 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   // (nach einem 403 bleibt das alte stehen, der Bot legt ein neues an).
   const isDash = (e) => /^works · \d+ Projekte?$/.test((e && e.title) || '');
   const dashOf = (name) => embedsOf().filter(({ e }) => isDash(e) && (e.description || '').includes(`**${name}**`)).pop();
+  // Karte je Aufgabe (W-0050): eine Nachricht, deren Titel mit der ID beginnt (erledigt mit ✓ davor); der Zustand
+  // steht in der Beschreibung. cardSays(id, re): die Karte, wenn ihr Zustand passt.
+  const isCardOf = (id) => (e) => new RegExp(`^(✓ )?${id}( |$)`).test((e && e.title) || '');
+  // proj: nur Karten dieses Projekts (zwei Projekte im selben Kanal können dieselbe ID haben).
+  const cardsOf = (id, ch = '11', proj = '') => embedsOf(ch).filter(({ e }) => isCardOf(id)(e) && (!proj || (e.author || {}).name === proj));
+  const cardOf = (id, ch, proj) => cardsOf(id, ch, proj).pop();
+  const cardSays = (id, re, ch, proj) => { const c = cardOf(id, ch, proj); return c && re.test(c.e.description || '') ? c : null; };
+  const descOf = (mid) => { const m = fake.messages.get(mid); return m ? (m.embeds[0] || {}).description || '' : null; };
+  // Der Bot kennt die Aufgabe schon (Stand in state.json): erst dann zählt ein Wechsel auf in Arbeit als Start.
+  const botKnows = (id) => { try { return Object.values(JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')).projects || {}).some((p) => p.snap && p.snap.tasks && p.snap.tasks[id]); } catch { return false; } };
+  const newStarted = async (args) => {
+    const id = (w(['new', ...args]).out.match(/W-\d+/) || [])[0];
+    await dwait(() => botKnows(id), `Bot kennt ${id}`);
+    w(['start', id, '--force']);
+    return id;
+  };
   let dprobe = '';
 
   await step('Discord: Einrichtung, Token nur lokal und nie in der Ausgabe', async () => {
@@ -1472,8 +1488,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       }
       // Anheften ist eine eigene Anfrage nach dem Anlegen: darauf warten, nicht nur auf die Nachricht.
       const st = await dwait(() => { const s = dashOf('projekt'); return s && s.m.pinned ? s : null; }, 'Dashboard mit projekt angeheftet');
+      // Panel nach P2 (W-0050): Zusammenfassung oben, Zeile je Projekt, nur noch das Feld Als Nächstes.
       const names = (st.e.fields || []).map((f) => f.name);
-      expect(names.includes('Heute'), `Felder fehlen: ${names.join(', ')}`);
+      expect(names.join() === 'Als Nächstes', `Felder: ${names.join(', ')}`);
+      expect(/^\*\*.*heute \d+ erledigt.*\*\*\n/.test(st.e.description || ''), `Zusammenfassung fehlt: ${st.e.description}`);
       expect(st.m.attachments.some((a) => a.filename === 'works.png'), 'Bild fehlt');
       expect(st.m.flags & 4096, 'Dashboard nicht still');
       r = await wa(['discord', 'start'], { extraEnv: denv });
@@ -1484,10 +1502,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       // Mehrere Änderungen kurz nacheinander: höchstens wenige Bearbeitungen, am Ende der neue Stand.
       // Eigene, frische Aufgabe: Im vollen Selbsttest sind die ersten Aufgaben schon in Arbeit oder erledigt.
       const before = st.m.edits;
-      dprobe = (w(['new', '--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0];
-      w(['start', dprobe, '--force']);
+      dprobe = await newStarted(['--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']);
       for (let i = 0; i < 5; i++) w(['log', dprobe, `Schritt ${i}`]);
-      await dwait(() => (dashOf('projekt').e.description || '').includes(dprobe), `Dashboard zeigt ${dprobe}`);
+      // Die Zeile nennt die Aufgabe in Arbeit, bei einer noch offenen Freigabe (aus früheren Schritten) deren Aufgabe.
+      await dwait(() => { const d = dashOf('projekt'); return d.m.edits > before && (d.e.description.includes(dprobe) || /Freigabe · .+ · W-\d+/.test(d.e.description)); }, `Dashboard zeigt ${dprobe}`);
       await new Promise((res) => setTimeout(res, 800));
       const edits = dashOf('projekt').m.edits - before;
       expect(edits >= 1 && edits <= 4, `Dashboard ${edits}-mal bearbeitet`);
@@ -1499,57 +1517,63 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     } catch (e) { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); throw e; }
   });
 
-  await step('Discord: Ereignisse mit Feldern, Erwähnung nur bei @, Erledigtes wird bearbeitet', async () => {
+  await step('Discord: Karte je Aufgabe, Erwähnung nur bei @, wartende Schritte kommen neu nach unten (W-0050)', async () => {
     // Eigenständig: Ist ein Schritt davor gescheitert, startet dieser den Bot selbst und legt seine Aufgabe an.
     await wa(['discord', 'start'], { extraEnv: denv, ok: false });
-    if (!dprobe) { dprobe = (w(['new', '--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0]; w(['start', dprobe, '--force']); }
+    if (!dprobe) dprobe = await newStarted(['--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']);
     try {
-      // Review: still, mit Kriterien.
+      // Start auf in Arbeit: die Karte der Aufgabe, still, mit Bild.
+      const st = await dwait(() => cardSays(dprobe, /In Arbeit/), 'Karte In Arbeit');
+      expect(st.m.flags & 4096 && !st.m.content.includes('<@'), 'Start nicht still');
+      expect(st.e.image && st.e.image.url === 'attachment://works.png' && st.m.attachments.some((a) => a.filename === 'works.png' && a.data.subarray(1, 4).toString() === 'PNG'), `Kartenbild fehlt: ${JSON.stringify(st.m.attachments.map((a) => a.filename))}`);
+      has(st.e.title, 'Discord-Probe', 'Titel der Aufgabe in der Karte');
+      // Review: wartet auf dich, kommt also neu nach unten; still, mit Kriterien; die alte Fassung ist weg.
       w(['set', dprobe, 'status=review']);
-      const rv = await dwait(() => findMsg((e) => e.title === `${dprobe} im Review`), 'Nachricht Im Review');
+      const rv = await dwait(() => { const c = cardSays(dprobe, /Im Review/); return c && c.m.id !== st.m.id ? c : null; }, 'Karte Im Review neu geschickt');
+      await dwait(() => !fake.messages.has(st.m.id), 'alte Fassung der Karte gelöscht');
       expect(rv.m.flags & 4096, 'Review nicht still');
       expect(!rv.m.content.includes('<@'), 'Review erwähnt');
-      expect((rv.e.fields || []).some((f) => f.name === 'Kriterien'), 'Feld Kriterien fehlt');
-      // Freigabe: Erwähnung, Befehl ausgeblendet.
-      const known = new Set(fake.messages.keys());
+      has(rv.e.description, 'Kriterien', 'Kriterien in der Zustandszeile');
+      // Freigabe: dieselbe Karte neu mit Erwähnung, Befehl ausgeblendet.
       hook('permission.mjs', { cwd: proj, session_id: 's-d', tool_name: 'Bash', tool_input: { command: 'echo geheim-4711' } });
-      const pm = await dwait(() => findMsg((e, m) => e.title === 'Wartet auf deine Freigabe' && !known.has(m.id)), 'Nachricht Freigabe');
+      const pm = await dwait(() => { const c = cardSays(dprobe, /Wartet auf deine Freigabe/); return c && c.m.id !== rv.m.id ? c : null; }, 'Karte mit Freigabe');
       has(pm.m.content, '<@4242>', 'Erwähnung');
       expect(pm.m.allowed_mentions && JSON.stringify(pm.m.allowed_mentions.users) === '["4242"]', `allowed_mentions: ${JSON.stringify(pm.m.allowed_mentions)}`);
       expect(!(pm.m.flags & 4096), 'Freigabe still');
       expect(!JSON.stringify(pm.m).includes('geheim-4711'), 'Befehl trotz Datenschutz gezeigt');
-      // Freigabe erledigt: dieselbe Nachricht wird grau, ohne Erwähnung im Text.
+      expect(cardsOf(dprobe).length === 1, `${cardsOf(dprobe).length} Karten für ${dprobe}`);
+      // Freigabe erledigt, Claude fertig: die Karte wartet wieder auf dich und kommt erneut nach unten.
       hook('stop-reminder.mjs', { cwd: proj, session_id: 's-d' });
-      await dwait(() => /beantwortet/.test(fake.messages.get(pm.m.id).embeds[0].title || ''), 'Freigabe als beantwortet bearbeitet');
-      // Fertig und wartet: nach setIdle, Verzögerung 0.
-      const fin = await dwait(() => findMsg((e) => e.title === 'Claude ist fertig und wartet auf dich'), 'Nachricht fertig');
+      const fin = await dwait(() => { const c = cardSays(dprobe, /fertig und wartet auf dich/); return c && c.m.id !== pm.m.id ? c : null; }, 'Karte fertig und wartet');
       has(fin.m.content, '<@4242>');
+      // Neue Anfrage: dieselbe Nachricht wird bearbeitet, die Karte zeigt wieder das offene Review, ohne Erwähnung.
       hook('prompt-submit.mjs', { cwd: proj, session_id: 's-d', prompt: 'weiter' });
-      await dwait(() => /weiter/i.test(fake.messages.get(fin.m.id).embeds[0].title || ''), 'Fertig-Nachricht nach neuer Anfrage bearbeitet');
-      // Review angenommen: Review-Nachricht wird grün bearbeitet statt einer neuen.
+      await dwait(() => /Im Review/.test(descOf(fin.m.id) || '') && !fake.messages.get(fin.m.id).content.includes('<@'), 'Karte nach neuer Anfrage bearbeitet');
+      // Angenommen: dieselbe Nachricht, erledigt mit ✓, ohne Knöpfe.
       w(['done', dprobe, '--confirm', '--force', '--reason=Selbsttest']);
-      await dwait(() => /angenommen/.test(fake.messages.get(rv.m.id).embeds[0].title || ''), 'Review als angenommen bearbeitet');
-      // Neue P1.
+      await dwait(() => /angenommen/.test(descOf(fin.m.id) || '') && /^✓ /.test(fake.messages.get(fin.m.id).embeds[0].title), 'Karte angenommen');
+      expect(cardsOf(dprobe).length === 1, 'mehr als eine Karte nach dem Abschluss');
+      // Neue P1: Karte der neuen Aufgabe.
       w(['new', '--type=bug', '--title=Server brennt', '--priority=P1']);
-      await dwait(() => findMsg((e) => /Neue P1/.test(e.title || '') && /Server brennt/.test(JSON.stringify(e))), 'Nachricht Neue P1');
+      await dwait(() => findMsg((e) => /Server brennt/.test(e.title || '') && /Neue P1/.test(e.description || '')), 'Karte Neue P1');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
     } catch (e) { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); throw e; }
   });
 
-  await step('Discord: works ship als eine Nachricht, CI rot mit Bug, Wochenbericht', async () => {
+  await step('Discord: works ship in der Karte der Aufgabe, CI rot mit Bug, Wochenbericht', async () => {
     await wa(['discord', 'start'], { extraEnv: denv, ok: false });
     try {
       const emit = (type, data) => w(['discord', 'emit', type, `--json=${JSON.stringify(data)}`], { extraEnv: denv });
       emit('ship', { id: 'W-0001', step: 'start', run: 'r1' });
-      const sh = await dwait(() => findMsg((e) => e.title === 'W-0001 wird ausgeliefert'), 'ship-Nachricht');
+      const sh = await dwait(() => cardSays('W-0001', /Wird ausgeliefert/), 'ship in der Karte');
       emit('ship', { id: 'W-0001', step: 'merge', run: 'r1' });
       emit('ship', { id: 'W-0001', step: 'push', sha: 'abcdef1234567', run: 'r1' });
       emit('ship', { id: 'W-0001', step: 'ci', ok: true, workflows: 3, run: 'r1' });
       emit('ship', { id: 'W-0001', step: 'done', run: 'r1' });
-      await dwait(() => fake.messages.get(sh.m.id).embeds[0].title === 'W-0001 ausgeliefert', 'ship-Nachricht abgeschlossen');
-      const d = fake.messages.get(sh.m.id).embeds[0].description;
-      expect((d.match(/✓/g) || []).length >= 3, `Schritte nicht abgehakt: ${d}`);
-      expect(fake.inChannel('11').filter((m) => /W-0001 (wird )?ausgeliefert/.test((m.embeds[0] || {}).title || '')).length === 1, 'ship als mehrere Nachrichten');
+      await dwait(() => /ausgeliefert abcdef1 · CI grün/.test(descOf(sh.m.id) || ''), 'ship in der Karte abgeschlossen');
+      expect(/^✓ W-0001/.test(fake.messages.get(sh.m.id).embeds[0].title), `ausgelieferte Karte ohne ✓: ${fake.messages.get(sh.m.id).embeds[0].title}`);
+      has(fake.messages.get(sh.m.id).embeds[0].footer.text, 'Min.', 'Minuten in der Fußzeile');
+      expect(cardsOf('W-0001').length === 1, 'ship als mehrere Nachrichten');
       emit('ci', { ok: false, sha: 'feedbeef1234', failed: 2, total: 6, job: 'test (windows)', error: 'AssertionError: expected 3 to be 4', bug: 'W-0099', url: 'https://github.com/a/b/actions/runs/1' });
       const ci = await dwait(() => findMsg((e) => e.title === 'CI rot für feedbee'), 'CI-Nachricht');
       has(JSON.stringify(ci.e.fields), 'W-0099', 'Bug im Feld');
@@ -1601,7 +1625,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const pidFile = path.join(ddir, 'bot.pid');
     const readPid = () => { try { return JSON.parse(fs.readFileSync(pidFile, 'utf8')); } catch { return null; } };
     const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
-    const p1Msgs = (title) => fake.inChannel('11').filter((m) => /Neue P1/.test((m.embeds[0] || {}).title || '') && ((m.embeds[0] || {}).description || '').includes(title));
+    // Neue P1 als Karte (W-0050): Titel der Aufgabe im Titel, Neue P1 in der Zustandszeile.
+    const p1Msgs = (title) => fake.inChannel('11').filter((m) => /Neue P1/.test((m.embeds[0] || {}).description || '') && ((m.embeds[0] || {}).title || '').includes(title));
     const ob = path.join(ddir, 'outbox');
     const obCount = () => (fs.existsSync(ob) ? fs.readdirSync(ob).filter((f) => f.endsWith('.json')).length : 0);
     // Wochenbericht: die Vorschau mit --no-send legt nichts für den Bot ab (Bot ist hier aus).
@@ -1640,7 +1665,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const actF = path.join(proj, '.works', 'activity.json');
       // Aufgabe, die schon im Review ist, wenn der Bot sie zum ersten Mal sieht (W-0039: langsame Runner).
       const direct = nid(w(['new', '--type=chore', '--title=Direkt im Review', '--status', 'review']).out);
-      await dwait(() => findMsg((e) => e.title === `${direct} im Review`), 'Review einer neuen Aufgabe');
+      await dwait(() => cardSays(direct, /Im Review/), 'Review einer neuen Aufgabe');
       const lane = nid(w(['new', '--type=chore', '--title=Bahn-Aufgabe']).out);
       const since = new Date().toISOString();
       const act = JSON.parse(fs.readFileSync(actF, 'utf8'));
@@ -1652,12 +1677,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       lanesNow.lanes = [...(lanesNow.lanes || []), { task: lane, branch: 'feature/bahn', path: path.join(base, 'bahn'), started: since, status: 'läuft' }];
       fs.writeFileSync(lanesF, JSON.stringify(lanesNow));
       fs.writeFileSync(actF, JSON.stringify(act));
-      const lp = await dwait(() => findMsg((e) => e.title === 'Wartet auf deine Freigabe' && JSON.stringify(e.fields || []).includes(lane)), 'Freigabe aus der Bahn');
+      const lp = await dwait(() => cardSays(lane, /Wartet auf deine Freigabe/), 'Freigabe aus der Bahn in der Karte der Aufgabe');
       has(lp.m.content, '<@4242>', 'Erwähnung bei Freigabe aus der Bahn');
       const act2 = JSON.parse(fs.readFileSync(actF, 'utf8'));
       act2.lanes[lane] = { at: new Date().toISOString(), task: lane, tool: 'Bash', verb: 'Führt aus', what: 'npm test', ok: true, lane: true };
       fs.writeFileSync(actF, JSON.stringify(act2));
-      await dwait(() => /beantwortet/.test(fake.messages.get(lp.m.id).embeds[0].title || ''), 'Freigabe aus der Bahn beantwortet');
+      await dwait(() => { const d = descOf(lp.m.id); return d !== null && !/Wartet auf deine Freigabe/.test(d) && !fake.messages.get(lp.m.id).content; }, 'Freigabe aus der Bahn beantwortet');
       if (lanesBefore === null) fs.unlinkSync(lanesF); else fs.writeFileSync(lanesF, lanesBefore);
       // Verzögerte Freigabe überlebt einen Neustart des Bots.
       await wa(['discord', 'set', 'delay.perm=3'], { extraEnv: denv });
@@ -1666,7 +1691,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       await sleep(700);
       await wa(['discord', 'stop'], { extraEnv: denv });
       await wa(['discord', 'start'], { extraEnv: denv });
-      const np = await dwait(() => findMsg((e, m) => e.title === 'Wartet auf deine Freigabe' && m.content.includes('(Read)')), 'Freigabe nach Neustart', 12000);
+      const np = await dwait(() => findMsg((e, m) => /Wartet auf deine Freigabe/.test(`${e.title} ${e.description}`) && m.content.includes('(Read)')), 'Freigabe nach Neustart', 12000);
       expect(np, 'Freigabe nach Neustart fehlt');
       await wa(['discord', 'set', 'delay.perm=0'], { extraEnv: denv });
       hook('prompt-submit.mjs', { cwd: proj, session_id: 's-n', prompt: 'weiter' });
@@ -1711,23 +1736,27 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         // ship: Während des Laufs keine Ereignisse; danach zählt der Vergleich mit dem Stand vor ship.
         const sid = nid(w(['new', '--type=chore', '--title=Ship-Probe'], { cwd: bp }).out);
         w(['set', sid, 'status=review'], { cwd: bp });
-        const rv = await dwait(() => findMsg((e) => e.title === `${sid} im Review`), 'Review Ship-Probe');
+        const rv = await dwait(() => cardSays(sid, /Im Review/, '11', 'dbranch'), 'Review Ship-Probe');
         const emitB = (data) => w(['discord', 'emit', 'ship', `--json=${JSON.stringify({ id: sid, run: 'b1', ...data })}`], { cwd: bp, extraEnv: denv });
         emitB({ step: 'start' });
         // Erst weiter, wenn der Bot den Start verarbeitet hat (feste Pausen reichen auf langsamen Runnern nicht).
-        await dwait(() => findMsg((e) => e.title === `${sid} wird ausgeliefert`), 'ship-Start verarbeitet');
+        await dwait(() => /Wird ausgeliefert/.test(descOf(rv.m.id) || ''), 'ship-Start in der Karte verarbeitet');
         w(['done', sid, '--confirm', '--force', '--reason=Selbsttest'], { cwd: bp });
         w(['new', '--type=bug', '--title=Während-ship', '--priority=P1'], { cwd: bp });
         await sleep(800);
         expect(!p1Msgs('Während-ship').length, 'Ereignis während ship gemeldet');
         // Nach dem Push sind die Git-Schritte vorbei: Der Bot taut auf, auch wenn ship noch auf die CI wartet.
         emitB({ step: 'push', sha: 'abc1234def' });
-        await dwait(() => /angenommen/.test(fake.messages.get(rv.m.id).embeds[0].title || ''), 'Review nach dem Push angenommen');
+        await dwait(() => /angenommen/.test(descOf(rv.m.id) || ''), 'Review nach dem Push angenommen');
         await dwait(() => p1Msgs('Während-ship').length, 'P1 aus der Zeit von ship nach dem Push gemeldet');
         emitB({ step: 'done' });
+        await dwait(() => /ausgeliefert abc1234/.test(descOf(rv.m.id) || ''), 'Karte ausgeliefert');
         await sleep(600);
         expect(p1Msgs('Während-ship').length === 1, 'P1 aus ship doppelt');
-        expect(!findMsg((e) => e.title === `✓ ${sid} erledigt`), 'Ausgelieferte Aufgabe zusätzlich als erledigt gemeldet');
+        // Ausgeliefert, nicht zusätzlich als erledigt: kein Eintrag done in der Karte.
+        const card = (JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')).cards || {})[`card:${rootIdOf(bp)}:${sid}`];
+        expect(card && !Object.keys(card.entries).some((k) => k.startsWith('done:')), `Ausgelieferte Aufgabe zusätzlich als erledigt gemeldet: ${JSON.stringify(card && Object.keys(card.entries))}`);
+        expect(cardsOf(sid, '11', 'dbranch').length === 1, `${cardsOf(sid, '11', 'dbranch').length} Karten für ${sid} in dbranch`);
       }
       expect(!fs.readdirSync(ddir).some((f) => f.endsWith('.tmp')), 'Halbe Zwischendateien im Discord-Ordner');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
@@ -1742,7 +1771,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const { loadTasks } = await import('./lib.mjs');
     // Gemeinsames Modul: Befehle englisch mit deutscher Übersetzung, Dialoge zu Knöpfen, custom_id-Schema.
     const own = ui.commands()[0];
-    expect(own.options.map((o) => o.name).join() === 'help,status,tasks,new,instruct', `Unterbefehle: ${own.options.map((o) => o.name)}`);
+    expect(own.options.map((o) => o.name).join() === 'help,status,tasks,new,instruct,history', `Unterbefehle: ${own.options.map((o) => o.name)}`);
+    expect(own.options.find((o) => o.name === 'history').name_localizations.de === 'verlauf', 'Übersetzung verlauf fehlt');
     expect(own.options.find((o) => o.name === 'tasks').name_localizations.de === 'aufgaben', 'Übersetzung fehlt');
     expect(ui.commands({ shared: true })[0].options.some((o) => o.name === 'link'), 'link fehlt beim gemeinsamen Bot');
     expect(JSON.stringify(ui.parseCid('w:acc:0123456789abcdef:W-0012')) === '{"act":"acc","rid":"0123456789abcdef","id":"W-0012"}', 'parseCid');
@@ -1754,7 +1784,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     await wa(['discord', 'start'], { extraEnv: denv, ok: false });
     try {
       const cmds = await dwait(() => fake.guildCommands.get('1'), 'Befehle für Server 1 registriert');
-      expect(cmds[0].name === 'works' && cmds[0].options.length === 5, `Befehle: ${JSON.stringify(cmds).slice(0, 200)}`);
+      expect(cmds[0].name === 'works' && cmds[0].options.length === 6, `Befehle: ${JSON.stringify(cmds).slice(0, 200)}`);
       // w() blockiert diesen Prozess und damit das Fake-Gateway; der Bot verbindet sich dann neu, und ein Klick in
       // dieser Lücke geht verloren (echtes Discord liefert ihn nach). Kommt keine Eingangsbestätigung, noch einmal.
       const send = async (opts, what) => {
@@ -1792,7 +1822,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       has(fs.readFileSync(path.join(proj, '.works', 'instructions.json'), 'utf8'), 'Bitte zuerst die Tests.', 'Anweisung gespeichert');
       // Review mit Knöpfen. Zurück an Claude öffnet einen Dialog, die Begründung landet als Kommentar.
       w(['set', created.id, 'status=review']);
-      const rv = await dwait(() => findMsg((e) => e.title === `${created.id} im Review`), 'Review-Nachricht');
+      const rv = await dwait(() => cardSays(created.id, /Im Review/), 'Karte im Review');
       const btns = rv.m.components.flatMap((r) => r.components);
       const acc = btns.find((b) => /^w:acc:/.test(b.custom_id || '')); const ret = btns.find((b) => /^w:ret:/.test(b.custom_id || ''));
       expect(acc && ret, `Knöpfe fehlen: ${JSON.stringify(btns)}`);
@@ -1806,19 +1836,19 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       has(JSON.stringify(a.data), 'Claude', 'Bestätigung');
       expect(task(created.id).status === 'in-arbeit', 'Aufgabe nicht zurück in Arbeit');
       has(fs.readFileSync(path.join(task(created.id)._dir, 'comments.md'), 'utf8'), 'Das Handy-Bild fehlt.', 'Begründung als Kommentar');
-      await dwait(() => !fake.messages.get(rv.m.id).components.length, 'Knöpfe nach der Rückgabe weg');
+      await dwait(() => !fake.messages.get(rv.m.id).components.length && /Zurückgegeben/.test(descOf(rv.m.id)), 'Knöpfe nach der Rückgabe weg');
       // Annehmen mit erfüllter DoD: erledigt, die Review-Nachricht wird grün und verliert die Knöpfe.
       const pid = (w(['new', '--type=chore', '--title=Abnahme-Probe', '--criteria=Geprüft']).out.match(/W-\d+/) || [])[0];
       w(['check', pid, '1', '--section=Akzeptanzkriterien']); w(['set', pid, 'status=review']);
-      const rv2 = await dwait(() => findMsg((e) => e.title === `${pid} im Review`), 'Review-Nachricht 2');
+      const rv2 = await dwait(() => cardSays(pid, /Im Review/), 'Karte im Review 2');
       const acc2 = rv2.m.components.flatMap((r) => r.components).find((b) => /^w:acc:/.test(b.custom_id || ''));
       has(JSON.stringify((await ask({ type: 3, customId: acc2.custom_id, messageId: rv2.m.id }, 'Annehmen')).data), 'angenommen');
       expect(task(pid).status === 'erledigt', `Nicht erledigt: ${task(pid).status}`);
-      await dwait(() => /angenommen/.test(fake.messages.get(rv2.m.id).embeds[0].title || '') && !fake.messages.get(rv2.m.id).components.length, 'Review-Nachricht angenommen, ohne Knöpfe');
+      await dwait(() => /angenommen/.test(descOf(rv2.m.id) || '') && !fake.messages.get(rv2.m.id).components.length, 'Karte angenommen, ohne Knöpfe');
       // Fertig und wartet: Knopf Anweisung an Claude öffnet einen Dialog für die aktive Aufgabe.
       w(['start', created.id, '--force']);
       hook('prompt-submit.mjs', { cwd: proj, session_id: 's-k', prompt: 'los' }); hook('stop-reminder.mjs', { cwd: proj, session_id: 's-k' });
-      const fin = await dwait(() => findMsg((e, m) => e.title === 'Claude ist fertig und wartet auf dich' && m.components.length), 'Fertig-Nachricht mit Knopf');
+      const fin = await dwait(() => { const c = cardSays(created.id, /fertig und wartet auf dich/); return c && c.m.components.length ? c : null; }, 'Karte fertig mit Knopf');
       const ins = fin.m.components.flatMap((r) => r.components).find((b) => /^w:ins:/.test(b.custom_id || ''));
       const dlg2 = await ask({ type: 3, customId: ins.custom_id, messageId: fin.m.id }, 'Dialog Anweisung');
       expect(dlg2.type === 9, 'Anweisung ohne Dialog');
@@ -1841,10 +1871,13 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const { loadTasks } = await import('./lib.mjs');
     // Bild: jedes Zeichen der Pixelschrift 5x7, gültiges PNG, gleiche Daten ergeben dasselbe Bild.
     for (const [ch, g] of Object.entries(img.GLYPHS)) expect(g.length === 35, `Zeichen ${ch} hat ${g.length} Punkte`);
-    const data = { projects: [{ name: 'projekt', done: 3, wip: 1, open: 2, color: 0x8e8cf7 }], days: [{ label: 'MO', counts: [2] }] };
+    // Nach P2 (W-0050): Ampel und Aufgabe je Balken, Spuren der letzten 24 Stunden, Woche mit heute.
+    const data = { projects: [{ name: 'projekt', done: 3, wip: 1, open: 2, dot: 0xe8a33d, task: 'W-0041' }], tracks: { labels: [[0, '21:00'], [0.5, '09:00'], [1, 'JETZT']], rows: [[[0.2, 0x23a55a], [0.9, 0xe8a33d]]] }, days: [{ label: 'MO', count: 2 }, { label: 'HEUTE', count: 1, today: true }] };
     const png = img.dashboardPng(data);
-    expect(png.subarray(1, 4).toString() === 'PNG' && png.length < 100 * 1024, `kein kleines PNG (${png.length} Bytes)`);
+    expect(png.subarray(1, 4).toString() === 'PNG' && png.length < 100 * 1024 && png.readUInt32BE(16) === 640, `kein kleines PNG in 640 px (${png.length} Bytes)`);
     expect(Buffer.compare(png, img.dashboardPng(data)) === 0, 'Bild nicht gleich bei gleichen Daten');
+    const many = img.dashboardPng({ ...data, projects: Array.from({ length: 9 }, (_, i) => ({ ...data.projects[0], name: `p${i}` })), tracks: { ...data.tracks, rows: Array.from({ length: 9 }, () => data.tracks.rows[0]) } });
+    expect(many.length < 256 * 1024 && many.readUInt32BE(20) < 1000, `Bild mit vielen Projekten zu groß: ${many.length} Bytes, ${many.readUInt32BE(20)} px hoch`);
     // Ohne Prozess: Aufräumen löscht eine Nachricht je Durchgang (der gemeinsame Bot erlaubt 60 in der Minute),
     // der Status nennt das zuletzt wartende Projekt, die Zeile nennt bei einer Freigabe die Aufgabe.
     const botM = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
@@ -1856,10 +1889,119 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     b.state.queue = []; b.state.open = {};
     await b.cleanup(botM.normalizeConfig({}));
     expect(dels === 1, `${dels} Löschungen in einem Durchgang`);
+    // Karte je Aufgabe ohne Prozess (W-0050): ein Eintrag je Schlüssel, ein neuer wartender schickt die Karte neu,
+    // der Zustand kommt aus dem jüngsten Eintrag, das Bild ist ein kleines PNG in 640 px, eine erledigte Karte
+    // verschwindet nach der Frist samt ihrem Stand.
+    const cfgC = botM.normalizeConfig({ quiet: { on: false } });
+    const kb = new botM.Bot({ rest: { del: async () => {} }, log: () => {} });
+    const task7 = { id: 'W-7', title: 'Karte', status: 'in-arbeit', crit: [1, 2], steps: [2, 5] };
+    Object.assign(kb.state, { msgs: {}, queue: [], open: {}, cards: {}, history: [], projects: { r: { name: 'p', root: 'x', snap: { name: 'p', tasks: { 'W-7': task7 } } } } });
+    const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
+    const ck = 'card:r:W-7';
+    kb.upsert('start:r:W-7:1', { type: 'start', project: 'p', id: 'W-7', title: 'Karte', state: 'open', at: ago(20) }, 'r', cfgC);
+    expect(kb.state.queue.length === 1 && kb.state.queue[0].key === ck && !kb.state.queue[0].resend, `Start: ${JSON.stringify(kb.state.queue)}`);
+    kb.state.queue = [];
+    kb.upsert('perm:r:main:x', { type: 'perm', project: 'p', id: 'W-7', title: 'Karte', tool: 'Bash', since: ago(5), state: 'open', at: ago(4) }, 'r', cfgC);
+    expect(kb.state.queue.length === 1 && kb.state.queue[0].key === ck && kb.state.queue[0].resend, `Freigabe schickt die Karte nicht neu: ${JSON.stringify(kb.state.queue)}`);
+    let cb = botM.renderCard(kb.state.cards[ck], cfgC, { owner: '1', task: task7 });
+    has(cb.embeds[0].description, 'Wartet auf deine Freigabe'); has(cb.content, '<@1>'); has(cb.embeds[0].title, 'W-7 Karte');
+    kb.state.queue = [];
+    kb.upsert('perm:r:main:x', { ...kb.state.cards[ck].entries['perm:r:main:x'], state: 'resolved', until: ago(1) }, 'r', cfgC);
+    expect(kb.state.queue.length === 1 && !kb.state.queue[0].resend, 'beantwortete Freigabe schickt die Karte neu');
+    cb = botM.renderCard(kb.state.cards[ck], cfgC, { owner: '1', task: task7 });
+    has(cb.embeds[0].description, 'In Arbeit'); expect(!cb.content, `Erwähnung nach der Freigabe: ${cb.content}`);
+    expect(Object.keys(kb.state.cards[ck].entries).length === 2, 'Eintrag der Freigabe doppelt');
+    const cdata = botM.cardImageData(kb.state.cards[ck], task7, Date.now());
+    has(cdata.right.join(' '), 'SCHRITTE 2/5'); has(cdata.right.join(' '), 'KRITERIEN 1/2'); has(cdata.right[0], '20 MIN');
+    expect(cdata.events.length === 2 && cdata.events[1].until > cdata.events[1].at, `Ereignisse im Bild: ${JSON.stringify(cdata.events)}`);
+    const cpng = img.cardPng(cdata);
+    expect(cpng.subarray(1, 4).toString() === 'PNG' && cpng.length < 50 * 1024 && cpng.readUInt32BE(16) === 640, `Kartenbild: ${cpng.length} Bytes, ${cpng.readUInt32BE(16)} px breit`);
+    expect(Buffer.compare(cpng, img.cardPng(cdata)) === 0, 'Kartenbild nicht gleich bei gleichen Daten');
+    kb.state.msgs[ck] = { channel_id: '11', message_id: '9', at: ago(60), done: 0 };
+    kb.state.queue = [];
+    await kb.cleanup(botM.normalizeConfig({ cleanup: { seconds: 1 } }));
+    expect(kb.state.msgs[ck] && !kb.state.msgs[ck].done, 'Karte einer offenen Aufgabe gilt als erledigt');
+    task7.status = 'erledigt';
+    await kb.cleanup(botM.normalizeConfig({ cleanup: { seconds: 1 } }));
+    expect(kb.state.msgs[ck] && kb.state.msgs[ck].done, 'erledigte Karte ohne Zeitpunkt der Erledigung');
+    kb.state.msgs[ck].done = Date.now() - 5000;
+    await kb.cleanup(botM.normalizeConfig({ cleanup: { seconds: 1 } }));
+    expect(!kb.state.msgs[ck] && !kb.state.cards[ck], 'erledigte Karte nach der Frist nicht samt Stand gelöscht');
+    // Funde der Code-Durchsicht zu W-0050. Ein Bot ohne Prozess, dessen Projektstand der Test vorgibt.
+    const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+    const fresh = () => {
+      let deletes = 0;
+      const x = new botM.Bot({ rest: { del: async () => { deletes++; } }, log: () => {} });
+      Object.assign(x.state, { msgs: {}, queue: [], open: {}, cards: {}, history: [], sent: {}, ships: {}, frozen: {}, projects: { r: { name: 'p', root: 'x', snap: { name: 'p', tasks: {}, costs: {}, queueIds: [] } } } });
+      return { x, deletes: () => deletes };
+    };
+    const snapWith = (tasks) => ({ name: 'p', tasks, costs: {}, queueIds: [] });
+    const short = botM.normalizeConfig({ cleanup: { seconds: 1 } });
+    // 1. Eine Karte, älter als eine Woche plus Frist, deren Aufgabe gerade erledigt wird: prune vergisst sie nicht vor
+    // dem Löschen, nach der Frist kommt ein DELETE.
+    {
+      const { x, deletes } = fresh();
+      x.state.projects.r.snap = snapWith({ 'W-1': { id: 'W-1', title: 'Alt', status: 'erledigt', q: 0 } });
+      x.state.cards['card:r:W-1'] = { rid: 'r', id: 'W-1', entries: { a: { type: 'p1', id: 'W-1', state: 'open', t0: ago(15 * 1440), u: 1 } } };
+      x.state.msgs['card:r:W-1'] = { channel_id: '11', message_id: '7', at: ago(15 * 1440), done: 0 };
+      await x.cleanup(short); x.prune(short);
+      expect(x.state.msgs['card:r:W-1'] && x.state.cards['card:r:W-1'], 'alte Karte bei der Erledigung vergessen statt gelöscht');
+      await sleepMs(1100); await x.cleanup(short);
+      expect(deletes() === 1 && !x.state.msgs['card:r:W-1'], `alte Karte nach der Frist nicht gelöscht (${deletes()} DELETE)`);
+    }
+    // 2. Frage A, dann Frage B zur selben Aufgabe, beide beantwortet, Aufgabe erledigt: Die Karte wartet nicht mehr und
+    // wird nach der Frist gelöscht. Eine im Review gelöschte Aufgabe und ein weggefallenes Projekt lassen ihre Karte
+    // ebenfalls nicht mehr warten.
+    {
+      const { x, deletes } = fresh();
+      const tq = (q, lastQ, status = 'in-arbeit') => ({ 'W-2': { id: 'W-2', title: 'Fragen', status, q, lastQ, crit: [0, 0] } });
+      x.diffTasks('r', snapWith(tq(0, '')), snapWith(tq(1, 'Frage A')), cfgC);
+      x.diffTasks('r', snapWith(tq(1, 'Frage A')), snapWith(tq(2, 'Frage B')), cfgC);
+      x.state.projects.r.snap = snapWith(tq(0, ''));
+      x.resolve('r', x.state.projects.r.snap, cfgC);
+      x.state.projects.r.snap = snapWith(tq(0, '', 'erledigt'));
+      const c2 = x.state.cards['card:r:W-2'];
+      expect(c2 && Object.keys(c2.entries).length === 2, `Karte mit zwei Fragen fehlt: ${JSON.stringify(c2)}`);
+      x.state.msgs['card:r:W-2'] = { channel_id: '11', message_id: '8', at: ago(5), done: 0 };
+      x.state.queue = [];
+      expect(!x.cardWaits(c2), 'Karte wartet nach zwei beantworteten Fragen und erledigter Aufgabe weiter');
+      has(x.cardMessage('card:r:W-2', c2, cfgC).body.embeds[0].description, 'Erledigt', 'Zustand nach zwei Fragen');
+      await x.cleanup(short); await sleepMs(1100); await x.cleanup(short);
+      expect(deletes() === 1 && !x.state.msgs['card:r:W-2'], 'Karte nach zwei Fragen nicht gelöscht');
+      // Im Review gelöscht.
+      const tr3 = (status) => ({ 'W-3': { id: 'W-3', title: 'Weg', status, q: 0, crit: [0, 0] } });
+      x.diffTasks('r', snapWith(tr3('in-arbeit')), snapWith(tr3('review')), cfgC);
+      x.diffTasks('r', snapWith(tr3('review')), snapWith({}), cfgC);
+      x.state.projects.r.snap = snapWith({});
+      expect(!x.cardWaits(x.state.cards['card:r:W-3']), 'Karte einer im Review gelöschten Aufgabe wartet weiter');
+      // Projekt weg (W-0051): seine offenen Einträge zählen nicht mehr.
+      const tr4 = (status) => ({ 'W-4': { id: 'W-4', title: 'Projekt weg', status, q: 0, crit: [0, 0] } });
+      x.diffTasks('r', snapWith(tr4('in-arbeit')), snapWith(tr4('review')), cfgC);
+      x.missing.set('r', Date.now() - 10 * 60000);
+      x.forget(new Set());
+      expect(!x.cardWaits(x.state.cards['card:r:W-4']) && !Object.keys(x.state.open).length, `Karte wartet nach dem Wegfall des Projekts: ${JSON.stringify(x.state.open)}`);
+    }
+    // 4. Ein Eintrag von vor dem Update ({ key, ev } ohne card) wartet noch in der Warteschlange: Seine Auflösung bleibt
+    // eine Einzelnachricht und wird nicht zur Karte.
+    {
+      const { x } = fresh();
+      const ev = { type: 'review', project: 'p', id: 'W-5', title: 'Alt', state: 'open', at: ago(3) };
+      x.state.queue = [{ key: 'review:r:W-5:1', ev, rid: 'r', channel_id: '11' }];
+      x.upsert('review:r:W-5:1', { ...ev, state: 'accepted', until: ago(0) }, 'r', cfgC);
+      expect(x.state.queue.length === 1 && !x.state.queue[0].card && x.state.queue[0].ev.state === 'accepted' && !x.state.cards['card:r:W-5'], `alter Eintrag wurde zur Karte: ${JSON.stringify(x.state.queue)}`);
+    }
     const snapOf = (name, since) => ({ root: 'x', name, snap: { name, tasks: {}, perm: { since, tool: 'Bash' }, perms: [], busy: true, active: { id: 'W-9', title: 'Probe' } } });
     b.state.projects = { r1: snapOf('alt', '2026-01-01T10:00:00.000Z'), r2: snapOf('neu', '2026-06-01T10:00:00.000Z') };
     expect(b.statusLine(botM.normalizeConfig({})) === 'neu wartet auf deine Freigabe', `Status: ${b.statusLine(botM.normalizeConfig({}))}`);
     expect(botM.stateOf(b.state.projects.r1.snap, botM.normalizeConfig({}), (de) => de)[1].includes('W-9'), 'Freigabe ohne Aufgabe');
+    // Daten für das Panel-Bild (W-0050): Ampel und Aufgabe je Projekt, Spur nur mit den letzten 24 Stunden in der
+    // Farbe der Art, Woche mit heute.
+    const dd = Array.from({ length: 7 }, (_, i) => [`2026-01-0${i + 1}`, i === 6 ? 4 : 1]);
+    const hist = [{ k: 'a', rid: 'r1', at: new Date(Date.now() - 3600000).toISOString(), ev: { type: 'ci_red' } }, { k: 'b', rid: 'r1', at: new Date(Date.now() - 2 * 86400000).toISOString(), ev: { type: 'review' } }];
+    const di = botM.dashImageData([{ rid: 'r1', snap: { name: 'p', perm: { tool: 'Bash', task: 'W-3' }, progress: { done: 1, wip: 1, total: 3 }, doneDays: dd } }], (de) => de, hist);
+    expect(di.projects[0].dot === 0xe8a33d && di.projects[0].task === 'W-3', `Ampel oder Aufgabe im Bild: ${JSON.stringify(di.projects)}`);
+    expect(di.tracks.rows[0].length === 1 && di.tracks.rows[0][0][1] === 0xf23f43 && di.tracks.labels.length === 5 && di.tracks.labels[4][1] === 'JETZT', `Spuren: ${JSON.stringify(di.tracks)}`);
+    expect(di.days.length === 7 && di.days[6].today && di.days[6].label === 'HEUTE' && di.days[6].count === 4, `Woche: ${JSON.stringify(di.days)}`);
     expect(uiM.modalFor('w:ins::', 'de').components.length === 2 && uiM.modalFor('w:ins:0123456789abcdef:W-1', 'de').components.length === 1, 'Dialog Anweisung ohne Projektfeld');
     // Ein früherer Schritt lässt ein Dashboard zurück, das der Bot nach 403 (fremde Anwendung) nicht mehr anfassen darf.
     const dashCount = Math.max(1, fake.inChannel('11').filter((m) => isDash(m.embeds[0])).length);
@@ -1878,7 +2020,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       if (hasWs) {
         const sel = comps.find((c) => c.type === 3);
         expect(sel && sel.custom_id === 'w:proj::' && sel.options.some((o) => o.label === 'projekt'), `Auswahlmenü fehlt: ${JSON.stringify(comps).slice(0, 300)}`);
-        for (const id of ['w:queue::', 'w:ins::', 'w:new::', 'w:help::']) expect(comps.some((c) => c.custom_id === id), `Knopf ${id} fehlt`);
+        for (const id of ['w:queue::', 'w:ins::', 'w:new::', 'w:hist::', 'w:help::']) expect(comps.some((c) => c.custom_id === id), `Knopf ${id} fehlt`);
         const send = async (opts, what) => {
           for (let n = 1; ; n++) {
             const id = fake.interact(opts);
@@ -1906,12 +2048,12 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         hook('stop-reminder.mjs', { cwd: proj, session_id: 's-p' });
       }
       // Aufräumen mit kurzer Frist: Infos verschwinden, Offenes bleibt bis zur Erledigung, das Dashboard bleibt.
-      await wa(['discord', 'set', 'cleanup.hours=0.0005'], { extraEnv: denv });
+      await wa(['discord', 'set', 'cleanup.seconds=2'], { extraEnv: denv });
       w(['discord', 'emit', 'report', `--json=${JSON.stringify({ title: 'Kurzlebig', summary: 'weg damit' })}`], { extraEnv: denv });
       const info = await dwait(() => findMsg((e) => e.title === 'Kurzlebig'), 'Info-Nachricht');
       const rid = (w(['new', '--type=chore', '--title=Offen im Review', '--criteria=Ja']).out.match(/W-\d+/) || [])[0];
       w(['check', rid, '1', '--section=Akzeptanzkriterien']); w(['set', rid, 'status=review']);
-      const rv = await dwait(() => findMsg((e) => e.title === `${rid} im Review`), 'offenes Review');
+      const rv = await dwait(() => cardSays(rid, /Im Review/), 'Karte im offenen Review');
       await dwait(() => !fake.messages.has(info.m.id), 'Info-Nachricht nach der Frist gelöscht');
       await new Promise((res) => setTimeout(res, 2500));
       expect(fake.messages.has(rv.m.id), 'offenes Review gelöscht');
@@ -1920,9 +2062,97 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(fake.messages.has(dashOf('projekt').m.id), 'Dashboard gelöscht');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
     } finally {
-      await wa(['discord', 'set', 'cleanup.hours=24'], { extraEnv: denv, ok: false });
+      await wa(['discord', 'set', 'cleanup.seconds=3600'], { extraEnv: denv, ok: false });
       await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
     }
+  });
+
+  // W-0050: Verlauf nach P2 hinter dem Knopf im Panel und /works verlauf, nur für den Aufrufer, mit Filtern; er steht in
+  // state.json und übersteht einen Neustart.
+  await step('Discord: Verlauf mit Knopf und /works verlauf, nur für dich, übersteht einen Neustart (W-0050)', async () => {
+    const botM = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
+    const ui = await import(pathToFileURL(path.join(HERE, 'discord-ui.mjs')).href);
+    const { embedProblems } = await import(fromUrl);
+    // Grenzen von Discord: Embeds, höchstens 5 Zeilen, Auswahl allein in ihrer Zeile mit 1 bis 25 Optionen, custom_id
+    // nach dem Schema, das auch der Dienst des gemeinsamen Bots verlangt.
+    const okView = (v, what) => {
+      for (const e of v.embeds || []) expect(!embedProblems(e).length, `${what}: ${embedProblems(e)}`);
+      const rows = v.components || [];
+      expect(rows.length <= 5, `${what}: ${rows.length} Zeilen`);
+      for (const r of rows) {
+        for (const c of r.components) {
+          expect(ui.CID_RE.test(c.custom_id || ''), `${what}: custom_id ${c.custom_id}`);
+          if (c.type === 3) expect(r.components.length === 1 && c.options.length >= 1 && c.options.length <= 25 && c.options.every((o) => o.label.length <= 100 && o.value.length <= 100 && String(o.description || '').length <= 100), `${what}: Auswahl ${JSON.stringify(c).slice(0, 200)}`);
+        }
+      }
+    };
+    const pickC = (v, a) => (v.components || []).flatMap((r) => r.components).find((c) => (c.custom_id || '').startsWith(`w:${a}:`));
+    // Ohne Prozess: höchstens 300 Einträge und 7 Tage, die neueste Fassung je Schlüssel, Filter und Seiten.
+    const cfg = botM.normalizeConfig({});
+    const t = (de) => de;
+    const A = 'aaaaaaaaaaaaaaaa'; const B = 'bbbbbbbbbbbbbbbb';
+    const hb = new botM.Bot({ rest: {}, log: () => {} });
+    Object.assign(hb.state, { history: [], projects: { [A]: { name: 'eins', root: 'x', snap: { name: 'eins', tasks: {} } }, [B]: { name: 'zwei', root: 'y', snap: { name: 'zwei', tasks: {} } } } });
+    const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
+    hb.remember('alt', { type: 'report_week', title: 'Uralt', at: ago(8 * 1440) }, A);
+    for (let i = 0; i < 310; i++) hb.remember(`k${i}`, { type: i % 2 ? 'ci_red' : 'review', id: `W-${i}`, title: 'y'.repeat(300), sha: 'abc1234', project: 'eins', state: 'open', at: ago(i * 10 + 1) }, i % 3 ? A : B);
+    expect(hb.state.history.length === 300 && !hb.state.history.some((x) => x.k === 'alt'), `Verlauf nicht begrenzt: ${hb.state.history.length}`);
+    hb.remember('k0', { type: 'review', id: 'W-0', state: 'accepted', project: 'eins', at: ago(0) }, B);
+    const k0 = hb.state.history.filter((x) => x.k === 'k0');
+    expect(k0.length === 1 && k0[0].ev.state === 'accepted', 'nicht die neueste Fassung je Schlüssel');
+    let v = hb.historyView(cfg, t, {});
+    okView(v, 'Verlauf 24 Std.');
+    has(v.embeds[0].title, 'Verlauf · letzte 24 Stunden');
+    expect(v.embeds[0].description.split('\n').length === 10, 'nicht 10 Einträge je Seite');
+    expect(pickC(v, 'hist') && pickC(v, 'hist').custom_id === 'w:hist::d-1', `Knopf Ältere: ${JSON.stringify(pickC(v, 'hist'))}`);
+    v = hb.historyView(cfg, t, { rid: B, range: 'w', page: 1 });
+    okView(v, 'Verlauf zwei');
+    expect(v.embeds[0].description.split('\n').every((l) => l.includes('**zwei**')), 'Filter nach Projekt wirkt nicht');
+    expect(pickC(v, 'histr').options.find((o) => o.default).value === 'w' && pickC(v, 'histp').options.find((o) => o.default).value === B, 'Auswahl zeigt den Filter nicht');
+    expect(v.components.flatMap((r) => r.components).filter((c) => /^w:hist:/.test(c.custom_id)).length === 2, 'Knöpfe Neuere und Ältere fehlen');
+    const entry = hb.historyEntry(pickC(v, 'histv').options[0].value, cfg, t, 'de');
+    expect(entry.embeds[0].timestamp && !entry.components && !entry.content, `Eintrag: ${JSON.stringify(entry).slice(0, 200)}`);
+    okView(entry, 'Eintrag');
+    // Mit Bot: Eintrag in state.json, nach einem Neustart noch da, Knopf und Befehl nur für den Aufrufer.
+    const stateHist = () => { try { return JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')).history || []; } catch { return []; } };
+    await wa(['discord', 'start'], { extraEnv: denv, ok: false });
+    try {
+      w(['discord', 'emit', 'report', `--json=${JSON.stringify({ title: 'Verlauf-Probe', summary: 'steht im Verlauf' })}`], { extraEnv: denv });
+      await dwait(() => findMsg((e) => e.title === 'Verlauf-Probe'), 'Nachricht für den Verlauf');
+      await dwait(() => stateHist().some((x) => x.ev.title === 'Verlauf-Probe'), 'Eintrag in state.json');
+      await wa(['discord', 'stop'], { extraEnv: denv });
+      await wa(['discord', 'start'], { extraEnv: denv });
+      expect(stateHist().length <= 300 && stateHist().some((x) => x.ev.title === 'Verlauf-Probe'), 'Verlauf nach dem Neustart weg');
+      if (hasWs) {
+        const send = async (opts, what) => {
+          for (let n = 1; ; n++) {
+            const id = fake.interact(opts);
+            try { await dwait(() => fake.callbacks.get(id), `${what}: Eingang`, 5000); return id; } catch (e) { if (n >= 3) throw e; }
+          }
+        };
+        const ask = async (opts, what) => { const id = await send(opts, what); const a = await dwait(() => fake.answerOf(id), what); return { ...a, cb: fake.callbacks.get(id) }; };
+        const d = await dwait(() => { const x = dashOf('projekt'); return x && x.m.components.length ? x : null; }, 'Dashboard mit Knöpfen');
+        let a = await ask({ type: 3, customId: 'w:hist::', messageId: d.m.id }, 'Knopf Verlauf');
+        expect(a.cb.type === 5 && a.cb.data.flags & 64, 'Verlauf nicht nur für dich');
+        has(JSON.stringify(a.data.embeds), 'Verlauf-Probe', 'Eintrag von vor dem Neustart im Verlauf');
+        okView(a.data, 'Antwort Verlauf');
+        a = await ask({ type: 3, customId: pickC(a.data, 'histr').custom_id, messageId: a.data.id, values: ['w'] }, 'Zeitraum 7 Tage');
+        has(a.data.embeds[0].title, 'letzte 7 Tage');
+        const ps = pickC(a.data, 'histp');
+        const mine = ps && ps.options.find((o) => o.label.endsWith(': projekt'));
+        if (mine) { a = await ask({ type: 3, customId: ps.custom_id, messageId: a.data.id, values: [mine.value] }, 'Projekt wählen'); has(a.data.embeds[0].title, '· projekt'); }
+        const vs = pickC(a.data, 'histv');
+        const one = vs && vs.options.find((o) => o.label.includes('Verlauf-Probe'));
+        expect(one, `Eintrag fehlt in der Auswahl: ${JSON.stringify(vs).slice(0, 300)}`);
+        a = await ask({ type: 3, customId: vs.custom_id, messageId: a.data.id, values: [one.value] }, 'Eintrag ansehen');
+        expect(a.data.embeds[0].title === 'Verlauf-Probe' && a.data.embeds[0].description === 'steht im Verlauf' && !(a.data.components || []).length, `Eintrag: ${JSON.stringify(a.data).slice(0, 300)}`);
+        a = await ask({ sub: 'history', options: [{ name: 'project', value: 'projekt' }] }, '/works verlauf');
+        expect(a.cb.type === 5 && a.cb.data.flags & 64, '/works verlauf nicht nur für dich');
+        has(a.data.embeds[0].title, 'Verlauf'); has(a.data.embeds[0].title, '· projekt');
+        has(JSON.stringify((await ask({ sub: 'history', user: '777' }, 'Verlauf für Fremde')).data), 'Nicht für dich');
+      }
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+    } finally { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); }
   });
 
   // W-0051: Das Panel zeigt nur Projekte, deren Ordner .works/config.json hat. Fehlt der Ordner oder steht das Projekt
@@ -2003,6 +2233,20 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(bot.isQuiet(q, new Date(2026, 0, 1, 23, 30)) && bot.isQuiet(q, new Date(2026, 0, 1, 6, 59)) && !bot.isQuiet(q, new Date(2026, 0, 1, 7, 0)), 'Ruhezeit falsch');
     const m = bot.renderEvent({ type: 'perm', project: 'p', id: 'W-1', tool: 'Bash' }, q, { owner: '1', now: new Date(2026, 0, 1, 23, 30) });
     expect(!m.content.includes('<@') && m.flags & 4096, 'Erwähnung in der Ruhezeit');
+    // Karte (W-0050): lange Titel, Fragen und Projektnamen passen in die Grenzen, Links bleiben entschärft, Datenschutz
+    // gilt auch hier, in der Ruhezeit keine Erwähnung.
+    const at = new Date().toISOString();
+    const card = { rid: '0123456789abcdef', id: 'W-1', project: long, title: '[klick](https://evil.example) ' + long, entries: {
+      a: { type: 'start', id: 'W-1', state: 'open', t0: at, u: 1 }, b: { type: 'question', id: 'W-1', text: long, q: 1, state: 'open', t0: at, u: 2 },
+      c: { type: 'perm', id: 'W-1', tool: long, what: 'geheim-4711', since: at, state: 'open', t0: at, u: 3 } } };
+    const cm = bot.renderCard(card, cfg, { owner: '1', interactive: true, task: { status: 'in-arbeit', crit: [1, 3], cost: '9,99 $' } });
+    for (const e of cm.embeds) expect(!embedProblems(e).length, `Karte zu lang: ${embedProblems(e)}`);
+    expect(cm.content.length <= 2000 && !JSON.stringify(cm).includes('geheim-4711'), 'Karte zu lang oder mit Befehl');
+    expect(!/(^|[^\\])\[klick\]\(/.test(cm.embeds[0].title), `Link in der Karte nicht entschärft: ${cm.embeds[0].title.slice(0, 80)}`);
+    const cq = bot.renderCard(card, q, { owner: '1', now: new Date(2026, 0, 1, 23, 30), task: { status: 'in-arbeit' } });
+    expect(!cq.content.includes('<@') && cq.flags & 4096, 'Erwähnung der Karte in der Ruhezeit');
+    const cp = JSON.stringify(bot.renderCard({ ...card, title: 'Geheimer Titel', entries: { a: card.entries.a, b: { ...card.entries.b, text: 'Geheime Frage' } } }, priv, { task: { status: 'in-arbeit', cost: '9,99 $' } }));
+    expect(!cp.includes('Geheimer Titel') && !cp.includes('9,99') && !cp.includes('Geheime Frage'), 'Titel, Frage oder Kosten der Karte trotz Datenschutz');
     // Ohne Einrichtung startet weder das Board noch der Sitzungsstart einen Bot.
     const home2 = path.join(base, 'home-ohne-discord'); fs.mkdirSync(home2, { recursive: true });
     const env2 = { HOME: home2, USERPROFILE: home2 };
@@ -2082,13 +2326,14 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       await call('POST', '/api/discord', { op: 'move', channel_id: '11' });
       expect((await call('GET', '/api/discord')).ready && dcfg().channel_id === '11', 'nach der Kanalwahl nicht eingerichtet');
       // Einstellungen über applySetting, falsche Werte abgelehnt, ohne dass etwas halb gespeichert wird.
-      await call('POST', '/api/discord', { op: 'set', values: { 'event.ci_red.at': 'an', 'privacy.costs': 'aus', 'cleanup.hours': '12' } });
-      expect(dcfg().events.ci_red.at === true && dcfg().privacy.costs === false && dcfg().cleanup.hours === 12, 'Einstellungen nicht gespeichert');
+      await call('POST', '/api/discord', { op: 'set', values: { 'event.ci_red.at': 'an', 'privacy.costs': 'aus', 'cleanup.seconds': '12' } });
+      expect(dcfg().events.ci_red.at === true && dcfg().privacy.costs === false && dcfg().cleanup.seconds === 12, 'Einstellungen nicht gespeichert');
+      expect((await call('GET', '/api/discord')).cleanup.seconds === 12, 'Frist in Sekunden fehlt im Stand für den Dialog');
       r = await call('POST', '/api/discord', { op: 'set', values: { 'privacy.costs': 'an', 'quiet.from': '25:00' } }, false);
       expect(r.status === 400 && dcfg().privacy.costs === false, `ungültige Uhrzeit: ${r.status}, costs ${dcfg().privacy.costs}`);
       await call('POST', '/api/discord', { op: 'set', values: { [`project.${here.rid}`]: 'aus' } });
       expect(dcfg().projects[here.rid].enabled === false, 'Projekt nicht abgeschaltet');
-      await call('POST', '/api/discord', { op: 'set', values: { [`project.${here.rid}`]: 'an', 'event.ci_red.at': 'aus', 'privacy.costs': 'an', 'cleanup.hours': '24', 'delay.perm': '0', 'delay.idle': '0', 'quiet.on': 'aus' } });
+      await call('POST', '/api/discord', { op: 'set', values: { [`project.${here.rid}`]: 'an', 'event.ci_red.at': 'aus', 'privacy.costs': 'an', 'cleanup.seconds': '3600', 'delay.perm': '0', 'delay.idle': '0', 'quiet.on': 'aus' } });
       // Vorschau mit dem ungespeicherten Stand: Erwähnung nur mit @, ohne @ still.
       let pv = await call('POST', '/api/discord', { op: 'preview', type: 'perm' });
       expect(pv.ring && /<@4242>/.test(pv.content) && pv.embeds[0].title === 'Wartet auf deine Freigabe', `Vorschau Freigabe: ${JSON.stringify(pv).slice(0, 300)}`);
@@ -2137,6 +2382,16 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const refused = (cfg, k, v) => { try { dm.applySetting(cfg, k, v); return ''; } catch (e) { return e.message; } };
     expect(/eigenen Bot/.test(refused(dm.normalizeConfig({ mode: 'shared' }), 'project.0123456789abcdef.channel', '15')), 'Kanal je Projekt beim gemeinsamen Bot angenommen');
     expect(refused(dm.normalizeConfig({}), 'project.0123456789abcdef.channel', 'dev'), 'Kanalname statt Kanal-ID angenommen');
+    // W-0050: Frist in Sekunden, Standard 1 Std.; ein altes cleanup.hours gilt nicht mehr.
+    const c1 = dm.normalizeConfig({ cleanup: { hours: 5 } });
+    expect(c1.cleanup.seconds === 3600 && !('hours' in c1.cleanup), `alte Frist in Stunden übernommen: ${JSON.stringify(c1.cleanup)}`);
+    // „Nie löschen“ aus der Zeit vor W-0050 bleibt nie löschen; eine gesetzte Sekundenzahl geht vor.
+    expect(dm.normalizeConfig({ cleanup: { hours: 0 } }).cleanup.seconds === 0, 'cleanup.hours=0 (nie löschen) nicht übernommen');
+    expect(dm.normalizeConfig({ cleanup: { hours: 0, seconds: 120 } }).cleanup.seconds === 120, 'cleanup.seconds geht nicht vor');
+    dm.applySetting(c1, 'cleanup.seconds', '0');
+    expect(c1.cleanup.seconds === 0, 'cleanup.seconds=0 wirkt nicht');
+    for (const v of ['-1', '1.5', '', '2592001']) expect(refused(c1, 'cleanup.seconds', v), `cleanup.seconds=${v} angenommen`);
+    expect(refused(c1, 'cleanup.hours', '2'), 'cleanup.hours noch angenommen');
     let r = await wa(['discord', 'set', 'commands=vielleicht'], { extraEnv: denv, ok: false });
     expect(r.code !== 0, 'commands=vielleicht angenommen');
     const { call } = await boardFor();
@@ -2217,14 +2472,24 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     try {
       process.env.WORKS_LANG = 'en';
       let d = botM.renderDashboard(list, cfg, { interactive: true });
-      expect(d.embeds[0].title === 'works · 1 project' && d.embeds[0].fields[0].name === 'Today' && d.components[1].components[0].label === 'Queue', `Dashboard global englisch: ${JSON.stringify(d).slice(0, 300)}`);
+      expect(d.embeds[0].title === 'works · 1 project' && d.embeds[0].fields[0].name === 'Up next' && d.components[1].components[0].label === 'Queue' && d.embeds[0].description.startsWith('**1 waiting for you · 1 done today**'), `Dashboard global englisch: ${JSON.stringify(d).slice(0, 300)}`);
+      expect(botM.cardImageData({ entries: { a: { type: 'perm', state: 'open', t0: new Date().toISOString() } } }, {}).legend[1][0] === 'WAITING FOR YOU', 'Kartenbild global englisch');
       let ev = botM.renderEvent(perm, cfg, { owner: '1' });
       expect(ev.embeds[0].title === 'Waiting for your approval' && ev.content.includes('projekt is waiting for your approval'), `Hinweis global englisch: ${JSON.stringify(ev).slice(0, 300)}`);
       expect(botM.dashImageData(list).labels.progress === 'PROGRESS', 'Bild global englisch');
       // Ohne Neustart: dieselben Module, andere Einstellung.
       process.env.WORKS_LANG = 'de';
       d = botM.renderDashboard(list, cfg, { interactive: true });
-      expect(d.embeds[0].title === 'works · 1 Projekt' && d.embeds[0].fields[0].name === 'Heute' && d.components[1].components[0].label === 'Warteschlange', `Dashboard global deutsch: ${JSON.stringify(d).slice(0, 300)}`);
+      expect(d.embeds[0].title === 'works · 1 Projekt' && d.embeds[0].fields[0].name === 'Als Nächstes' && d.components[1].components[0].label === 'Warteschlange' && d.embeds[0].description.startsWith('**1 wartet auf dich · heute 1 erledigt**'), `Dashboard global deutsch: ${JSON.stringify(d).slice(0, 300)}`);
+      // Panel nach P2 (W-0050): Zusammenfassung mit Kostensumme nur mit privacy.costs, Zeile je Projekt mit Ampel,
+      // Zustand, Werkzeug bei Freigabe und Aufgabe.
+      const two = [{ rid: 'r1', snap: { ...snap, today: { done: 2, cost: '1.00 $', value: 1, currency: 'USD' } } }, { rid: 'r2', snap: { name: 'zwei', tasks: {}, perms: [], busy: true, active: { id: 'W-4', title: 'Läuft' }, today: { done: 3, cost: '2.50 $', value: 2.5, currency: 'USD' } } }];
+      d = botM.renderDashboard(two, cfg, { interactive: true });
+      const [sum, l1, l2] = d.embeds[0].description.split('\n');
+      expect(/^\*\*1 wartet auf dich · 1 arbeitet · heute 5 erledigt · 3[.,]50 \$\*\*$/.test(sum), `Zusammenfassung: ${sum}`);
+      expect(l1 === '🟠 **projekt** wartet auf deine Freigabe · Bash · W-9' && l2 === '🟢 **zwei** arbeitet · W-4', `Zeilen je Projekt: ${l1} | ${l2}`);
+      expect(d.components[1].components.map((c) => c.custom_id).join() === 'w:queue::,w:ins::,w:new::,w:hist::,w:help::', `Knöpfe: ${JSON.stringify(d.components[1])}`);
+      expect(!botM.renderDashboard(two, botM.normalizeConfig({ privacy: { costs: false } }), {}).embeds[0].description.includes('$'), 'Kosten trotz Datenschutz im Panel');
       ev = botM.renderEvent(perm, cfg, { owner: '1' });
       expect(ev.embeds[0].title === 'Wartet auf deine Freigabe' && ev.content.includes('projekt wartet auf deine Freigabe'), `Hinweis global deutsch: ${JSON.stringify(ev).slice(0, 300)}`);
       // Antworten bekommen die Sprache des Clients.
