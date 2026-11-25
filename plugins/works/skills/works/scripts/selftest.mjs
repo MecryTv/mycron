@@ -117,6 +117,30 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   fs.writeFileSync(path.join(proj, 'src', 'web', 'page.tsx'), 'export const b = 2;\n');
   fs.writeFileSync(path.join(proj, 'package.json'), '{"name":"selftest","scripts":{"test":"node -e \\"process.exit(0)\\""}}\n');
 
+  // W-0060: writeJson schreibt in einem Zug. Ein anderer Prozess, der config.json gerade liest (Bot, Board, Test), sieht
+  // nie eine halbe Datei. Ein Kindprozess schreibt eine große Datei immer wieder, dieser liest ständig mit.
+  await step('Dateien: writeJson schreibt in einem Zug (W-0060)', async () => {
+    const f = path.join(base, 'atomar', 'config.json');
+    const lib = pathToFileURL(path.join(HERE, 'lib.mjs')).href;
+    const big = { items: Array.from({ length: 40000 }, (_, i) => ({ i, text: 'x'.repeat(30) })) };
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, JSON.stringify(big));
+    const child = spawn(process.execPath, ['--input-type=module', '-e', `const { writeJson } = await import(${JSON.stringify(lib)}); const d = ${JSON.stringify({ n: 0 })}; const big = { items: Array.from({ length: 40000 }, (_, i) => ({ i, text: 'x'.repeat(30) })) }; const until = Date.now() + 3000; while (Date.now() < until) writeJson(${JSON.stringify(f)}, big);`], { stdio: 'ignore', windowsHide: true });
+    const exited = new Promise((r) => child.on('exit', r));
+    let reads = 0; let torn = 0;
+    const until = Date.now() + 3500;
+    while (Date.now() < until) {
+      let s;
+      try { s = fs.readFileSync(f, 'utf8'); } catch { continue; } // kurz gesperrt (Windows): kein halber Inhalt
+      reads++;
+      try { JSON.parse(s); } catch { torn++; }
+    }
+    await exited;
+    expect(reads > 20, `zu wenige Lesevorgänge (${reads})`);
+    expect(!torn, `${torn} von ${reads} Lesevorgängen sahen eine halbe Datei`);
+    expect(!fs.readdirSync(path.dirname(f)).some((x) => x !== 'config.json'), `Zwischendateien liegen geblieben: ${fs.readdirSync(path.dirname(f)).join(', ')}`);
+  });
+
   await step('init, new, list, show', () => {
     has(w(['init']).out, '.works');
     has(w(['new', '--type=feature', '--title=Backup Export', '--priority=P2', '--effort=M', '--tags=bot', '--description=Export in src/bot/backup.ts erweitern', '--criteria=Export als JSON']).out, 'Angelegt: W-0001');
