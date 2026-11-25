@@ -51,6 +51,14 @@ Gemeldet vom Nutzer am 2026-11-24 mit Screenshot: In der Kopfleiste des Boards i
 
 ## Lösung
 <!-- Was wurde geändert und warum genau so? -->
+Umgesetzt nach Entwurf B „Kompakter Chip mit Popover“ (board.js `renderBusy()`, template.html, board.css, de.json):
+- Chip statt Satz: Im Chip stehen nur Aufgabe und Dauer („W-0050 · 12 Min.“), bei mehreren Agenten eine Plakette mit ihrer Zahl. Bei einer Freigabe „Freigabe nötig · 2 Min.“ in der Warnfarbe, ohne Hauptsitzung „2 Agenten“. Der Chip schrumpft nicht (`flex: none`) und ist kurz genug, dass er nicht mehr über die Reiter ragt. Die Dauer ist übersetzbar („12 Min.“, „1 Std. 5 Min.“).
+- Popover darunter (`#busyPop`): „Claude arbeitet seit 12 Min.“, Aufgabe mit Titel, „2 Agenten parallel“ mit ihren Aufgaben, bei einer Freigabe der wartende Aufruf, unten der letzte Schritt („Zuletzt: Befehl, vor 20 s“) und „Zur Live-Ansicht“. Der Satz im Kopf des Popovers steckt in einem eigenen span, damit kein Flex-Abstand mehr vor der Zeit entsteht. Alle Zeiten zählt der Sekundentakt weiter, auch das aria-label.
+- Bedienung: Maus darüber öffnet (eine unsichtbare Brücke hält es beim Hinüberfahren offen), Klick führt wie bisher in die Live-Ansicht. Tastatur: Fokus auf dem Chip öffnet, Tab erreicht den Knopf, Esc schließt und setzt den Fokus zurück, Enter führt in die Live-Ansicht. Touch: erster Tipp öffnet, Tipp daneben schließt, zweiter Tipp auf den Chip führt weiter. Der Chip hat als aria-label den vollen Text.
+- Offen bei Tastaturfokus über `:focus-within` plus Klasse `.kb`, die nur bei `:focus-visible` gesetzt wird. `:has(:focus-visible)` war der erste Versuch: Beim Tab vom Chip zum Knopf schließt das Popover kurz, und Chromium verliert den Fokus (im Test nachgestellt).
+- Platz in der Marke: Neben dem Chip zeigt die Verbindungsanzeige nur den Punkt (Text bleibt für Screenreader); ist die Verbindung getrennt, bleibt der Text sichtbar, wird aber mit … gekürzt. Danach darf der Projektname bis 5em schrumpfen. Das Suchfeld behält mindestens 140 px. Reicht das ab 1641 px nicht (etwa Freigabe-Chip bei 1720 px), setzt `fitTop()` die Klasse `.tight` und die Reiter rutschen wie unter 1640 px in die zweite Zeile, statt überdeckt zu werden. Gemessen wird an den Kindern der Marke, nicht an `scrollWidth`, weil das offene Popover über die Marke hinausragt.
+- Am Handy hängt das Popover an der Marke und nutzt die Breite bis 32 px Rand.
+- Abweichung vom Kriterium „gekürzt mit …, voller Text als Tooltip“: Das stammt aus Entwurf A. Mit B wird der Chip nicht gekürzt, der volle Text steht im Popover und im aria-label.
 
 ## Akzeptanzkriterien
 - [ ] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
