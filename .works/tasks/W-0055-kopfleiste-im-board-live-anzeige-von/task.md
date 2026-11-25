@@ -3,13 +3,13 @@ id: W-0055
 title: "Kopfleiste im Board: Live-Anzeige von Claude bei langem Text kaputt"
 type: bug
 priority: P3
-status: review
+status: erledigt
 effort: S
 risk:
 created: 2026-11-24
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: fix/w-0055-kopfleiste-im-board-live
 tags: [ui, board]
@@ -88,9 +88,7 @@ Art: nachher · Hinzugefügt: 2026-11-25
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-25 21:08
-
-Fertig zur Abnahme. Umgesetzt nach Entwurf B in board.js (renderBusy, fitTop), board.css, template.html, de.json; Commits cec4c26 und 0e15815 auf fix/w-0055-kopfleiste-im-board-live, nicht gemergt. Abweichungen vom Entwurf: Neben dem Chip zeigt die Verbindungsanzeige nur den Punkt, weil ‚Live, Stand 20:25:46‘ sonst bei 1880 px nicht passt; getrennt bleibt der Text, gekürzt mit …. Popover als role=group, offen bei Tastaturfokus über .kb statt :has(:focus-visible) (sonst geht der Fokus beim Tab verloren). Ab 1641 px schrumpft bei Platzmangel erst der Projektname, dann rutschen die Reiter in Zeile 2 (z. B. Freigabe-Chip bei 1720 px). Tests: Schritt Kopfleiste gegen alten Stand rot, jetzt grün; voll mit Browser 68/68, ohne WebSocket 58/58. Nachher-Bilder liegen im Scratchpad (kopf55/nachher), Selbsttest schreibt sie mit WORKS_SELFTEST_SHOTS=<Ordner>. Beim Mergen auf W-0054 achten (gleiche Dateien).
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -111,3 +109,4 @@ Fertig zur Abnahme. Umgesetzt nach Entwurf B in board.js (renderBusy, fitTop), b
 - 2026-11-25: Parallele Arbeit beendet
 - 2026-11-25: Asset hinzugefügt: assets/2026-11-25-nachher-1440-hell-kopfleiste-mit-nachher.png (nachher)
 - 2026-11-25: Asset hinzugefügt: assets/2026-11-25-nachher-390-dunkel-kopfleiste-auf-dem-nachher.png (nachher)
+- 2026-11-25: Abgeschlossen (Status: review → erledigt), DoD bestätigt
