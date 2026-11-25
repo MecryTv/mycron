@@ -70,7 +70,7 @@ try {
   const works = cmds.find((c) => c.name === 'works');
   assert.ok(works, 'command /works missing');
   assert.equal(works.default_member_permissions, '32', '/works must require Manage Server');
-  assert.deepEqual(works.options.map((o) => o.name).sort(), ['help', 'instruct', 'link', 'new', 'status', 'tasks', 'unlink']);
+  assert.deepEqual(works.options.map((o) => o.name).sort(), ['help', 'history', 'instruct', 'link', 'new', 'status', 'tasks', 'unlink']);
   assert.equal(works.options.find((o) => o.name === 'link').name_localizations.de, 'verbinden');
   await healthy();
   const info = (await api('GET', '/v1/info')).body;
@@ -128,7 +128,8 @@ try {
   assert.equal(dashboards().length, 1, `dashboard created ${dashboards().length} times`);
   assert.ok(fake.requests.every((q) => q.auth === `Bot ${TOKEN}` || q.path.includes('/callback')), 'request to Discord without the bot token');
   spawnSync(process.execPath, [path.join(HOOKS, 'permission.mjs')], { cwd: proj, env, input: JSON.stringify({ cwd: proj, session_id: 's', tool_name: 'Bash', tool_input: { command: 'npm test' } }), encoding: 'utf8', windowsHide: true });
-  const pm = await wait(() => fake.inChannel('11').find((m) => (m.embeds[0] || {}).title === 'Wartet auf deine Freigabe'), 'permission message');
+  // Without a task a single message, with one the task's card (W-0050): either way the state is visible.
+  const pm = await wait(() => fake.inChannel('11').find((m) => /Wartet auf deine Freigabe/.test(`${(m.embeds[0] || {}).title} ${(m.embeds[0] || {}).description}`)), 'permission message');
   assert.match(pm.content, /<@4242>/);
   assert.deepEqual(pm.allowed_mentions, { parse: [], users: ['4242'] });
   assert.match((await wa(['discord'])).out, /Gemeinsamer Bot/);
@@ -153,7 +154,9 @@ try {
   const nid = (JSON.stringify(a.data).match(/W-\d+/) || [])[0];
   assert.ok(nid, `no task id in ${JSON.stringify(a.data)}`);
   assert.equal((await wa(['set', nid, 'status=review'])).code, 0);
-  const rv = await wait(() => fake.inChannel('11').find((m) => (m.embeds[0] || {}).title === `${nid} im Review` && m.components.length), 'review message with buttons');
+  // W-0050: the task's card with its image, sent through the service, and the review buttons.
+  const rv = await wait(() => fake.inChannel('11').find((m) => ((m.embeds[0] || {}).title || '').startsWith(`${nid} `) && /Im Review/.test((m.embeds[0] || {}).description || '') && m.components.length), 'review card with buttons');
+  assert.ok(rv.attachments.some((x) => x.filename === 'works.png' && x.data.subarray(1, 4).toString() === 'PNG'), 'card image dropped by the service');
   const ret = rv.components.flatMap((x) => x.components).find((b) => /^w:ret:/.test(b.custom_id || ''));
   assert.ok(ret, `buttons dropped by the service: ${JSON.stringify(rv.components)}`);
   a = await ask({ type: 3, customId: ret.custom_id, messageId: rv.id }, 'dialog from the service');
@@ -180,6 +183,12 @@ try {
   const tb = (a.data.components || []).flatMap((x) => x.components).find((c) => /^w:tasks:/.test(c.custom_id || ''));
   assert.ok(tb, `no tasks button in ${JSON.stringify(a.data).slice(0, 300)}`);
   assert.match(JSON.stringify((await ask({ type: 3, customId: tb.custom_id, messageId: a.data.id }, 'button on an answer')).data), /offen/);
+  // W-0050: the history button, and a select menu on that answer, through the service.
+  a = await ask({ type: 3, customId: 'w:hist::', messageId: d0.id }, 'history button through the service');
+  assert.match(JSON.stringify(a.data.embeds), /Verlauf/);
+  const hr = (a.data.components || []).flatMap((x) => x.components).find((c) => /^w:histr:/.test(c.custom_id || ''));
+  assert.ok(hr, `no period select in ${JSON.stringify(a.data).slice(0, 300)}`);
+  assert.match(JSON.stringify((await ask({ type: 3, customId: hr.custom_id, messageId: a.data.id, values: ['w'] }, 'period through the service')).data), /letzte 7 Tage/);
   // Answers only for interactions of the own device.
   assert.equal((await api('POST', `/v1/interactions/${sid}/reply`, { content: 'x' }, key1)).status, 404, 'answered twice');
   // W-0046: commands and buttons switched off on the device, without a restart. The dashboard loses its select menu
