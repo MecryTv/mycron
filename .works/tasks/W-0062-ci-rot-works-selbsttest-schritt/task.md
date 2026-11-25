@@ -3,13 +3,13 @@ id: W-0062
 title: "CI rot: works Selbsttest, Schritt Selbsttest"
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort:
 risk:
 created: 2026-11-25
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: fix/w-0062-ci-rot-works-selbsttest
 tags: []
@@ -72,9 +72,7 @@ liveServer() in server-control.mjs fragt /tabs auf dem Port der server.json: Ant
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-25 20:09
-
-Fix: liveServer prüft über /tabs, ob auf dem Port der server.json wirklich ein works-Board antwortet (works board, works shot, Sitzungsstart, ship); waitForServer nimmt nur die server.json des gestarteten Prozesses. Regressionstest mit fremdem Prozess. Tests: mit Browser 67/67, ohne WebSocket 58/58.
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
@@ -83,3 +81,4 @@ Fix: liveServer prüft über /tabs, ob auf dem Port der server.json wirklich ein
 - 2026-11-25: Akzeptanzkriterien: "Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen" abgehakt
 - 2026-11-25: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
 - 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
