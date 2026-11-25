@@ -47,6 +47,18 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   const proj = path.join(base, 'projekt');
   const home = path.join(base, 'home');
   fs.mkdirSync(proj, { recursive: true }); fs.mkdirSync(home, { recursive: true });
+  // Temp-Ordner für Hook und Board bei Hintergrundbefehlen (W-0059): Claude Code legt deren Ausgabe unter
+  // <tmp>/claude/<Projekt>/<Sitzung>/tasks/<id>.output ab. Im Test liegt das im Testordner, nie unter dem echten Temp.
+  const tmpDir = path.join(base, 'tmp');
+  fs.mkdirSync(tmpDir, { recursive: true });
+  const tmpVars = { TMP: tmpDir, TEMP: tmpDir, TMPDIR: tmpDir };
+  const bgOutput = (session, id) => { const d = path.join(tmpDir, 'claude', 'p0selftest', session, 'tasks'); fs.mkdirSync(d, { recursive: true }); return path.join(d, `${id}.output`); };
+  // Direkt aufgerufene Funktionen (boardData, signature) lesen os.tmpdir() aus der Umgebung dieses Prozesses.
+  const withTmp = (fn) => {
+    const keep = Object.fromEntries(Object.keys(tmpVars).map((k) => [k, process.env[k]]));
+    Object.assign(process.env, tmpVars);
+    try { return fn(); } finally { for (const [k, v] of Object.entries(keep)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } }
+  };
   // WORKS_DRY_OPEN: --open meldet nur, was es öffnen würde. Der Selbsttest öffnet nie einen Browser.
   // WORKS_LANG=de: Die Prüfungen erwarten deutsche Ausgaben; die englische Standardausgabe prüft ein eigener Schritt (W-0041).
   const env = { ...process.env, HOME: home, USERPROFILE: home, WORKS_ACTOR: '', WORKS_DRY_OPEN: '1', WORKS_LANG: 'de', GIT_AUTHOR_NAME: 'works', GIT_AUTHOR_EMAIL: 'works@test', GIT_COMMITTER_NAME: 'works', GIT_COMMITTER_EMAIL: 'works@test' };
@@ -63,8 +75,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     if (ok && res.code !== 0) throw new Error(`works ${args.join(' ')} → Exit ${res.code}: ${(res.err || res.out).split('\n').slice(-3).join(' | ')}`);
     return res;
   };
-  const hook = (file, input) => {
-    const r = spawnSync(process.execPath, [path.join(HOOKS, file)], { cwd: proj, env, encoding: 'utf8', input: JSON.stringify(input), timeout: 20000 });
+  const hook = (file, input, extraEnv = null) => {
+    const r = spawnSync(process.execPath, [path.join(HOOKS, file)], { cwd: proj, env: extraEnv ? { ...env, ...extraEnv } : env, encoding: 'utf8', input: JSON.stringify(input), timeout: 20000 });
     if (r.status !== 0) throw new Error(`${file} → Exit ${r.status}: ${r.stderr}`);
     return (r.stdout || '').trim();
   };
@@ -769,6 +781,71 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     expect(boardData(proj).tasks.find((t) => t.id === 'W-0001').stale === null && boardData(proj).meta.staleDays === 3, 'Board kennt stale nicht');
   });
 
+  // W-0059: Hintergrundbefehle (run_in_background). Das Werkzeug kommt sofort mit backgroundTaskId zurück, Claude Code
+  // schreibt die Ausgabe nach <tmp>/claude/<Projekt>/<Sitzung>/tasks/<id>.output und hängt am Ende „[exited with code N]“ an.
+  await step('Live: Hintergrundbefehle und ihr Ende', async () => {
+    const { boardData } = await import('./board.mjs');
+    const { signature } = await import('./serve.mjs');
+    const { buildSnapshot } = await import('./export.mjs');
+    const actF = path.join(proj, '.works', 'activity.json');
+    const act = () => (fs.existsSync(actF) ? JSON.parse(fs.readFileSync(actF, 'utf8')) : { recent: [] });
+    const bgCall =(id, ti, extra = {}) => hook('post-tool.mjs', { cwd: proj, session_id: 'sbg', tool_name: 'Bash', tool_input: ti, tool_response: { stdout: '', stderr: '', interrupted: false, isImage: false, ...(id ? { backgroundTaskId: id } : {}), ...extra } }, tmpVars);
+    const n0 = (act().background || []).length;
+    bgCall('', { command: 'npm test' });
+    expect((act().background || []).length === n0, 'Befehl im Vordergrund landet unter background');
+    const out = bgOutput('sbg', 'bt3st1d');
+    fs.writeFileSync(out, 'Selbsttest läuft, geheime Ausgabe\n');
+    bgCall('bt3st1d', { command: 'node scripts/works.mjs selftest --browser', description: 'Selbsttest mit Browser', run_in_background: true });
+    const e = act().background[0];
+    expect(e && e.id === 'bt3st1d' && e.what === 'Selbsttest mit Browser' && e.tool === 'Bash' && e.file && path.resolve(e.file) === path.resolve(out) && Date.parse(e.at) && e.task === act().recent[0].task, `Eintrag: ${JSON.stringify(act().background)}`);
+    // Ohne Beschreibung steht der gekürzte Befehl da. Nach dem Timeout in den Hintergrund verschoben: Der Start liegt
+    // timedOutAfterMs zurück. Ohne Ausgabedatei kein Pfad, der Stand ist dann unbekannt.
+    bgCall('bdev0001', { command: 'npm run dev -- --port 3000\necho zweite Zeile' }, { timedOutAfterMs: 120000 });
+    const dv = act().background[0];
+    expect(dv.id === 'bdev0001' && dv.what === 'npm run dev -- --port 3000' && dv.cmd === true && !dv.file && Date.now() - Date.parse(dv.at) >= 119000, `Ohne Beschreibung: ${JSON.stringify(dv)}`);
+    const one = (id) => withTmp(() => boardData(proj)).meta.activity.background.find((x) => x.id === id);
+    let b = one('bt3st1d');
+    expect(b && b.state === 'running' && b.what === 'Selbsttest mit Browser' && b.code === null, `läuft: ${JSON.stringify(b)}`);
+    expect(one('bdev0001').state === 'unknown', `ohne Datei: ${JSON.stringify(one('bdev0001'))}`);
+    // Das Ende ändert den Fingerabdruck des Boards, damit offene Tabs ohne neuen Werkzeugaufruf nachladen.
+    const sig0 = withTmp(() => signature(proj));
+    fs.appendFileSync(out, 'noch eine Zeile\n');
+    expect(withTmp(() => signature(proj)) === sig0, 'Neue Ausgabe eines laufenden Befehls lädt das Board neu');
+    fs.appendFileSync(out, '\n[exited with code 3]\n');
+    b = one('bt3st1d');
+    expect(b.state === 'done' && b.code === 3 && Date.parse(b.end) >= Date.parse(b.at), `fertig: ${JSON.stringify(b)}`);
+    expect(withTmp(() => signature(proj)) !== sig0, 'Board merkt das Ende eines Hintergrundbefehls nicht');
+    // Ins Board gehen Stand und Exit-Code, weder Pfad noch Inhalt der Ausgabe; der Export enthält gar nichts davon.
+    const all = JSON.stringify(withTmp(() => boardData(proj)));
+    expect(!all.includes('geheime Ausgabe') && !all.includes('bt3st1d.output') && !all.includes('p0selftest'), 'Board-Daten enthalten Ausgabe oder Pfad');
+    expect(!withTmp(() => buildSnapshot(proj, { images: false }).html).includes('Selbsttest mit Browser'), 'Export enthält Hintergrundbefehle');
+    // Gelesen wird nur unter <tmp>/claude und nur *.output. Fehlt die Datei, gilt der Befehl als beendet ohne Code.
+    // Vor über einer Stunde beendete fallen weg, laufende bleiben.
+    const fremd = path.join(base, 'fremd.output');
+    fs.writeFileSync(fremd, '[exited with code 5]\n');
+    const txt = bgOutput('sbg', 'btxt0001').replace(/\.output$/, '.txt');
+    fs.writeFileSync(txt, '[exited with code 6]\n');
+    const twoH = new Date(Date.now() - 2 * 3600000);
+    const oldDone = bgOutput('sbg', 'bold0001');
+    fs.writeFileSync(oldDone, 'x\n\n[exited with code 0]\n');
+    fs.utimesSync(oldDone, twoH, new Date(twoH.getTime() + 60000));
+    const oldRun = bgOutput('sbg', 'boldrun1');
+    fs.writeFileSync(oldRun, 'läuft noch\n');
+    const a = act();
+    const x = (id, file, at = new Date().toISOString()) => ({ id, task: '', tool: 'Bash', what: `Test ${id}`, at, file });
+    a.background = [...a.background, x('bfremd01', fremd), x('btxt0001', txt), x('bgone001', bgOutput('sbg', 'bgone001')), x('bold0001', oldDone, twoH.toISOString()), x('boldrun1', oldRun, twoH.toISOString())];
+    fs.writeFileSync(actF, JSON.stringify(a));
+    expect(one('bfremd01').state === 'unknown' && one('btxt0001').state === 'unknown', `Pfad außerhalb oder ohne .output gelesen: ${JSON.stringify([one('bfremd01'), one('btxt0001')])}`);
+    expect(one('bgone001').state === 'done' && one('bgone001').code === null, `fehlende Datei: ${JSON.stringify(one('bgone001'))}`);
+    expect(!one('bold0001') && one('boldrun1') && one('boldrun1').state === 'running', 'vor über einer Stunde beendet wird gezeigt oder ein alter laufender fehlt');
+    // Höchstens zehn Einträge, der neueste zuerst; der Hook räumt dabei alte fertige auf.
+    for (let i = 0; i < 5; i++) bgCall(`bmany00${i}`, { command: `sleep ${i}`, description: `Warten ${i}` });
+    const ids = act().background.map((y) => y.id);
+    expect(ids.length === 10 && ids[0] === 'bmany004' && !ids.includes('bold0001') && !ids.includes('boldrun1'), `Liste: ${ids.join(', ')}`);
+    // Aufräumen, damit spätere Schritte und die Browserprüfung eigene Einträge haben.
+    fs.writeFileSync(actF, JSON.stringify({ ...act(), background: [] }));
+  });
+
   if (hasGit) {
     await step('Dateien: Commits mit ID, works file, Hinweis beim Edit', () => {
       git(['add', '-A']); git(['commit', '-q', '-m', 'chore: start']);
@@ -868,7 +945,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   await step('Live-Board: Start, Seite, Daten, API, Rückgängig, Stopp', async () => {
     for (let p = 47900 + Math.floor(Math.random() * 80); p < 48000 && !port; p++) port = await free(p) ? p : 0;
     expect(port, 'Kein freier Port');
-    has(w(['board', '--serve', '--detach', `--port=${port}`]).out, `:${port}`);
+    // Mit dem Temp-Ordner des Tests, damit das Board die Ausgabe von Hintergrundbefehlen dort liest (W-0059).
+    has(w(['board', '--serve', '--detach', `--port=${port}`], { extraEnv: tmpVars }).out, `:${port}`);
     const url = `http://127.0.0.1:${port}`;
     const html = await (await fetch(url + '/')).text();
     has(html, 'data-view="live"', 'Seite'); has(html, 'id="viewLive"', 'Seite');
@@ -959,6 +1037,17 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const nid = (w(['new', '--type=chore', '--title=Heute schon erledigt', '--priority=P4']).out.match(/W-\d+/) || [])[0];
       w(['done', nid, '--confirm', '--force', '--reason=Selbsttest']);
     }
+    // Hintergrundbefehle für die Live-Ansicht (W-0059): einer läuft, einer endete mit 0, einer mit 3.
+    const bgRun = bgOutput('s9', 'bbrun001');
+    fs.writeFileSync(bgRun, 'läuft\n');
+    for (const [id, what, code] of [['bbok0001', 'Build im Hintergrund', 0], ['bbbad001', 'Tests mit Browser', 3], ['bbrun001', 'Selbsttest im Hintergrund', null]]) {
+      if (code !== null) fs.writeFileSync(bgOutput('s9', id), 'Ausgabe\n');
+      hook('post-tool.mjs', { cwd: proj, session_id: 's9', tool_name: 'Bash', tool_input: { command: `node lang.js ${id}`, description: what, run_in_background: true }, tool_response: { stdout: '', stderr: '', backgroundTaskId: id } }, tmpVars);
+      if (code !== null) fs.appendFileSync(bgOutput('s9', id), `\n[exited with code ${code}]\n`);
+    }
+    const bgd = (await (await fetch(url + '/data.json')).json()).meta.activity.background || [];
+    const bgSt = (id) => { const y = bgd.find((z) => z.id === id); return y ? `${y.state}:${y.code}` : '-'; };
+    expect(bgSt('bbrun001') === 'running:null' && bgSt('bbok0001') === 'done:0' && bgSt('bbbad001') === 'done:3', `Hintergrundbefehle in data.json: ${JSON.stringify(bgd)}`);
     // Eine frische Dateiänderung für den Diff im Verlauf (W-0011), vor der Freigabe, damit sie diese nicht ersetzt.
     hook('post-tool.mjs', { cwd: proj, session_id: 's9', tool_name: 'Edit', tool_input: { file_path: path.join(proj, 'src', 'bot', 'backup.ts') }, tool_response: {} });
     // Claude wartet auf eine Freigabe für W-0002: Desktop zeigt das, der Stop-Hook beendet es vor der Handyprüfung.
@@ -993,7 +1082,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         expect(!kitDirs().some((d) => !before.has(d)), `Szenario hat nicht aufgeräumt: ${kitDirs().filter((d) => !before.has(d)).join(', ')}`);
       }
     }
-    if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }));
+    if (browser) await browserCheck(url, log, () => hook('stop-reminder.mjs', { cwd: proj, session_id: 's9', stop_hook_active: true }), () => fs.appendFileSync(bgRun, '\n[exited with code 0]\n'));
     w(['checks', 'remove', ...many]);
   });
   w(['board', '--stop'], { ok: false });
@@ -3066,7 +3155,7 @@ async function launchChromium(log) {
 }
 
 // between: läuft zwischen Desktop- und Handyprüfung, hier setzt der Stop-Hook Claude auf untätig.
-async function browserCheck(url, log, between = async () => {}) {
+async function browserCheck(url, log, between = async () => {}, bgEnd = () => {}) {
   const b = await launchChromium(log);
   if (!b) return;
   const errs = [];
@@ -3139,6 +3228,21 @@ async function browserCheck(url, log, between = async () => {}) {
     if (!/Verbrauch heute .*Tokens, ca\. [\d,]+ \$/.test(use.replace(/\s+/g, ' '))) errs.push(`Live: Verbrauch heute fehlt (${use})`);
     if (!/Freigabe für einen Befehl/.test(perm.first)) errs.push(`Live: Freigabe nicht erster Punkt in Wartet auf dich (${perm.first})`);
     if (!perm.pulse || !/^Freigabe/.test(perm.title)) errs.push(`Live: Reiter oder Titel ohne Freigabe (${perm.title})`);
+    // Hintergrundbefehle (W-0059): Abschnitt „Im Hintergrund“ mit dem laufenden Befehl und seiner Laufzeit, fertige mit
+    // Exit-Code (0 grün, sonst rot). Endet der laufende, zeigt das Board das ohne Neuladen der Seite.
+    const bgv = () => p.evaluate(() => {
+      const s = document.querySelector('#viewLive [data-lv-bg]');
+      const head = s && s.previousElementSibling ? s.previousElementSibling.innerText : '';
+      return s ? { head, text: s.innerText.replace(/\s+/g, ' '), run: s.querySelectorAll('.ck.running').length, since: !!s.querySelector('.ck.running [data-since]'), ok: s.querySelectorAll('.ck.ok').length, bad: s.querySelectorAll('.ck.bad').length } : null;
+    });
+    const bg1 = await bgv();
+    if (!bg1 || !/Im Hintergrund/.test(bg1.head)) errs.push('Live: Abschnitt Im Hintergrund fehlt');
+    else {
+      if (bg1.run !== 1 || !bg1.since || !/Selbsttest im Hintergrund/.test(bg1.text) || !/läuft \d/.test(bg1.text)) errs.push(`Live: laufender Hintergrundbefehl ohne Laufzeit (${bg1.text})`);
+      if (bg1.ok !== 1 || bg1.bad !== 1 || !/Tests mit Browser/.test(bg1.text) || !/Exit-Code 3/.test(bg1.text) || !/Exit-Code 0/.test(bg1.text)) errs.push(`Live: fertige Hintergrundbefehle ohne Exit-Code (${bg1.text})`);
+      bgEnd();
+      try { await p.waitForFunction(() => document.querySelectorAll('#viewLive [data-lv-bg] .ck.ok').length === 2 && !document.querySelector('#viewLive [data-lv-bg] .ck.running'), null, { timeout: 15000 }); } catch { errs.push(`Live: Ende des Hintergrundbefehls erscheint nicht (${((await bgv()) || {}).text})`); }
+    }
     // Diff im Verlauf (W-0011): Verlauf aller Aufgaben, ein Dateieintrag klappt seinen Diff auf.
     await p.click('#viewLive [data-lv-feed="1"]'); await p.waitForTimeout(300);
     if (!(await p.$('#viewLive [data-lv-diff]'))) errs.push('Live: kein aufklappbarer Dateieintrag im Verlauf');
