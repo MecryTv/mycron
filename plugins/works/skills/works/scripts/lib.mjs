@@ -201,9 +201,19 @@ export function readJson(p, fallback = null) {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; }
 }
 
+// In einem Zug (W-0060): erst in eine Zwischendatei daneben, dann umbenennen. Wer die Datei gerade liest (Bot, Board,
+// anderer Prozess), sieht so den alten oder den neuen Stand, nie eine halbe Datei. Unter Windows kann ein Leser oder
+// Virenscanner das Ziel kurz sperren, dann ein paar Versuche.
 export function writeJson(p, data) {
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(data, null, 2) + '\n');
+  const tmp = `${p}.${process.pid}.${crypto.randomBytes(3).toString('hex')}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n');
+  for (let i = 0; ; i++) {
+    try { fs.renameSync(tmp, p); return; } catch (e) {
+      if (i >= 40 || !['EPERM', 'EACCES', 'EBUSY'].includes(e.code)) { try { fs.unlinkSync(tmp); } catch { /* schon weg */ } throw e; }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+    }
+  }
 }
 
 export function deepMerge(base, over) {
