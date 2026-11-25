@@ -38,7 +38,7 @@ import { setDirection, addVariant, addBrainstorm, chooseVariant, removeVariant, 
 import { addInstruction } from './live.mjs';
 import { loadKnowledge, addKnowledge, updateKnowledge, removeKnowledge } from './knowledge.mjs';
 import { rules, KINDS, dueRules, fillTitle, describe, upcoming } from './recurring.mjs';
-import { serveHub, projectList, registerProject, runningBoards } from './hub.mjs';
+import { serveHub, projectList, registerProject, runningBoards, sendTabsToHub } from './hub.mjs';
 import { syncGithub, syncSettings, syncState, DEFAULT_SYNC } from './ghsync.mjs';
 import { buildIcal } from './ical.mjs';
 import { undo, undoList, snapshot, snapshotRestore } from './undo.mjs';
@@ -921,20 +921,6 @@ async function openBoardOnce(info, wait = 0) {
       : openInBrowser(serverUrl(info)));
 }
 
-// W-0049: Ein offener works-Tab eines laufenden Boards wechselt zum Hub (Ereignis hub über die API mit dem lokalen
-// Token aus /boards); ohne offenen Tab öffnet sich der Hub im Browser.
-async function showHub(hubUrl) {
-  for (const b of runningBoards()) {
-    if (!await boardTabs(b)) continue;
-    try {
-      const { token } = await (await fetch(`http://127.0.0.1:${b.port}/boards`, { signal: AbortSignal.timeout(1500) })).json();
-      const r = await fetch(`http://127.0.0.1:${b.port}/api/hub`, { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'show' }), signal: AbortSignal.timeout(1500) });
-      if (r.ok) { out(tr('The open works tab switches to the hub.')); return; }
-    } catch { /* nächstes Board */ }
-  }
-  out(openInBrowser(hubUrl));
-}
-
 function printShare(root, info) {
   if (!info || !['0.0.0.0', '::'].includes(info.host)) return;
   const links = shareLinks(root, info.port);
@@ -1012,7 +998,10 @@ async function cmdBoard() {
         const hubUrl = `${other.url}hub`;
         out(tr('Another works board is already running, so none starts here. Hub with all projects: {url}', { url: hubUrl }));
         out(tr('Open this project there with "Open board", or start it anyway: works board --serve --detach --no-hub'));
-        if (flags.open) await showHub(hubUrl);
+        // W-0057: Offene works-Tabs der laufenden Boards wechseln immer zum Hub, auch ohne --open. Ist keiner offen,
+        // öffnet nur --open den Hub im Browser.
+        if (await sendTabsToHub()) out(tr('The open works tab switches to the hub.'));
+        else if (flags.open) out(openInBrowser(hubUrl));
         return;
       }
     }

@@ -1201,6 +1201,54 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  // W-0057: Startet ein weiteres Board (direkt oder über den Hub), schickt der neue Server die offenen works-Tabs aller
+  // anderen laufenden Boards sofort zum Hub (Ereignis hub, ohne auf die 5-s-Abfrage zu warten). Ein umgeleiteter Start
+  // (W-0049) tut das auch ohne --open. Ein Neustart desselben Boards zählt nicht. Ein Tab ist ein gelesener /events-Stream.
+  await step('Hub: weiteres Board schickt offene Tabs anderer Boards sofort zum Hub, Neustart nicht (W-0057)', async () => {
+    if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
+    if (!fs.existsSync(path.join(other, '.works', 'config.json'))) { fs.mkdirSync(other, { recursive: true }); w(['init'], { cwd: other }); }
+    const ctrl = new AbortController();
+    const tabAt = async (port) => {
+      const res = await fetch(`http://127.0.0.1:${port}/events`, { signal: ctrl.signal });
+      const reader = res.body.getReader();
+      const t = { text: '', hub: () => t.text.includes('event: hub') };
+      (async () => { try { for (;;) { const { value, done } = await reader.read(); if (done) return; t.text += Buffer.from(value).toString(); } } catch { /* abgebrochen */ } })();
+      return t;
+    };
+    const heard = (t, what) => waitFor(async () => t.hub(), `Tab bekam kein Signal zum Hub: ${what}`, 4000);
+    try {
+      const a = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`]).out);
+      let tabA = await tabAt(a);
+      // B startet ausdrücklich (--no-hub): Tab A wechselt, ohne --open.
+      const b = portOf(w(['board', '--serve', '--detach', '--no-hub', `--port=${await highPort()}`], { cwd: other }).out);
+      expect(a && b && a !== b, `Zwei Boards erwartet: ${a}, ${b}`);
+      await heard(tabA, 'B startet mit --no-hub');
+      // Neustart von A ist kein weiteres Board: Der Tab an B bleibt still, auch der neu verbundene Tab an A.
+      const tabB = await tabAt(b);
+      w(['board', '--restart']);
+      tabA = await tabAt(a);
+      await new Promise((r) => setTimeout(r, 2000));
+      expect(!tabB.hub() && !tabA.hub(), `Neustart von A schickte Tabs zum Hub: B ${tabB.hub()}, A ${tabA.hub()}`);
+      // B startet über den Hub („Öffnen“ bei einem gestoppten Projekt): Tab A wechselt.
+      w(['board', '--stop'], { cwd: other });
+      const token = ((await (await fetch(`http://127.0.0.1:${a}/hub`)).text()).match(/"token":"([a-f0-9]{20,})"/) || [])[1];
+      const r = await (await fetch(`http://127.0.0.1:${a}/api/hub`, { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'open', path: other }) })).json();
+      expect(r.url, `Öffnen im Hub hat B nicht gestartet: ${JSON.stringify(r)}`);
+      await heard(tabA, 'B startet über den Hub');
+      // Umgeleiteter Start (W-0049) ohne --open: In B startet nichts, Tab A wechselt trotzdem, kein neuer Browser-Tab.
+      w(['board', '--stop'], { cwd: other });
+      tabA = await tabAt(a);
+      const out = w(['board', '--serve', '--detach'], { cwd: other }).out;
+      has(out, 'wechselt zum Hub', 'umgeleiteter Start ohne --open mit offenem Tab');
+      expect(!out.includes('Im Browser geöffnet') && !fs.existsSync(path.join(other, '.works', 'server.json')), `umgeleiteter Start: ${out}`);
+      await heard(tabA, 'umgeleiteter Start ohne --open');
+    } finally {
+      ctrl.abort();
+      w(['board', '--stop'], { ok: false });
+      w(['board', '--stop'], { cwd: other, ok: false });
+    }
+  });
+
   // Im Browser: Ein offenes Board wechselt zum Hub, sobald ein zweites startet. Öffnen zeigt ein Board im selben Tab.
   if (browser) {
     await step('Hub im Browser: Wechsel beim zweiten Board, Öffnen im selben Tab', async () => {
@@ -1222,6 +1270,50 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         await p.waitForURL(new RegExp(`:${b}/`), { timeout: 10000 }); await p.waitForSelector('.card');
         await p.waitForSelector('#hubLink:not([hidden])', { timeout: 10000 });
         has(await p.locator('#hubLink').textContent(), '2 Boards', 'Hub-Link');
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        w(['board', '--stop'], { ok: false });
+        w(['board', '--stop'], { cwd: other, ok: false });
+      }
+    });
+  }
+
+  // W-0057 im Browser: Wer im Hub ein gestopptes Projekt öffnet, bleibt auf dessen Board, auch über eine Abfrage und einen
+  // Neustart eines anderen Boards hinweg; der schon offene Tab des alten Boards wechselt zum Hub. Ein aus dem Hub geöffneter
+  // Tab, der schon offen war, als ein weiteres Board startet, wechselt ebenfalls.
+  if (browser) {
+    await step('Hub im Browser: Board aus dem Hub bleibt, alte Tabs wechseln beim nächsten Board (W-0057)', async () => {
+      if (!fs.existsSync(path.join(other, '.works', 'config.json'))) { fs.mkdirSync(other, { recursive: true }); w(['init'], { cwd: other }); }
+      if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eine Karte']); }
+      w(['board', '--stop'], { cwd: other, ok: false });
+      const br = await launchChromium(log);
+      if (!br) return;
+      try {
+        const pa = await highPort();
+        const a = portOf(w(['board', '--serve', '--detach', `--port=${pa}`]).out);
+        const ctx = await br.newContext({ viewport: { width: 1280, height: 900 } });
+        const errs = [];
+        const open = async (url) => { const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message)); await p.goto(url); return p; };
+        const old = await open(`http://127.0.0.1:${a}/`); await old.waitForSelector('.card');
+        const hub = await open(`http://127.0.0.1:${a}/hub`);
+        await hub.locator('[data-op="open"][data-name="zweites"]').click();
+        await hub.waitForURL(/\?from=hub$/, { timeout: 15000 }); await hub.waitForSelector('.card');
+        const b = new URL(hub.url()).port;
+        expect(b && b !== a, `Öffnen im Hub zeigt nicht das neue Board: ${hub.url()}`);
+        await old.waitForURL(/\/hub$/, { timeout: 5000 });
+        // Ein zweiter Tab am neuen Board ohne ?from=hub; dann startet A neu. Beide bleiben über mehr als eine Abfrage.
+        const plain = await open(`http://127.0.0.1:${b}/`); await plain.waitForSelector('.card');
+        w(['board', '--restart']);
+        await hub.waitForTimeout(7000);
+        expect(new URL(hub.url()).port === b && !/\/hub$/.test(hub.url()), `Board aus dem Hub sprang weg: ${hub.url()}`);
+        expect(new URL(plain.url()).port === b && !/\/hub$/.test(plain.url()), `Neustart von A schickte den Tab zum Hub: ${plain.url()}`);
+        // Ein weiteres Board startet (A nach einem Stopp): auch der aus dem Hub geöffnete Tab wechselt.
+        await old.close();
+        w(['board', '--stop']);
+        w(['board', '--serve', '--detach', `--port=${pa}`]);
+        await hub.waitForURL(/\/hub$/, { timeout: 5000 });
+        await plain.waitForURL(/\/hub$/, { timeout: 5000 });
         expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
       } finally {
         await br.close();

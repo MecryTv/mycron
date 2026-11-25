@@ -10,7 +10,7 @@ import { boardData, renderBoard, refreshBoardIfPresent } from './board.mjs';
 import { generateIndex } from './views.mjs';
 import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload, backupPreview, setLang } from './api.mjs';
 import { buildIcal } from './ical.mjs';
-import { registerProject, runningBoards, projectsBrief, hubHtml, hubAction } from './hub.mjs';
+import { registerProject, runningBoards, projectsBrief, hubHtml, hubAction, sendTabsToHub } from './hub.mjs';
 import { syncSettings, syncState } from './ghsync.mjs';
 import { dueRules } from './recurring.mjs';
 import { loadConfig, loadTasks } from './lib.mjs';
@@ -473,6 +473,9 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
       ensureGitignore(root, ['server.json', 'server-last.json', 'server.log', '.tmp/', 'share.json', 'activity.json', 'steps.json', 'instructions.json', '.undo/', '.usage-state.json', 'github.json', 'lanes.json', 'files.jsonl', '.filemap.json', '.file-hints.json']);
       writeServer(root, { pid: process.pid, port: p, host, version: runningVersion(), cli: OWN_CLI, started: new Date().toISOString() });
       rememberPort(root, p, host);
+      // W-0057: Ein weiteres Board läuft: Die offenen Tabs der anderen Boards wechseln sofort zum Hub, der es schon zeigt.
+      // Übernimmt der Server von einem Vorgänger desselben Projekts (Neustart, neue Version, takeover), ist es kein neues Board.
+      if (!takeover) sendTabsToHub({ except: root }).catch(() => {});
       const url = `http://${host === '0.0.0.0' || host === '::' ? 'localhost' : host}:${p}/`;
       process.stdout.write(`${tr('Live board running: {url}', { url })}\n${tr('Watching {dir}', { dir: wd })}\n${tr('Stop with Ctrl+C.')}\n`);
       if (shared) {

@@ -4043,18 +4043,30 @@
   };
   applyTheme();
 
-  // Hub (W-0025): Laufen mehrere Boards, führt oben ein Link zur Übersicht. Wird aus einem Board zwei,
-  // wechselt der Tab von selbst dorthin. Ein Board, das aus dem Hub geöffnet wurde (?from=hub), bleibt offen.
+  // Hub (W-0025): Laufen mehrere Boards, führt oben ein Link zur Übersicht. Startet ein weiteres Board, wechselt der Tab
+  // zum Hub (W-0057): sofort über das Ereignis hub, das der neue Server schickt, sonst spätestens mit dieser Abfrage.
+  // Sie vergleicht Kennungen statt der Anzahl. Was bei der ersten Abfrage schon läuft, ist der Ausgangsstand; so bleibt
+  // ein Tab, der gerade für das neue Board geöffnet wurde (etwa aus dem Hub), auf seinem Board. Ein Board, das bei einer
+  // Abfrage fehlte und binnen zwei Minuten wieder da ist, wurde neu gestartet (Neustart, neue Version) und zählt nicht.
+  // Zwei Minuten, weil der Browser die Abfrage in Hintergrund-Tabs auf einmal pro Minute drosseln kann.
   if (LIVE && EDIT) {
     const hubLink = $('#hubLink');
-    const fromHub = new URLSearchParams(location.search).has('from');
-    let boardCount = null;
+    const RESTART_MS = 120000;
+    let last = null;
+    const missing = new Map();
     const pollBoards = async () => {
       if (orphan) return;
-      let n;
-      try { const r = await fetch('/boards', { cache: 'no-store' }); if (!r.ok) return; n = (await r.json()).boards.length; } catch (e) { return; }
-      if (boardCount !== null && boardCount < 2 && n >= 2 && !fromHub) { location.href = '/hub'; return; }
-      boardCount = n;
+      let ids;
+      try { const r = await fetch('/boards', { cache: 'no-store' }); if (!r.ok) return; ids = ((await r.json()).boards || []).map((b) => b.id); } catch (e) { return; }
+      const now = Date.now();
+      if (last) {
+        for (const id of last) if (!ids.includes(id) && !missing.has(id)) missing.set(id, now);
+        const added = ids.some((id) => !last.includes(id) && !(missing.has(id) && now - missing.get(id) < RESTART_MS));
+        for (const id of ids) missing.delete(id);
+        if (added && ids.length >= 2) { location.href = '/hub'; return; }
+      }
+      last = ids;
+      const n = ids.length;
       hubLink.hidden = n < 2;
       hubLink.textContent = tr('← Hub ({n} boards)', { n });
     };
@@ -4115,7 +4127,8 @@
       reload().then(() => { if (!orphan && langChanged(meta)) location.reload(); });
     });
     es.addEventListener('restart', () => { first = true; setLive(true, tr('New version starting')); });
-    // W-0049: works board in einem anderen Projekt zeigt den Hub statt eines zweiten Boards; dieser Tab wechselt dorthin.
+    // Ein weiteres Board ist gestartet (W-0057) oder works board in einem anderen Projekt zeigt den Hub statt eines zweiten
+    // Boards (W-0049): Dieser Tab wechselt zum Hub, auch wenn er aus dem Hub geöffnet wurde.
     es.addEventListener('hub', () => { if (EDIT) location.href = '/hub'; });
     es.onopen = () => { if ($('#live').classList.contains('off')) setLive(true, 'Live'); };
     es.onerror = () => setLive(false, tr('Disconnected, retrying'));
