@@ -29,6 +29,8 @@
   const ROOT_ID = meta.rootId || '';
   const isForeign = (m) => !!(m && m.rootId && ROOT_ID && m.rootId !== ROOT_ID);
   let orphan = false;
+  // Das eigene Board wurde gewollt beendet (W-0054). Dann ist auch orphan gesetzt, das sperrt Neuladen und Abfragen.
+  let ended = false;
   let liveSource = null;
   // Neue Version oder andere Sprache (works lang): Seite neu laden, damit Texte und Skript passen.
   const outdated = (m) => !!m && ((m.version && PAGE_VERSION && m.version !== PAGE_VERSION) || (m.server && PAGE_SERVER && m.server !== PAGE_SERVER) || (BOOT.i18n && m.lang && m.lang !== I18N.lang));
@@ -1301,6 +1303,100 @@
     };
   }
 
+  // Gewollt beendetes Board (W-0054, Entwurf B): works board --stop, „Stoppen“ im Hub oder Strg+C. Der Server schickt
+  // vorher ended mit dem, was der Tab danach anbieten kann (endInfo in hub.mjs). Der Tab springt nicht mehr zum Hub, das
+  // ergab einen zweiten Hub-Tab. Er versucht sich zu schließen; Browser erlauben das nur in bestimmten Fällen, etwa bei
+  // Tabs, die ein Skript geöffnet hat. Bleibt er offen, zeigt er eine ruhige Karte über dem grauen, gesperrten letzten
+  // Stand. Bricht nur die Verbindung ab, bleibt alles wie bisher.
+  const FAV_ENDED = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='14' rx='4' fill='%239aa3b2'/%3E%3Cpath d='M5 8h6' stroke='%23fff' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E";
+  function boardEnded(d) {
+    if (ended || orphan) return;
+    ended = true;
+    orphan = true;
+    afterSave = null;
+    if (liveSource) liveSource.close();
+    setLive(false, tr('Ended'));
+    document.title = baseTitle();
+    const fav = $('#favicon');
+    if (fav) fav.href = FAV_ENDED;
+    // Eine offene Eingabe nicht still mit dem Tab schließen.
+    if (!dirty) { try { window.close(); } catch (e) { /* nicht erlaubt */ } }
+    setTimeout(() => showEndCard(d), 300);
+    // Läuft das eigene Board wieder auf diesem Port (works board --serve, „Öffnen“ im Hub), lädt der Tab neu und ist
+    // wieder live wie nach einem Neustart (W-0031); alle 2 s, damit --open ihn mitzählt. Der alte Server (gleiche
+    // Kennung, kurz vor dem Ende) und ein anderes Projekt auf dem Port ändern nichts.
+    const back = setInterval(async () => {
+      try {
+        const m = (await (await fetch('data.json', { cache: 'no-store' })).json()).meta || {};
+        if (ROOT_ID && m.rootId === ROOT_ID && m.server && m.server !== PAGE_SERVER) { clearInterval(back); location.reload(); }
+      } catch (e) { /* noch aus */ }
+    }, 2000);
+  }
+
+  // Erstes erreichbares Board der Liste. no-cors: Der Inhalt bleibt fremd, es zählt nur, ob der Server antwortet.
+  async function firstAlive(urls) {
+    for (const u of urls) { try { await fetch(u + 'tabs', { mode: 'no-cors', cache: 'no-store' }); return u; } catch (e) { /* läuft nicht */ } }
+    return '';
+  }
+
+  function showEndCard(d) {
+    const veil = $('#endVeil');
+    const own = esc(meta.project);
+    // Die Angaben zu anderen Boards gibt es nur für lokale Tabs; geteilte Links sehen nur das Ende, ohne Knöpfe.
+    const local = EDIT && Array.isArray(d.boards);
+    const boards = local ? d.boards.filter((b) => b && b.url) : [];
+    const start = local && d.start && d.start.board && d.start.ticket ? d.start : null;
+    const gone = tr('The board is no longer running, nothing here will change.');
+    // Bleibt nur ein Board, folgt ein offener Hub ihm (W-0032); dann zeigt der andere Tab dieses Board, nicht den Hub.
+    const say = !local ? ''
+      : !boards.length ? tr('No other board is running right now.')
+      : d.hubs && boards.length >= 2 ? tr('The hub is already open in another tab.')
+      : d.tabs && boards.length === 1 ? tr('{project} is already open in another tab.', { project: esc(boards[0].name) })
+      : d.tabs ? tr('works is already open in another tab.')
+      : tr('works is not open in any other tab right now.');
+    const cmd = '<p class="end-cmd">' + tr('To start it again: {cmd} in the project folder.', { cmd: '<code>works board --serve</code>' }) + '</p>';
+    const acts = (boards.length ? '<a class="btn" id="endHub" href="' + esc(boards[0].url) + 'hub">' + tr('Open the hub here') + '</a>' : '') +
+      (start ? '<button type="button" class="btn" id="endStart">' + tr('Start {project} again', { project: own }) + '</button>' : '');
+    const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    const keys = mac ? '<kbd>⌘</kbd>+<kbd>W</kbd>' : '<kbd>' + tr('Ctrl') + '</kbd>+<kbd>W</kbd>';
+    veil.innerHTML = '<div class="end-card" role="alertdialog" aria-modal="true" aria-labelledby="endT" aria-describedby="endD" tabindex="-1">' +
+      '<span class="end-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/><path d="M3 3l18 18"/></svg></span>' +
+      '<h2 id="endT">' + tr('{project} has ended', { project: own }) + '</h2>' +
+      '<p id="endD">' + gone + (say ? ' ' + say : '') + '</p>' +
+      (acts ? '<div class="end-acts">' + acts + '</div>' : '') + (local && !start ? cmd : '') +
+      '<p class="end-hint"><span class="end-key">' + tr('{keys} closes this tab.', { keys }) + '</span><span class="end-touch">' + tr('You can close this tab.') + '</span></p></div>';
+    if (dlg.open) dlg.close();
+    pal.hidden = true;
+    for (const el of document.body.children) if (el !== veil && el.tagName !== 'SCRIPT') el.inert = true;
+    document.body.classList.add('ended');
+    veil.hidden = false;
+    // Tasten erreichen das Board nicht mehr (N, /, Ziffern, Schnellsuche). Tab, Enter und Leertaste wirken weiter.
+    const swallow = (e) => e.stopImmediatePropagation();
+    window.addEventListener('keydown', swallow, true);
+    window.addEventListener('keyup', swallow, true);
+    const card = $('.end-card', veil);
+    const focusFirst = () => ($('.btn', card) || card).focus();
+    // Ein Knopf fällt weg, wenn sein Board inzwischen auch nicht mehr läuft.
+    const drop = (b, html) => { const wrap = b.parentElement; b.remove(); if (html) wrap.insertAdjacentHTML('afterend', html); if (!wrap.children.length) wrap.remove(); focusFirst(); };
+    const hubBtn = $('#endHub', card);
+    if (hubBtn) hubBtn.onclick = async (e) => {
+      e.preventDefault();
+      const u = await firstAlive(boards.map((b) => b.url));
+      if (u) { location.href = u + 'hub'; return; }
+      $('#endD', card).textContent = gone + ' ' + tr('No other board is running right now.');
+      drop(hubBtn);
+    };
+    const startBtn = $('#endStart', card);
+    if (startBtn) startBtn.onclick = async () => {
+      startBtn.disabled = true;
+      startBtn.textContent = tr('{project} is starting …', { project: meta.project });
+      // Der Hub, der das Ticket ausgestellt hat, startet das Board und zeigt es danach in diesem Tab.
+      if (await firstAlive([start.board])) { location.href = start.board + 'hub#start=' + start.ticket; return; }
+      drop(startBtn, cmd);
+    };
+    focusFirst();
+  }
+
   async function reload() {
     if (orphan) return;
     // Während eine Karte gezogen wird, nicht neu zeichnen, sonst springt das Board unter dem Mauszeiger.
@@ -2372,7 +2468,7 @@
   const NDEF = { on: false, perm: true, review: true, question: true, p1: true, unblocked: false, queueEmpty: true, any: false, sound: true, title: true };
   let notifySet = { ...NDEF, ...store.get(NKEY, {}) };
   let hiddenCount = 0;
-  const baseTitle = () => (lvPermEntry() ? tr('Approval') + ' · ' : '') + 'Works ' + meta.project;
+  const baseTitle = () => (ended ? tr('Ended') + ' · ' + meta.project : (lvPermEntry() ? tr('Approval') + ' · ' : '') + 'Works ' + meta.project);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { hiddenCount = 0; document.title = baseTitle(); } });
 
   function beep() {
@@ -4277,6 +4373,8 @@
     // Boards (W-0049): Dieser Tab wechselt zum Hub, auch wenn er aus dem Hub geöffnet wurde. Mit offener Eingabe erst
     // nach dem Speichern oder Verwerfen.
     es.addEventListener('hub', () => { if (EDIT) goToHub(); });
+    // Das Board wurde gewollt beendet (W-0054): kein Neuverbinden, kein Sprung zum Hub.
+    es.addEventListener('ended', (e) => { let d = {}; try { d = JSON.parse(e.data) || {}; } catch (err) { d = {}; } boardEnded(d); });
     es.onopen = () => { if ($('#live').classList.contains('off')) setLive(true, 'Live'); };
     es.onerror = () => setLive(false, tr('Disconnected, retrying'));
     ensureMeta().then(() => { if (detail) renderDetail(); }).catch(() => {});

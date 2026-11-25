@@ -38,7 +38,7 @@ import { setDirection, addVariant, addBrainstorm, chooseVariant, removeVariant, 
 import { addInstruction } from './live.mjs';
 import { loadKnowledge, addKnowledge, updateKnowledge, removeKnowledge } from './knowledge.mjs';
 import { rules, KINDS, dueRules, fillTitle, describe, upcoming } from './recurring.mjs';
-import { serveHub, projectList, registerProject, runningBoards, sendTabsToHub } from './hub.mjs';
+import { serveHub, projectList, registerProject, runningBoards, sendTabsToHub, announceEnd } from './hub.mjs';
 import { syncGithub, syncSettings, syncState, DEFAULT_SYNC } from './ghsync.mjs';
 import { buildIcal } from './ical.mjs';
 import { undo, undoList, snapshot, snapshotRestore } from './undo.mjs';
@@ -979,6 +979,8 @@ async function cmdBoard() {
   }
   if (flags.stop) {
     let n = 0;
+    // W-0054: Gewolltes Ende vorher ankündigen. Die offenen Tabs zeigen dann „beendet“, statt sich neu zu verbinden.
+    if (info) await announceEnd(info);
     if (info && await stopProcess(info.pid)) { clearServer(root, info.pid); n++; }
     for (const p of legacy) if (await stopProcess(p.pid)) n++;
     out(n ? tr('{n} board server(s) stopped.', { n }) : tr('No live board running for this project.'));

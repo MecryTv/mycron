@@ -52,6 +52,14 @@ export function scenarioKit({ cli }) {
       return `http://127.0.0.1:${p}/`;
     },
     stop(cwd) { kit.works(cwd, ['board', '--stop'], { ok: false }); },
+    // Board ohne Ankündigung beenden wie bei einem Absturz (W-0054): Seine Tabs zeigen nicht „beendet“, sondern
+    // verbinden sich neu wie bisher. Wartet, bis der Port frei ist.
+    async crash(cwd) {
+      let info = null;
+      try { info = JSON.parse(fs.readFileSync(path.join(cwd, '.works', 'server.json'), 'utf8')); } catch { return; }
+      try { process.kill(info.pid); } catch { /* schon weg */ }
+      for (let i = 0; i < 50 && !(await freePort(info.port)); i++) await new Promise((r) => setTimeout(r, 100));
+    },
     // Hook von works auslösen, etwa permission.mjs für eine wartende Freigabe.
     hook(cwd, file, input = {}) {
       if (!/^[\w-]+\.mjs$/.test(file)) throw new Error(tr('Invalid hook: {file}', { file }));

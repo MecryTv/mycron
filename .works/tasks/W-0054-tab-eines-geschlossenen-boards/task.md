@@ -3,15 +3,15 @@ id: W-0054
 title: Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden
 type: feature
 priority: P3
-status: backlog
+status: erledigt
 effort:
 risk:
 created: 2026-11-24
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
-branch:
+branch: feature/w-0054-tab-eines-geschlossenen
 tags: [board, hub]
 blocked_by: []
 blocks: []
@@ -35,14 +35,15 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Wird ein Board beendet, während sein Tab offen ist und schon ein Hub-Tab offen ist, bleibt am Ende nur ein Hub-Tab
+- [x] Wird ein Board beendet, während sein Tab offen ist und schon ein Hub-Tab offen ist, bleibt am Ende nur ein Hub-Tab
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] Erkennen: Endet das Board eines Tabs, fragt der Tab die anderen laufenden Boards (/boards aus dem letzten Stand), ob dort schon ein works-Tab offen ist (/tabs, nur Zahl; dafür CORS nur für http://127.0.0.1:* und localhost)
-- [ ] Ist einer offen: window.close() versuchen; klappt das nicht (von Hand geöffnete Tabs darf eine Seite nicht schließen), statt eines zweiten Hubs eine schlichte Seite „Board beendet“ zeigen: Hinweis, dass der Hub schon in einem anderen Tab offen ist, Knopf „Hier den Hub öffnen“
-- [ ] Ist keiner offen: wie bisher zum Hub oder zum verbliebenen Board
-- [ ] Selbsttest (Browser): zwei Tabs, Board B endet, am Ende nur ein Hub-Tab; Doku board.md beide Sprachen
+- [x] Selbsttests zuerst (rot): works board --stop schickt den offenen Tabs vorher event: ended, --restart nicht; im Browser: Tab an Board B, B wird gestoppt, die Karte „… ist beendet“ erscheint, Titel „Beendet · …“, kein Sprung zum Hub, bei 390 px kein seitliches Scrollen
+- [x] Server: works board --stop (auch „Stoppen“ im Hub) kündigt das Ende über POST /api/hub {op:'end'} an, bevor es den Server beendet (unter Windows hart, ohne SIGTERM). Der Server zählt über /tabs der anderen laufenden Boards die offenen Tabs und Hub-Tabs, nennt einen anderen Hub und holt dort ein Einmal-Ticket für den Neustart, dann event: ended an alle Tabs. Ein Neustart (--restart, neue Version, Übergabe) sendet nichts; bricht nur die Verbindung ab, bleibt alles wie bisher (Neuverbinden, verwaister Tab W-0029)
+- [x] Board (Entwurf B): bei ended Verbindung zu, Neuladen gesperrt, kein Sprung zum Hub; window.close() versuchen, ist der Tab danach noch offen, die ruhige Karte über dem grauen, unscharfen Board zeigen: „Hier den Hub öffnen“ nur, wenn ein anderes Board läuft, „<Projekt> wieder starten“ über dessen Hub mit dem Ticket, sonst Hinweis auf works board --serve; Satz zum anderen Tab nur, wenn er stimmt; Strg+W bzw. ⌘W, auf Touch ohne Tastenkürzel; Titel „Beendet · <Projekt>“, graues Favicon
+- [x] Hub: #start=<Ticket> startet das Board und zeigt es im selben Tab; Hub-Seiten zählen unter /tabs zusätzlich als hubs
+- [x] Texte in de.json, Doku board.md in beiden Sprachen
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -51,14 +52,20 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 <!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Nachher, 1440 hell: Tab eines gestoppten Boards zeigt die Karte „beta ist beende](assets/2026-11-25-nachher-1440-hell-tab-eines-gestoppten-nachher.png)
+Beschreibung: Nachher, 1440 hell: Tab eines gestoppten Boards zeigt die Karte „beta ist beendet“ nach Entwurf B, Board grau und unscharf dahinter, Knöpfe Hier den Hub öffnen und beta wieder starten, Hinweis Strg+W
+Art: nachher · Hinzugefügt: 2026-11-25
+
+![Nachher, 390 dunkel: dieselbe Karte auf dem Handy ohne seitliches Scrollen](assets/2026-11-25-nachher-390-dunkel-dieselbe-karte-auf-nachher.png)
+Beschreibung: Nachher, 390 dunkel: dieselbe Karte auf dem Handy ohne seitliches Scrollen
+Art: nachher · Hinzugefügt: 2026-11-25
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 - [x] Vorschlag für den Fall, dass der Browser das Schließen verbietet: statt eines zweiten Hubs eine schlichte Seite „Board beendet“ mit Hinweis und Knopf „Hier den Hub öffnen“. Passt das so, oder soll ich vorher Entwürfe für diese Seite zeigen? Antwort: Nutzer am 2026-11-25: erst Entwürfe der Seite zeigen.
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -72,3 +79,19 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 - 2026-11-25: Entwürfe A bis C (Fable 5.2) angehängt; Tab-Titel „Beendet · mycron“ mit grauem Symbol in allen drei. Wartet auf die Wahl des Nutzers.
 - 2026-11-25: Entwurf B „Ruhige Karte in der Mitte“ gewählt. Grund: Nutzer am 2026-11-25: Beide B
 - 2026-11-25: Priorität: P3 → P3; incomplete: true → false
+- 2026-11-25: Parallel gestartet im Worktree W-0054-tab-eines-geschlossenen (Status: backlog → in-arbeit)
+- 2026-11-25: Abschnitt Umsetzungsplan aktualisiert
+- 2026-11-25: Umsetzungsplan an Entwurf B angepasst. Geprüft: Ein Tab am beendeten Board kann /boards anderer Boards nicht lesen und deren API nicht aufrufen (anderer Port = andere Herkunft, kein CORS, API prüft Origin und Token). Deshalb holt der stoppende Server die Angaben und ein Einmal-Ticket, der Neustart läuft über den Hub des anderen Boards im selben Tab.
+- 2026-11-25: Umsetzungsplan: "Selbsttests zuerst (rot): works board --stop schickt den offenen Tabs vorher event: ended, --restart nicht; im Browser: Tab an Board B, B wird gestoppt, die Karte „… ist beendet“ erscheint, Titel „Beendet · …“, kein Sprung zum Hub, bei 390 px kein seitliches Scrollen" abgehakt
+- 2026-11-25: Umsetzungsplan: "Server: works board --stop (auch „Stoppen“ im Hub) kündigt das Ende über POST /api/hub {op:'end'} an, bevor es den Server beendet (unter Windows hart, ohne SIGTERM). Der Server zählt über /tabs der anderen laufenden Boards die offenen Tabs und Hub-Tabs, nennt einen anderen Hub und holt dort ein Einmal-Ticket für den Neustart, dann event: ended an alle Tabs. Ein Neustart (--restart, neue Version, Übergabe) sendet nichts; bricht nur die Verbindung ab, bleibt alles wie bisher (Neuverbinden, verwaister Tab W-0029)" abgehakt
+- 2026-11-25: Umsetzungsplan: "Board (Entwurf B): bei ended Verbindung zu, Neuladen gesperrt, kein Sprung zum Hub; window.close() versuchen, ist der Tab danach noch offen, die ruhige Karte über dem grauen, unscharfen Board zeigen: „Hier den Hub öffnen“ nur, wenn ein anderes Board läuft, „<Projekt> wieder starten“ über dessen Hub mit dem Ticket, sonst Hinweis auf works board --serve; Satz zum anderen Tab nur, wenn er stimmt; Strg+W bzw. ⌘W, auf Touch ohne Tastenkürzel; Titel „Beendet · <Projekt>“, graues Favicon" abgehakt
+- 2026-11-25: Umsetzungsplan: "Hub: #start=<Ticket> startet das Board und zeigt es im selben Tab; Hub-Seiten zählen unter /tabs zusätzlich als hubs" abgehakt
+- 2026-11-25: Umsetzungsplan: "Texte in de.json, Doku board.md in beiden Sprachen" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Wird ein Board beendet, während sein Tab offen ist und schon ein Hub-Tab offen ist, bleibt am Ende nur ein Hub-Tab" abgehakt
+- 2026-11-25: Umgesetzt (Commit 8034cc8): works board --stop kündigt das Ende an, Tabs bekommen event: ended, Karte nach Entwurf B, Neustart über Einmal-Ticket im Hub eines anderen Boards. Ergänzt: Der beendete Tab wird wieder live, sobald sein Board auf demselben Port zurück ist (W-0031, sonst öffnete works board --open morgens einen zweiten Tab); Ursache einer roten Prüfung war der Socket, den Node nach dem Ende von der Antwort löst, deshalb schließt der Server ihn selbst. Selbsttest voll: 69/69 mit Browser, 59/59 ohne WebSocket.
+- 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
+- 2026-11-25: Parallele Arbeit beendet
+- 2026-11-25: Asset hinzugefügt: assets/2026-11-25-nachher-1440-hell-tab-eines-gestoppten-nachher.png (nachher)
+- 2026-11-25: Asset hinzugefügt: assets/2026-11-25-nachher-390-dunkel-dieselbe-karte-auf-nachher.png (nachher)
+- 2026-11-25: Abgeschlossen (Status: review → erledigt), DoD bestätigt

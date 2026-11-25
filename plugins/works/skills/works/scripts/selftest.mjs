@@ -1385,6 +1385,79 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  // W-0054: Endet ein Board gewollt (works board --stop, „Stoppen“ im Hub), bekommen seine offenen Tabs vorher das
+  // Ereignis ended mit dem, was sie danach anbieten können: offene Tabs und Hub-Tabs der anderen Boards, deren Adressen
+  // und ein Einmal-Ticket, mit dem der Hub eines anderen Boards dieses wieder startet. Ein Neustart schickt nichts.
+  // Ein Tab ist ein gelesener /events-Stream, eine Hub-Seite verbindet sich mit ?hub=1.
+  await step('Board-Ende: --stop kündigt den Tabs das Ende an, --restart nicht, Ticket startet neu (W-0054)', async () => {
+    if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
+    if (!fs.existsSync(path.join(other, '.works', 'config.json'))) { fs.mkdirSync(other, { recursive: true }); w(['init'], { cwd: other }); }
+    const open = [];
+    const tabAt = async (port, q = '') => {
+      const ctrl = new AbortController();
+      const res = await fetch(`http://127.0.0.1:${port}/events${q}`, { signal: ctrl.signal });
+      const reader = res.body.getReader();
+      const t = { text: '', close: () => ctrl.abort(), ended: () => { const m = t.text.match(/event: ended\ndata: (.*)\n/); return m ? JSON.parse(m[1]) : null; } };
+      (async () => { try { for (;;) { const { value, done } = await reader.read(); if (done) return; t.text += Buffer.from(value).toString(); } } catch { /* abgebrochen */ } })();
+      open.push(t);
+      return t;
+    };
+    const count = async (port) => { try { return await (await fetch(`http://127.0.0.1:${port}/tabs`)).json(); } catch { return {}; } };
+    const ended = async (t, what) => {
+      try { await waitFor(async () => t.ended(), what, 4000); } catch { throw new Error(`Tab bekam kein ended (${what}): ${JSON.stringify(t.text.slice(-300))}`); }
+      return t.ended();
+    };
+    try {
+      const a = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`]).out);
+      const b = portOf(w(['board', '--serve', '--detach', '--no-hub', `--port=${await highPort()}`], { cwd: other }).out);
+      expect(a && b && a !== b, `Zwei Boards erwartet: ${a}, ${b}`);
+      // An A ein Board-Tab und eine Hub-Seite, an B ein Board-Tab.
+      const boardA = await tabAt(a); const hubA = await tabAt(a, '?hub=1');
+      let tabB = await tabAt(b);
+      await waitFor(async () => { const c = await count(a); return c.tabs === 2 && c.hubs === 1; }, '/tabs an A zählt 2 Tabs, davon 1 Hub');
+      // Neustart von B ist kein Ende.
+      w(['board', '--restart'], { cwd: other });
+      await new Promise((r) => setTimeout(r, 1000));
+      expect(!tabB.ended(), `Neustart schickte ended: ${tabB.text.slice(-200)}`);
+      // Gewollter Stopp von B: ended mit den Tabs an A, der Adresse von A und einem Ticket.
+      tabB = await tabAt(b);
+      await waitFor(async () => (await count(b)).tabs === 1, 'Tab an B nach dem Neustart');
+      w(['board', '--stop'], { cwd: other });
+      const d = await ended(tabB, '--stop von B');
+      const urlA = `http://127.0.0.1:${a}/`;
+      expect(d.tabs === 2 && d.hubs === 1 && d.boards.length === 1 && d.boards[0].url === urlA && d.boards[0].name === 'projekt' && d.start && d.start.board === urlA && /^[a-f0-9]{32,}$/.test(d.start.ticket), `ended an B: ${JSON.stringify(d)}`);
+      expect(!boardA.ended() && !hubA.ended(), 'Tabs an A bekamen ended');
+      // Der Hub von A startet B mit dem Ticket genau einmal; ein fremdes Ticket startet nichts.
+      const token = ((await (await fetch(`${urlA}hub`)).text()).match(/"token":"([a-f0-9]{20,})"/) || [])[1];
+      const redeem = (ticket) => fetch(`${urlA}api/hub`, { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'redeem', ticket }) });
+      expect((await redeem('ab'.repeat(24))).status === 400, 'fremdes Ticket angenommen');
+      expect(!fs.existsSync(path.join(other, '.works', 'server.json')), 'fremdes Ticket hat B gestartet');
+      const r1 = await redeem(d.start.ticket);
+      const j1 = await r1.json();
+      const b2 = portOf(j1.url);
+      expect(r1.ok && b2 && fs.existsSync(path.join(other, '.works', 'server.json')), `Ticket startet B nicht: ${JSON.stringify(j1)}`);
+      expect((await redeem(d.start.ticket)).status === 400, 'Ticket ein zweites Mal angenommen');
+      // Ohne offene Tabs an A: tabs 0, A bleibt als Hub genannt.
+      boardA.close(); hubA.close();
+      await waitFor(async () => (await count(a)).tabs === 0, 'Tabs an A geschlossen');
+      tabB = await tabAt(b2);
+      await waitFor(async () => (await count(b2)).tabs === 1, 'Tab am neu gestarteten B');
+      w(['board', '--stop'], { cwd: other });
+      const d2 = await ended(tabB, 'zweiter Stopp von B');
+      expect(d2.tabs === 0 && d2.hubs === 0 && d2.boards.length === 1 && d2.start, `ended ohne Tabs an A: ${JSON.stringify(d2)}`);
+      // Letztes Board: kein Hub, kein Ticket.
+      const lastTab = await tabAt(a);
+      await waitFor(async () => (await count(a)).tabs === 1, 'Tab an A');
+      w(['board', '--stop']);
+      const d3 = await ended(lastTab, 'Stopp des letzten Boards');
+      expect(d3.tabs === 0 && !d3.boards.length && !d3.start, `ended beim letzten Board: ${JSON.stringify(d3)}`);
+    } finally {
+      for (const t of open) t.close();
+      w(['board', '--stop'], { ok: false });
+      w(['board', '--stop'], { cwd: other, ok: false });
+    }
+  });
+
   // Im Browser: Ein offenes Board wechselt zum Hub, sobald ein zweites startet. Öffnen zeigt ein Board im selben Tab.
   if (browser) {
     await step('Hub im Browser: Wechsel beim zweiten Board, Öffnen im selben Tab', async () => {
@@ -1616,7 +1689,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         p.on('pageerror', (e) => errs.push(e.message));
         await p.goto(`http://127.0.0.1:${port}/`); await p.waitForSelector('.card');
         expect(await p.locator('#orphanBar').isHidden(), 'Leiste sichtbar, obwohl das eigene Board läuft');
-        w(['board', '--stop']);
+        // Das Board endet ohne Ankündigung (abgestürzt, hart beendet). Nach works board --stop zeigt der Tab die Karte
+        // „beendet“ und verbindet sich nicht mehr neu (W-0054).
+        process.kill(JSON.parse(fs.readFileSync(path.join(proj, '.works', 'server.json'), 'utf8')).pid);
+        await waitFor(() => free(port), 'Port des beendeten Boards frei');
         w(['board', '--serve', '--detach', `--port=${port}`], { cwd: other });
         await p.waitForSelector('#orphanBar:not([hidden])', { timeout: 15000 });
         const bar = await p.locator('#orphanBar').textContent();
@@ -1799,6 +1875,85 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         w(['board', '--stop'], { cwd: kp, ok: false });
       }
       expect(!errs.length, errs.join('\n'));
+    });
+  }
+
+  // W-0054 im Browser: Wird ein Board gestoppt, wird sein Tab kein zweiter Hub. Ein Tab mit nur einer Seite im Verlauf
+  // schließt sich; einer mit Verlauf zeigt die ruhige Karte über dem grauen Board, Titel „Beendet · …“, graues Symbol.
+  // Drei Boards, damit der Hub-Tab beim Stopp eines Boards Hub bleibt (bei einem verbliebenen Board folgt er ihm, W-0032).
+  // „wieder starten“ läuft über den Hub eines anderen Boards und zeigt das Board danach im selben Tab.
+  // Eigene Projekte alpha, beta, gamma: frei von Freigaben und Aufgaben anderer Schritte.
+  // WORKS_SELFTEST_SHOTS=<Ordner>: Bilder der Karte (1440 hell, 390 dunkel) dorthin.
+  if (browser) {
+    await step('Board-Ende im Browser: Karte statt zweitem Hub, Titel, Neustart über den Hub, 390 px (W-0054)', async () => {
+      const [pa, pb, pc] = ['alpha', 'beta', 'gamma'].map((n) => path.join(base, 'ende', n));
+      for (const cwd of [pa, pb, pc]) {
+        if (!fs.existsSync(path.join(cwd, '.works', 'config.json'))) { fs.mkdirSync(cwd, { recursive: true }); w(['init'], { cwd }); w(['new', '--type=chore', '--title=Eine Karte'], { cwd }); }
+        w(['board', '--stop'], { cwd, ok: false });
+      }
+      const br = await launchChromium(log);
+      if (!br) return;
+      try {
+        const a = portOf(w(['board', '--serve', '--detach', '--no-hub', `--port=${await highPort()}`], { cwd: pa }).out);
+        const b = portOf(w(['board', '--serve', '--detach', '--no-hub', `--port=${await highPort()}`], { cwd: pb }).out);
+        w(['board', '--serve', '--detach', '--no-hub', `--port=${await highPort()}`], { cwd: pc });
+        const ctx = await br.newContext({ viewport: { width: 1440, height: 900 } });
+        const errs = [];
+        const open = async (...urls) => { const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message)); for (const u of urls) await p.goto(u); return p; };
+        const hub = await open(`http://127.0.0.1:${a}/hub`);
+        await hub.waitForSelector('.hub-bc');
+        // solo: per Skript geöffnet, darf sich schließen; card: von Hand geöffnet und mit Verlauf, bleibt offen.
+        const [solo] = await Promise.all([ctx.waitForEvent('page'), hub.evaluate((u) => { window.open(u); }, `http://127.0.0.1:${b}/`)]);
+        solo.on('pageerror', (e) => errs.push(e.message));
+        const card = await open(`http://127.0.0.1:${a}/`, `http://127.0.0.1:${b}/`);
+        // second: ein weiterer Tab an B, der wieder live wird, sobald B auf seinem Port zurück ist (W-0031).
+        const second = await open(`http://127.0.0.1:${a}/`, `http://127.0.0.1:${b}/`);
+        for (const p of [solo, card, second]) await p.waitForSelector('.card');
+        await waitFor(async () => (await (await fetch(`http://127.0.0.1:${b}/tabs`)).json()).tabs === 3, 'drei Tabs an B');
+        expect(await card.locator('#endVeil').isHidden(), 'Karte sichtbar, obwohl das Board läuft');
+        const closed = solo.waitForEvent('close', { timeout: 10000 });
+        w(['board', '--stop'], { cwd: pb });
+        await card.waitForSelector('#endVeil:not([hidden])', { timeout: 10000 });
+        const text = await card.locator('#endVeil').innerText();
+        for (const part of ['beta ist beendet', 'Das Board läuft nicht mehr', 'Der Hub ist schon in einem anderen Tab offen.', 'Hier den Hub öffnen', 'beta wieder starten', 'schließt diesen Tab']) has(text, part, 'Karte');
+        const st = await card.evaluate(() => ({
+          title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '',
+          focus: (document.activeElement && document.activeElement.textContent || '').trim(),
+          dialog: !!document.querySelector('#endVeil [role="alertdialog"][aria-labelledby][aria-describedby]'),
+          inert: document.querySelector('#board').closest('[inert]') !== null && !document.querySelector('#endVeil').inert,
+          ended: document.body.classList.contains('ended'),
+        }));
+        expect(st.title === 'Beendet · beta', `Titel: ${st.title}`);
+        expect(/9aa3b2/i.test(decodeURIComponent(st.icon)), `Symbol nicht grau: ${st.icon.slice(0, 120)}`);
+        expect(st.focus === 'Hier den Hub öffnen' && st.dialog && st.inert && st.ended, `Karte: ${JSON.stringify(st)}`);
+        await closed;
+        // Kein Sprung zum Hub, auch nicht über die Abfrage alle 5 s: Am Ende gibt es genau einen Hub-Tab.
+        await card.waitForTimeout(6000);
+        expect(new URL(card.url()).port === b && !/\/hub/.test(card.url()), `Tab des beendeten Boards sprang weg: ${card.url()}`);
+        const hubs = ctx.pages().filter((p) => /\/hub(#.*)?$/.test(p.url())).length;
+        expect(hubs === 1, `${hubs} Hub-Tabs statt einem: ${ctx.pages().map((p) => p.url()).join(', ')}`);
+        const shots = process.env.WORKS_SELFTEST_SHOTS;
+        if (shots) { fs.mkdirSync(shots, { recursive: true }); await card.screenshot({ path: path.join(shots, 'ende-nachher-light-1440.png') }); }
+        // 390 px dunkel: Karte ganz sichtbar, kein seitliches Scrollen.
+        await card.setViewportSize({ width: 390, height: 844 });
+        await card.emulateMedia({ colorScheme: 'dark' });
+        const m = await card.evaluate(() => { const r = document.querySelector('.end-card').getBoundingClientRect(); return { scroll: document.documentElement.scrollWidth > window.innerWidth + 1, left: r.left, right: r.right, wide: [...document.querySelectorAll('body *')].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1).slice(0, 4).map((e) => `${e.tagName}#${e.id}.${e.className}`) }; });
+        expect(!m.scroll && m.left >= 0 && m.right <= 390, `390 px: ${JSON.stringify(m)}`);
+        if (shots) { await card.waitForTimeout(400); await card.screenshot({ path: path.join(shots, 'ende-nachher-dark-390.png') }); }
+        await card.setViewportSize({ width: 1440, height: 900 });
+        // Neustart über den Hub von A: derselbe Tab zeigt danach wieder das Board von beta, live.
+        await card.getByRole('button', { name: 'beta wieder starten' }).click();
+        await card.waitForURL(/\?from=hub$/, { timeout: 20000 });
+        await card.waitForSelector('.card');
+        expect(await card.title() === 'Works beta' && await card.locator('#endVeil').isHidden(), `nach dem Neustart: ${await card.title()}`);
+        expect(fs.existsSync(path.join(pb, '.works', 'server.json')), 'beta läuft nach dem Neustart nicht');
+        // B läuft wieder auf seinem Port: Der andere beendete Tab ist von selbst wieder live.
+        await second.waitForFunction(() => document.title === 'Works beta' && document.querySelector('#endVeil').hidden, null, { timeout: 15000 });
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        for (const cwd of [pa, pb, pc]) w(['board', '--stop'], { cwd, ok: false });
+      }
     });
   }
 
@@ -3279,8 +3434,16 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       fs.chmodSync(hookPath, 0o755);
       // Neue Zeiten in time.jsonl, noch nicht committet: Sie müssen nach dem Abschluss erhalten bleiben.
       fs.appendFileSync(path.join(sp, '.works', 'time.jsonl'), JSON.stringify({ t: new Date().toISOString(), ev: 'turn', task: id, marke: 'ship-zeit' }) + '\n');
+      // W-0063: War beim Stopp ein Tab offen, verbindet er sich nach dem Neustart selbst wieder, auch wenn das nach der
+      // CI länger dauert. ship öffnet dann keinen zweiten Tab (der Tab hier ist ein offener /events-Strom).
+      const tabCtl = new AbortController();
+      const tabRes = await fetch(`http://127.0.0.1:${bport}/events`, { signal: tabCtl.signal });
+      (async () => { try { const rd = tabRes.body.getReader(); for (;;) { const { done } = await rd.read(); if (done) break; } } catch { /* Ende */ } })();
+      await waitFor(async () => (await (await fetch(`http://127.0.0.1:${bport}/tabs`)).json()).tabs >= 1, 'Tab am Board vor ship');
       const r3 = w(['ship', id], { cwd: sp, ok: false });
+      tabCtl.abort();
       expect(r3.code === 0, `ship → Exit ${r3.code}: ${(r3.out + r3.err).slice(0, 500)}`);
+      expect(!/Im Browser geöffnet/.test(r3.out), `ship öffnet trotz offenem Tab einen neuen: ${r3.out.split('\n').filter((l) => /Board/.test(l)).join(' | ').slice(0, 300)}`);
       expect(branchNow() === 'main', `Nach ship nicht auf main, sondern ${branchNow()}`);
       has(git(['log', '--merges', '--format=%s', '-1'], sp), "Merge branch 'feature/ship-test'", 'Merge-Commit');
       expect(!git(['branch', '--list', 'feature/ship-test'], sp), 'Feature-Branch nicht gelöscht');

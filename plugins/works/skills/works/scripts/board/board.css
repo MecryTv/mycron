@@ -1344,6 +1344,26 @@ details.lv-all > summary::-webkit-details-marker { display: none; }
 .orphan-acts { display: flex; flex-wrap: wrap; gap: 8px; }
 body.orphan > :not(#orphanBar):not(dialog):not(script) { filter: grayscale(1); opacity: .45; }
 
+/* Gewollt beendetes Board (W-0054, Entwurf B): ruhige Karte in der Mitte, der letzte Stand grau und unscharf dahinter */
+.end-veil { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 20px; overflow-y: auto; background: color-mix(in srgb, var(--bg) 55%, transparent); }
+.end-veil[hidden] { display: none; }
+body.ended { overflow: hidden; }
+body.ended > :not(#endVeil):not(script) { filter: grayscale(1) blur(3px); opacity: .5; }
+.end-card { width: min(430px, 100%); margin-bottom: 6vh; padding: 26px 26px 20px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow-pop); display: grid; gap: 14px; justify-items: start; }
+.end-card:focus { outline: none; }
+.end-ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--sunken); color: var(--muted); }
+.end-ic svg { width: 21px; height: 21px; }
+.end-card h2 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.end-card p { margin: -6px 0 0; color: var(--text-2); font-size: 14px; line-height: 1.55; }
+.end-card .end-acts { margin-top: 4px; width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+.end-card .end-acts .btn { flex: 1 1 auto; }
+.end-card .end-cmd { margin: 0; font-size: 13px; }
+.end-card .end-hint { width: 100%; margin: 2px 0 0; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.end-touch { display: none; }
+/* Tastenkürzel nur, wo es eine Tastatur mit Zeiger gibt; am Touchgerät nur der Satz, dass der Tab zu kann */
+@media (hover: none) { .end-key { display: none; } .end-touch { display: inline; } }
+@media (max-width: 560px) { .end-card { padding: 22px 20px 18px; } .end-card .end-acts .btn { height: 38px; } }
+
 /* Discord-Bot (W-0038): Dialog nach J2 mit Reitern und Vorschau, Einrichtung nach R, Kanalwahl nach K */
 dialog:has(.dc) { width: min(1040px, calc(100vw - 24px)); }
 dialog:has(.dc) form { padding: 0; gap: 0; }
