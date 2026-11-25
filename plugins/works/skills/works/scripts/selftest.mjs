@@ -1416,9 +1416,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   // Karte je Aufgabe (W-0050): eine Nachricht, deren Titel mit der ID beginnt (erledigt mit ✓ davor); der Zustand
   // steht in der Beschreibung. cardSays(id, re): die Karte, wenn ihr Zustand passt.
   const isCardOf = (id) => (e) => new RegExp(`^(✓ )?${id}( |$)`).test((e && e.title) || '');
-  const cardsOf = (id, ch = '11') => embedsOf(ch).filter(({ e }) => isCardOf(id)(e));
-  const cardOf = (id, ch) => cardsOf(id, ch).pop();
-  const cardSays = (id, re, ch) => { const c = cardOf(id, ch); return c && re.test(c.e.description || '') ? c : null; };
+  // proj: nur Karten dieses Projekts (zwei Projekte im selben Kanal können dieselbe ID haben).
+  const cardsOf = (id, ch = '11', proj = '') => embedsOf(ch).filter(({ e }) => isCardOf(id)(e) && (!proj || (e.author || {}).name === proj));
+  const cardOf = (id, ch, proj) => cardsOf(id, ch, proj).pop();
+  const cardSays = (id, re, ch, proj) => { const c = cardOf(id, ch, proj); return c && re.test(c.e.description || '') ? c : null; };
   const descOf = (mid) => { const m = fake.messages.get(mid); return m ? (m.embeds[0] || {}).description || '' : null; };
   // Der Bot kennt die Aufgabe schon (Stand in state.json): erst dann zählt ein Wechsel auf in Arbeit als Start.
   const botKnows = (id) => { try { return Object.values(JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')).projects || {}).some((p) => p.snap && p.snap.tasks && p.snap.tasks[id]); } catch { return false; } };
@@ -1503,7 +1504,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       const before = st.m.edits;
       dprobe = await newStarted(['--type=chore', '--title=Discord-Probe', '--criteria=Geprüft']);
       for (let i = 0; i < 5; i++) w(['log', dprobe, `Schritt ${i}`]);
-      await dwait(() => (dashOf('projekt').e.description || '').includes(dprobe), `Dashboard zeigt ${dprobe}`);
+      // Die Zeile nennt die Aufgabe in Arbeit, bei einer noch offenen Freigabe (aus früheren Schritten) deren Aufgabe.
+      await dwait(() => { const d = dashOf('projekt'); return d.m.edits > before && (d.e.description.includes(dprobe) || /Freigabe · .+ · W-\d+/.test(d.e.description)); }, `Dashboard zeigt ${dprobe}`);
       await new Promise((res) => setTimeout(res, 800));
       const edits = dashOf('projekt').m.edits - before;
       expect(edits >= 1 && edits <= 4, `Dashboard ${edits}-mal bearbeitet`);
@@ -1734,7 +1736,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         // ship: Während des Laufs keine Ereignisse; danach zählt der Vergleich mit dem Stand vor ship.
         const sid = nid(w(['new', '--type=chore', '--title=Ship-Probe'], { cwd: bp }).out);
         w(['set', sid, 'status=review'], { cwd: bp });
-        const rv = await dwait(() => cardSays(sid, /Im Review/), 'Review Ship-Probe');
+        const rv = await dwait(() => cardSays(sid, /Im Review/, '11', 'dbranch'), 'Review Ship-Probe');
         const emitB = (data) => w(['discord', 'emit', 'ship', `--json=${JSON.stringify({ id: sid, run: 'b1', ...data })}`], { cwd: bp, extraEnv: denv });
         emitB({ step: 'start' });
         // Erst weiter, wenn der Bot den Start verarbeitet hat (feste Pausen reichen auf langsamen Runnern nicht).
@@ -1754,7 +1756,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         // Ausgeliefert, nicht zusätzlich als erledigt: kein Eintrag done in der Karte.
         const card = (JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')).cards || {})[`card:${rootIdOf(bp)}:${sid}`];
         expect(card && !Object.keys(card.entries).some((k) => k.startsWith('done:')), `Ausgelieferte Aufgabe zusätzlich als erledigt gemeldet: ${JSON.stringify(card && Object.keys(card.entries))}`);
-        expect(cardsOf(sid).length === 1, `${cardsOf(sid).length} Karten für ${sid}`);
+        expect(cardsOf(sid, '11', 'dbranch').length === 1, `${cardsOf(sid, '11', 'dbranch').length} Karten für ${sid} in dbranch`);
       }
       expect(!fs.readdirSync(ddir).some((f) => f.endsWith('.tmp')), 'Halbe Zwischendateien im Discord-Ordner');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
