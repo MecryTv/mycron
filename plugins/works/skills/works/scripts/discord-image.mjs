@@ -1,13 +1,20 @@
-// Bild für das Discord-Dashboard (W-0044, Entwurf D3): Fortschritt je Projekt und erledigte Aufgaben der letzten
-// sieben Tage. works zeichnet es selbst, ohne Abhängigkeiten und ohne fremden Dienst: ein RGB-Raster, eine eingebaute
-// Pixelschrift (nur Großbuchstaben, Ziffern und wenige Zeichen) und PNG über zlib aus Node.
+// Bilder für Discord: das Panel (W-0044, seit W-0050 nach Entwurf P2: Fortschritt, letzte 24 Stunden, Woche) und die
+// Karte je Aufgabe (W-0050, Entwurf I3). works zeichnet sie selbst, ohne Abhängigkeiten und ohne fremden Dienst: ein
+// RGB-Raster, eine eingebaute Pixelschrift (nur Großbuchstaben, Ziffern und wenige Zeichen) und PNG über zlib aus Node.
 import zlib from 'node:zlib';
 
-const BG = 0x2b2d31;
-const TEXT = 0xdbdee1;
-const MUTED = 0x949ba4;
+// Farben wie in den Entwürfen P2 und I3.
+const BG = 0x1e1f2a;
+const TEXT = 0xe9eaf2;
+const MUTED = 0x9aa0b8;
+const SOFT = 0xc6c8d8;
+const LANE = 0x262938;
+const GRID = 0x343748;
 const DONE = 0x23a55a;
+const DONE_DIM = 0x216944; // Grün zu 55 % auf dem Grund: die Tage vor heute
 const WIP = 0x5865f2;
+const WAIT = 0xe8a33d;
+const RED = 0xf23f43;
 const OPEN = 0x4e5058;
 const W = 640;
 const S = 2; // Schrift doppelt: 10x14 Pixel je Zeichen, damit sie auch verkleinert auf dem Handy lesbar bleibt.
@@ -77,31 +84,36 @@ function png(px, h) {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
 }
 
-// projects: [{ name, done, wip, open, color }], days: [{ label, counts: [je Projekt] }] (älteste zuerst).
-// labels: Überschriften in der Sprache des Dashboards (W-0041), ohne Angabe deutsch; more mit {n}.
-const LABELS = { progress: 'FORTSCHRITT', open: 'OFFEN', wip: 'IN ARBEIT', done: 'ERLEDIGT', more: '+{n} WEITERE', chart: 'ERLEDIGT · LETZTE 7 TAGE' };
-export function dashboardPng({ projects = [], days = [], labels = {} } = {}) {
+// Panel nach P2 (W-0050). projects: [{ name, done, wip, open, dot, task }] mit Ampelfarbe und Aufgabe;
+// tracks: { labels: [[Anteil, Text]], rows: [[[Anteil, Farbe]]] je Projekt } für die letzten 24 Stunden;
+// days: [{ label, count, today }] (älteste zuerst). labels: Überschriften in der Sprache des Panels (W-0041), ohne
+// Angabe deutsch; more und total mit {n}.
+const LABELS = { progress: 'FORTSCHRITT', open: 'OFFEN', wip: 'IN ARBEIT', done: 'ERLEDIGT', more: '+{n} WEITERE', chart: 'ERLEDIGT · LETZTE 7 TAGE', total: '{n} GESAMT', track: 'LETZTE 24 STUNDEN', result: 'ERGEBNIS', waited: 'WARTETE', red: 'CI ROT', ship: 'SHIP' };
+export function dashboardPng({ projects = [], tracks = null, days = [], labels = {} } = {}) {
   const L = { ...LABELS, ...labels };
   const shown = projects.slice(0, MAX_ROWS);
   const more = projects.length - shown.length;
-  const ROW = 28;
+  const ROW = 28; const TROW = 22; const CH = 80; // Zeile Fortschritt, Zeile Spur, Höhe der Tagesbalken
   const top = 16;
-  const chartTop = top + 30 + shown.length * ROW + (more > 0 ? ROW : 0) + 16;
-  const CH = 80; // Höhe der Tagesbalken
-  const h = chartTop + 30 + CH + 40;
+  const trackTop = top + 30 + shown.length * ROW + (more > 0 ? ROW : 0) + 16;
+  const withTracks = !!(tracks && shown.length);
+  const chartTop = withTracks ? trackTop + 30 + shown.length * TROW + 26 + 22 + 16 : trackTop;
+  const baseY = chartTop + 30 + CH;
+  const h = baseY + 40;
   const { px, rect, text } = raster(h);
+  const legend = (x, y, items) => { for (const [l, c] of items) { const s = fit(l, 14); rect(x, y + 2, 10, 10, c); text(x + 16, y, s, MUTED); x += 16 + width(s) + 22; } };
 
-  // Fortschritt: Name, Balken (erledigt, in Arbeit, offen), erledigt/gesamt. Legende rechts oben.
+  // Fortschritt: Ampel, Name, Balken (erledigt, in Arbeit, offen), erledigt/gesamt, Aufgabe. Legende rechts oben.
   text(16, top, fit(L.progress, 24), TEXT);
   let lx = W - 16;
   for (const [label, c] of [[fit(L.open, 12), OPEN], [fit(L.wip, 12), WIP], [fit(L.done, 12), DONE]]) {
     lx -= width(label); text(lx, top, label, MUTED); lx -= 16; rect(lx, top + 2, 10, 10, c); lx -= 18;
   }
-  const barX = 200; const barW = 300;
+  const barX = 200; const barW = 236;
   shown.forEach((p, i) => {
     const y = top + 30 + i * ROW;
-    rect(16, y + 2, 6, 10, p.color ?? MUTED);
-    text(28, y, fit(p.name, 13), TEXT);
+    rect(16, y + 2, 10, 10, p.dot ?? MUTED);
+    text(32, y, fit(p.name, 13), TEXT);
     const total = Math.max(0, p.done) + Math.max(0, p.wip) + Math.max(0, p.open);
     rect(barX, y, barW, 14, OPEN);
     if (total) {
@@ -110,38 +122,57 @@ export function dashboardPng({ projects = [], days = [], labels = {} } = {}) {
       rect(barX, y, d, 14, DONE);
       rect(barX + d, y, w, 14, WIP);
     }
-    text(barX + barW + 12, y, fit(`${p.done}/${total}`, 10), MUTED);
+    const n = fit(`${p.done}/${total}`, 7);
+    text(barX + barW + 96 - width(n), y, n, SOFT);
+    if (p.task) { const tk = fit(p.task, 7); text(W - 16 - width(tk), y, tk, MUTED); }
   });
-  if (more > 0) text(28, top + 30 + shown.length * ROW, fit(L.more.replace('{n}', more), 20), MUTED);
+  if (more > 0) text(32, top + 30 + shown.length * ROW, fit(L.more.replace('{n}', more), 20), MUTED);
 
-  // Erledigte Aufgaben der letzten Tage, gestapelt nach Projektfarbe.
-  text(16, chartTop, fit(L.chart, 50), TEXT);
-  const baseY = chartTop + 30 + CH;
-  const max = Math.max(1, ...days.map((d) => (d.counts || []).reduce((s, n) => s + Math.max(0, n), 0)));
+  // Letzte 24 Stunden: eine Spur je Projekt, ein Punkt je Nachricht in der Farbe ihrer Art, Uhrzeiten und Legende darunter.
+  if (withTracks) {
+    text(16, trackTop, fit(L.track, 40), TEXT);
+    const tx = 200; const tw = W - 16 - tx;
+    shown.forEach((p, i) => {
+      const y = trackTop + 30 + i * TROW;
+      text(16, y + 1, fit(p.name, 14), TEXT);
+      rect(tx, y, tw, 16, LANE);
+      for (let k = 1; k < 6; k++) rect(tx + Math.round((tw * k) / 6), y, 1, 16, GRID);
+      for (const [f, c] of (tracks.rows || [])[i] || []) rect(tx + Math.round(Math.max(0, Math.min(1, f)) * (tw - 10)), y + 3, 10, 10, c);
+    });
+    const ay = trackTop + 30 + shown.length * TROW + 4;
+    for (const [f, s0] of tracks.labels || []) {
+      const s = fit(s0, 6); const w = width(s);
+      text(f <= 0 ? tx : f >= 1 ? tx + tw - w : tx + Math.round(f * tw) - Math.floor(w / 2), ay, s, MUTED);
+    }
+    legend(16, ay + 26, [[L.result, DONE], [L.waited, WAIT], [L.red, RED], [L.ship, WIP]]);
+  }
+
+  // Erledigt je Tag über alle Projekte, einfarbig; heute hervorgehoben, die Summe rechts.
+  const week = days.slice(-7);
+  text(16, chartTop, fit(L.chart, 34), TEXT);
+  const tot = fit(L.total.replace('{n}', week.reduce((s, d) => s + Math.max(0, d.count || 0), 0)), 14);
+  text(W - 16 - width(tot), chartTop, tot, MUTED);
+  const max = Math.max(1, ...week.map((d) => Math.max(0, d.count || 0)));
   const colW = Math.floor((W - 32) / 7);
   rect(16, baseY, W - 32, 2, OPEN);
-  days.slice(-7).forEach((d, i) => {
+  week.forEach((d, i) => {
     const x = 16 + i * colW + Math.floor((colW - 44) / 2);
-    let y = baseY;
-    let sum = 0;
-    (d.counts || []).forEach((n, k) => {
-      const hh = Math.round((Math.max(0, n) / max) * CH);
-      if (hh) { rect(x, y - hh, 44, hh, (projects[k] && projects[k].color) ?? DONE); y -= hh; }
-      sum += Math.max(0, n);
-    });
-    if (sum) { const s = fit(String(sum), 4); text(x + 22 - Math.floor(width(s) / 2), y - 20, s, TEXT); }
-    const l = fit(d.label, 3);
-    text(x + 22 - Math.floor(width(l) / 2), baseY + 10, l, MUTED);
+    const n = Math.max(0, d.count || 0);
+    const hh = Math.round((n / max) * CH);
+    if (hh && d.today) rect(x - 2, baseY - hh - 2, 48, hh + 2, TEXT);
+    if (hh) rect(x, baseY - hh, 44, hh, d.today ? DONE : DONE_DIM);
+    if (n) { const s = fit(String(n), 4); text(x + 22 - Math.floor(width(s) / 2), baseY - hh - 20, s, d.today ? TEXT : SOFT); }
+    const l = fit(d.label, 5);
+    text(x + 22 - Math.floor(width(l) / 2), baseY + 10, l, d.today ? TEXT : MUTED);
   });
   return png(px, h);
 }
 
 // Bild einer Karte je Aufgabe (W-0050, Entwurf I3): links die Zeitachse der Aufgabe vom ersten Ereignis bis end
 // (jetzt oder, wenn erledigt, das letzte Ereignis), Ereignisse als Quadrate, Wartezeiten als Strich bis zur Antwort,
-// Uhrzeiten darunter; rechts Minuten, Schritte und Kriterien; darunter die Legende. Farben wie im Entwurf.
+// Uhrzeiten darunter; rechts Minuten, Schritte und Kriterien; darunter die Legende.
 // events: [{ at, until, color }] in ms (until 0: kein Strich), right: Zeilen der rechten Spalte, die erste groß,
 // legend: [[Text, Farbe]].
-const I3 = { bg: 0x1e1f2a, lane: 0x262938, grid: 0x343748, text: 0xe9eaf2, muted: 0x9aa0b8 };
 export function cardPng({ start = 0, end = 0, events = [], right = [], legend = [] } = {}) {
   const top = 14;
   const big = fit(right[0] || '', 8);
@@ -153,9 +184,9 @@ export function cardPng({ start = 0, end = 0, events = [], right = [], legend = 
   const sy = top + 21 + 10; // Zeilen unter der großen Zahl
   const ly = Math.max(ty + 14, sy + small.length * 22 - 8) + 16; // Legende
   const h = ly + 14 + 14;
-  const { px, rect, text } = raster(h, I3.bg);
-  rect(x0, top, x1 - x0, 20, I3.lane);
-  for (let k = 1; k < 6; k++) rect(x0 + Math.round(((x1 - x0) * k) / 6), top, 1, 20, I3.grid);
+  const { px, rect, text } = raster(h);
+  rect(x0, top, x1 - x0, 20, LANE);
+  for (let k = 1; k < 6; k++) rect(x0 + Math.round(((x1 - x0) * k) / 6), top, 1, 20, GRID);
   const span = Math.max(1, end - start);
   const xOf = (t) => x0 + 10 + Math.round(Math.max(0, Math.min(1, (t - start) / span)) * (x1 - x0 - 20));
   for (const e of events) if (e.until > e.at) rect(xOf(e.at), top + 8, Math.max(2, xOf(e.until) - xOf(e.at)), 4, e.color);
@@ -169,11 +200,11 @@ export function cardPng({ start = 0, end = 0, events = [], right = [], legend = 
   const last = times.length > 1 ? times[times.length - 1] : null;
   for (const t of times.slice(1, -1)) { const p = shown[shown.length - 1]; if (t.x >= p.x + p.w + 12 && (!last || t.x + t.w + 12 <= last.x)) shown.push(t); }
   if (last && last.x >= shown[shown.length - 1].x + shown[shown.length - 1].w + 12) shown.push(last);
-  for (const t of shown) text(t.x, ty, t.s, I3.muted);
+  for (const t of shown) text(t.x, ty, t.s, MUTED);
   // Rechte Spalte, rechtsbündig.
-  text(W - 16 - width(big, 3), top - 1, big, I3.text, 3);
-  small.forEach((s, i) => text(W - 16 - width(s), sy + i * 22, s, I3.muted));
+  text(W - 16 - width(big, 3), top - 1, big, TEXT, 3);
+  small.forEach((s, i) => text(W - 16 - width(s), sy + i * 22, s, MUTED));
   let lx = x0;
-  for (const [l, c] of legend) { const s = fit(l, 20); rect(lx, ly + 2, 10, 10, c); text(lx + 16, ly, s, I3.muted); lx += 16 + width(s) + 22; }
+  for (const [l, c] of legend) { const s = fit(l, 20); rect(lx, ly + 2, 10, 10, c); text(lx + 16, ly, s, MUTED); lx += 16 + width(s) + 22; }
   return png(px, h);
 }

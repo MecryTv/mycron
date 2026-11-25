@@ -1487,8 +1487,10 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       }
       // Anheften ist eine eigene Anfrage nach dem Anlegen: darauf warten, nicht nur auf die Nachricht.
       const st = await dwait(() => { const s = dashOf('projekt'); return s && s.m.pinned ? s : null; }, 'Dashboard mit projekt angeheftet');
+      // Panel nach P2 (W-0050): Zusammenfassung oben, Zeile je Projekt, nur noch das Feld Als Nächstes.
       const names = (st.e.fields || []).map((f) => f.name);
-      expect(names.includes('Heute'), `Felder fehlen: ${names.join(', ')}`);
+      expect(names.join() === 'Als Nächstes', `Felder: ${names.join(', ')}`);
+      expect(/^\*\*.*heute \d+ erledigt.*\*\*\n/.test(st.e.description || ''), `Zusammenfassung fehlt: ${st.e.description}`);
       expect(st.m.attachments.some((a) => a.filename === 'works.png'), 'Bild fehlt');
       expect(st.m.flags & 4096, 'Dashboard nicht still');
       r = await wa(['discord', 'start'], { extraEnv: denv });
@@ -1867,10 +1869,13 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const { loadTasks } = await import('./lib.mjs');
     // Bild: jedes Zeichen der Pixelschrift 5x7, gültiges PNG, gleiche Daten ergeben dasselbe Bild.
     for (const [ch, g] of Object.entries(img.GLYPHS)) expect(g.length === 35, `Zeichen ${ch} hat ${g.length} Punkte`);
-    const data = { projects: [{ name: 'projekt', done: 3, wip: 1, open: 2, color: 0x8e8cf7 }], days: [{ label: 'MO', counts: [2] }] };
+    // Nach P2 (W-0050): Ampel und Aufgabe je Balken, Spuren der letzten 24 Stunden, Woche mit heute.
+    const data = { projects: [{ name: 'projekt', done: 3, wip: 1, open: 2, dot: 0xe8a33d, task: 'W-0041' }], tracks: { labels: [[0, '21:00'], [0.5, '09:00'], [1, 'JETZT']], rows: [[[0.2, 0x23a55a], [0.9, 0xe8a33d]]] }, days: [{ label: 'MO', count: 2 }, { label: 'HEUTE', count: 1, today: true }] };
     const png = img.dashboardPng(data);
-    expect(png.subarray(1, 4).toString() === 'PNG' && png.length < 100 * 1024, `kein kleines PNG (${png.length} Bytes)`);
+    expect(png.subarray(1, 4).toString() === 'PNG' && png.length < 100 * 1024 && png.readUInt32BE(16) === 640, `kein kleines PNG in 640 px (${png.length} Bytes)`);
     expect(Buffer.compare(png, img.dashboardPng(data)) === 0, 'Bild nicht gleich bei gleichen Daten');
+    const many = img.dashboardPng({ ...data, projects: Array.from({ length: 9 }, (_, i) => ({ ...data.projects[0], name: `p${i}` })), tracks: { ...data.tracks, rows: Array.from({ length: 9 }, () => data.tracks.rows[0]) } });
+    expect(many.length < 256 * 1024 && many.readUInt32BE(20) < 1000, `Bild mit vielen Projekten zu groß: ${many.length} Bytes, ${many.readUInt32BE(20)} px hoch`);
     // Ohne Prozess: Aufräumen löscht eine Nachricht je Durchgang (der gemeinsame Bot erlaubt 60 in der Minute),
     // der Status nennt das zuletzt wartende Projekt, die Zeile nennt bei einer Freigabe die Aufgabe.
     const botM = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
@@ -1924,6 +1929,14 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     b.state.projects = { r1: snapOf('alt', '2026-01-01T10:00:00.000Z'), r2: snapOf('neu', '2026-06-01T10:00:00.000Z') };
     expect(b.statusLine(botM.normalizeConfig({})) === 'neu wartet auf deine Freigabe', `Status: ${b.statusLine(botM.normalizeConfig({}))}`);
     expect(botM.stateOf(b.state.projects.r1.snap, botM.normalizeConfig({}), (de) => de)[1].includes('W-9'), 'Freigabe ohne Aufgabe');
+    // Daten für das Panel-Bild (W-0050): Ampel und Aufgabe je Projekt, Spur nur mit den letzten 24 Stunden in der
+    // Farbe der Art, Woche mit heute.
+    const dd = Array.from({ length: 7 }, (_, i) => [`2026-01-0${i + 1}`, i === 6 ? 4 : 1]);
+    const hist = [{ k: 'a', rid: 'r1', at: new Date(Date.now() - 3600000).toISOString(), ev: { type: 'ci_red' } }, { k: 'b', rid: 'r1', at: new Date(Date.now() - 2 * 86400000).toISOString(), ev: { type: 'review' } }];
+    const di = botM.dashImageData([{ rid: 'r1', snap: { name: 'p', perm: { tool: 'Bash', task: 'W-3' }, progress: { done: 1, wip: 1, total: 3 }, doneDays: dd } }], (de) => de, hist);
+    expect(di.projects[0].dot === 0xe8a33d && di.projects[0].task === 'W-3', `Ampel oder Aufgabe im Bild: ${JSON.stringify(di.projects)}`);
+    expect(di.tracks.rows[0].length === 1 && di.tracks.rows[0][0][1] === 0xf23f43 && di.tracks.labels.length === 5 && di.tracks.labels[4][1] === 'JETZT', `Spuren: ${JSON.stringify(di.tracks)}`);
+    expect(di.days.length === 7 && di.days[6].today && di.days[6].label === 'HEUTE' && di.days[6].count === 4, `Woche: ${JSON.stringify(di.days)}`);
     expect(uiM.modalFor('w:ins::', 'de').components.length === 2 && uiM.modalFor('w:ins:0123456789abcdef:W-1', 'de').components.length === 1, 'Dialog Anweisung ohne Projektfeld');
     // Ein früherer Schritt lässt ein Dashboard zurück, das der Bot nach 403 (fremde Anwendung) nicht mehr anfassen darf.
     const dashCount = Math.max(1, fake.inChannel('11').filter((m) => isDash(m.embeds[0])).length);
@@ -2391,14 +2404,24 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     try {
       process.env.WORKS_LANG = 'en';
       let d = botM.renderDashboard(list, cfg, { interactive: true });
-      expect(d.embeds[0].title === 'works · 1 project' && d.embeds[0].fields[0].name === 'Today' && d.components[1].components[0].label === 'Queue', `Dashboard global englisch: ${JSON.stringify(d).slice(0, 300)}`);
+      expect(d.embeds[0].title === 'works · 1 project' && d.embeds[0].fields[0].name === 'Up next' && d.components[1].components[0].label === 'Queue' && d.embeds[0].description.startsWith('**1 waiting for you · 1 done today**'), `Dashboard global englisch: ${JSON.stringify(d).slice(0, 300)}`);
+      expect(botM.cardImageData({ entries: { a: { type: 'perm', state: 'open', t0: new Date().toISOString() } } }, {}).legend[1][0] === 'WAITING FOR YOU', 'Kartenbild global englisch');
       let ev = botM.renderEvent(perm, cfg, { owner: '1' });
       expect(ev.embeds[0].title === 'Waiting for your approval' && ev.content.includes('projekt is waiting for your approval'), `Hinweis global englisch: ${JSON.stringify(ev).slice(0, 300)}`);
       expect(botM.dashImageData(list).labels.progress === 'PROGRESS', 'Bild global englisch');
       // Ohne Neustart: dieselben Module, andere Einstellung.
       process.env.WORKS_LANG = 'de';
       d = botM.renderDashboard(list, cfg, { interactive: true });
-      expect(d.embeds[0].title === 'works · 1 Projekt' && d.embeds[0].fields[0].name === 'Heute' && d.components[1].components[0].label === 'Warteschlange', `Dashboard global deutsch: ${JSON.stringify(d).slice(0, 300)}`);
+      expect(d.embeds[0].title === 'works · 1 Projekt' && d.embeds[0].fields[0].name === 'Als Nächstes' && d.components[1].components[0].label === 'Warteschlange' && d.embeds[0].description.startsWith('**1 wartet auf dich · heute 1 erledigt**'), `Dashboard global deutsch: ${JSON.stringify(d).slice(0, 300)}`);
+      // Panel nach P2 (W-0050): Zusammenfassung mit Kostensumme nur mit privacy.costs, Zeile je Projekt mit Ampel,
+      // Zustand, Werkzeug bei Freigabe und Aufgabe.
+      const two = [{ rid: 'r1', snap: { ...snap, today: { done: 2, cost: '1.00 $', value: 1, currency: 'USD' } } }, { rid: 'r2', snap: { name: 'zwei', tasks: {}, perms: [], busy: true, active: { id: 'W-4', title: 'Läuft' }, today: { done: 3, cost: '2.50 $', value: 2.5, currency: 'USD' } } }];
+      d = botM.renderDashboard(two, cfg, { interactive: true });
+      const [sum, l1, l2] = d.embeds[0].description.split('\n');
+      expect(/^\*\*1 wartet auf dich · 1 arbeitet · heute 5 erledigt · 3[.,]50 \$\*\*$/.test(sum), `Zusammenfassung: ${sum}`);
+      expect(l1 === '🟠 **projekt** wartet auf deine Freigabe · Bash · W-9' && l2 === '🟢 **zwei** arbeitet · W-4', `Zeilen je Projekt: ${l1} | ${l2}`);
+      expect(d.components[1].components.map((c) => c.custom_id).join() === 'w:queue::,w:ins::,w:new::,w:hist::,w:help::', `Knöpfe: ${JSON.stringify(d.components[1])}`);
+      expect(!botM.renderDashboard(two, botM.normalizeConfig({ privacy: { costs: false } }), {}).embeds[0].description.includes('$'), 'Kosten trotz Datenschutz im Panel');
       ev = botM.renderEvent(perm, cfg, { owner: '1' });
       expect(ev.embeds[0].title === 'Wartet auf deine Freigabe' && ev.content.includes('projekt wartet auf deine Freigabe'), `Hinweis global deutsch: ${JSON.stringify(ev).slice(0, 300)}`);
       // Antworten bekommen die Sprache des Clients.

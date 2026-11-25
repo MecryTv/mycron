@@ -130,39 +130,65 @@ export function renderStatus(s, cfg, { now = new Date(), lang = '' } = {}) {
 
 // ---------- Dashboard nach D3 (W-0044) ----------
 
-// Ampel und Satz zu einem Projekt: wartet auf dich (Freigabe oder fertig), arbeitet, ruhig.
+// Ampel und Satz zu einem Projekt nach P2 (W-0050): wartet auf dich (Freigabe mit Werkzeug oder fertig), arbeitet,
+// ruhig; am Ende die Aufgabe (bei einer Freigabe die der Freigabe).
 export function stateOf(s, cfg, t) {
   const a = s.active;
-  const aL = a ? `${a.id}${cfg.privacy.titles && a.title ? ` ${cut(a.title, 60)}` : ''}` : '';
-  const on = aL ? ` · ${aL}` : '';
-  if (s.perm) return ['🟠', t(`wartet auf deine Freigabe${on}`, `waits for your approval${on}`)];
-  if (s.busy) return ['🟢', a ? t(`arbeitet an ${aL}`, `working on ${aL}`) : t('arbeitet', 'working')];
+  const id = (s.perm && s.perm.task) || (a && a.id) || '';
+  const on = id ? ` · ${id}` : '';
+  if (s.perm) { const tool = s.perm.tool ? ` · ${cut(s.perm.tool, 40)}` : ''; return ['🟠', t(`wartet auf deine Freigabe${tool}${on}`, `waits for your approval${tool}${on}`)]; }
+  if (s.busy) return ['🟢', t(`arbeitet${on}`, `working${on}`)];
   if (s.idleSince) return ['🟠', t(`ist fertig und wartet auf dich${on}`, `is done and waits for you${on}`)];
-  return ['⚪', a ? t(`in Arbeit: ${aL}`, `in progress: ${aL}`) : t('keine Aufgabe in Arbeit', 'no task in progress')];
+  return ['⚪', a ? t(`in Arbeit${on}`, `in progress${on}`) : t('keine Aufgabe in Arbeit', 'no task in progress')];
 }
 
 export function projectLineOf(s, ci, cfg, t) {
   const [dot, text] = stateOf(s, cfg, t);
-  const p = s.progress;
-  const prog = p && p.total ? ` · ${p.done}/${p.total}` : '';
-  return `${dot} **${cut(s.name, 80)}** ${text}${prog}${ci && !ci.ok ? ' · 🔴 CI' : ''}`;
+  return `${dot} **${cut(s.name, 80)}** ${text}${ci && !ci.ok ? ' · 🔴 CI' : ''}`;
+}
+
+// Zusammenfassung oben im Panel (P2): wartet, arbeitet, heute erledigt, Kosten des Tages über alle Projekte nur mit
+// privacy.costs (je Währung summiert).
+function summaryLine(list, cfg, t) {
+  const wait = list.filter((p) => p.snap.perm || (!p.snap.busy && p.snap.idleSince)).length;
+  const work = list.filter((p) => p.snap.busy && !p.snap.perm).length;
+  const done = list.reduce((s, p) => s + ((p.snap.today && p.snap.today.done) || 0), 0);
+  const sums = {};
+  for (const p of list) { const d = p.snap.today || {}; if (d.value > 0) sums[d.currency || 'USD'] = (sums[d.currency || 'USD'] || 0) + d.value; }
+  const cost = cfg.privacy.costs ? Object.entries(sums).map(([c, v]) => fmtCost(v, c, language(null))).join(' + ') : '';
+  return [wait ? t(`${wait} ${wait === 1 ? 'wartet' : 'warten'} auf dich`, `${wait} waiting for you`) : '', work ? t(`${work} ${work === 1 ? 'arbeitet' : 'arbeiten'}`, `${work} working`) : '', t(`heute ${done} erledigt`, `${done} done today`), cost].filter(Boolean).join(' · ');
 }
 
 const WEEKDAY = [['SO', 'SUN'], ['MO', 'MON'], ['DI', 'TUE'], ['MI', 'WED'], ['DO', 'THU'], ['FR', 'FRI'], ['SA', 'SAT']];
-// Projektfarben im Bild der Reihe nach, damit sich keine zwei gleichen; ohne Grün (das steht für erledigt).
-const IMAGE_COLORS = [0x8e8cf7, 0xe8a33d, 0x3aa7a3, 0xd16ba5, 0x5aa9e6, 0xf08a4b, 0xc9b458];
 
-// Daten für das Bild: Fortschritt je Projekt und erledigt je Tag, gestapelt nach Projekt; Überschriften in der Sprache t.
-export function dashImageData(list, t = langOf()) {
+// Daten für das Bild nach P2 (W-0050): Fortschritt je Projekt mit Ampel und Aufgabe, die letzten 24 Stunden je Projekt
+// als Spur aus dem Verlauf (ein Punkt je Nachricht in der Farbe ihrer Art), erledigt je Tag über alle Projekte mit
+// heute hervorgehoben. Die Spuren enden an einer 5-Minuten-Grenze: So ändert sich das Bild nicht bei jedem Durchgang.
+// Überschriften in der Sprache t.
+export function dashImageData(list, t = langOf(), history = [], now = Date.now()) {
   const days = (list[0] && list[0].snap.doneDays) || [];
+  const to = Math.floor(now / 300000) * 300000;
+  const from = to - DAY_MS;
+  const dot = (s) => (s.perm || (!s.busy && s.idleSince) ? KIND.wait[0] : s.busy ? KIND.result[0] : 0x80848e);
   return {
-    labels: { progress: t('FORTSCHRITT', 'PROGRESS'), open: t('OFFEN', 'OPEN'), wip: t('IN ARBEIT', 'IN PROGRESS'), done: t('ERLEDIGT', 'DONE'), more: t('+{n} WEITERE', '+{n} MORE'), chart: t('ERLEDIGT · LETZTE 7 TAGE', 'DONE · LAST 7 DAYS') },
-    projects: list.map((p, i) => {
+    labels: {
+      progress: t('FORTSCHRITT', 'PROGRESS'), open: t('OFFEN', 'OPEN'), wip: t('IN ARBEIT', 'IN PROGRESS'), done: t('ERLEDIGT', 'DONE'), more: t('+{n} WEITERE', '+{n} MORE'),
+      chart: t('ERLEDIGT · LETZTE 7 TAGE', 'DONE · LAST 7 DAYS'), total: t('{n} GESAMT', '{n} TOTAL'),
+      track: t('LETZTE 24 STUNDEN', 'LAST 24 HOURS'), result: t('ERGEBNIS', 'RESULT'), waited: t('WARTETE', 'WAITED'), red: t('CI ROT', 'CI RED'), ship: 'SHIP',
+    },
+    projects: list.map((p) => {
       const g = p.snap.progress || {};
       const done = g.done || 0; const wip = g.wip || 0;
-      return { name: p.snap.name, done, wip, open: Math.max(0, (g.total || 0) - done - wip), color: IMAGE_COLORS[i % IMAGE_COLORS.length] };
+      return { name: p.snap.name, done, wip, open: Math.max(0, (g.total || 0) - done - wip), dot: dot(p.snap), task: (p.snap.perm && p.snap.perm.task) || (p.snap.active && p.snap.active.id) || '' };
     }),
-    days: days.map(([d], i) => ({ label: t(...WEEKDAY[new Date(`${d}T12:00:00`).getDay()]), counts: list.map((p) => ((p.snap.doneDays || [])[i] || [])[1] || 0) })),
+    tracks: {
+      labels: [...[0, 0.25, 0.5, 0.75].map((f) => [f, hhmm(from + f * DAY_MS)]), [1, t('JETZT', 'NOW')]],
+      rows: list.map((p) => history.filter((x) => x.rid === p.rid && msOf(x.at, 0) > from).map((x) => [Math.min(1, (msOf(x.at, 0) - from) / DAY_MS), KIND[kindOf(x.ev)][0]])),
+    },
+    days: days.map(([d], i) => {
+      const today = i === days.length - 1;
+      return { label: today ? t('HEUTE', 'TODAY') : t(...WEEKDAY[new Date(`${d}T12:00:00`).getDay()]), count: list.reduce((s, p) => s + (((p.snap.doneDays || [])[i] || [])[1] || 0), 0), today };
+    }),
   };
 }
 
@@ -171,21 +197,15 @@ const button = (style, lbl, custom_id) => ({ type: 2, style, label: lbl, custom_
 // list: [{ rid, snap }]. interactive: Auswahlmenü und Knöpfe nur, wenn Klicks ankommen. lang: sonst die globale Sprache.
 export function renderDashboard(list, cfg, { ci = {}, interactive = false, now = new Date(), lang = '' } = {}) {
   const t = langOf(lang);
-  const waiting = list.filter((p) => p.snap.perm || (!p.snap.busy && p.snap.idleSince)).map((p) => cut(p.snap.name, 60));
-  const done = list.reduce((s, p) => s + ((p.snap.today && p.snap.today.done) || 0), 0);
-  const costs = list.map((p) => p.snap.today && p.snap.today.cost).filter(Boolean);
   const next = list.flatMap((p) => (p.snap.queue || []).slice(0, 1).map((q) => `${cut(label(cfg, q.id, q.title), 100)} · ${cut(p.snap.name, 40)}`)).slice(0, 3);
   const options = list.slice(0, 25).map((p) => ({ label: cut(p.snap.name, 100), value: p.rid, description: cut(stateOf(p.snap, cfg, t)[1], 100) }));
+  const lines = list.map((p) => projectLineOf(p.snap, ci[p.rid], cfg, t)).join('\n') || t('Noch kein Projekt.', 'No project yet.');
   return {
     embeds: [fit({
       title: t(`works · ${list.length} ${list.length === 1 ? 'Projekt' : 'Projekte'}`, `works · ${list.length} ${list.length === 1 ? 'project' : 'projects'}`),
       color: COLOR.status,
-      description: trimTo(list.map((p) => projectLineOf(p.snap, ci[p.rid], cfg, t)).join('\n') || t('Noch kein Projekt.', 'No project yet.'), 4000),
-      fields: [
-        field(t('Heute', 'Today'), `${t(`${done} erledigt`, `${done} done`)}${cfg.privacy.costs && costs.length ? ` · ${costs.join(' + ')}` : ''}`),
-        field(t('Wartet auf dich', 'Waiting for you'), waiting.join(', ') || t('nichts', 'nothing')),
-        field(t('Als Nächstes', 'Up next'), next.join('\n') || t('nichts eingeplant', 'nothing planned'), false),
-      ],
+      description: trimTo(`**${summaryLine(list, cfg, t)}**\n${lines}`, 4000),
+      fields: [field(t('Als Nächstes', 'Up next'), next.join('\n') || t('nichts eingeplant', 'nothing planned'), false)],
       image: { url: 'attachment://works.png' },
       footer: { text: `${t('Bild höchstens alle 5 Minuten neu', 'Image redrawn at most every 5 minutes')}${interactive ? t(' · Details nur für dich über das Menü', ' · Details only for you via the menu') : ''}` },
       timestamp: now.toISOString(),
@@ -986,7 +1006,7 @@ export class Bot {
       const d = this.state.dash[ch] || {};
       const body = renderDashboard(list, cfg, { ci: this.state.ci, interactive: this.interactive });
       const hash = sha({ ...body.embeds[0], timestamp: 0, c: body.components });
-      const data = dashImageData(list);
+      const data = dashImageData(list, langOf(), this.state.history || []);
       const imgHash = sha(data);
       const img = this.images.get(ch);
       const draw = !img || (img.hash !== imgHash && Date.now() - img.at >= IMAGE_MIN);
