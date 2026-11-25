@@ -646,12 +646,13 @@ export class Bot {
   // Nachricht anlegen oder bearbeiten. Eine spätere Fassung derselben Nachricht ersetzt eine noch wartende.
   // Ereignisse mit Aufgabe (W-0050) werden ein Eintrag der Karte card:<rid>:<id>, die als Ganzes rausgeht; ein neuer
   // wartender Eintrag schickt sie neu (resend), damit Discord benachrichtigt. Eine Nachricht, die schon als einzelne
-  // verschickt ist (vor W-0050), bleibt einzeln.
+  // verschickt ist oder als einzelne in der Warteschlange steht (vor W-0050), bleibt einzeln.
   upsert(key, ev, rid, cfg) {
     this.remember(key, ev, rid);
     let qk = key;
     let resend = false;
-    if (rid && ev.id && CARD.has(ev.type) && !this.state.msgs[key]) {
+    const single = !!this.state.msgs[key] || this.state.queue.some((q) => q.key === key && !q.card);
+    if (rid && ev.id && CARD.has(ev.type) && !single) {
       qk = `card:${rid}:${ev.id}`;
       const c = this.state.cards[qk] || (this.state.cards[qk] = { rid, id: ev.id, entries: {} });
       const prev = c.entries[key];
