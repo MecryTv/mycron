@@ -62,3 +62,7 @@ Wunsch des Nutzers am 2026-11-25 (nach W-0049): Ist ein Board offen und startet 
 - 2026-11-25: Beziehung: related W-0054
 - 2026-11-25: Priorität: P3 → P2; incomplete: true → false
 - 2026-11-25: Parallel gestartet im Worktree W-0057-offenes-board-wechselt (Status: backlog → in-arbeit)
+- 2026-11-25: Test zuerst: neuer Selbsttest-Schritt (Tab als /events-Stream) war vor der Umsetzung rot: Tab A bekam beim Start von B mit --no-hub kein event: hub.
+- 2026-11-25: Entscheidung: Der neue Server meldet sich nach listen bei allen anderen laufenden Boards (sendTabsToHub in hub.mjs: /boards für das Token, dann POST /api/hub op show, 1,5 s Timeout, Fehler still). Kein Signal, wenn er mit takeover startet (--restart, neue Version, Übergabe), damit ein Neustart nichts umschaltet. --restart ohne laufendes Board zählt als neuer Start.
+- 2026-11-25: Entscheidung: Die 5-s-Abfrage in board.js vergleicht Kennungen statt Anzahl. Ausgangsstand ist die erste Abfrage, so bleibt der frisch geöffnete Tab des neuen Boards stehen; die ?from=hub-Ausnahme entfällt. Ein Board, das bei einer Abfrage fehlte und binnen 2 min wieder da ist, gilt als Neustart (2 min wegen gedrosselter Timer in Hintergrund-Tabs). Der Parameter ?from=hub bleibt in den Hub-Links stehen, wirkt aber nicht mehr.
+- 2026-11-25: Entscheidung: Umgeleiteter Start (W-0049) schickt die Tabs aller laufenden Boards zum Hub, auch ohne --open; showHub entfällt. Ohne offenen Tab öffnet nur --open den Hub.

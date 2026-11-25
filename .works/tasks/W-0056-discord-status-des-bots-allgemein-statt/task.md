@@ -61,8 +61,8 @@ Der Status war seit W-0044 als „das Wichtigste über alle Projekte“ gebaut: 
 ## Akzeptanzkriterien
 - [ ] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
 - [ ] Regressionstest deckt den Fall ab oder der Verzicht ist begründet
-- [ ] Der Status des Bots nennt keine Aufgaben-ID mehr
-- [ ] Der Status nennt keine Projektnamen und passt für viele Nutzer, etwa „x Leute nutzen works“ (Zahl beim gemeinsamen Bot aus dem Dienst)
+- [x] Der Status des Bots nennt keine Aufgaben-ID mehr
+- [x] Der Status nennt keine Projektnamen und passt für viele Nutzer, etwa „x Leute nutzen works“ (Zahl beim gemeinsamen Bot aus dem Dienst)
 
 ## Betroffene Dateien
 - plugins/works/skills/works/scripts/discord-bot.mjs (countParts, summaryLine, statusLine)
@@ -86,3 +86,5 @@ Der Status war seit W-0044 als „das Wichtigste über alle Projekte“ gebaut: 
 - 2026-11-25: Eigener Bot: statusLine zählt wie die Zusammenfassung im Panel (gemeinsame Funktion countParts), etwa „2 warten auf dich · 1 arbeitet“, sonst „N Projekte im Blick“. Arbeitet zählt jetzt wie im Panel auch ohne aktive Aufgabe.
 - 2026-11-25: Entscheidung gemeinsamer Bot: n = verschiedene user_id mit funktionierender Kopplung (kaputte zählen nicht, mehrere Geräte einmal). Ab 2 „n people use works“, darunter bleibt „/works help“: „1 Leute“ wäre falsch und „1 Person nutzt works“ sagt anderen nichts, der Hinweis auf die Hilfe nützt mehr. Löst auf Wunsch des Nutzers den Teil „gemeinsamer Bot fest /works help“ aus W-0044 (E3) ab.
 - 2026-11-25: Entscheidung Sprache: Der Status des gemeinsamen Bots gilt für alle Server gleich, daher eine Sprache über WORKS_BOT_LANG (de oder en), Standard en. Für „n Leute nutzen works“ WORKS_BOT_LANG=de in die .env des Dienstes. Neu gesetzt höchstens alle 5 Minuten, geprüft jede Minute; sichtbar erst nach einem Neustart des Dienstes auf dem VPS.
+- 2026-11-25: Akzeptanzkriterien: "Der Status des Bots nennt keine Aufgaben-ID mehr" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Der Status nennt keine Projektnamen und passt für viele Nutzer, etwa „x Leute nutzen works“ (Zahl beim gemeinsamen Bot aus dem Dienst)" abgehakt
