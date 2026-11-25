@@ -3,13 +3,13 @@ id: W-0063
 title: ship öffnet nach dem Neustart des Boards einen zweiten Tab
 type: bug
 priority: P3
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-25
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: fix/w-0063-ship-oeffnet-nach-dem
 tags: [board, ship]
@@ -64,9 +64,7 @@ ship fragt vor dem Stopp /tabs des Boards; waren Tabs offen, startet es das Boar
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-25 21:20
-
-Fix: ship merkt sich vor dem Stopp offene Tabs und startet das Board dann ohne --open. Tests: mit Browser 69/69, ohne WebSocket 59/59.
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
@@ -77,3 +75,4 @@ Fix: ship merkt sich vor dem Stopp offene Tabs und startet das Board dann ohne -
 - 2026-11-25: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
 - 2026-11-25: Akzeptanzkriterien: "Nach works ship mit offenem Board-Tab hängt am Ende genau ein Tab am Board" abgehakt
 - 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt

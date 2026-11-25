@@ -6,13 +6,9 @@
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 1 | 0 | 1 | 1 | 0 | 0 | 60 | 0 |
+| 1 | 0 | 0 | 1 | 0 | 0 | 61 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 2 · P4 Niedrig: 1
-
-## Aktive Aufgabe
-
-[W-0063](tasks/W-0063-ship-oeffnet-nach-dem-neustart-des/task.md) ship öffnet nach dem Neustart des Boards einen zweiten Tab (In Arbeit), letzte Übergabe 2026-11-25 21:20
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 1 · P4 Niedrig: 1
 
 ## Kritisch (P1)
 
@@ -23,7 +19,6 @@ _Keine Einträge._
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
 | [W-0055](tasks/W-0055-kopfleiste-im-board-live-anzeige-von/task.md) | Kopfleiste im Board: Live-Anzeige von Claude bei langem Text kaputt | Bug | P3 Mittel | Review | S |  |  |  |
-| [W-0063](tasks/W-0063-ship-oeffnet-nach-dem-neustart-des/task.md) | ship öffnet nach dem Neustart des Boards einen zweiten Tab | Bug | P3 Mittel | In Arbeit | S |  |  |  |
 
 ## Geplant und Backlog
 
