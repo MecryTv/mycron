@@ -261,6 +261,8 @@ export function renderEvent(ev, cfg, { owner = '', now = new Date(), rid = '', i
     case 'review':
       if (ev.state === 'accepted') { e = { color: COLOR.done, title: t(`✓ ${ev.id} angenommen`, `✓ ${ev.id} accepted`), description: `${cfg.privacy.titles && ev.title ? `${cut(ev.title, 200)} · ` : ''}${hhmm(ev.at || now.toISOString())}` }; break; }
       if (ev.state === 'returned') { e = { color: COLOR.gone, title: t(`↩ ${ev.id} zurückgegeben`, `↩ ${ev.id} returned`), description: cfg.privacy.titles ? cut(ev.title, 200) : '' }; break; }
+      // Ohne Abnahme erledigt (W-0050): Aufgabe im Review gelöscht oder von einem neueren Review abgelöst.
+      if (!open) { e = { color: COLOR.gone, title: t(`${ev.id} nicht mehr im Review`, `${ev.id} no longer in review`), description: cfg.privacy.titles ? cut(ev.title, 200) : '' }; break; }
       e = { color: COLOR.done, title: t(`${ev.id} im Review`, `${ev.id} in review`), fields: [...(cfg.privacy.titles && ev.title ? [field(t('Aufgabe', 'Task'), cut(ev.title, 200))] : []), field(t('Kriterien', 'Criteria'), ev.crit && ev.crit[1] ? t(`${ev.crit[0]} von ${ev.crit[1]}`, `${ev.crit[0]} of ${ev.crit[1]}`) : t('keine', 'none')), ...(cfg.privacy.costs && ev.cost ? [field(t('Kosten', 'Costs'), ev.cost)] : [])], footer: { text: acts ? t('Abnehmen hier, im Board oder mit works done', 'Accept here, in the board or with works done') : t('Abnehmen im Board oder mit works done', 'Accept in the board or with works done') } };
       if (acts) actions = [...act(3, t('Annehmen', 'Accept'), cid('acc', rid, ev.id)), ...act(2, t('Zurück an Claude', 'Back to Claude'), cid('ret', rid, ev.id))];
       break;
@@ -403,7 +405,7 @@ function cardState(card, task, cfg, t) {
     }
   } else if (cur.type === 'review' && cur.state === 'accepted') s = ['done', t('Erledigt · angenommen', 'Done · accepted')];
   else if (cur.type === 'done') s = ['done', t('Erledigt', 'Done')];
-  else if (cur.type === 'returned' || cur.type === 'review') s = ['run', t('Zurückgegeben, wieder in Arbeit', 'Returned, back in progress')];
+  else if (cur.type === 'returned' || (cur.type === 'review' && cur.state === 'returned')) s = ['run', t('Zurückgegeben, wieder in Arbeit', 'Returned, back in progress')];
   else if (cur.type === 'p1' && !['in-arbeit', 'review', 'erledigt', 'verworfen'].includes(task.status)) s = ['red', t('Neue P1', 'New P1')];
   else if (cur.type === 'start') s = ['run', t(`In Arbeit${since(cur.t0)}`, `In progress${since(cur.t0)}`)];
   if (!s || (!w && cur.type !== 'ship' && s[0] !== 'done' && ['erledigt', 'verworfen'].includes(task.status))) {
@@ -688,13 +690,31 @@ export class Bot {
     return x ? { title: x.title, status: x.status, crit: x.crit, steps: x.steps, cost } : { cost };
   }
 
+  // Die Karte, wie sie gilt: Ein wartender Eintrag zählt nur, solange sein Schlüssel in state.open steht. Sonst
+  // hielten eine überholte Frage, eine im Review gelöschte Aufgabe oder ein weggefallenes Projekt sie für immer offen.
+  liveCard(c) {
+    const open = new Set(Object.values(this.state.open).map((o) => o.key));
+    const entries = {};
+    for (const [k, e] of Object.entries(c.entries || {})) entries[k] = waiting(e) && !open.has(k) ? { ...e, state: 'resolved' } : e;
+    return { ...c, entries };
+  }
+
   // Die Karte bleibt stehen, solange ein Eintrag auf dich wartet oder die Aufgabe offen ist.
-  cardWaits(c) { return Object.values(c.entries || {}).some(waiting) || OPEN_STATUSES.includes(this.taskOf(c).status); }
+  cardWaits(c) { return Object.values(this.liveCard(c).entries).some(waiting) || OPEN_STATUSES.includes(this.taskOf(c).status); }
   // Aktiv: Achse und Minuten laufen, das Bild wird alle 5 Minuten neu gezeichnet.
-  cardActive(c) { return Object.values(c.entries || {}).some(waiting) || ['in-arbeit', 'review'].includes(this.taskOf(c).status); }
+  cardActive(c) { return Object.values(this.liveCard(c).entries).some(waiting) || ['in-arbeit', 'review'].includes(this.taskOf(c).status); }
+
+  // Offener Schritt unter slot: Ein älterer, der dort noch steht (etwa die erste von zwei Fragen zur selben Aufgabe),
+  // gilt als erledigt, statt offen liegen zu bleiben.
+  setOpen(slot, r, rid, cfg) {
+    const old = this.state.open[slot];
+    if (old && old.key !== r.key) this.upsert(old.key, { ...old.ev, state: 'resolved', until: new Date().toISOString() }, old.rid, cfg);
+    this.state.open[slot] = { ...r, rid };
+  }
 
   // Körper und Bild einer Karte; das Bild neu bei geänderten Einträgen oder Aufgabe, sonst höchstens alle 5 Minuten.
-  cardMessage(key, c, cfg) {
+  cardMessage(key, card, cfg) {
+    const c = this.liveCard(card);
     const task = this.taskOf(c);
     const waits = this.cardWaits(c);
     const body = renderCard(c, cfg, { owner: cfg.owner_id, interactive: this.interactive, task, waits });
@@ -806,14 +826,14 @@ export class Bot {
         // Erledigte oder Fragen neuer Aufgaben nicht melden: Ein Import brächte sonst Dutzende Nachrichten.
         if (t.status === 'review' && this.once(rid, `review:${t.id}`)) {
           const r = this.event(rid, 'review', { ...base, crit: t.crit, cost: next.costs[t.id] || '' }, cfg);
-          if (r) this.state.open[`review:${rid}:${t.id}`] = { ...r, rid };
+          if (r) this.setOpen(`review:${rid}:${t.id}`, r, rid, cfg);
         }
         continue;
       }
       if (o.status !== 'review' && t.status === 'review') {
         if (this.once(rid, `review:${t.id}`)) {
           const r = this.event(rid, 'review', { ...base, crit: t.crit, cost: next.costs[t.id] || '' }, cfg);
-          if (r) this.state.open[`review:${rid}:${t.id}`] = { ...r, rid };
+          if (r) this.setOpen(`review:${rid}:${t.id}`, r, rid, cfg);
         }
       } else if (o.status === 'review' && t.status !== 'review') {
         const slot = `review:${rid}:${t.id}`;
@@ -829,9 +849,15 @@ export class Bot {
       if (t.status === 'in-arbeit' && !['in-arbeit', 'review'].includes(o.status)) this.event(rid, 'start', base, cfg);
       if (t.q > o.q && this.once(rid, `question:${t.id}:${String(t.lastQ).slice(0, 80)}`)) {
         const r = this.event(rid, 'question', { ...base, text: t.lastQ, q: t.q }, cfg);
-        if (r) this.state.open[`question:${rid}:${t.id}`] = { ...r, rid };
+        if (r) this.setOpen(`question:${rid}:${t.id}`, r, rid, cfg);
       }
       if (o.priority !== 'P1' && t.priority === 'P1' && OPEN_STATUSES.includes(t.status) && this.once(rid, `p1:${t.id}`)) this.event(rid, 'p1', base, cfg);
+    }
+    // W-0050: Eine Aufgabe, die im Review verschwindet (gelöscht), wartet nicht mehr auf dich.
+    for (const id of Object.keys(prev.tasks)) {
+      const slot = `review:${rid}:${id}`;
+      const op = !next.tasks[id] && this.state.open[slot];
+      if (op) { this.upsert(op.key, { ...op.ev, state: 'resolved', until: new Date().toISOString() }, rid, cfg); delete this.state.open[slot]; }
     }
     if (prev.queueIds.length && !next.queueIds.length) this.event(rid, 'queue_empty', {}, cfg);
   }
@@ -890,7 +916,7 @@ export class Bot {
       const snap = this.state.projects[tm.rid] && this.state.projects[tm.rid].snap;
       if (!this.stillTrue(tm.type, tm.data, snap)) continue;
       const r = this.event(tm.rid, tm.type, tm.data, cfg, tm.key);
-      if (r) this.state.open[slot] = { ...r, rid: tm.rid };
+      if (r) this.setOpen(slot, r, tm.rid, cfg);
     }
   }
 
@@ -1100,6 +1126,9 @@ export class Bot {
       if (now - this.missing.get(rid) < GONE_AFTER || pr.status) continue;
       delete this.state.projects[rid];
       for (const m of [this.missing, this.fingers, this.snapAt, this.caches, this.snapJson]) m.delete(rid);
+      // Offene Schritte und Timer des Projekts gelten nicht mehr: Seine Karten warten dann auf nichts (W-0050).
+      for (const [slot, op] of Object.entries(this.state.open)) if (op.rid === rid) delete this.state.open[slot];
+      for (const [slot, tm] of this.timers) if (tm.rid === rid) this.timers.delete(slot);
       this.dirty = true;
       this.log(`${pr.name || rid}: kein .works mehr, aus dem Panel genommen`);
     }
