@@ -7,7 +7,7 @@ status: backlog
 effort:
 risk:
 created: 2026-11-24
-updated: 2026-11-24
+updated: 2026-11-25
 due:
 completed:
 milestone:
@@ -15,7 +15,7 @@ branch:
 tags: [board, hub]
 blocked_by: []
 blocks: []
-related: []
+related: [W-0057]
 source: manuell
 incomplete: true
 ---
@@ -59,3 +59,4 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
 - 2026-11-24: Priorität: P3 → P3
+- 2026-11-25: Beziehung: W-0057 related

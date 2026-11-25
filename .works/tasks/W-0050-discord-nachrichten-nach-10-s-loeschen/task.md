@@ -76,15 +76,17 @@ Art: nachher · Hinzugefügt: 2026-11-25
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-25 08:26
+Stand: 2026-11-25 15:53
 
-Fertig zur Abnahme. Alle 10 Kriterien und 8 Planschritte abgehakt, Branch feature/w-0050-discord-nachrichten-nach-10-s mit 7 Commits (392bc5a bis aa605b2), nichts uncommittet.
+Fertig zur Abnahme, Status review. Alle 10 Kriterien und 8 Planschritte abgehakt, Branch feature/w-0050-discord-nachrichten-nach-10-s, nichts uncommittet.
 
-Umgesetzt: cleanup.seconds (Standard 3600, 0 nie, cleanup.hours gilt nicht mehr) in discord.mjs, Board-Dialog und Bot. Karte je Aufgabe nach I3 in discord-bot.mjs (upsert, cardState, renderCard, cardImageData, cardMessage, refreshCards, cleanup/prune) mit neuem Ereignis start; wartende Schritte schicken die Karte neu und löschen die alte Fassung; Bild cardPng in discord-image.mjs (640 px, Zeitachse, Minuten, Schritte, Kriterien, Legende), neu bei Ereignissen, sonst höchstens alle 5 Minuten. Verlauf in state.history (7 Tage, 300 Einträge), Knopf Verlauf (w:hist) und /works verlauf mit Auswahl Eintrag, Projekt, Zeitraum, Neuere/Ältere. Panel nach P2: Zusammenfassung, Zeile je Projekt mit Werkzeug und Aufgabe, nur Als Nächstes; Bild mit Ampel und Aufgabe je Balken, 24-Stunden-Spuren, Woche mit heute. Doku in integrations.md, cli.md (beide Sprachen), README des Dienstes, Hilfe im Discord, de.json.
+Umgesetzt (Commits 392bc5a bis aa605b2): cleanup.seconds statt cleanup.hours, Karte je Aufgabe nach I3 mit Bild und neuem Ereignis start, Verlauf (state.history, Knopf Verlauf, /works verlauf), Panel nach P2 (Text und Bild), Doku und Hilfe.
 
-Tests: Selbsttest mit Browser 58/58 (475 s), ohne WebSocket 51/51 (282 s), services/works-bot/test.mjs alle Prüfungen. Im ersten Durchgang rot und danach behoben: zwei Testannahmen (gleiche Aufgaben-ID in zwei Projekten im selben Kanal, Panel-Zeile bei einer offenen Freigabe aus früheren Schritten); einmal brach der Browser-Lauf mit EADDRINUSE auf Port 48444 ab (fremder Port, nicht von W-0050), die Wiederholung war grün.
+Funde der Code-Durchsicht behoben (je Fund erst ein roter Test): 01cca0e prune rechnet ab der Erledigung statt ab dem Posten, und ein altes cleanup.hours=0 bleibt nie löschen. d0f8d90 Karten warten nur auf Schritte, deren Schlüssel noch in state.open steht (liveCard); ein neuer Schritt im selben Slot löst den älteren auf; eine im Review gelöschte Aufgabe löst ihr Review auf; ein weggefallenes Projekt räumt offene Schritte und Timer weg. 7d25ab7 ein alter Eintrag ohne Karte in der Warteschlange bleibt Einzelnachricht.
 
-Offen: Die Vorschau im Board-Dialog zeigt weiter die Einzelnachricht (renderEvent), nicht die Karte. Beim gemeinsamen Bot erscheint /works verlauf erst nach einem Neustart des Dienstes (Knopf geht sofort); Dienst nicht angefasst. Karten offener Aufgaben bleiben, solange die Aufgabe offen ist, auch eine P1 im Backlog. Liegt eine Freigabe noch offen, nennt die Panel-Zeile deren Aufgabe statt der aktiven.
+Tests nach den Fixes: Schnelltest 21/21, Selbsttest ohne WebSocket 51/51 (231 s), mit Browser 58/58 (376 s) im zweiten Lauf, services/works-bot/test.mjs alle Prüfungen. Im ersten Browser-Lauf war der Schritt „Dialog Discord-Bot im Browser (W-0038)“ einmal rot mit „Unexpected end of JSON input“: Der Test liest config.json, während das Board sie schreibt; writeJson in lib.mjs schreibt nicht atomar (vorher schon so, nicht Teil von W-0050).
+
+Offen: Board-Vorschau zeigt weiter die Einzelnachricht statt der Karte. /works verlauf beim gemeinsamen Bot erst nach Neustart des Dienstes (Knopf geht sofort). Karten offener Aufgaben bleiben, auch eine P1 im Backlog. Eine Karte, deren Aufgabe gelöscht wurde, zeigt bis zum Löschen als Zustand „In Arbeit“ (Rückfall ohne Status). writeJson nicht atomar (siehe oben).
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -144,3 +146,7 @@ Offen: Die Vorschau im Board-Dialog zeigt weiter die Einzelnachricht (renderEven
 - 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
 - 2026-11-25: Asset hinzugefügt: assets/2026-11-25-kartenbild-nach-i3-gezeichnet-mit-nachher.png (nachher)
 - 2026-11-25: Asset hinzugefügt: assets/2026-11-25-panel-bild-nach-p2-gezeichnet-mit-nachher.png (nachher)
+- 2026-11-25: Code-Durchsicht: nichts Kritisches, vier Funde (Karte nach langer Laufzeit nie gelöscht, offene Frage hält Karte fest, cleanup.hours 0 wird 3600, alter ungesendeter Queue-Eintrag); Nutzer: alle beheben.
+- 2026-11-25: Vier Funde der Code-Durchsicht behoben (01cca0e, d0f8d90, 7d25ab7), je Fund zuerst ein roter Test. Danach Schnelltest 21/21, ohne WebSocket 51/51, mit Browser 58/58 (zweiter Lauf; im ersten einmal 'Unexpected end of JSON input' im Browser-Dialog-Test, weil config.json nicht atomar geschrieben wird), Dienst-Test grün.
+- 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Abschließende Prüfung nach den vier Fixes: Selbsttest mit Browser 58/58, ohne WebSocket 51/51, works-bot grün.

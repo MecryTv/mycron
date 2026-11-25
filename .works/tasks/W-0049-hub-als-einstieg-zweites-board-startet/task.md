@@ -7,7 +7,7 @@ status: erledigt
 effort: M
 risk:
 created: 2026-11-24
-updated: 2026-11-24
+updated: 2026-11-25
 due:
 completed: 2026-11-24
 milestone:
@@ -15,7 +15,7 @@ branch: feature/w-0049-hub-als-einstieg-zweites
 tags: [board, hub]
 blocked_by: [W-0041]
 blocks: []
-related: []
+related: [W-0057]
 source: manuell
 incomplete: false
 ---
@@ -85,3 +85,4 @@ Abgeschlossen am 2026-11-24. Keine offene Übergabe.
 - 2026-11-24: Akzeptanzkriterien: "Selbsttest deckt beide Fälle ab, in beiden Sprachen (nach W-0041)" abgehakt
 - 2026-11-24: Übergabe aktualisiert
 - 2026-11-24: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
+- 2026-11-25: Beziehung: W-0057 related
