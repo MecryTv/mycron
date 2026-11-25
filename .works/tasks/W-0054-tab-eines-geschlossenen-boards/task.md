@@ -3,13 +3,13 @@ id: W-0054
 title: Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden
 type: feature
 priority: P3
-status: review
+status: erledigt
 effort:
 risk:
 created: 2026-11-24
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: feature/w-0054-tab-eines-geschlossenen
 tags: [board, hub]
@@ -65,15 +65,7 @@ Art: nachher · Hinzugefügt: 2026-11-25
 - [x] Vorschlag für den Fall, dass der Browser das Schließen verbietet: statt eines zweiten Hubs eine schlichte Seite „Board beendet“ mit Hinweis und Knopf „Hier den Hub öffnen“. Passt das so, oder soll ich vorher Entwürfe für diese Seite zeigen? Antwort: Nutzer am 2026-11-25: erst Entwürfe der Seite zeigen.
 
 ## Übergabe
-Stand: 2026-11-25 20:40
-
-Stand: umgesetzt und committet (8034cc8, Branch feature/w-0054-tab-eines-geschlossenen), noch nicht gemergt. Selbsttest voll grün: 69/69 mit Browser, 59/59 ohne WebSocket.
-
-Was es tut: works board --stop (auch Stoppen im Hub, Strg+C im Terminal) kündigt das Ende über POST /api/hub {op:'end'} an. Der Server fragt die anderen laufenden Boards (/tabs mit tabs und hubs), holt bei einem davon ein Einmal-Ticket und schickt seinen Tabs event: ended, dann schließt er die Verbindungen. Ein Neustart schickt nichts. Der Tab springt nicht mehr zum Hub: window.close(), sonst Karte nach Entwurf B (Hier den Hub öffnen, <Projekt> wieder starten über /hub#start=<Ticket>, sonst Hinweis auf works board --serve), Titel Beendet · <Projekt>, graues Favicon. Läuft das Board wieder auf demselben Port, wird der Tab wieder live (wie W-0031).
-
-Prüfen: Nachher-Bilder im Scratchpad ende54/nachher (1440 hell, 390 dunkel). Selbsttest-Schritte: Board-Ende: --stop … und Board-Ende im Browser …; WORKS_SELFTEST_SHOTS=<Ordner> legt die Bilder ab.
-
-Offen: Hub-Seite eines gestoppten Boards (Tab auf B/hub) folgt weiter W-0032 und ignoriert ended. Ob ein von works board --open geöffneter Tab sich wirklich schließt, hängt vom Browser ab und ist nur für per Skript geöffnete Tabs geprüft. Touch ohne Tastenkürzel und ⌘W am Mac nicht automatisch geprüft. Tickets liegen im Speicher des ausstellenden Boards; nach dessen Neustart zeigt der Hub eine Meldung, dann hilft Öffnen. Konfliktgefahr mit W-0055 in board.js, board.css, template.html, selftest.mjs (andere Stellen; W-0055 macht die Kopfleiste bei langer Freigabe-Pille zu breit, deshalb nutzt der 390-px-Test eigene Projekte).
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -102,3 +94,4 @@ Offen: Hub-Seite eines gestoppten Boards (Tab auf B/hub) folgt weiter W-0032 und
 - 2026-11-25: Parallele Arbeit beendet
 - 2026-11-25: Asset hinzugefügt: assets/2026-11-25-nachher-1440-hell-tab-eines-gestoppten-nachher.png (nachher)
 - 2026-11-25: Asset hinzugefügt: assets/2026-11-25-nachher-390-dunkel-dieselbe-karte-auf-nachher.png (nachher)
+- 2026-11-25: Abgeschlossen (Status: review → erledigt), DoD bestätigt
