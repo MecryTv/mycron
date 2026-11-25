@@ -3,7 +3,7 @@ id: W-0057
 title: Offenes Board wechselt immer sofort zum Hub, wenn ein weiteres startet
 type: feature
 priority: P2
-status: in-arbeit
+status: review
 effort: S
 risk:
 created: 2026-11-25
@@ -35,7 +35,7 @@ Wunsch des Nutzers am 2026-11-25 (nach W-0049): Ist ein Board offen und startet 
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Startet ein weiteres Board oder wird ein Start in den Hub umgeleitet, wechselt jeder offene works-Board-Tab sofort zum Hub, auch ohne --open und auch Tabs mit ?from=hub
+- [x] Startet ein weiteres Board oder wird ein Start in den Hub umgeleitet, wechselt jeder offene works-Board-Tab sofort zum Hub, auch ohne --open und auch Tabs mit ?from=hub
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
@@ -51,10 +51,12 @@ Wunsch des Nutzers am 2026-11-25 (nach W-0049): Ist ein Board offen und startet 
 <!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
 
 ## Offene Fragen
-<!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
+- [x] Soll der Wechsel zum Hub warten, solange im Board ungespeicherte Eingaben offen sind (etwa ein angefangener Abschnitt oder Kommentar)? Heute springt der Tab sofort, wie schon bei W-0049, und die Eingabe geht verloren. Vorschlag: warten bis gespeichert oder verworfen, wie beim Neuladen nach einem Update. Antwort: Ja, warten bis gespeichert oder verworfen, wie beim Neuladen nach einem Update. Verlorene Eingaben wären ein Fehler. Entschieden von Claude nach der Vorgabe des Nutzers vom 2026-11-25, solche Dinge selbst zu entscheiden.
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Stand: 2026-11-25 18:06
+
+Umgesetzt in Commit 9345506 (Branch feature/w-0057-offenes-board-wechselt-immer). Der neue Board-Server meldet sich nach dem Start bei allen anderen laufenden Boards (sendTabsToHub in hub.mjs, aufgerufen in serve.mjs nach listen, nicht bei takeover); deren offene works-Tabs bekommen event: hub und wechseln zum Hub, auch mit ?from=hub. Der umgeleitete Start (W-0049) schickt die Tabs immer zum Hub, ohne offenen Tab öffnet nur --open den Hub; showHub in works.mjs ist weg. Die 5-s-Abfrage in board.js vergleicht Kennungen: Ausgangsstand ist die erste Abfrage (der frisch geöffnete Tab bleibt), ein Board, das binnen 2 min zurück ist, gilt als Neustart. ?from=hub steht noch in den Hub-Links, wirkt aber nicht mehr. Doku: references/board.md, de/board.md, cli.md, de/cli.md. Tests: zwei neue Selbsttest-Schritte (Stream-Tab, Playwright), alle Läufe grün. Offen: Frage zu ungespeicherten Eingaben; works shot zählt als Start (wie jeder Start). Nichts gemergt, nichts gepusht.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
@@ -66,3 +68,8 @@ Wunsch des Nutzers am 2026-11-25 (nach W-0049): Ist ein Board offen und startet 
 - 2026-11-25: Entscheidung: Der neue Server meldet sich nach listen bei allen anderen laufenden Boards (sendTabsToHub in hub.mjs: /boards für das Token, dann POST /api/hub op show, 1,5 s Timeout, Fehler still). Kein Signal, wenn er mit takeover startet (--restart, neue Version, Übergabe), damit ein Neustart nichts umschaltet. --restart ohne laufendes Board zählt als neuer Start.
 - 2026-11-25: Entscheidung: Die 5-s-Abfrage in board.js vergleicht Kennungen statt Anzahl. Ausgangsstand ist die erste Abfrage, so bleibt der frisch geöffnete Tab des neuen Boards stehen; die ?from=hub-Ausnahme entfällt. Ein Board, das bei einer Abfrage fehlte und binnen 2 min wieder da ist, gilt als Neustart (2 min wegen gedrosselter Timer in Hintergrund-Tabs). Der Parameter ?from=hub bleibt in den Hub-Links stehen, wirkt aber nicht mehr.
 - 2026-11-25: Entscheidung: Umgeleiteter Start (W-0049) schickt die Tabs aller laufenden Boards zum Hub, auch ohne --open; showHub entfällt. Ohne offenen Tab öffnet nur --open den Hub.
+- 2026-11-25: Akzeptanzkriterien: "Startet ein weiteres Board oder wird ein Start in den Hub umgeleitet, wechselt jeder offene works-Board-Tab sofort zum Hub, auch ohne --open und auch Tabs mit ?from=hub" abgehakt
+- 2026-11-25: Selbsttest grün: schnell 7/7 (init, new, list|Hub|Board merkt), voll mit Browser 62/62, ohne WebSocket 54/54; kein Schritt rot, keine Wiederholung nötig.
+- 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
+- 2026-11-25: Frage 1 geklärt: Ja, warten bis gespeichert oder verworfen, wie beim Neuladen nach einem Update. Verlorene Eingaben wären ein Fehler. Entschieden von Claude nach der Vorgabe des Nutzers vom 2026-11-25, solche Dinge selbst zu entscheiden.
