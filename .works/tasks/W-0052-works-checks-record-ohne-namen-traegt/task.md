@@ -3,13 +3,13 @@ id: W-0052
 title: works checks record ohne Namen trägt Prüfung undefined ein
 type: bug
 priority: P4
-status: in-arbeit
+status: erledigt
 effort: S
 risk:
 created: 2026-11-24
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: fix/w-0052-works-checks-record-ohne
 tags: [cli]
@@ -64,9 +64,7 @@ recordCheck verlangt einen Text als Namen (gilt für alle Aufrufer), das CLI end
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-25 17:37
-
-Fix: recordCheck verlangt einen Text als Namen, CLI endet ohne Namen mit Nutzungszeile; Regressionstest. Tests: mit Browser 61/61, ohne WebSocket 54/54.
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -75,3 +73,4 @@ Fix: recordCheck verlangt einen Text als Namen, CLI endet ohne Namen mit Nutzung
 - 2026-11-25: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
 - 2026-11-25: Akzeptanzkriterien: "works checks record <ID> ohne Namen endet mit Fehler und schreibt nichts" abgehakt
 - 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
