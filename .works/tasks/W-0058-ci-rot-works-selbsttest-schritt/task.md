@@ -3,13 +3,13 @@ id: W-0058
 title: "CI rot: works Selbsttest, Schritt Selbsttest"
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort:
 risk:
 created: 2026-11-25
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: fix/w-0058-ci-rot-works-selbsttest
 tags: []
@@ -76,9 +76,7 @@ upsert() vergibt u streng steigend (lastU, mindestens Date.now()). So ist der zu
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-25 16:38
-
-Fix: streng steigender Zeitstempel je Karteneintrag in upsert() (discord-bot.mjs), Regressionstest mit festgehaltener Uhr. Tests: mit Browser 59/59, ohne WebSocket 52/52, works-bot grün. Code-Audit: eine Zeile, kein Fund.
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
@@ -87,3 +85,4 @@ Fix: streng steigender Zeitstempel je Karteneintrag in upsert() (discord-bot.mjs
 - 2026-11-25: Akzeptanzkriterien: "Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen" abgehakt
 - 2026-11-25: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
 - 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
