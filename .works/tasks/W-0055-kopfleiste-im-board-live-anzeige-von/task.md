@@ -3,7 +3,7 @@ id: W-0055
 title: "Kopfleiste im Board: Live-Anzeige von Claude bei langem Text kaputt"
 type: bug
 priority: P3
-status: in-arbeit
+status: review
 effort: S
 risk:
 created: 2026-11-24
@@ -61,11 +61,16 @@ Umgesetzt nach Entwurf B „Kompakter Chip mit Popover“ (board.js `renderBusy(
 - Abweichung vom Kriterium „gekürzt mit …, voller Text als Tooltip“: Das stammt aus Entwurf A. Mit B wird der Chip nicht gekürzt, der volle Text steht im Popover und im aria-label.
 
 ## Akzeptanzkriterien
-- [ ] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
-- [ ] Regressionstest deckt den Fall ab oder der Verzicht ist begründet
-- [ ] Bei langem Text bleibt die Live-Anzeige in ihrem Platz (gekürzt mit …, voller Text als Tooltip) und überdeckt oder verschiebt die Ansichtswahl nicht
+- [x] Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen
+- [x] Regressionstest deckt den Fall ab oder der Verzicht ist begründet
+- [x] Bei langem Text bleibt die Live-Anzeige in ihrem Platz (gekürzt mit …, voller Text als Tooltip) und überdeckt oder verschiebt die Ansichtswahl nicht
 
 ## Betroffene Dateien
+- plugins/works/skills/works/scripts/board/board.js (`renderBusy()`, `fitTop()`, Sekundentakt, Format „Min.“ in `lvSinceText`)
+- plugins/works/skills/works/scripts/board/board.css (Chip, Popover, Marke, `.squeeze`, `.tight`)
+- plugins/works/skills/works/scripts/board/template.html (`#busyWrap`, `#busyPop`)
+- plugins/works/skills/works/scripts/i18n/de.json (neue Texte, drei alte entfernt)
+- plugins/works/skills/works/scripts/selftest.mjs (Schritt „Kopfleiste: Live-Chip bei langem Text, Popover, Handy (W-0055)“)
 
 ## Assets
 ![Kopfleiste des Boards: Live-Anzeige „Claude arbeitet an W-0050, seit 1 min , 1 A](assets/2026-11-24-kopfleiste-des-boards-live-anzeige-vorher.png)
@@ -75,6 +80,9 @@ Art: vorher · Hinzugefügt: 2026-11-24
 ## Offene Fragen
 
 ## Übergabe
+Stand: 2026-11-25 21:08
+
+Fertig zur Abnahme. Umgesetzt nach Entwurf B in board.js (renderBusy, fitTop), board.css, template.html, de.json; Commits cec4c26 und 0e15815 auf fix/w-0055-kopfleiste-im-board-live, nicht gemergt. Abweichungen vom Entwurf: Neben dem Chip zeigt die Verbindungsanzeige nur den Punkt, weil ‚Live, Stand 20:25:46‘ sonst bei 1880 px nicht passt; getrennt bleibt der Text, gekürzt mit …. Popover als role=group, offen bei Tastaturfokus über .kb statt :has(:focus-visible) (sonst geht der Fokus beim Tab verloren). Ab 1641 px schrumpft bei Platzmangel erst der Projektname, dann rutschen die Reiter in Zeile 2 (z. B. Freigabe-Chip bei 1720 px). Tests: Schritt Kopfleiste gegen alten Stand rot, jetzt grün; voll mit Browser 68/68, ohne WebSocket 58/58. Nachher-Bilder liegen im Scratchpad (kopf55/nachher), Selbsttest schreibt sie mit WORKS_SELFTEST_SHOTS=<Ordner>. Beim Mergen auf W-0054 achten (gleiche Dateien).
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -85,3 +93,10 @@ Art: vorher · Hinzugefügt: 2026-11-24
 - 2026-11-25: Entwürfe A bis C mit Fable 5.2 gestaltet, auf Basis des echten board.css. Befund: .brand hat min-width 0, die Pille white-space nowrap ohne Schrumpfen, deshalb ragt sie über die Reiter; der Zeitkasten ist span.num aus lvSince(), das Leerzeichen vor dem Komma kommt aus join(', '). Wartet auf die Wahl des Nutzers.
 - 2026-11-25: Entwurf B „Kompakter Chip mit Popover“ gewählt. Grund: Nutzer am 2026-11-25: Beide B
 - 2026-11-25: Parallel gestartet im Worktree W-0055-kopfleiste-im-board (Status: backlog → in-arbeit)
+- 2026-11-25: Umgesetzt nach Entwurf B (Commit cec4c26): Chip mit Aufgabe, Dauer in Min. und Agenten-Plakette, Popover mit Titel, Agenten, letztem Schritt und Zur Live-Ansicht; Maus, Tastatur (Tab, Esc, Enter) und Touch (erster Tipp öffnet). Zusätzlich zum Entwurf: Neben dem Chip nur der Verbindungspunkt, getrennt gekürzt mit …; ab 1641 px erst Projektname kürzen, dann Reiter in Zeile 2, falls es sonst nicht passt (Freigabe-Chip bei 1720 px). Selbsttest Kopfleiste gegen alten Stand rot (Suche 48 px, Projektname 0 px, Leerzeichen vor Komma), jetzt grün; voller Lauf mit Browser 68 von 68.
+- 2026-11-25: Akzeptanzkriterien: "Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Bei langem Text bleibt die Live-Anzeige in ihrem Platz (gekürzt mit …, voller Text als Tooltip) und überdeckt oder verschiebt die Ansichtswahl nicht" abgehakt
+- 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
+- 2026-11-25: Entscheidung E1 dokumentiert: Neben dem Chip nur der Verbindungspunkt
