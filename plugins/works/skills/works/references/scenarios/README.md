@@ -26,7 +26,8 @@ export default {
 | `kit.project(name, tasks)` | Throwaway project with `works init`, tasks as titles or `{ title, priority, type }`. Returns the folder |
 | `kit.works(folder, args, { env })` | works command in the project, throws on errors. `env: kit.realProfile` for commands that start Chrome themselves (such as `works shot`) |
 | `await kit.board(folder, { port })` | Starts the board on a free port (from 49300) or the given one, returns the URL |
-| `kit.stop(folder)` | Stops the board |
+| `kit.stop(folder)` | Stops the board (its open tabs show "<project> has ended", W-0054) |
+| `await kit.crash(folder)` | Ends the board without notice, as if it crashed; its tabs reconnect as before. Waits until the port is free |
 | `kit.hook(folder, 'permission.mjs', input)` | Triggers a works hook, such as a pending approval |
 | `kit.file(name, content)` | Creates a file in the throwaway folder, returns the path |
 | `kit.dir` | The throwaway folder |

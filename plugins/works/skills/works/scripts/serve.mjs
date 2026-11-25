@@ -11,7 +11,7 @@ import { loadActivity, backgroundOf } from './live.mjs';
 import { generateIndex } from './views.mjs';
 import { ApiError, runAction, saveAsset, taskDetail, ideasList, metaInfo, nextList, dodOf, codeOf, diffOf, templatesList, templateDraft, estimatesInfo, checksInfo, reportsInfo, runActionWithUndo, knowledgeList, recurringInfo, usageInfo, checkHealthInfo, githubInfo, similarTo, cleanupInfo, undoInfo, background, parallelInfo, importUpload, backupPreview, setLang } from './api.mjs';
 import { buildIcal } from './ical.mjs';
-import { registerProject, runningBoards, projectsBrief, hubHtml, hubAction, sendTabsToHub } from './hub.mjs';
+import { registerProject, runningBoards, projectsBrief, hubHtml, hubAction, sendTabsToHub, endInfo } from './hub.mjs';
 import { syncSettings, syncState } from './ghsync.mjs';
 import { dueRules } from './recurring.mjs';
 import { loadConfig, loadTasks } from './lib.mjs';
@@ -98,6 +98,10 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   const clients = new Set();
   // Offene Board-Tabs auf diesem Rechner (Verbindungen zu /events von localhost). Geteilte Links anderer Geräte zählen nicht.
   const localTabs = new Set();
+  // Davon Hub-Seiten (/events?hub=1), damit ein beendetes Board sagen kann, ob der Hub schon offen ist (W-0054).
+  const localHubs = new Set();
+  // Einmal-Tickets: Damit startet dieser Hub ein gestopptes Board wieder, dessen Tab hierher kommt (W-0054, endInfo).
+  const tickets = new Map();
   // Zufällige Tokens pro Serverstart. Nur Seiten, die dieser Server ausgeliefert hat, kennen sie.
   // token erlaubt Lesen und Schreiben, viewToken nur Lesen (geteilter Link).
   const token = crypto.randomBytes(24).toString('hex');
@@ -173,10 +177,33 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     for (const res of clients) { res.write('event: restart\ndata: 1\n\n'); res.end(); }
     clients.clear();
     localTabs.clear();
+    localHubs.clear();
     clearServer(root, process.pid);
     server.close();
     startDetached(root, { cli, port: boundPort, host: newHost, takeover: true });
     setTimeout(() => process.exit(0), 300).unref();
+  }
+
+  // W-0054: Gewolltes Ende (works board --stop, „Stoppen“ im Hub, Strg+C). Alle offenen Tabs bekommen das Ereignis
+  // ended, lokale mit endInfo (was sie danach anbieten können), Tabs geteilter Links nur das Ende. Die Verbindung wird
+  // danach geschlossen. Erst wenn alles beim Betriebssystem ist, geht es weiter; dann darf der stoppende Prozess den
+  // Server beenden, unter Windows hart. Wer sich bis dahin neu verbindet, bekommt das Ereignis sofort (/events).
+  // Ein Neustart (--restart, neue Version, Übergabe) kündigt nichts an, seine Tabs verbinden sich neu.
+  let endNote = null;
+  async function announceEnd() {
+    if (!endNote) {
+      const info = localTabs.size ? await endInfo(root).catch(() => ({})) : {};
+      endNote = { local: `event: ended\ndata: ${JSON.stringify(info)}\n\n`, remote: 'event: ended\ndata: {}\n\n' };
+    }
+    const tabs = [...clients];
+    await Promise.all(tabs.map((res) => new Promise((done) => {
+      const t = setTimeout(done, 1000);
+      // Den Socket vorher merken: Nach dem Ende löst Node ihn von der Antwort. Ihn selbst zu schließen (FIN) heißt, das
+      // Ereignis kommt auch an, wenn der Server danach hart beendet wird und der Tab es erst später liest.
+      const sock = res.socket;
+      try { res.end(localTabs.has(res) ? endNote.local : endNote.remote, () => { clearTimeout(t); try { if (sock) sock.end(); } catch { /* weg */ } done(); }); } catch { clearTimeout(t); done(); }
+    })));
+    return tabs.length;
   }
 
   // Schutz vor DNS-Rebinding: nur lokale Hostnamen annehmen, außer der Nutzer hat bewusst 0.0.0.0 gewählt.
@@ -325,6 +352,24 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
         try { body = JSON.parse((await readBody(req, 8192)).toString('utf8')); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, tr('Invalid JSON.')); }
         // W-0049: works board in einem anderen Projekt schickt die offenen Tabs dieses Boards zum Hub.
         if (body && body.op === 'show') { for (const t of localTabs) t.write('event: hub\ndata: 1\n\n'); return json(res, 200, { ok: true, tabs: localTabs.size }); }
+        // W-0054: works board --stop kündigt das Ende an; die Antwort kommt, wenn alle Tabs Bescheid haben.
+        if (body && body.op === 'end') return json(res, 200, { ok: true, tabs: await announceEnd() });
+        // W-0054: Ein Board, das gleich endet, holt hier ein Einmal-Ticket für seinen Tab (endInfo). Höchstens 100 offen.
+        if (body && body.op === 'ticket') {
+          if (tickets.size >= 100) tickets.delete(tickets.keys().next().value);
+          const t = crypto.randomBytes(24).toString('hex');
+          tickets.set(t, String(body.path || ''));
+          return json(res, 200, { ok: true, ticket: t });
+        }
+        // Die Hub-Seite löst es ein (#start=…): startet das Board wie „Öffnen“, jedes Ticket nur einmal.
+        if (body && body.op === 'redeem') {
+          const key = String(body.ticket || '');
+          const dir = tickets.get(key);
+          tickets.delete(key);
+          if (!dir) throw new ApiError(400, tr('The link to start the board is no longer valid. Start the project here with "Open board".'));
+          const r = await hubAction('open', dir);
+          return json(res, r.status, r.error ? { error: r.error } : { ok: true, url: r.url });
+        }
         const r = await hubAction(body && body.op, body && body.path);
         return json(res, r.status, r.error ? { error: r.error } : { ok: true, ...(r.url ? { url: r.url } : {}) });
       }
@@ -406,7 +451,8 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
       try { return send(res, 200, 'text/calendar; charset=utf-8', buildIcal(root, { recurring: url.searchParams.get('recurring') === '1' })); } catch (e) { return send(res, 500, 'text/plain', e.message); }
     }
     // Wie viele Board-Tabs hier offen sind, damit works board --open keinen zweiten öffnet. Nur lokal, nur eine Zahl.
-    if (pathname === '/tabs') return isLocal(req) ? json(res, 200, { tabs: localTabs.size }) : send(res, 403, 'text/plain; charset=utf-8', tr('No access'));
+    // hubs: davon Hub-Seiten (W-0054).
+    if (pathname === '/tabs') return isLocal(req) ? json(res, 200, { tabs: localTabs.size, hubs: localHubs.size }) : send(res, 403, 'text/plain; charset=utf-8', tr('No access'));
     // Hub (W-0025): laufende Boards aller Projekte und die Übersicht. Nur lokal, die Seite enthält das Token.
     // Verwaiste Tabs (W-0029) brauchen die Projekte mit Pfad und das Token für "Board starten". Nur lokal, wie /hub.
     if (pathname === '/boards') return isLocal(req) ? json(res, 200, { boards: runningBoards().map(({ id, name, port, url: u }) => ({ id, name, port, url: u })), projects: projectsBrief(), token }) : send(res, 403, 'text/plain; charset=utf-8', tr('No access'));
@@ -433,10 +479,12 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     if (pathname === '/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
       res.write('retry: 2000\n\n');
+      // Das Ende ist schon angekündigt (W-0054): gleich Bescheid geben, nicht mehr als Tab zählen.
+      if (endNote) return res.end(isLocal(req) ? endNote.local : endNote.remote);
       res.write(`event: update\ndata: ${Date.now()}\n\n`); // nach Reconnect sofort aufholen
       clients.add(res);
-      if (isLocal(req)) localTabs.add(res);
-      req.on('close', () => { clients.delete(res); localTabs.delete(res); });
+      if (isLocal(req)) { localTabs.add(res); if (url.searchParams.has('hub')) localHubs.add(res); }
+      req.on('close', () => { clients.delete(res); localTabs.delete(res); localHubs.delete(res); });
       return;
     }
 
@@ -496,9 +544,12 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
   listen(port);
 
   let shuttingDown = false;
-  const shutdown = async () => {
+  // announce: Strg+C im Terminal ist ein gewolltes Ende wie works board --stop (W-0054). SIGTERM kommt auch beim
+  // Neustart und bei neuer Version (stopProcess), deshalb ohne Ankündigung.
+  const shutdown = async (announce = false) => {
     if (shuttingDown) return;
     shuttingDown = true;
+    if (announce) await Promise.race([announceEnd().catch(() => {}), new Promise((r) => setTimeout(r, 6000))]);
     await drain(8000);
     clearInterval(timer);
     clearInterval(keepalive);
@@ -508,7 +559,7 @@ export function serveBoard(root, { port = 4747, host = '127.0.0.1', open = false
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 500).unref();
   };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', () => shutdown(true));
+  process.on('SIGTERM', () => shutdown(false));
   return server;
 }
