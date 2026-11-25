@@ -3,13 +3,13 @@ id: W-0056
 title: "Discord: Status des Bots allgemein statt aufgabenbezogen"
 type: bug
 priority: P2
-status: review
+status: erledigt
 effort: S
 risk:
 created: 2026-11-25
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: fix/w-0056-discord-status-des-bots
 tags: [discord]
@@ -77,9 +77,7 @@ Der Status war seit W-0044 als „das Wichtigste über alle Projekte“ gebaut: 
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-25 17:50
-
-Fertig im Branch fix/w-0056-discord-status-des-bots (Commit ca07d38), nicht gemergt. Eigener Bot: Status nur noch Zahlen wie die Panel-Zusammenfassung („2 warten auf dich · 1 arbeitet“, „1 arbeitet“, sonst „N Projekte im Blick“), gemeinsame Funktion countParts in discord-bot.mjs. Gemeinsamer Bot (services/works-bot/server.mjs): ab zwei verschiedenen Discord-Nutzern mit funktionierender Kopplung „n people use works“, mit WORKS_BOT_LANG=de „n Leute nutzen works“, darunter „/works help“; höchstens alle 5 Minuten neu. Für den Nutzer: Der neue Status des gemeinsamen Bots erscheint erst nach einem Neustart des Dienstes auf dem VPS (git pull && docker compose up -d --build); für die deutsche Form WORKS_BOT_LANG=de in die .env. Der eigene Bot zeigt den neuen Status erst mit einem Plugin-Update. Tests: Discord-Schnelltest 17/17, voll ohne WebSocket 53/53, mit Browser 60/60, Diensttest bestanden. Offen: Merge, Neustart des Dienstes.
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
@@ -97,3 +95,4 @@ Fertig im Branch fix/w-0056-discord-status-des-bots (Commit ca07d38), nicht geme
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
 - 2026-11-25: Parallele Arbeit beendet
+- 2026-11-25: Abgeschlossen (Status: review → erledigt), DoD bestätigt
