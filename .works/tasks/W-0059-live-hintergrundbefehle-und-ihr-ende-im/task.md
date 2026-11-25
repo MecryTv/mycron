@@ -85,3 +85,4 @@ Umgesetzt in Commit 01f9c42 auf feature/w-0059-live-hintergrundbefehle-und. Post
 - 2026-11-25: Abschlusstests: Selbsttest mit Browser 66 von 66, ohne WebSocket 57 von 57 grün, kein Schritt erst rot und dann grün.
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
+- 2026-11-25: Parallele Arbeit beendet
