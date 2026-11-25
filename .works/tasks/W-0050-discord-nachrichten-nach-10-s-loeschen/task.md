@@ -3,15 +3,15 @@ id: W-0050
 title: "Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard"
 type: feature
 priority: P2
-status: backlog
+status: review
 effort: M
 risk:
 created: 2026-11-24
-updated: 2026-11-24
+updated: 2026-11-25
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0050-discord-nachrichten-nach-10-s
 tags: [discord]
 blocked_by: [W-0041]
 blocks: []
@@ -35,27 +35,27 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 <!-- Wer profitiert und wie? Optional: Als <Rolle> möchte ich <Fähigkeit>, damit <Nutzen>. -->
 
 ## Akzeptanzkriterien
-- [ ] Je Aufgabe genau eine Nachricht (Karte nach Entwurf I3, verbessert), die bei jedem Schritt bearbeitet wird: Start, Frage, Freigabe, fertig und wartet, Review, zurückgegeben, erledigt, Auslieferung (Wunsch des Nutzers vom 2026-11-24, ersetzt „nach 10 s löschen“)
-- [ ] Braucht die Karte den Nutzer (Freigabe, Frage, Review, fertig und wartet), kommt sie als neue Nachricht nach unten, damit Discord benachrichtigt; die alte Fassung wird gelöscht
-- [ ] Karten bleiben, solange die Aufgabe offen ist, und verschwinden nach der Frist ab Erledigung; Nachrichten ohne Aufgabe nach der Frist ab Senden
-- [ ] Knopf Verlauf im Discord-Panel (der angehefteten Dashboard-Nachricht nach D3, neben Warteschlange, Anweisung an Claude, Neue Aufgabe, Hilfe) und /works verlauf zeigen die letzten Nachrichten nur dem Aufrufer, nach Projekt filterbar
-- [ ] Der Verlauf übersteht einen Neustart des Bots und ist begrenzt (Anzahl oder Alter)
-- [ ] Frist einstellbar in Sekunden (Dialog im Board, works discord set), Standard 1 Std. (3600 s)
-- [ ] Geht beim eigenen und beim gemeinsamen Bot, Tests ohne echtes Discord, auch ohne WebSocket
-- [ ] Panel-Text nach Entwurf P2: Zusammenfassung oben (wartet, arbeitet, heute erledigt, Kosten), Zeile je Projekt mit Ampel, Zustand und Aufgabe, darunter Als Nächstes
-- [ ] Panel-Bild nach P2: Fortschritt mit Ampel und Aufgabe je Balken, letzte 24 Stunden je Projekt als Spur (ein Punkt je Nachricht in der Farbe ihrer Art), Woche mit heute hervorgehoben
-- [ ] Verlauf-Ansicht nach P2: Einträge mit Symbol, Projekt, Text und relativer Zeit, Eintrag ansehen mit allen Feldern, Filter Projekt und Zeitraum, Ältere
+- [x] Je Aufgabe genau eine Nachricht (Karte nach Entwurf I3), die bei jedem Schritt bearbeitet wird: Start, Frage, Freigabe, fertig und wartet, Review, zurückgegeben, erledigt, Auslieferung (Wunsch des Nutzers vom 2026-11-24, ersetzt „nach 10 s löschen“)
+- [x] Braucht die Karte den Nutzer (Freigabe, Frage, Review, fertig und wartet), kommt sie als neue Nachricht nach unten, damit Discord benachrichtigt; die alte Fassung wird gelöscht
+- [x] Karten bleiben, solange die Aufgabe offen ist, und verschwinden nach der Frist ab Erledigung; Nachrichten ohne Aufgabe nach der Frist ab Senden
+- [x] Knopf Verlauf im Discord-Panel (der angehefteten Dashboard-Nachricht nach D3, neben Warteschlange, Anweisung an Claude, Neue Aufgabe, Hilfe) und /works verlauf zeigen die letzten Nachrichten nur dem Aufrufer, nach Projekt filterbar
+- [x] Der Verlauf übersteht einen Neustart des Bots und ist begrenzt (Anzahl oder Alter)
+- [x] Frist einstellbar in Sekunden (Dialog im Board, works discord set), Standard 1 Std. (3600 s)
+- [x] Geht beim eigenen und beim gemeinsamen Bot, Tests ohne echtes Discord, auch ohne WebSocket
+- [x] Panel-Text nach Entwurf P2: Zusammenfassung oben (wartet, arbeitet, heute erledigt, Kosten), Zeile je Projekt mit Ampel, Zustand und Aufgabe, darunter Als Nächstes
+- [x] Panel-Bild nach P2: Fortschritt mit Ampel und Aufgabe je Balken, letzte 24 Stunden je Projekt als Spur (ein Punkt je Nachricht in der Farbe ihrer Art), Woche mit heute hervorgehoben
+- [x] Verlauf-Ansicht nach P2: Einträge mit Symbol, Projekt, Text und relativer Zeit, Eintrag ansehen mit allen Feldern, Filter Projekt und Zeitraum, Ältere
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] Frist in Sekunden: cleanup.seconds (Standard 3600, 0 nie) statt cleanup.hours in discord.mjs (DEFAULTS, normalizeConfig, works discord set, Liste der Schlüssel), Bot cleanup() und prune(), Board-Dialog (Feld in Sekunden), Tests zuerst
-- [ ] Karte je Aufgabe: Ereignisse mit Aufgaben-ID (neues Ereignis start beim Wechsel auf in Arbeit, perm, idle mit Aufgabe, question, review, returned, done, ship, p1) laufen in upsert() in eine Karte card:<rid>:<id> mit Einträgen je ursprünglichem Schlüssel; Zustand aus dem jüngsten offenen Eintrag; neue wartende Einträge senden die Karte neu (alte löschen, Erwähnung wie bisher je Ereignis); Knöpfe Annehmen und Zurückgeben im Review wie bisher
-- [ ] Kartenbild nach I3 verbessert (Entwurf I4 in design/): Status-Quadrat links, Zeitachse der Aufgabe rechts, Bild nur bei Ereignissen neu, Minuten im Footer
-- [ ] Verlauf speichern: jede gesendete oder bearbeitete Nachricht als Eintrag (Schlüssel, Projekt, Art, Zeit, Ereignis) in state.history, neueste Fassung je Schlüssel, höchstens 7 Tage und 300 Einträge, übersteht Neustart
-- [ ] Verlauf zeigen: Knopf Verlauf (w:hist) im Dashboard und /works verlauf (history) mit Option project, nur für den Aufrufer; Liste mit Symbol je Art, Projekt, Text, relativer Zeit; Auswahl „Eintrag ansehen“ holt die Nachricht mit allen Feldern; Auswahl Projekt und Zeitraum (24 Std., 3 Tage, 7 Tage), Knopf Ältere; custom_ids passen zu CID_RE (Dienst des gemeinsamen Bots)
-- [ ] Panel-Text nach P2: Zusammenfassung oben, Zeile je Projekt mit Ampel, Zustand, Werkzeug bei Freigabe und Aufgabe, Feld Als Nächstes; Kosten in der Zusammenfassung nur mit privacy.costs
-- [ ] Panel-Bild nach P2: Ampel und Aufgabe je Balken, Abschnitt LETZTE 24 STUNDEN mit Spur je Projekt aus state.history (Farbe nach Art), Woche einfarbig mit heute hervorgehoben und Summe
-- [ ] Doku (integrations.md, cli.md, beide Sprachen), Hilfe im Discord, Katalog de.json; Selbsttest mit und ohne WebSocket, Dienst-Test
+- [x] Frist in Sekunden: cleanup.seconds (Standard 3600, 0 nie) statt cleanup.hours in discord.mjs (DEFAULTS, normalizeConfig, works discord set, Liste der Schlüssel), Bot cleanup() und prune(), Board-Dialog (Feld in Sekunden), Tests zuerst
+- [x] Karte je Aufgabe: Ereignisse mit Aufgaben-ID (neues Ereignis start beim Wechsel auf in Arbeit, perm, idle mit Aufgabe, question, review, returned, done, ship, p1) laufen in upsert() in eine Karte card:<rid>:<id> mit Einträgen je ursprünglichem Schlüssel; Zustand aus dem jüngsten offenen Eintrag; neue wartende Einträge senden die Karte neu (alte löschen, Erwähnung wie bisher je Ereignis); Knöpfe Annehmen und Zurückgeben im Review wie bisher
+- [x] Kartenbild nach Entwurf I3 (der Nutzer fand I4 schlechter): Zeitachse der Aufgabe mit Uhrzeiten, rechts Minuten, Schritte, Kriterien, Legende; Bild bei Ereignissen neu, sonst höchstens alle 5 Minuten
+- [x] Verlauf speichern: jede gesendete oder bearbeitete Nachricht als Eintrag (Schlüssel, Projekt, Art, Zeit, Ereignis) in state.history, neueste Fassung je Schlüssel, höchstens 7 Tage und 300 Einträge, übersteht Neustart
+- [x] Verlauf zeigen: Knopf Verlauf (w:hist) im Dashboard und /works verlauf (history) mit Option project, nur für den Aufrufer; Liste mit Symbol je Art, Projekt, Text, relativer Zeit; Auswahl „Eintrag ansehen“ holt die Nachricht mit allen Feldern; Auswahl Projekt und Zeitraum (24 Std., 3 Tage, 7 Tage), Knopf Ältere; custom_ids passen zu CID_RE (Dienst des gemeinsamen Bots)
+- [x] Panel-Text nach P2: Zusammenfassung oben, Zeile je Projekt mit Ampel, Zustand, Werkzeug bei Freigabe und Aufgabe, Feld Als Nächstes; Kosten in der Zusammenfassung nur mit privacy.costs
+- [x] Panel-Bild nach P2: Ampel und Aufgabe je Balken, Abschnitt LETZTE 24 STUNDEN mit Spur je Projekt aus state.history (Farbe nach Art), Woche einfarbig mit heute hervorgehoben und Summe
+- [x] Doku (integrations.md, cli.md, beide Sprachen), Hilfe im Discord, Katalog de.json; Selbsttest mit und ohne WebSocket, Dienst-Test
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -64,13 +64,29 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 <!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Kartenbild nach I3, gezeichnet mit cardPng aus dem Branch: Zeitachse 20:10 bis 2](assets/2026-11-25-kartenbild-nach-i3-gezeichnet-mit-nachher.png)
+Beschreibung: Kartenbild nach I3, gezeichnet mit cardPng aus dem Branch: Zeitachse 20:10 bis 20:41 mit Start, zwei Wartezeiten als Strich, Tests und Review; rechts 31 MIN, Schritte 5/5, Kriterien 5/5; Legende START/SHIP, WARTET AUF DICH, TESTS/REVIEW
+Art: nachher · Hinzugefügt: 2026-11-25
+
+![Panel-Bild nach P2, gezeichnet mit dashboardPng aus dem Branch: Fortschritt mit ](assets/2026-11-25-panel-bild-nach-p2-gezeichnet-mit-nachher.png)
+Beschreibung: Panel-Bild nach P2, gezeichnet mit dashboardPng aus dem Branch: Fortschritt mit Ampel und Aufgabe je Projekt, letzte 24 Stunden als Spur je Projekt mit Legende, erledigt der letzten 7 Tage mit hervorgehobenem Heute und Summe
+Art: nachher · Hinzugefügt: 2026-11-25
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-<!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
+Stand: 2026-11-25 15:53
+
+Fertig zur Abnahme, Status review. Alle 10 Kriterien und 8 Planschritte abgehakt, Branch feature/w-0050-discord-nachrichten-nach-10-s, nichts uncommittet.
+
+Umgesetzt (Commits 392bc5a bis aa605b2): cleanup.seconds statt cleanup.hours, Karte je Aufgabe nach I3 mit Bild und neuem Ereignis start, Verlauf (state.history, Knopf Verlauf, /works verlauf), Panel nach P2 (Text und Bild), Doku und Hilfe.
+
+Funde der Code-Durchsicht behoben (je Fund erst ein roter Test): 01cca0e prune rechnet ab der Erledigung statt ab dem Posten, und ein altes cleanup.hours=0 bleibt nie löschen. d0f8d90 Karten warten nur auf Schritte, deren Schlüssel noch in state.open steht (liveCard); ein neuer Schritt im selben Slot löst den älteren auf; eine im Review gelöschte Aufgabe löst ihr Review auf; ein weggefallenes Projekt räumt offene Schritte und Timer weg. 7d25ab7 ein alter Eintrag ohne Karte in der Warteschlange bleibt Einzelnachricht.
+
+Tests nach den Fixes: Schnelltest 21/21, Selbsttest ohne WebSocket 51/51 (231 s), mit Browser 58/58 (376 s) im zweiten Lauf, services/works-bot/test.mjs alle Prüfungen. Im ersten Browser-Lauf war der Schritt „Dialog Discord-Bot im Browser (W-0038)“ einmal rot mit „Unexpected end of JSON input“: Der Test liest config.json, während das Board sie schreibt; writeJson in lib.mjs schreibt nicht atomar (vorher schon so, nicht Teil von W-0050).
+
+Offen: Board-Vorschau zeigt weiter die Einzelnachricht statt der Karte. /works verlauf beim gemeinsamen Bot erst nach Neustart des Dienstes (Knopf geht sofort). Karten offener Aufgaben bleiben, auch eine P1 im Backlog. Eine Karte, deren Aufgabe gelöscht wurde, zeigt bis zum Löschen als Zustand „In Arbeit“ (Rückfall ohne Status). writeJson nicht atomar (siehe oben).
 
 ## Verlauf
 - 2026-11-24: Aufgabe angelegt
@@ -97,3 +113,41 @@ Wunsch des Nutzers am 2026-11-24: Nachrichten sollen nicht erst nach 24 h, sonde
 - 2026-11-24: Entwurf I2 „Karte mit Phasenstreifen“ angehängt
 - 2026-11-24: Entwurf I3 „Karte mit Zeitachse“ angehängt
 - 2026-11-24: Entwurf I3 „Karte mit Zeitachse“ gewählt. Grund: Nutzer am 2026-11-24: „L3 verbessert“, gemeint ist I3 (Karte mit Zeitachse) in verbesserter Fassung: auf dem Handy lesbar, Bild nur bei Ereignissen neu
+- 2026-11-24: Parallel gestartet im Worktree W-0050-discord-nachrichten (Status: backlog → in-arbeit)
+- 2026-11-24: Entwurf I4 „Zeitachse verbessert“ angehängt
+- 2026-11-24: Entwurf I4 „Zeitachse verbessert“ gewählt. Grund: Verbesserte Fassung von I3 nach dem Wunsch des Nutzers „I3 verbessert“ vom 2026-11-24
+- 2026-11-24: Entwurf I3 „Karte mit Zeitachse“ gewählt. Grund: Nutzer am 2026-11-24: I4 sieht schlecht aus, die alte Fassung I3 war deutlich besser. I3 wird wie im Entwurf gebaut.
+- 2026-11-24: Nutzer zu I4: gefällt nicht, I3 war deutlich besser. Kartenbild wird nach I3 gebaut, Bild bei Ereignissen neu, sonst höchstens alle 5 Minuten.
+- 2026-11-24: Übergabe aktualisiert
+- 2026-11-24: Kartenbild nach Korrektur des Nutzers nach I3 statt I4; Plan für alle Schritte in der Übergabe, noch kein Code (Feierabend). Ausgangslage Discord-Selbsttests 20 von 20 grün.
+- 2026-11-25: Akzeptanzkriterien: "Frist einstellbar in Sekunden (Dialog im Board, works discord set), Standard 1 Std. (3600 s)" abgehakt
+- 2026-11-25: Umsetzungsplan: "Frist in Sekunden: cleanup.seconds (Standard 3600, 0 nie) statt cleanup.hours in discord.mjs (DEFAULTS, normalizeConfig, works discord set, Liste der Schlüssel), Bot cleanup() und prune(), Board-Dialog (Feld in Sekunden), Tests zuerst" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Je Aufgabe genau eine Nachricht (Karte nach Entwurf I3), die bei jedem Schritt bearbeitet wird: Start, Frage, Freigabe, fertig und wartet, Review, zurückgegeben, erledigt, Auslieferung (Wunsch des Nutzers vom 2026-11-24, ersetzt „nach 10 s löschen“)" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Braucht die Karte den Nutzer (Freigabe, Frage, Review, fertig und wartet), kommt sie als neue Nachricht nach unten, damit Discord benachrichtigt; die alte Fassung wird gelöscht" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Karten bleiben, solange die Aufgabe offen ist, und verschwinden nach der Frist ab Erledigung; Nachrichten ohne Aufgabe nach der Frist ab Senden" abgehakt
+- 2026-11-25: Umsetzungsplan: "Karte je Aufgabe: Ereignisse mit Aufgaben-ID (neues Ereignis start beim Wechsel auf in Arbeit, perm, idle mit Aufgabe, question, review, returned, done, ship, p1) laufen in upsert() in eine Karte card:<rid>:<id> mit Einträgen je ursprünglichem Schlüssel; Zustand aus dem jüngsten offenen Eintrag; neue wartende Einträge senden die Karte neu (alte löschen, Erwähnung wie bisher je Ereignis); Knöpfe Annehmen und Zurückgeben im Review wie bisher" abgehakt
+- 2026-11-25: Umsetzungsplan: "Kartenbild nach Entwurf I3 (der Nutzer fand I4 schlechter): Zeitachse der Aufgabe mit Uhrzeiten, rechts Minuten, Schritte, Kriterien, Legende; Bild bei Ereignissen neu, sonst höchstens alle 5 Minuten" abgehakt
+- 2026-11-25: Karte je Aufgabe umgesetzt: Zustand aus dem jüngsten offenen Eintrag, eine nach dem Review begonnene Auslieferung zeigt die Karte statt des Reviews; fertig und wartet geht an die Aufgabe, an der Claude zuletzt war (auch im Review). Einzelnachrichten von vor dem Update bleiben einzeln.
+- 2026-11-25: Akzeptanzkriterien: "Knopf Verlauf im Discord-Panel (der angehefteten Dashboard-Nachricht nach D3, neben Warteschlange, Anweisung an Claude, Neue Aufgabe, Hilfe) und /works verlauf zeigen die letzten Nachrichten nur dem Aufrufer, nach Projekt filterbar" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Der Verlauf übersteht einen Neustart des Bots und ist begrenzt (Anzahl oder Alter)" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Verlauf-Ansicht nach P2: Einträge mit Symbol, Projekt, Text und relativer Zeit, Eintrag ansehen mit allen Feldern, Filter Projekt und Zeitraum, Ältere" abgehakt
+- 2026-11-25: Umsetzungsplan: "Verlauf speichern: jede gesendete oder bearbeitete Nachricht als Eintrag (Schlüssel, Projekt, Art, Zeit, Ereignis) in state.history, neueste Fassung je Schlüssel, höchstens 7 Tage und 300 Einträge, übersteht Neustart" abgehakt
+- 2026-11-25: Umsetzungsplan: "Verlauf zeigen: Knopf Verlauf (w:hist) im Dashboard und /works verlauf (history) mit Option project, nur für den Aufrufer; Liste mit Symbol je Art, Projekt, Text, relativer Zeit; Auswahl „Eintrag ansehen“ holt die Nachricht mit allen Feldern; Auswahl Projekt und Zeitraum (24 Std., 3 Tage, 7 Tage), Knopf Ältere; custom_ids passen zu CID_RE (Dienst des gemeinsamen Bots)" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Panel-Text nach Entwurf P2: Zusammenfassung oben (wartet, arbeitet, heute erledigt, Kosten), Zeile je Projekt mit Ampel, Zustand und Aufgabe, darunter Als Nächstes" abgehakt
+- 2026-11-25: Akzeptanzkriterien: "Panel-Bild nach P2: Fortschritt mit Ampel und Aufgabe je Balken, letzte 24 Stunden je Projekt als Spur (ein Punkt je Nachricht in der Farbe ihrer Art), Woche mit heute hervorgehoben" abgehakt
+- 2026-11-25: Umsetzungsplan: "Panel-Text nach P2: Zusammenfassung oben, Zeile je Projekt mit Ampel, Zustand, Werkzeug bei Freigabe und Aufgabe, Feld Als Nächstes; Kosten in der Zusammenfassung nur mit privacy.costs" abgehakt
+- 2026-11-25: Umsetzungsplan: "Panel-Bild nach P2: Ampel und Aufgabe je Balken, Abschnitt LETZTE 24 STUNDEN mit Spur je Projekt aus state.history (Farbe nach Art), Woche einfarbig mit heute hervorgehoben und Summe" abgehakt
+- 2026-11-25: Panel nach P2 und Verlauf umgesetzt. Entscheidungen: Spuren im Panel-Bild enden an einer 5-Minuten-Grenze, damit das Bild nicht bei jedem Durchgang neu gezeichnet wird; Kartenbild höchstens alle 5 Minuten auch im Testtakt; Board-Vorschau zeigt weiter die Einzelnachricht (offener Punkt).
+- 2026-11-25: Dienst-Test angepasst: /works verlauf in der Befehlsliste, Karte mit Bild und Verlauf mit Auswahl über den Dienst.
+- 2026-11-25: Akzeptanzkriterien: "Geht beim eigenen und beim gemeinsamen Bot, Tests ohne echtes Discord, auch ohne WebSocket" abgehakt
+- 2026-11-25: Umsetzungsplan: "Doku (integrations.md, cli.md, beide Sprachen), Hilfe im Discord, Katalog de.json; Selbsttest mit und ohne WebSocket, Dienst-Test" abgehakt
+- 2026-11-25: Volle Tests grün: Selbsttest mit Browser 58 von 58, ohne WebSocket 51 von 51, Dienst-Test alle Prüfungen. Im ersten Durchgang zwei Testfehler behoben (gleiche Aufgaben-ID in zwei Projekten, Panel-Zeile bei offener Freigabe aus früheren Schritten) und einmal Absturz des Browser-Laufs mit EADDRINUSE auf Port 48444 (fremder Port, Wiederholung grün).
+- 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
+- 2026-11-25: Asset hinzugefügt: assets/2026-11-25-kartenbild-nach-i3-gezeichnet-mit-nachher.png (nachher)
+- 2026-11-25: Asset hinzugefügt: assets/2026-11-25-panel-bild-nach-p2-gezeichnet-mit-nachher.png (nachher)
+- 2026-11-25: Code-Durchsicht: nichts Kritisches, vier Funde (Karte nach langer Laufzeit nie gelöscht, offene Frage hält Karte fest, cleanup.hours 0 wird 3600, alter ungesendeter Queue-Eintrag); Nutzer: alle beheben.
+- 2026-11-25: Vier Funde der Code-Durchsicht behoben (01cca0e, d0f8d90, 7d25ab7), je Fund zuerst ein roter Test. Danach Schnelltest 21/21, ohne WebSocket 51/51, mit Browser 58/58 (zweiter Lauf; im ersten einmal 'Unexpected end of JSON input' im Browser-Dialog-Test, weil config.json nicht atomar geschrieben wird), Dienst-Test grün.
+- 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Abschließende Prüfung nach den vier Fixes: Selbsttest mit Browser 58/58, ohne WebSocket 51/51, works-bot grün.
+- 2026-11-25: Parallele Arbeit beendet
