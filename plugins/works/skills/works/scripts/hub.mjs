@@ -45,6 +45,22 @@ export function runningBoards() {
     .map(({ p, s }) => ({ id: rootIdOf(p.path), name: p.name, path: p.path, port: s.port, url: boardUrl(s) }));
 }
 
+// W-0057: Offene works-Tabs laufender Boards wechseln zum Hub (Ereignis hub über POST /api/hub mit dem lokalen Token
+// aus /boards). except: Projektordner, dessen Tabs bleiben (das gerade gestartete Board selbst). Nur lokal, kurz,
+// Fehler still. Gibt zurück, wie viele Tabs das Signal bekommen haben.
+export async function sendTabsToHub({ except = '' } = {}) {
+  const skip = except ? fs.realpathSync(except) : '';
+  const sent = await Promise.all(runningBoards().filter((b) => b.path !== skip).map(async (b) => {
+    try {
+      const base = `http://127.0.0.1:${b.port}`;
+      const { token } = await (await fetch(`${base}/boards`, { signal: AbortSignal.timeout(1500) })).json();
+      const r = await fetch(`${base}/api/hub`, { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'show' }), signal: AbortSignal.timeout(1500) });
+      return r.ok ? Number((await r.json()).tabs) || 0 : 0;
+    } catch { return 0; }
+  }));
+  return sent.reduce((a, n) => a + n, 0);
+}
+
 // Alle angemeldeten Projekte mit Kennung, für verwaiste Board-Tabs (W-0029).
 export function projectsBrief() {
   return projectList().map((p) => ({ id: rootIdOf(p.path), name: p.name, path: p.path }));
