@@ -3,7 +3,7 @@
 // nichts zusätzlich tun müssen; ship, CI-Wächter und Berichte legen Ereignisse in die outbox (discord.mjs).
 // Nachrichten nach Entwurf F2: Felder, Erledigtes wird nachträglich bearbeitet, nur Erwähnungen klingeln.
 // Dauerhaft im Kanal steht nur das Dashboard nach D3 (W-0044), eines je Kanal für alle Projekte; alles andere
-// löscht der Bot nach der Frist (cleanup.hours), offene Nachrichten erst nach ihrer Erledigung.
+// löscht der Bot nach der Frist (cleanup.seconds), offene Nachrichten erst nach ihrer Erledigung.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -766,9 +766,9 @@ export class Bot {
   // Durchgang (30 in der Minute): Der gemeinsame Bot erlaubt 60, und nach einer langen Pause laufen viele Fristen
   // gleichzeitig ab. Einträge von vor W-0044 haben kein done: erledigt ab dem Senden.
   async cleanup(cfg) {
-    const hours = Number(cfg.cleanup && cfg.cleanup.hours) || 0;
-    if (hours <= 0) return;
-    const limit = Date.now() - hours * 3600000;
+    const secs = Number(cfg.cleanup && cfg.cleanup.seconds) || 0;
+    if (secs <= 0) return;
+    const limit = Date.now() - secs * 1000;
     const busy = new Set([...this.state.queue.map((q) => q.key), ...Object.values(this.state.open).map((o) => o.key)]);
     let n = 0;
     for (const [k, v] of Object.entries(this.state.msgs)) {
@@ -823,7 +823,7 @@ export class Bot {
   prune(cfg) {
     const now = Date.now();
     // Gemerkte Nachrichten bleiben, bis das Aufräumen sie gelöscht hat (spätestens Frist plus eine Woche).
-    const keep = Math.max(7 * DAY, ((Number(cfg && cfg.cleanup && cfg.cleanup.hours) || 0) * 3600000) + 7 * DAY);
+    const keep = ((Number(cfg && cfg.cleanup && cfg.cleanup.seconds) || 0) * 1000) + 7 * DAY;
     for (const [k, v] of Object.entries(this.state.msgs)) if (Date.parse(v.at) < now - keep && !Object.values(this.state.open).some((o) => o.key === k)) delete this.state.msgs[k];
     for (const [k, v] of Object.entries(this.state.ships)) if (Date.parse(v.ended || v.started) < now - DAY) delete this.state.ships[k];
     for (const m of Object.values(this.state.sent)) for (const [k, t] of Object.entries(m)) if (now - t > DAY) delete m[k];

@@ -1906,7 +1906,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         hook('stop-reminder.mjs', { cwd: proj, session_id: 's-p' });
       }
       // Aufräumen mit kurzer Frist: Infos verschwinden, Offenes bleibt bis zur Erledigung, das Dashboard bleibt.
-      await wa(['discord', 'set', 'cleanup.hours=0.0005'], { extraEnv: denv });
+      await wa(['discord', 'set', 'cleanup.seconds=2'], { extraEnv: denv });
       w(['discord', 'emit', 'report', `--json=${JSON.stringify({ title: 'Kurzlebig', summary: 'weg damit' })}`], { extraEnv: denv });
       const info = await dwait(() => findMsg((e) => e.title === 'Kurzlebig'), 'Info-Nachricht');
       const rid = (w(['new', '--type=chore', '--title=Offen im Review', '--criteria=Ja']).out.match(/W-\d+/) || [])[0];
@@ -1920,7 +1920,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       expect(fake.messages.has(dashOf('projekt').m.id), 'Dashboard gelöscht');
       expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
     } finally {
-      await wa(['discord', 'set', 'cleanup.hours=24'], { extraEnv: denv, ok: false });
+      await wa(['discord', 'set', 'cleanup.seconds=3600'], { extraEnv: denv, ok: false });
       await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
     }
   });
@@ -2082,13 +2082,14 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       await call('POST', '/api/discord', { op: 'move', channel_id: '11' });
       expect((await call('GET', '/api/discord')).ready && dcfg().channel_id === '11', 'nach der Kanalwahl nicht eingerichtet');
       // Einstellungen über applySetting, falsche Werte abgelehnt, ohne dass etwas halb gespeichert wird.
-      await call('POST', '/api/discord', { op: 'set', values: { 'event.ci_red.at': 'an', 'privacy.costs': 'aus', 'cleanup.hours': '12' } });
-      expect(dcfg().events.ci_red.at === true && dcfg().privacy.costs === false && dcfg().cleanup.hours === 12, 'Einstellungen nicht gespeichert');
+      await call('POST', '/api/discord', { op: 'set', values: { 'event.ci_red.at': 'an', 'privacy.costs': 'aus', 'cleanup.seconds': '12' } });
+      expect(dcfg().events.ci_red.at === true && dcfg().privacy.costs === false && dcfg().cleanup.seconds === 12, 'Einstellungen nicht gespeichert');
+      expect((await call('GET', '/api/discord')).cleanup.seconds === 12, 'Frist in Sekunden fehlt im Stand für den Dialog');
       r = await call('POST', '/api/discord', { op: 'set', values: { 'privacy.costs': 'an', 'quiet.from': '25:00' } }, false);
       expect(r.status === 400 && dcfg().privacy.costs === false, `ungültige Uhrzeit: ${r.status}, costs ${dcfg().privacy.costs}`);
       await call('POST', '/api/discord', { op: 'set', values: { [`project.${here.rid}`]: 'aus' } });
       expect(dcfg().projects[here.rid].enabled === false, 'Projekt nicht abgeschaltet');
-      await call('POST', '/api/discord', { op: 'set', values: { [`project.${here.rid}`]: 'an', 'event.ci_red.at': 'aus', 'privacy.costs': 'an', 'cleanup.hours': '24', 'delay.perm': '0', 'delay.idle': '0', 'quiet.on': 'aus' } });
+      await call('POST', '/api/discord', { op: 'set', values: { [`project.${here.rid}`]: 'an', 'event.ci_red.at': 'aus', 'privacy.costs': 'an', 'cleanup.seconds': '3600', 'delay.perm': '0', 'delay.idle': '0', 'quiet.on': 'aus' } });
       // Vorschau mit dem ungespeicherten Stand: Erwähnung nur mit @, ohne @ still.
       let pv = await call('POST', '/api/discord', { op: 'preview', type: 'perm' });
       expect(pv.ring && /<@4242>/.test(pv.content) && pv.embeds[0].title === 'Wartet auf deine Freigabe', `Vorschau Freigabe: ${JSON.stringify(pv).slice(0, 300)}`);
@@ -2137,6 +2138,13 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     const refused = (cfg, k, v) => { try { dm.applySetting(cfg, k, v); return ''; } catch (e) { return e.message; } };
     expect(/eigenen Bot/.test(refused(dm.normalizeConfig({ mode: 'shared' }), 'project.0123456789abcdef.channel', '15')), 'Kanal je Projekt beim gemeinsamen Bot angenommen');
     expect(refused(dm.normalizeConfig({}), 'project.0123456789abcdef.channel', 'dev'), 'Kanalname statt Kanal-ID angenommen');
+    // W-0050: Frist in Sekunden, Standard 1 Std.; ein altes cleanup.hours gilt nicht mehr.
+    const c1 = dm.normalizeConfig({ cleanup: { hours: 5 } });
+    expect(c1.cleanup.seconds === 3600 && !('hours' in c1.cleanup), `alte Frist in Stunden übernommen: ${JSON.stringify(c1.cleanup)}`);
+    dm.applySetting(c1, 'cleanup.seconds', '0');
+    expect(c1.cleanup.seconds === 0, 'cleanup.seconds=0 wirkt nicht');
+    for (const v of ['-1', '1.5', '', '2592001']) expect(refused(c1, 'cleanup.seconds', v), `cleanup.seconds=${v} angenommen`);
+    expect(refused(c1, 'cleanup.hours', '2'), 'cleanup.hours noch angenommen');
     let r = await wa(['discord', 'set', 'commands=vielleicht'], { extraEnv: denv, ok: false });
     expect(r.code !== 0, 'commands=vielleicht angenommen');
     const { call } = await boardFor();

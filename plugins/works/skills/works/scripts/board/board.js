@@ -3457,7 +3457,7 @@
 
   // Gespeicherter Stand unter den Schlüsseln von works discord set.
   function dcValues(s) {
-    const v = { auto_enroll: onOff(s.auto_enroll), commands: onOff(s.commands_on), 'quiet.on': onOff(s.quiet.on), 'quiet.from': s.quiet.from, 'quiet.to': s.quiet.to, 'delay.perm': String(s.delays.perm), 'delay.idle': String(s.delays.idle), 'cleanup.hours': String(s.cleanup.hours) };
+    const v = { auto_enroll: onOff(s.auto_enroll), commands: onOff(s.commands_on), 'quiet.on': onOff(s.quiet.on), 'quiet.from': s.quiet.from, 'quiet.to': s.quiet.to, 'delay.perm': String(s.delays.perm), 'delay.idle': String(s.delays.idle), 'cleanup.seconds': String(s.cleanup.seconds) };
     for (const g of s.events) for (const e of g.items) { v['event.' + e.key + '.on'] = onOff(e.on); v['event.' + e.key + '.at'] = onOff(e.at); }
     for (const k of Object.keys(s.privacy)) v['privacy.' + k] = onOff(s.privacy[k]);
     for (const p of s.projects) { v['project.' + p.rid] = onOff(p.enabled); v['project.' + p.rid + '.channel'] = p.channel_id || ''; }
@@ -3493,7 +3493,7 @@
     const sw = (k, label, hint) => '<label class="switch small"><span><b>' + esc(label) + '</b>' + (hint ? '<small>' + esc(hint) + '</small>' : '') + '</span><input type="checkbox" data-k="' + k + '"' + (on(k) ? ' checked' : '') + '><i aria-hidden="true"></i></label>';
     const bare = (k, label) => '<label class="switch dc-bare"><input type="checkbox" data-k="' + k + '"' + (on(k) ? ' checked' : '') + ' aria-label="' + esc(label) + '"><i aria-hidden="true"></i></label>';
     const at = (k, label) => '<button type="button" class="dc-at" data-k="' + k + '" aria-pressed="' + on(k) + '" aria-label="' + esc(tr('Mention for {label}', { label })) + '">@</button>';
-    const num = (k, label, unit, max) => '<label class="field"><span>' + esc(label) + '</span><div class="dc-numin"><input class="input" type="number" min="0" max="' + max + '" step="' + (k === 'cleanup.hours' ? 'any' : '1') + '" data-k="' + k + '" value="' + esc(val(k)) + '"><small>' + esc(unit) + '</small></div></label>';
+    const num = (k, label, unit, max) => '<label class="field"><span>' + esc(label) + '</span><div class="dc-numin"><input class="input" type="number" min="0" max="' + max + '" step="1" data-k="' + k + '" value="' + esc(val(k)) + '"><small>' + esc(unit) + '</small></div></label>';
     const step = (n, cls, title, body) => '<li class="dc-step ' + cls + '"><span class="dc-num" aria-hidden="true">' + n + '</span><div><h3>' + title + '</h3>' + body + '</div></li>';
     const tokenBox = () => '<div class="dc-box"><div class="dc-pw"><input class="input" id="dcToken" type="password" autocomplete="off" spellcheck="false" aria-label="' + esc(tr('Bot token')) + '"><button type="button" class="btn small primary" id="dcTokenGo">' + tr('Verify') + '</button></div><p class="dc-hint">' + tr('Stored only on this computer and shown only masked afterwards.') + '</p></div>';
     const codeBox = () => '<div class="dc-box"><div class="dc-pw"><input class="input" id="dcCode" autocomplete="off" spellcheck="false" placeholder="ABCD-2345" aria-label="' + esc(tr('Code from Discord')) + '"><button type="button" class="btn small primary" id="dcCodeGo">' + tr('Pair') + '</button></div><p class="dc-hint">' + tr('In the terminal, use {cmd}.', { cmd: '<code>works discord link &lt;' + esc(tr('code')) + '&gt;</code>' }) + '</p></div>';
@@ -3593,8 +3593,8 @@
       return '<div class="dc-legend"><span><span class="dc-at" aria-pressed="true">@</span> ' + tr('rings with a mention') + '</span><span><span class="dc-at" aria-pressed="false">@</span> ' + tr('arrives silently') + '</span></div>' + s.events.map(grp).join('') +
         '<div class="dc-quiet"><span><b>' + tr('Quiet hours') + '</b><small>' + tr('Mentions also arrive silently then, nothing gets lost') + '</small></span>' + bare('quiet.on', tr('Quiet hours')) +
         '<div class="dc-times">' + tr('from') + ' <input class="input" type="time" data-k="quiet.from" value="' + esc(val('quiet.from')) + '" aria-label="' + esc(tr('Quiet hours from')) + '"> ' + tr('until') + ' <input class="input" type="time" data-k="quiet.to" value="' + esc(val('quiet.to')) + '" aria-label="' + esc(tr('Quiet hours until')) + '"></div></div>' +
-        '<div class="dc-nums">' + num('delay.perm', tr('Report approval after'), tr('seconds'), 3600) + num('delay.idle', tr('Report done after'), tr('seconds'), 3600) + num('cleanup.hours', tr('Delete messages after'), tr('hours, 0 never'), 720) + '</div>' +
-        '<p class="dc-hint">' + tr('The delay saves notifications when you were faster. The dashboard stays; open messages are deleted only once they are dealt with.') + '</p>';
+        '<div class="dc-nums">' + num('delay.perm', tr('Report approval after'), tr('seconds'), 3600) + num('delay.idle', tr('Report done after'), tr('seconds'), 3600) + num('cleanup.seconds', tr('Delete messages after'), tr('seconds, 0 never'), 2592000) + '</div>' +
+        '<p class="dc-hint">' + tr('The delay saves notifications when you were faster. The dashboard stays; task cards and open messages are deleted only once they are dealt with.') + '</p>';
     }
 
     // Schalter nach J2 (W-0046); ausgeschaltet wird die Liste blass (CSS über :has).
