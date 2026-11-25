@@ -65,8 +65,10 @@ export function normalizeConfig(c = {}) {
   const out = { ...DEFAULTS, ...src };
   out.events = Object.fromEntries(Object.entries(DEFAULTS.events).map(([k, v]) => [k, { ...v, ...((src.events || {})[k] || {}) }]));
   for (const k of ['quiet', 'privacy', 'delays']) out[k] = { ...DEFAULTS[k], ...(src[k] || {}) };
-  // Nur noch Sekunden (W-0050): eine alte Frist cleanup.hours gilt nicht mehr, dann der Standard.
-  const sec = Number((src.cleanup || {}).seconds);
+  // Nur noch Sekunden (W-0050): eine alte Frist cleanup.hours gilt nicht mehr, dann der Standard; nur „nie löschen“
+  // (hours 0 ohne seconds) bleibt nie löschen.
+  const cl = src.cleanup || {};
+  const sec = cl.seconds === undefined && cl.hours === 0 ? 0 : Number(cl.seconds);
   out.cleanup = { seconds: Number.isInteger(sec) && sec >= 0 ? sec : DEFAULTS.cleanup.seconds };
   out.projects = { ...(src.projects || {}) };
   return out;

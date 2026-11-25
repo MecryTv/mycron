@@ -1927,6 +1927,69 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     kb.state.msgs[ck].done = Date.now() - 5000;
     await kb.cleanup(botM.normalizeConfig({ cleanup: { seconds: 1 } }));
     expect(!kb.state.msgs[ck] && !kb.state.cards[ck], 'erledigte Karte nach der Frist nicht samt Stand gelöscht');
+    // Funde der Code-Durchsicht zu W-0050. Ein Bot ohne Prozess, dessen Projektstand der Test vorgibt.
+    const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+    const fresh = () => {
+      let deletes = 0;
+      const x = new botM.Bot({ rest: { del: async () => { deletes++; } }, log: () => {} });
+      Object.assign(x.state, { msgs: {}, queue: [], open: {}, cards: {}, history: [], sent: {}, ships: {}, frozen: {}, projects: { r: { name: 'p', root: 'x', snap: { name: 'p', tasks: {}, costs: {}, queueIds: [] } } } });
+      return { x, deletes: () => deletes };
+    };
+    const snapWith = (tasks) => ({ name: 'p', tasks, costs: {}, queueIds: [] });
+    const short = botM.normalizeConfig({ cleanup: { seconds: 1 } });
+    // 1. Eine Karte, älter als eine Woche plus Frist, deren Aufgabe gerade erledigt wird: prune vergisst sie nicht vor
+    // dem Löschen, nach der Frist kommt ein DELETE.
+    {
+      const { x, deletes } = fresh();
+      x.state.projects.r.snap = snapWith({ 'W-1': { id: 'W-1', title: 'Alt', status: 'erledigt', q: 0 } });
+      x.state.cards['card:r:W-1'] = { rid: 'r', id: 'W-1', entries: { a: { type: 'p1', id: 'W-1', state: 'open', t0: ago(15 * 1440), u: 1 } } };
+      x.state.msgs['card:r:W-1'] = { channel_id: '11', message_id: '7', at: ago(15 * 1440), done: 0 };
+      await x.cleanup(short); x.prune(short);
+      expect(x.state.msgs['card:r:W-1'] && x.state.cards['card:r:W-1'], 'alte Karte bei der Erledigung vergessen statt gelöscht');
+      await sleepMs(1100); await x.cleanup(short);
+      expect(deletes() === 1 && !x.state.msgs['card:r:W-1'], `alte Karte nach der Frist nicht gelöscht (${deletes()} DELETE)`);
+    }
+    // 2. Frage A, dann Frage B zur selben Aufgabe, beide beantwortet, Aufgabe erledigt: Die Karte wartet nicht mehr und
+    // wird nach der Frist gelöscht. Eine im Review gelöschte Aufgabe und ein weggefallenes Projekt lassen ihre Karte
+    // ebenfalls nicht mehr warten.
+    {
+      const { x, deletes } = fresh();
+      const tq = (q, lastQ, status = 'in-arbeit') => ({ 'W-2': { id: 'W-2', title: 'Fragen', status, q, lastQ, crit: [0, 0] } });
+      x.diffTasks('r', snapWith(tq(0, '')), snapWith(tq(1, 'Frage A')), cfgC);
+      x.diffTasks('r', snapWith(tq(1, 'Frage A')), snapWith(tq(2, 'Frage B')), cfgC);
+      x.state.projects.r.snap = snapWith(tq(0, ''));
+      x.resolve('r', x.state.projects.r.snap, cfgC);
+      x.state.projects.r.snap = snapWith(tq(0, '', 'erledigt'));
+      const c2 = x.state.cards['card:r:W-2'];
+      expect(c2 && Object.keys(c2.entries).length === 2, `Karte mit zwei Fragen fehlt: ${JSON.stringify(c2)}`);
+      x.state.msgs['card:r:W-2'] = { channel_id: '11', message_id: '8', at: ago(5), done: 0 };
+      x.state.queue = [];
+      expect(!x.cardWaits(c2), 'Karte wartet nach zwei beantworteten Fragen und erledigter Aufgabe weiter');
+      has(x.cardMessage('card:r:W-2', c2, cfgC).body.embeds[0].description, 'Erledigt', 'Zustand nach zwei Fragen');
+      await x.cleanup(short); await sleepMs(1100); await x.cleanup(short);
+      expect(deletes() === 1 && !x.state.msgs['card:r:W-2'], 'Karte nach zwei Fragen nicht gelöscht');
+      // Im Review gelöscht.
+      const tr3 = (status) => ({ 'W-3': { id: 'W-3', title: 'Weg', status, q: 0, crit: [0, 0] } });
+      x.diffTasks('r', snapWith(tr3('in-arbeit')), snapWith(tr3('review')), cfgC);
+      x.diffTasks('r', snapWith(tr3('review')), snapWith({}), cfgC);
+      x.state.projects.r.snap = snapWith({});
+      expect(!x.cardWaits(x.state.cards['card:r:W-3']), 'Karte einer im Review gelöschten Aufgabe wartet weiter');
+      // Projekt weg (W-0051): seine offenen Einträge zählen nicht mehr.
+      const tr4 = (status) => ({ 'W-4': { id: 'W-4', title: 'Projekt weg', status, q: 0, crit: [0, 0] } });
+      x.diffTasks('r', snapWith(tr4('in-arbeit')), snapWith(tr4('review')), cfgC);
+      x.missing.set('r', Date.now() - 10 * 60000);
+      x.forget(new Set());
+      expect(!x.cardWaits(x.state.cards['card:r:W-4']) && !Object.keys(x.state.open).length, `Karte wartet nach dem Wegfall des Projekts: ${JSON.stringify(x.state.open)}`);
+    }
+    // 4. Ein Eintrag von vor dem Update ({ key, ev } ohne card) wartet noch in der Warteschlange: Seine Auflösung bleibt
+    // eine Einzelnachricht und wird nicht zur Karte.
+    {
+      const { x } = fresh();
+      const ev = { type: 'review', project: 'p', id: 'W-5', title: 'Alt', state: 'open', at: ago(3) };
+      x.state.queue = [{ key: 'review:r:W-5:1', ev, rid: 'r', channel_id: '11' }];
+      x.upsert('review:r:W-5:1', { ...ev, state: 'accepted', until: ago(0) }, 'r', cfgC);
+      expect(x.state.queue.length === 1 && !x.state.queue[0].card && x.state.queue[0].ev.state === 'accepted' && !x.state.cards['card:r:W-5'], `alter Eintrag wurde zur Karte: ${JSON.stringify(x.state.queue)}`);
+    }
     const snapOf = (name, since) => ({ root: 'x', name, snap: { name, tasks: {}, perm: { since, tool: 'Bash' }, perms: [], busy: true, active: { id: 'W-9', title: 'Probe' } } });
     b.state.projects = { r1: snapOf('alt', '2026-01-01T10:00:00.000Z'), r2: snapOf('neu', '2026-06-01T10:00:00.000Z') };
     expect(b.statusLine(botM.normalizeConfig({})) === 'neu wartet auf deine Freigabe', `Status: ${b.statusLine(botM.normalizeConfig({}))}`);
@@ -2322,6 +2385,9 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     // W-0050: Frist in Sekunden, Standard 1 Std.; ein altes cleanup.hours gilt nicht mehr.
     const c1 = dm.normalizeConfig({ cleanup: { hours: 5 } });
     expect(c1.cleanup.seconds === 3600 && !('hours' in c1.cleanup), `alte Frist in Stunden übernommen: ${JSON.stringify(c1.cleanup)}`);
+    // „Nie löschen“ aus der Zeit vor W-0050 bleibt nie löschen; eine gesetzte Sekundenzahl geht vor.
+    expect(dm.normalizeConfig({ cleanup: { hours: 0 } }).cleanup.seconds === 0, 'cleanup.hours=0 (nie löschen) nicht übernommen');
+    expect(dm.normalizeConfig({ cleanup: { hours: 0, seconds: 120 } }).cleanup.seconds === 120, 'cleanup.seconds geht nicht vor');
     dm.applySetting(c1, 'cleanup.seconds', '0');
     expect(c1.cleanup.seconds === 0, 'cleanup.seconds=0 wirkt nicht');
     for (const v of ['-1', '1.5', '', '2592001']) expect(refused(c1, 'cleanup.seconds', v), `cleanup.seconds=${v} angenommen`);

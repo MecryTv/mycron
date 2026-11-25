@@ -1107,10 +1107,13 @@ export class Bot {
 
   prune(cfg) {
     const now = Date.now();
-    // Gemerkte Nachrichten bleiben, bis das Aufräumen sie gelöscht hat (spätestens Frist plus eine Woche).
+    // Gemerkte Nachrichten bleiben, bis das Aufräumen sie gelöscht hat: höchstens Frist plus eine Woche ab ihrer
+    // Erledigung (ohne Erledigung ab dem Senden). Karten einer offenen Aufgabe bleiben, solange sie dauert (W-0050).
     const keep = ((Number(cfg && cfg.cleanup && cfg.cleanup.seconds) || 0) * 1000) + 7 * DAY;
-    // Karten einer offenen Aufgabe bleiben, solange sie dauert (W-0050).
-    for (const [k, v] of Object.entries(this.state.msgs)) if (Date.parse(v.at) < now - keep && !Object.values(this.state.open).some((o) => o.key === k) && !(this.state.cards[k] && this.cardWaits(this.state.cards[k]))) delete this.state.msgs[k];
+    for (const [k, v] of Object.entries(this.state.msgs)) {
+      if ((v.done || Date.parse(v.at)) >= now - keep || Object.values(this.state.open).some((o) => o.key === k) || (this.state.cards[k] && this.cardWaits(this.state.cards[k]))) continue;
+      delete this.state.msgs[k];
+    }
     // Karten ohne Nachricht und ohne ausstehendes Senden (verworfen, längst aufgeräumt) braucht niemand mehr.
     for (const k of Object.keys(this.state.cards)) if (!this.state.msgs[k] && !this.state.queue.some((q) => q.key === k)) { delete this.state.cards[k]; this.cardImgs.delete(k); }
     const old = now - 7 * DAY;
