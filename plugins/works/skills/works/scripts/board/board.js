@@ -91,7 +91,7 @@
       }
       return r;
     } catch (e) { fail(e); return null; } finally {
-      setTimeout(() => { if (updateWaiting && !dirty) { updateWaiting = false; reloadForUpdate(); } }, 600);
+      setTimeout(runWhenSaved, 600);
     }
   }
 
@@ -1131,9 +1131,28 @@
   }
 
   let reloadPending = false;
+  // Neuladen nach einem Update und Wechsel zum Hub (W-0057) warten, solange eine Eingabe ungespeichert offen ist, und
+  // laufen, sobald sie gespeichert oder verworfen ist. Geprüft wird nach jedem Speichern (run) und jede Sekunde, damit
+  // auch Abbrechen, Escape und Schließen zählen. Der Wechsel zum Hub geht vor, der Hub lädt ohnehin die neue Version.
+  let afterSave = null;
+  function whenSaved(fn, why, hub = false) {
+    if (!dirty) { fn(); return; }
+    if (afterSave && afterSave.hub && !hub) return;
+    afterSave = { fn, why, hub };
+    setLive(true, why);
+  }
+  function runWhenSaved() {
+    if (!afterSave) return;
+    if (dirty) { if (!$('#live').classList.contains('off')) setLive(true, afterSave.why); return; }
+    const { fn } = afterSave;
+    afterSave = null;
+    fn();
+  }
+  function goToHub() { whenSaved(() => { location.href = '/hub'; }, tr('Another board started, the hub opens after saving'), true); }
+
   // Neue works-Version auf dem Server: Ansicht merken und Seite neu laden, damit Design und Skript aktuell sind.
   function reloadForUpdate() {
-    if (dirty) { setLive(true, tr('New version available, loads after saving')); updateWaiting = true; return; }
+    if (dirty) { whenSaved(reloadForUpdate, tr('New version available, loads after saving')); return; }
     try {
       sessionStorage.setItem(UI_KEY, JSON.stringify({
         q: state.q, prios: [...state.prios], type: state.type, tag: state.tag, ms: state.ms, closed: state.closed, signal: state.signal, view: state.view,
@@ -1143,7 +1162,6 @@
     setLive(true, tr('Loading the new version'));
     location.reload();
   }
-  let updateWaiting = false;
 
   // Verwaister Tab (W-0029): Das eigene Board ist beendet, auf seinem Port läuft jetzt ein anderes Projekt.
   // Statt es still anzuzeigen: Leiste oben, der letzte Stand bleibt ausgegraut und gesperrt. Die Verbindung wird
@@ -4063,7 +4081,7 @@
         for (const id of last) if (!ids.includes(id) && !missing.has(id)) missing.set(id, now);
         const added = ids.some((id) => !last.includes(id) && !(missing.has(id) && now - missing.get(id) < RESTART_MS));
         for (const id of ids) missing.delete(id);
-        if (added && ids.length >= 2) { location.href = '/hub'; return; }
+        if (added && ids.length >= 2) goToHub();
       }
       last = ids;
       const n = ids.length;
@@ -4128,8 +4146,9 @@
     });
     es.addEventListener('restart', () => { first = true; setLive(true, tr('New version starting')); });
     // Ein weiteres Board ist gestartet (W-0057) oder works board in einem anderen Projekt zeigt den Hub statt eines zweiten
-    // Boards (W-0049): Dieser Tab wechselt zum Hub, auch wenn er aus dem Hub geöffnet wurde.
-    es.addEventListener('hub', () => { if (EDIT) location.href = '/hub'; });
+    // Boards (W-0049): Dieser Tab wechselt zum Hub, auch wenn er aus dem Hub geöffnet wurde. Mit offener Eingabe erst
+    // nach dem Speichern oder Verwerfen.
+    es.addEventListener('hub', () => { if (EDIT) goToHub(); });
     es.onopen = () => { if ($('#live').classList.contains('off')) setLive(true, 'Live'); };
     es.onerror = () => setLive(false, tr('Disconnected, retrying'));
     ensureMeta().then(() => { if (detail) renderDetail(); }).catch(() => {});
@@ -4140,6 +4159,7 @@
       // Zeitangaben der Live-Ansicht und der Pille im Kopf weiterzählen.
       $$('#viewLive [data-since], #busy [data-since]').forEach((el) => { el.textContent = lvSinceText(el.dataset.since, el.dataset.fmt); });
       if (Date.now() >= liveDeadline) { liveDeadline = Infinity; reload(); }
+      runWhenSaved();
     }, 1000);
   }
   // Ansicht nach einem Update-Neuladen wiederherstellen.

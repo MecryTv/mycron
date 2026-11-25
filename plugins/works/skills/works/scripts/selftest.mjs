@@ -1285,7 +1285,8 @@ export async function selftest({ keep = false, browser = false, verbose = false,
   if (browser) {
     await step('Hub im Browser: Board aus dem Hub bleibt, alte Tabs wechseln beim nächsten Board (W-0057)', async () => {
       if (!fs.existsSync(path.join(other, '.works', 'config.json'))) { fs.mkdirSync(other, { recursive: true }); w(['init'], { cwd: other }); }
-      if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) { w(['init']); w(['new', '--type=chore', '--title=Eine Karte']); }
+      if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
+      for (const cwd of [proj, other]) if (!JSON.parse(w(['list', '--json'], { cwd }).out).length) w(['new', '--type=chore', '--title=Eine Karte'], { cwd });
       w(['board', '--stop'], { cwd: other, ok: false });
       const br = await launchChromium(log);
       if (!br) return;
@@ -1314,6 +1315,59 @@ export async function selftest({ keep = false, browser = false, verbose = false,
         w(['board', '--serve', '--detach', `--port=${pa}`]);
         await hub.waitForURL(/\/hub$/, { timeout: 5000 });
         await plain.waitForURL(/\/hub$/, { timeout: 5000 });
+        expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
+      } finally {
+        await br.close();
+        w(['board', '--stop'], { ok: false });
+        w(['board', '--stop'], { cwd: other, ok: false });
+      }
+    });
+  }
+
+  // W-0057: Ist im Board eine Eingabe offen, wartet der Wechsel zum Hub wie das Neuladen nach einem Update, bis sie
+  // verworfen oder gespeichert ist. Das gilt für das Ereignis hub und die 5-s-Abfrage.
+  if (browser) {
+    await step('Hub im Browser: Wechsel wartet auf ungespeicherte Eingaben (W-0057)', async () => {
+      if (!fs.existsSync(path.join(other, '.works', 'config.json'))) { fs.mkdirSync(other, { recursive: true }); w(['init'], { cwd: other }); }
+      if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
+      if (!JSON.parse(w(['list', '--json']).out).length) w(['new', '--type=chore', '--title=Eine Karte']);
+      w(['board', '--stop'], { cwd: other, ok: false });
+      const br = await launchChromium(log);
+      if (!br) return;
+      try {
+        const a = portOf(w(['board', '--serve', '--detach', `--port=${await highPort()}`]).out);
+        const pb = await highPort();
+        const p = await br.newPage({ viewport: { width: 1280, height: 900 } });
+        const errs = [];
+        p.on('pageerror', (e) => errs.push(e.message));
+        const onBoard = () => new URL(p.url()).port === a && !/\/hub$/.test(p.url());
+        const startEdit = async (text) => {
+          await p.goto(`http://127.0.0.1:${a}/`); await p.waitForSelector('.card');
+          const id = await p.locator('.card').first().getAttribute('data-id');
+          await p.click(`.card[data-id="${id}"]`);
+          await p.locator('#panel .sec-view [data-edit]').first().click();
+          await p.fill('[data-secedit]', text);
+          return id;
+        };
+        // Angefangene Eingabe, B startet (Ereignis und Abfrage): Der Tab bleibt mit der Eingabe, der Kopf sagt warum.
+        await startEdit('Angefangen, noch nicht gespeichert');
+        w(['board', '--serve', '--detach', '--no-hub', `--port=${pb}`], { cwd: other });
+        await p.waitForTimeout(7000);
+        expect(onBoard(), `Tab wechselte trotz offener Eingabe: ${p.url()}`);
+        expect(await p.inputValue('[data-secedit]') === 'Angefangen, noch nicht gespeichert', 'Eingabe verloren');
+        has(await p.locator('#live').textContent(), 'Hub', 'Hinweis im Kopf');
+        // Verwerfen: Jetzt wechselt er.
+        await p.click('[data-seccancel]');
+        await p.waitForURL(/\/hub$/, { timeout: 5000 });
+        // Speichern: B startet erneut als weiteres Board (Ereignis), der Tab wartet bis zum Speichern.
+        const id = await startEdit('Gespeichert vor dem Wechsel');
+        w(['board', '--stop'], { cwd: other });
+        w(['board', '--serve', '--detach', '--no-hub', `--port=${pb}`], { cwd: other });
+        await p.waitForTimeout(3000);
+        expect(onBoard(), `Tab wechselte vor dem Speichern: ${p.url()}`);
+        await p.click('[data-secsave]');
+        await p.waitForURL(/\/hub$/, { timeout: 5000 });
+        has(w(['show', id]).out, 'Gespeichert vor dem Wechsel', 'gespeicherter Abschnitt');
         expect(!errs.length, `Fehler auf der Seite: ${errs.join(' | ')}`);
       } finally {
         await br.close();

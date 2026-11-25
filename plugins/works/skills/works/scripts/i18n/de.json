@@ -1567,6 +1567,7 @@
   "New in {col}": "Neu in {col}",
   "Claude or terminal": "Claude oder Terminal",
   "New version available, loads after saving": "Neue Version verfügbar, wird nach dem Speichern geladen",
+  "Another board started, the hub opens after saving": "Weiteres Board gestartet, der Hub öffnet nach dem Speichern",
   "Loading the new version": "Neue Version wird geladen",
   "Another project on this port": "Anderes Projekt auf diesem Port",
   "{project} is no longer running here.": "{project} läuft hier nicht mehr.",
