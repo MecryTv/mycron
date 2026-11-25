@@ -1134,7 +1134,13 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       try {
         const out = w(['board', '--serve', '--detach']).out;
         const got = (out.match(/127\.0\.0\.1:(\d+)/) || [])[1];
-        expect(got && got !== String(p1), `Belegter letzter Port nicht ausgewichen: ${out.split('\n')[0]}`);
+        // W-0053: Einmal auf macOS rot, nicht nachzustellen. Bei einem Fehler zeigen, was der Server selbst meint
+        // (server.json, Ende von server.log) und ob der Blocker den Port noch hält, damit die CI die Ursache nennt.
+        const diag = () => {
+          const rd = (f) => { try { return fs.readFileSync(path.join(proj, '.works', f), 'utf8').trim(); } catch { return '–'; } };
+          return ` | Blocker: ${blocker.listening ? JSON.stringify(blocker.address()) : 'nicht mehr aktiv'} | server.json: ${rd('server.json').replace(/\s+/g, ' ').slice(0, 300)} | server.log: ${rd('server.log').split('\n').slice(-8).join(' / ').slice(0, 900)}`;
+        };
+        expect(got && got !== String(p1), `Belegter letzter Port nicht ausgewichen: ${out.split('\n')[0]}${got && got !== String(p1) ? '' : diag()}`);
       } finally { blocker.close(); w(['board', '--stop'], { ok: false }); }
       expect(fs.readFileSync(path.join(proj, '.works', '.gitignore'), 'utf8').includes('server-last.json'), 'server-last.json nicht in .works/.gitignore');
     } finally { w(['board', '--stop'], { ok: false }); }
