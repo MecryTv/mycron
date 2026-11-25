@@ -17,7 +17,7 @@ blocked_by: []
 blocks: []
 related: [W-0057]
 source: manuell
-incomplete: true
+incomplete: false
 ---
 
 # Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden
@@ -55,7 +55,7 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
-- [ ] Vorschlag für den Fall, dass der Browser das Schließen verbietet: statt eines zweiten Hubs eine schlichte Seite „Board beendet“ mit Hinweis und Knopf „Hier den Hub öffnen“. Passt das so, oder soll ich vorher Entwürfe für diese Seite zeigen?
+- [x] Vorschlag für den Fall, dass der Browser das Schließen verbietet: statt eines zweiten Hubs eine schlichte Seite „Board beendet“ mit Hinweis und Knopf „Hier den Hub öffnen“. Passt das so, oder soll ich vorher Entwürfe für diese Seite zeigen? Antwort: Nutzer am 2026-11-25: erst Entwürfe der Seite zeigen.
 
 ## Übergabe
 <!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
@@ -65,3 +65,10 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 - 2026-11-24: Priorität: P3 → P3
 - 2026-11-25: Beziehung: W-0057 related
 - 2026-11-25: Vorgehen ausgearbeitet (Umsetzungsplan) und Frage zum Fall „Browser verbietet das Schließen“ eingetragen; W-0057 ist ausgeliefert, damit entstehen zwei Hub-Tabs nur noch, wenn ein Board-Tab offen bleibt, dessen Board endet.
+- 2026-11-25: Frage 1 geklärt: Nutzer am 2026-11-25: erst Entwürfe der Seite zeigen.
+- 2026-11-25: Entwurf A „Leiste wie bei verwaisten Tabs“ angehängt
+- 2026-11-25: Entwurf B „Ruhige Karte in der Mitte“ angehängt
+- 2026-11-25: Entwurf C „Schlichte Seite statt Board“ angehängt
+- 2026-11-25: Entwürfe A bis C (Fable 5.2) angehängt; Tab-Titel „Beendet · mycron“ mit grauem Symbol in allen drei. Wartet auf die Wahl des Nutzers.
+- 2026-11-25: Entwurf B „Ruhige Karte in der Mitte“ gewählt. Grund: Nutzer am 2026-11-25: Beide B
+- 2026-11-25: Priorität: P3 → P3; incomplete: true → false

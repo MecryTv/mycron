@@ -71,3 +71,4 @@ Art: vorher · Hinzugefügt: 2026-11-24
 - 2026-11-25: Entwurf B „Kompakter Chip mit Popover“ angehängt
 - 2026-11-25: Entwurf C „Eigene Zeile bei Platzmangel“ angehängt
 - 2026-11-25: Entwürfe A bis C mit Fable 5.2 gestaltet, auf Basis des echten board.css. Befund: .brand hat min-width 0, die Pille white-space nowrap ohne Schrumpfen, deshalb ragt sie über die Reiter; der Zeitkasten ist span.num aus lvSince(), das Leerzeichen vor dem Komma kommt aus join(', '). Wartet auf die Wahl des Nutzers.
+- 2026-11-25: Entwurf B „Kompakter Chip mit Popover“ gewählt. Grund: Nutzer am 2026-11-25: Beide B
