@@ -1,18 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-25 19:04 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-25 19:35 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 3 | 0 | 1 | 0 | 0 | 0 | 57 | 0 |
+| 3 | 0 | 0 | 1 | 0 | 0 | 57 | 0 |
 
 Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 2 · P4 Niedrig: 1
 
 ## Aktive Aufgabe
 
-[W-0053](tasks/W-0053-ci-rot-works-selbsttest-schritt/task.md) CI rot: works Selbsttest, Schritt Selbsttest mit Browser, Selbsttest (Backlog), letzte Übergabe 2026-11-25 19:04
+[W-0059](tasks/W-0059-live-hintergrundbefehle-und-ihr-ende-im/task.md) Live: Hintergrundbefehle und ihr Ende im Board anzeigen (Review), letzte Übergabe 2026-11-25 19:34
 
 ## Kritisch (P1)
 
@@ -22,7 +22,7 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0059](tasks/W-0059-live-hintergrundbefehle-und-ihr-ende-im/task.md) | Live: Hintergrundbefehle und ihr Ende im Board anzeigen | Feature | P2 Hoch | In Arbeit | M |  |  |  |
+| [W-0059](tasks/W-0059-live-hintergrundbefehle-und-ihr-ende-im/task.md) | Live: Hintergrundbefehle und ihr Ende im Board anzeigen | Feature | P2 Hoch | Review | M |  |  |  |
 
 ## Geplant und Backlog
 
