@@ -47,7 +47,7 @@ import { findSimilar } from './similar.mjs';
 import { taskUsage, projectUsage, liveUsage, fmtTokens, fmtCost } from './usage.mjs';
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
-import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion, lastPort, OWN_CLI, isAlive } from './server-control.mjs';
+import { readServer, liveServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion, lastPort, OWN_CLI, isAlive } from './server-control.mjs';
 import { BOARD_VIEWS, loadPlaywright, takeShots, boardPrepare } from './shot.mjs';
 import { tr, languages, languageSource, setLanguage, normLang, settingsFile, LANGUAGE_NAMES, variants, LANG_MIGRATION } from './i18n.mjs';
 
@@ -881,11 +881,13 @@ function serverUrl(info) {
   return `http://${h}:${info.port}/`;
 }
 
-async function waitForServer(root, oldPid, ms = 8000) {
+// want: PID des gerade gestarteten Servers. Nur dessen server.json zählt (W-0062); eine veraltete Datei, deren PID
+// inzwischen einem anderen Prozess gehört, nannte sonst den alten Port.
+async function waitForServer(root, oldPid, ms = 8000, want = 0) {
   const until = Date.now() + ms;
   while (Date.now() < until) {
     const info = readServer(root);
-    if (info && info.pid !== oldPid) return info;
+    if (info && info.pid !== oldPid && (!want || info.pid === want)) return info;
     await new Promise((r) => setTimeout(r, 150));
   }
   return null;
@@ -965,7 +967,8 @@ function cmdExport() {
 async function cmdBoard() {
   const root = requireRoot();
   const current = cliVersion(newestCli());
-  const info = readServer(root);
+  // Geprüft (W-0062): Eine veraltete server.json mit fremder PID zählt nicht, sonst beendete --stop den fremden Prozess.
+  const info = await liveServer(root);
   const legacy = info ? [] : findServerProcesses(root);
 
   if (flags.status) {
@@ -1022,7 +1025,7 @@ async function cmdBoard() {
       // Sonst darf der Hintergrundprozess ausweichen, etwa wenn ein anderes Projekt 4747 belegt.
       const fixed = !!(flags.port || info || legacy.length);
       const pid = startDetached(root, { cli: newestCli(), port: fixed ? port : 0, host, takeover: !!(info || legacy.length) });
-      const started = await waitForServer(root, info ? info.pid : null);
+      const started = await waitForServer(root, info ? info.pid : null, 8000, pid);
       if (!started) fail(tr('Board server does not start (PID {pid}). Details in .works/server.log', { pid }));
       out(tr('Live board running: {url}', { url: serverUrl(started) }));
       printShare(root, started);
@@ -2533,10 +2536,10 @@ async function cmdShot() {
     const target = String(pos[0] || 'board');
     const view = target.toLowerCase();
     task = BOARD_VIEWS[view] ? null : findTask(root, config, target).id;
-    let info = readServer(root);
+    let info = await liveServer(root);
     if (!info) {
-      startDetached(root, { cli: newestCli(), port: 0, host: '127.0.0.1', takeover: false });
-      info = started = await waitForServer(root, null);
+      const sp = startDetached(root, { cli: newestCli(), port: 0, host: '127.0.0.1', takeover: false });
+      info = started = await waitForServer(root, null, 8000, sp);
       if (!info) fail(tr('Board server does not start. Details in .works/server.log'));
     }
     url = `http://127.0.0.1:${info.port}/`;

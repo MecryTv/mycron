@@ -1118,6 +1118,33 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     }
   });
 
+  // W-0062: Eine server.json, deren PID inzwischen einem anderen Prozess gehört (Windows vergibt PIDs schnell neu), ist
+  // kein laufendes Board. works board beendet diesen Prozess nicht, entfernt die Datei und meldet beim Start den Port
+  // des Servers, den es selbst gestartet hat.
+  await step('Board: fremde PID in server.json wird nicht beendet (W-0062)', async () => {
+    if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
+    const isUp = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+    const stranger = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true });
+    const sf = path.join(proj, '.works', 'server.json');
+    const plant = async () => fs.writeFileSync(sf, JSON.stringify({ pid: stranger.pid, port: await highPort(), host: '127.0.0.1', version: 'fremd', started: new Date().toISOString() }));
+    try {
+      await new Promise((r) => setTimeout(r, 200));
+      await plant();
+      w(['board', '--stop'], { ok: false });
+      expect(isUp(stranger.pid), 'works board --stop hat einen fremden Prozess beendet');
+      expect(!fs.existsSync(sf), 'veraltete server.json nach --stop nicht entfernt');
+      await plant();
+      const p2 = await highPort();
+      const out = w(['board', '--serve', '--detach', `--port=${p2}`]).out;
+      expect(isUp(stranger.pid), 'works board --serve hat einen fremden Prozess beendet');
+      has(out, `127.0.0.1:${p2}/`, 'Start meldet den eigenen Port');
+      expect(JSON.parse(fs.readFileSync(sf, 'utf8')).pid !== stranger.pid, 'server.json nennt noch den fremden Prozess');
+    } finally {
+      w(['board', '--stop'], { ok: false });
+      stranger.kill();
+    }
+  });
+
   // W-0031: Ohne --port startet ein Board auf seinem letzten Port, damit offene Tabs sich wieder verbinden.
   await step('Board merkt sich seinen Port: Neustart ohne --port, belegter Port weicht aus', async () => {
     if (!fs.existsSync(path.join(proj, '.works', 'config.json'))) w(['init']);
