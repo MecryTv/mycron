@@ -3,7 +3,7 @@ id: W-0057
 title: Offenes Board wechselt immer sofort zum Hub, wenn ein weiteres startet
 type: feature
 priority: P2
-status: backlog
+status: in-arbeit
 effort: S
 risk:
 created: 2026-11-25
@@ -11,7 +11,7 @@ updated: 2026-11-25
 due:
 completed:
 milestone:
-branch:
+branch: feature/w-0057-offenes-board-wechselt-immer
 tags: [board, hub]
 blocked_by: []
 blocks: []
@@ -61,3 +61,4 @@ Wunsch des Nutzers am 2026-11-25 (nach W-0049): Ist ein Board offen und startet 
 - 2026-11-25: Beziehung: related W-0049
 - 2026-11-25: Beziehung: related W-0054
 - 2026-11-25: Priorität: P3 → P2; incomplete: true → false
+- 2026-11-25: Parallel gestartet im Worktree W-0057-offenes-board-wechselt (Status: backlog → in-arbeit)

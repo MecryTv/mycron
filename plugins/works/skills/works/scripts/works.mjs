@@ -2250,6 +2250,7 @@ async function cmdChecks() {
   } else if (sub === 'record') {
     const t = findTask(root, config, pos.shift());
     const name = pos.shift();
+    if (!name) fail(tr('Usage: works checks record <ID> <name> --status ok|warn|fail [--note ..]'));
     try { recordCheck(root, t, name, String(flags.status || 'ok'), flags.note && flags.note !== true ? String(flags.note) : ''); } catch (e) { fail(e.message); }
     refresh(root);
     out(tr('{name} recorded for {id}: {status}', { name, id: t.id, status: flags.status || 'ok' }));
