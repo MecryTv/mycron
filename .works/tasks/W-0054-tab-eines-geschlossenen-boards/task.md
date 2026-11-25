@@ -52,7 +52,13 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 <!-- Kurzfassung der wichtigsten Entscheidungen. Details in decisions.md (works decisions <ID>). -->
 
 ## Assets
-<!-- Wird über `works asset` gepflegt. Jedes Bild hat eine Beschreibungszeile. -->
+![Nachher, 1440 hell: Tab eines gestoppten Boards zeigt die Karte „beta ist beende](assets/2026-11-25-nachher-1440-hell-tab-eines-gestoppten-nachher.png)
+Beschreibung: Nachher, 1440 hell: Tab eines gestoppten Boards zeigt die Karte „beta ist beendet“ nach Entwurf B, Board grau und unscharf dahinter, Knöpfe Hier den Hub öffnen und beta wieder starten, Hinweis Strg+W
+Art: nachher · Hinzugefügt: 2026-11-25
+
+![Nachher, 390 dunkel: dieselbe Karte auf dem Handy ohne seitliches Scrollen](assets/2026-11-25-nachher-390-dunkel-dieselbe-karte-auf-nachher.png)
+Beschreibung: Nachher, 390 dunkel: dieselbe Karte auf dem Handy ohne seitliches Scrollen
+Art: nachher · Hinzugefügt: 2026-11-25
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
@@ -94,3 +100,5 @@ Offen: Hub-Seite eines gestoppten Boards (Tab auf B/hub) folgt weiter W-0032 und
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
 - 2026-11-25: Parallele Arbeit beendet
+- 2026-11-25: Asset hinzugefügt: assets/2026-11-25-nachher-1440-hell-tab-eines-gestoppten-nachher.png (nachher)
+- 2026-11-25: Asset hinzugefügt: assets/2026-11-25-nachher-390-dunkel-dieselbe-karte-auf-nachher.png (nachher)

@@ -26,7 +26,8 @@ export default {
 | `kit.project(name, aufgaben)` | Wegwerf-Projekt mit `works init`, Aufgaben als Titel oder `{ title, priority, type }`. Gibt den Ordner zurück |
 | `kit.works(ordner, args, { env })` | works-Befehl im Projekt, wirft bei Fehlern. `env: kit.realProfile` für Befehle, die selbst Chrome starten (etwa `works shot`) |
 | `await kit.board(ordner, { port })` | Board auf einem freien Port (ab 49300) oder dem angegebenen starten, gibt die URL zurück |
-| `kit.stop(ordner)` | Board stoppen |
+| `kit.stop(ordner)` | Board stoppen (seine offenen Tabs zeigen „<Projekt> ist beendet“, W-0054) |
+| `await kit.crash(ordner)` | Board ohne Ankündigung beenden, wie abgestürzt; seine Tabs verbinden sich neu wie bisher. Wartet, bis der Port frei ist |
 | `kit.hook(ordner, 'permission.mjs', eingabe)` | Hook von works auslösen, etwa eine wartende Freigabe |
 | `kit.file(name, inhalt)` | Datei im Wegwerf-Ordner anlegen, gibt den Pfad zurück |
 | `kit.dir` | Der Wegwerf-Ordner |

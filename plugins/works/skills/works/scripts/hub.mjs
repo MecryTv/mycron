@@ -45,20 +45,55 @@ export function runningBoards() {
     .map(({ p, s }) => ({ id: rootIdOf(p.path), name: p.name, path: p.path, port: s.port, url: boardUrl(s) }));
 }
 
+// POST /api/hub eines laufenden Boards mit dessen lokalem Token aus /boards. Antwort als Objekt, null bei Fehlerstatus.
+async function hubOp(port, body, ms = 1500, host = '127.0.0.1') {
+  const base = `http://${host}:${port}`;
+  const { token } = await (await fetch(`${base}/boards`, { signal: AbortSignal.timeout(ms) })).json();
+  const r = await fetch(`${base}/api/hub`, { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(ms) });
+  return r.ok ? r.json() : null;
+}
+
 // W-0057: Offene works-Tabs laufender Boards wechseln zum Hub (Ereignis hub über POST /api/hub mit dem lokalen Token
 // aus /boards). except: Projektordner, dessen Tabs bleiben (das gerade gestartete Board selbst). Nur lokal, kurz,
 // Fehler still. Gibt zurück, wie viele Tabs das Signal bekommen haben.
 export async function sendTabsToHub({ except = '' } = {}) {
   const skip = except ? fs.realpathSync(except) : '';
   const sent = await Promise.all(runningBoards().filter((b) => b.path !== skip).map(async (b) => {
-    try {
-      const base = `http://127.0.0.1:${b.port}`;
-      const { token } = await (await fetch(`${base}/boards`, { signal: AbortSignal.timeout(1500) })).json();
-      const r = await fetch(`${base}/api/hub`, { method: 'POST', headers: { 'X-Works-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'show' }), signal: AbortSignal.timeout(1500) });
-      return r.ok ? Number((await r.json()).tabs) || 0 : 0;
-    } catch { return 0; }
+    try { return Number(((await hubOp(b.port, { op: 'show' })) || {}).tabs) || 0; } catch { return 0; }
   }));
   return sent.reduce((a, n) => a + n, 0);
+}
+
+// W-0054: works board --stop kündigt das Ende beim Server an, bevor es ihn beendet (unter Windows hart, ohne SIGTERM).
+// Der Server schickt seinen Tabs dann das Ereignis ended. Wartet, bis er das bestätigt; Fehler still.
+export async function announceEnd(info) {
+  const host = !info.host || ['0.0.0.0', '::'].includes(info.host) ? '127.0.0.1' : info.host;
+  try { return Number(((await hubOp(info.port, { op: 'end' }, 8000, host)) || {}).tabs) || 0; } catch { return 0; }
+}
+
+// W-0054: Was der Tab eines gewollt beendeten Boards danach anbieten kann. Der Tab selbst kann die anderen Boards nicht
+// fragen: Ein anderer Port ist für ihn eine fremde Herkunft (kein CORS, die API prüft Origin und Token). Deshalb fragt
+// der Server vor dem Ende: offene works-Tabs der anderen laufenden Boards (/tabs: tabs, davon Hub-Seiten hubs), ihre
+// Adressen und Namen, und beim ersten erreichbaren ein Einmal-Ticket, mit dem dessen Hub dieses Board wieder startet.
+// Das Board mit dem Ticket steht in boards vorn. Nur lokal, kurz, Fehler still.
+export async function endInfo(root) {
+  const self = fs.realpathSync(root);
+  const found = await Promise.all(runningBoards().filter((b) => b.path !== self).map(async (b) => {
+    try {
+      const t = await (await fetch(`http://127.0.0.1:${b.port}/tabs`, { signal: AbortSignal.timeout(1500) })).json();
+      return { url: b.url, name: b.name, port: b.port, tabs: Number(t.tabs) || 0, hubs: Number(t.hubs) || 0 };
+    } catch { return null; }
+  }));
+  const alive = found.filter(Boolean);
+  let start = null;
+  for (const b of alive) {
+    try {
+      const r = await hubOp(b.port, { op: 'ticket', path: self });
+      if (r && r.ticket) { start = { board: b.url, ticket: r.ticket }; alive.unshift(...alive.splice(alive.indexOf(b), 1)); break; }
+    } catch { /* nächstes Board */ }
+  }
+  const sum = (k) => alive.reduce((n, b) => n + b[k], 0);
+  return { tabs: sum('tabs'), hubs: sum('hubs'), boards: alive.map(({ url, name }) => ({ url, name })), start };
 }
 
 // Alle angemeldeten Projekte mit Kennung, für verwaiste Board-Tabs (W-0029).
@@ -278,7 +313,17 @@ const HUB_JS = `(() => {
     } catch (e) { serverGone(); }
   }
   setInterval(refresh, 5000);
-  if (H.events) new EventSource('/events');
+  // hub=1: Der Server zählt die Seite unter /tabs zusätzlich als Hub (W-0054).
+  if (H.events) new EventSource('/events?hub=1');
+  // W-0054: Der Tab eines gestoppten Boards kommt mit einem Einmal-Ticket hierher (#start=…). Der Hub startet das Board
+  // damit wieder und zeigt es im selben Tab. Ohne gültiges Ticket bleibt der Hub stehen, dort startet „Öffnen“ es.
+  const ticket = (/^#start=([a-f0-9]{32,64})$/.exec(location.hash) || [])[1];
+  if (ticket) {
+    history.replaceState(null, '', location.pathname);
+    fetch('/api/hub', { method: 'POST', headers: { 'X-Works-Token': H.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'redeem', ticket }) })
+      .then(async (r) => { const res = await r.json().catch(() => ({})); if (r.ok && res.url) location.href = res.url + '?from=hub'; else alert(res.error || tr('That did not work.')); })
+      .catch(() => alert(tr('No connection to the board.')));
+  }
   root.addEventListener('click', async (e) => {
     if (e.target.closest('[data-theme-toggle]')) { const o = ['auto', 'light', 'dark']; put('works-theme', o[(o.indexOf(get('works-theme', 'auto')) + 1) % 3]); theme(); return; }
     if (e.target.closest('[data-notify-on]')) { await askPermission(); return; }
