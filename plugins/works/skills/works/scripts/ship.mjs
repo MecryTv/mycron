@@ -97,10 +97,16 @@ export async function ship(root, { id = '', push = true, ci = true, update = tru
   // 3. Board stoppen. Es startet am Ende mit der neuen Version auf demselben Port, bei einem Abbruch sofort.
   // Geprüft (W-0062): nur ein Board, das auf seinem Port wirklich antwortet, nie ein fremder Prozess mit alter PID.
   const board = await liveServer(root);
-  if (board) { await stopProcess(board.pid); clearServer(root, board.pid); log(`ok  ${tr('Board stopped (port {port})', { port: board.port })}`); }
+  // W-0063: Offene Tabs merken. Sie verbinden sich nach dem Neustart auf demselben Port von selbst wieder, nach der
+  // Wartezeit auf die CI aber oft später als die 3 s, die --open wartet; dann öffnete --open einen zweiten Tab.
+  let hadTabs = 0;
+  if (board) {
+    try { hadTabs = Number((await (await fetch(`http://127.0.0.1:${board.port}/tabs`, { signal: AbortSignal.timeout(2000) })).json()).tabs) || 0; } catch { /* unbekannt: wie ohne Tab */ }
+    await stopProcess(board.pid); clearServer(root, board.pid); log(`ok  ${tr('Board stopped (port {port})', { port: board.port })}`);
+  }
   const restartBoard = () => {
     if (!board) return;
-    const args = ['board', '--serve', '--detach', `--port=${board.port}`, ...(board.host && board.host !== '127.0.0.1' ? [`--host=${board.host}`] : []), ...(open ? ['--open'] : [])];
+    const args = ['board', '--serve', '--detach', `--port=${board.port}`, ...(board.host && board.host !== '127.0.0.1' ? [`--host=${board.host}`] : []), ...(open && !hadTabs ? ['--open'] : [])];
     const r = works(newestCli(), root, args);
     log(r.ok ? `ok  ${r.out.split('\n').filter(Boolean).join(' · ')}` : `--  ${tr('Board does not start: {msg}', { msg: r.out.split('\n').pop() })}`);
   };

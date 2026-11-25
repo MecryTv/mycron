@@ -3271,8 +3271,16 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       fs.chmodSync(hookPath, 0o755);
       // Neue Zeiten in time.jsonl, noch nicht committet: Sie müssen nach dem Abschluss erhalten bleiben.
       fs.appendFileSync(path.join(sp, '.works', 'time.jsonl'), JSON.stringify({ t: new Date().toISOString(), ev: 'turn', task: id, marke: 'ship-zeit' }) + '\n');
+      // W-0063: War beim Stopp ein Tab offen, verbindet er sich nach dem Neustart selbst wieder, auch wenn das nach der
+      // CI länger dauert. ship öffnet dann keinen zweiten Tab (der Tab hier ist ein offener /events-Strom).
+      const tabCtl = new AbortController();
+      const tabRes = await fetch(`http://127.0.0.1:${bport}/events`, { signal: tabCtl.signal });
+      (async () => { try { const rd = tabRes.body.getReader(); for (;;) { const { done } = await rd.read(); if (done) break; } } catch { /* Ende */ } })();
+      await waitFor(async () => (await (await fetch(`http://127.0.0.1:${bport}/tabs`)).json()).tabs >= 1, 'Tab am Board vor ship');
       const r3 = w(['ship', id], { cwd: sp, ok: false });
+      tabCtl.abort();
       expect(r3.code === 0, `ship → Exit ${r3.code}: ${(r3.out + r3.err).slice(0, 500)}`);
+      expect(!/Im Browser geöffnet/.test(r3.out), `ship öffnet trotz offenem Tab einen neuen: ${r3.out.split('\n').filter((l) => /Board/.test(l)).join(' | ').slice(0, 300)}`);
       expect(branchNow() === 'main', `Nach ship nicht auf main, sondern ${branchNow()}`);
       has(git(['log', '--merges', '--format=%s', '-1'], sp), "Merge branch 'feature/ship-test'", 'Merge-Commit');
       expect(!git(['branch', '--list', 'feature/ship-test'], sp), 'Feature-Branch nicht gelöscht');
