@@ -873,12 +873,61 @@ dialog:has(.tp), dialog:has(#teFields) { width: min(920px, calc(100vw - 24px)); 
 }
 
 /* ---------- Runde 3 ---------- */
-.busy { display: none; align-items: center; gap: 7px; height: 26px; padding: 0 11px; border-radius: 13px; border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.busy { display: none; align-items: center; gap: 6px; height: 26px; padding: 0 11px; border-radius: 13px; border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .busy:not([hidden]) { display: inline-flex; }
 .busy::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); animation: wpulse 1.4s ease-in-out infinite; }
 /* Wartet auf Freigabe: ruhiger Punkt mit Ring statt Pulsieren, damit es sich vom Arbeiten unterscheidet. */
 .busy.perm { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 18%, var(--surface)); font-weight: 600; }
 .busy.perm::before { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 30%, transparent); }
+/* Live-Chip im Kopf (W-0055): im Chip nur Aufgabe und Dauer, die Zahl der Agenten als Plakette. Er schrumpft nicht und
+   bleibt kurz, damit er Reiter und Suche nicht überdeckt; alles Weitere steht im Popover darunter. */
+/* Wird die Marke zu schmal, kürzt sie zuerst den Verbindungstext; der Chip bleibt ganz. Reicht das nicht, setzt fitTop()
+   in board.js erst .squeeze (Projektname darf bis 5em schrumpfen) und dann .tight (Reiter in die zweite Zeile). Der
+   Projektname schrumpft nicht von sich aus mit: Schon ein Bruchteil eines Pixels würde ihn mit … kürzen. */
+.brand h1 { flex: none; max-width: 24ch; }
+.top.squeeze .brand h1 { flex: 0 1 auto; min-width: 5em; }
+.brand .live { display: block; flex: 0 100 auto; min-width: 26px; margin-left: -3px; padding-left: 3px; overflow: hidden; text-overflow: ellipsis; }
+.brand .live::before { display: inline-block; margin-right: .5em; vertical-align: 1px; }
+/* Neben dem Chip zeigt nur der Punkt die Verbindung, das Wort bleibt für Screenreader. Getrennt bleibt der Text sichtbar. */
+.brand:has(.busy:not([hidden])) .live:not(.off) { font-size: 0; flex: none; min-width: 0; overflow: visible; }
+.top.tight { flex-wrap: wrap; row-gap: 10px; }
+.top.tight .views { order: 5; }
+.top.tight .search { max-width: 360px; }
+.search { min-width: 140px; }
+.busy-wrap { position: relative; display: inline-flex; flex: none; }
+.busy::before { flex: none; }
+.busy .b-id { font-weight: 600; }
+.busy .b-sep { color: var(--muted); }
+.busy .b-n { display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px 0 5px; margin-right: -5px; border-radius: 9px; background: color-mix(in srgb, var(--warn) 24%, var(--surface)); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.busy .b-n svg { width: 11px; height: 11px; }
+.busy-pop { display: none; position: absolute; z-index: 30; top: calc(100% + 8px); left: 0; width: 350px; max-width: calc(100vw - 32px); padding: 12px 14px; border-radius: var(--r-card); border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow-pop); color: var(--text); font-size: 12.5px; font-weight: 400; line-height: 1.45; white-space: normal; gap: 10px; }
+/* Brücke über den Abstand zum Chip, damit das Popover beim Hinüberfahren mit der Maus offen bleibt. */
+.busy-pop::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 12px; }
+/* Auf bei Maus darüber, bei Fokus per Tastatur (.kb mit :focus-within) oder nach dem ersten Tipp (.open). .kb setzt das
+   Skript nur bei Tastaturfokus, sonst bliebe das Popover nach einem Mausklick offen, solange der Chip den Fokus hat.
+   :has(:focus-visible) taugt nicht: Beim Tab vom Chip zum Knopf im Popover schließt es kurz und der Fokus geht verloren.
+   .shut schließt nach Esc oder nach dem Wechsel in die Live-Ansicht, bis Maus oder Fokus den Chip verlassen. */
+@media (hover: hover) { .busy-wrap:not(.shut):hover .busy-pop { display: grid; } }
+.busy-wrap.kb:not(.shut):focus-within .busy-pop, .busy-wrap.open .busy-pop { display: grid; }
+.bp-body { display: grid; gap: 10px; min-width: 0; }
+.bp-h { display: flex; align-items: center; gap: 7px; font-weight: 600; }
+.bp-h::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: none; }
+.bp-what { color: var(--text-2); overflow-wrap: anywhere; }
+.bp-what b { color: var(--text); font-weight: 600; }
+.bp-task { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 8px; }
+.bp-task b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.bp-sub { font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); margin-bottom: -6px; }
+.bp-rows { display: grid; gap: 4px; }
+.bp-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--muted); }
+.bp-foot .btn { height: 28px; flex: none; }
+/* Schmal: Das Popover hängt an der Marke und nutzt die ganze Breite; der Projektname darf gekürzt werden, nicht der Chip. */
+@media (max-width: 900px) {
+  .search { min-width: 0; }
+  .brand { position: relative; max-width: 100%; }
+  .brand h1 { flex: 0 1 auto; min-width: 5em; max-width: 20ch; }
+  .busy-wrap { position: static; }
+}
+@media (max-width: 560px) { .brand { gap: 8px; } }
 @keyframes wpulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .busy::before, .lb-dot { animation: none; } }
 .live-box { display: grid; gap: 6px; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 8%, var(--raised)); border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--line)); font-size: 12px; }

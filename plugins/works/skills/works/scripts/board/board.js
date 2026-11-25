@@ -186,28 +186,129 @@
 
   function renderHeader() {
     $('#project').innerHTML = esc(meta.project) + ' <span class="dim">' + tr('Tasks') + '</span>';
-    const pill = $('#busy');
-    const a = meta.activity;
-    const fresh = a && a.busy && lvFresh(a.current);
-    const laneIds = (meta.lanes || []).map((l) => l.task).filter((id) => a && a.lanes && lvFresh(a.lanes[id]));
-    pill.hidden = !fresh && !laneIds.length;
-    const perm = lvPermEntry();
-    pill.classList.toggle('perm', !!perm);
-    const pulse = $('#livePulse');
-    if (pulse) { pulse.hidden = pill.hidden; pulse.classList.toggle('perm', !!perm); }
-    if (fresh || laneIds.length) {
-      const main = fresh ? (a.current.perm ? tr('Waiting for your approval') + (a.current.task ? ' (' + esc(a.current.task) + ')' : '') : a.current.task ? tr('Claude has been working on {task} for {since}', { task: esc(a.current.task), since: lvSince(a.since || a.current.at, 'min') }) : tr('Claude has been working for {since}', { since: lvSince(a.since || a.current.at, 'min') })) : '';
-      const par = laneIds.length ? (laneIds.length === 1 ? tr('1 agent in parallel on {task}', { task: esc(laneIds[0]) }) : tr('{n} agents in parallel', { n: laneIds.length })) : '';
-      pill.innerHTML = [main, par].filter(Boolean).join(', ');
-      const go = fresh && a.current.task ? a.current.task : laneIds[0];
-      // Im Live-Board führt die Pille in die Live-Ansicht und lässt sie wieder Claude folgen.
-      pill.onclick = () => { if (LIVE) { liveFollowClaude(); setView('live'); } else if (go) focusCard(go); };
-    }
+    renderBusy();
+    fitTop();
     const tc = $('#toolsCount');
     const n = (meta.knowledgeProposals || 0);
     tc.hidden = !n; tc.textContent = n;
     document.title = (hiddenCount && notifySet.title ? '(' + hiddenCount + ') ' : '') + baseTitle();
   }
+
+  // ---------- Live-Chip im Kopf (W-0055) ----------
+  // Im Chip stehen nur Aufgabe und Dauer (bei einer Freigabe „Freigabe nötig“ und die Wartezeit), daneben die Zahl der
+  // Agenten. Titel, Agenten mit ihren Aufgaben und den letzten Schritt zeigt das Popover. Ein Klick führt im Live-Board
+  // in die Live-Ansicht; am Touchscreen öffnet der erste Tipp das Popover.
+  let busyGoTo = '';
+  let busyLabel = null;
+  const BUSY_AGENTS_SVG = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="5" r="2.5"/><path d="M1 13c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4z"/><circle cx="11.5" cy="5.5" r="2"/><path d="M11 9.1c2.2.1 4 1.4 4 3.9h-3.6c0-1.6-.6-2.9-1.6-3.7.4-.1.8-.2 1.2-.2z"/></svg>';
+  function renderBusy() {
+    const pill = $('#busy');
+    const wrap = $('#busyWrap');
+    const a = meta.activity;
+    const cur = a && a.busy && lvFresh(a.current) ? a.current : null;
+    const laneIds = (meta.lanes || []).map((l) => l.task).filter((id) => a && a.lanes && lvFresh(a.lanes[id]));
+    const perm = lvPermEntry();
+    const show = !!(cur || laneIds.length);
+    pill.hidden = !show; wrap.hidden = !show;
+    pill.classList.toggle('perm', !!perm);
+    const pulse = $('#livePulse');
+    if (pulse) { pulse.hidden = !show; pulse.classList.toggle('perm', !!perm); }
+    busyLabel = null;
+    if (!show) { wrap.classList.remove('open', 'shut', 'kb'); syncBusy(); return; }
+    const n = laneIds.length;
+    const titleOf = (id) => { const t = tasks.find((x) => x.id === id); return t ? t.title : ''; };
+    const since = perm ? perm.permSince || perm.at : cur ? a.since || cur.at : '';
+    const agents = n === 1 ? tr('1 agent in parallel') : tr('{n} agents in parallel', { n });
+    const sep = ' <span class="b-sep">·</span> ';
+    const idTag = (id) => '<span class="b-id">' + esc(id) + '</span>';
+    let chip;
+    if (perm) chip = tr('Approval needed') + sep + lvSince(since, 'min');
+    else if (cur) chip = (cur.task ? idTag(cur.task) : tr('Claude is working')) + sep + lvSince(since, 'min');
+    else chip = n === 1 ? tr('1 agent') : tr('{n} agents', { n });
+    if ((perm || cur) && n) chip += '<span class="b-n" title="' + esc(agents) + '">' + BUSY_AGENTS_SVG + n + '</span>';
+    pill.innerHTML = chip;
+    // Voller Text für Screenreader; die Dauer zählt der Sekundentakt mit.
+    const named = (id) => id + (titleOf(id) ? ' ' + titleOf(id) : '');
+    busyLabel = () => [
+      perm ? tr('Waiting for your approval') : cur ? (cur.task ? tr('Claude is working on {task}', { task: named(cur.task) }) : tr('Claude is working')) : '',
+      perm && perm.task ? named(perm.task) : '',
+      perm ? [perm.verb, perm.what].filter(Boolean).join(' ') : '',
+      since ? tr('for {time}', { time: lvSinceText(since, 'min') }) : '',
+      n ? agents + ': ' + laneIds.join(', ') : '',
+    ].filter(Boolean).join(' · ');
+    pill.setAttribute('aria-label', busyLabel());
+    const row = (id) => '<div class="bp-task"><b>' + esc(id) + '</b><span>' + esc(titleOf(id)) + '</span></div>';
+    // Der Satz steckt in einem eigenen span: Im Flex-Kopf würde die Zeitangabe sonst ein eigenes Element mit Abstand.
+    let body = '<div class="bp-h"><span>' + (perm ? tr('Waiting for your approval for {time}', { time: lvSince(since, 'min') }) : cur ? tr('Claude is working for {time}', { time: lvSince(since, 'min') }) : agents) + '</span></div>';
+    if (perm) body += '<div class="bp-what">' + (perm.lane && perm.task ? '<b>' + esc(perm.task) + '</b> ' : '') + lvWhat(perm) + '</div>';
+    if (cur && cur.task) body += row(cur.task);
+    if (n) body += ((perm || cur) ? '<div class="bp-sub">' + agents + '</div>' : '') + '<div class="bp-rows">' + laneIds.map(row).join('') + '</div>';
+    $('#busyPopBody').innerHTML = body;
+    // Letzter Schritt: der Hauptsitzung, sonst des zuletzt aktiven Agenten. Bei einer Freigabe steht der Aufruf schon oben.
+    const last = perm ? null : cur || laneIds.map((id) => a.lanes[id]).sort((x, y) => Date.parse(y.at) - Date.parse(x.at))[0];
+    $('#busyLast').innerHTML = !last ? ''
+      : last.running ? tr('Right now') + ': ' + esc(last.verb) + ', ' + tr('for {time}', { time: lvSince(last.at, 'short') })
+      : tr('Last: {what}', { what: esc(last.verb) }) + ', ' + tr('{time} ago', { time: lvSince(last.at, 'short') });
+    busyGoTo = cur && cur.task ? cur.task : perm && perm.task ? perm.task : laneIds[0] || '';
+    const go = $('#busyGo');
+    go.textContent = LIVE ? tr('To the live view') : tr('Open task');
+    go.hidden = !LIVE && !busyGoTo;
+    syncBusy();
+  }
+  // Ab 1641 px steht der Kopf in einer Zeile. Passt die Marke dort nicht, obwohl der Verbindungstext schon gekürzt ist,
+  // darf zuerst der Projektname schrumpfen (.squeeze). Reicht auch das nicht (etwa Chip bei einer Freigabe in einem
+  // knappen Fenster), rutschen die Reiter wie in schmaleren Fenstern in die zweite Zeile (.tight), statt überdeckt zu
+  // werden. Gemessen wird an den Kindern der Marke statt an scrollWidth: Das offene Popover ragt absichtlich hinaus.
+  const topWide = matchMedia('(min-width: 1641px)');
+  function fitTop() {
+    const top = $('header.top');
+    const brand = top && $('.brand', top);
+    if (!brand) return;
+    top.classList.remove('squeeze', 'tight');
+    if (!topWide.matches) return;
+    const over = () => { const edge = brand.getBoundingClientRect().right + 1; return [...brand.children].some((el) => el.getBoundingClientRect().right > edge); };
+    if (!over()) return;
+    top.classList.add('squeeze');
+    if (over()) top.classList.add('tight');
+  }
+  // aria-expanded folgt dem, was das CSS gerade zeigt (Maus, Tastaturfokus, .open, .shut).
+  function syncBusy() {
+    requestAnimationFrame(() => { const pop = $('#busyPop'); if (pop) $('#busy').setAttribute('aria-expanded', String(getComputedStyle(pop).display !== 'none')); });
+  }
+  (() => {
+    const wrap = $('#busyWrap');
+    const pill = $('#busy');
+    if (!wrap || !pill) return;
+    let touch = false;
+    const open = () => { wrap.classList.remove('shut'); wrap.classList.add('open'); syncBusy(); };
+    const close = (shut) => { wrap.classList.remove('open'); if (shut) wrap.classList.add('shut'); syncBusy(); };
+    // Im Live-Board in die Live-Ansicht, die wieder Claude folgt; sonst zur Karte.
+    const go = () => { close(true); if (LIVE) { liveFollowClaude(); setView('live'); } else if (busyGoTo) focusCard(busyGoTo); };
+    pill.addEventListener('pointerdown', (e) => { touch = e.pointerType !== 'mouse'; });
+    pill.addEventListener('keydown', () => { touch = false; });
+    pill.onclick = () => { const t = touch; touch = false; if (t && !wrap.classList.contains('open')) open(); else go(); };
+    $('#busyGo').onclick = go;
+    document.addEventListener('pointerdown', (e) => { if (wrap.classList.contains('open') && !wrap.contains(e.target)) close(false); });
+    wrap.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || getComputedStyle($('#busyPop')).display === 'none') return;
+      e.stopPropagation();
+      // Fokus erst zurück auf den Chip, dann schließen: Der Knopf im Popover verschwindet mit ihm.
+      if (document.activeElement !== pill && wrap.contains(document.activeElement)) pill.focus();
+      close(true);
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && wrap.classList.contains('open')) close(false); });
+    // .kb: Fokus kam über die Tastatur. Nur dann hält der Fokus das Popover offen (siehe board.css).
+    wrap.addEventListener('focusin', (e) => { wrap.classList.toggle('kb', e.target.matches(':focus-visible')); syncBusy(); });
+    wrap.addEventListener('pointerdown', () => wrap.classList.remove('kb'));
+    wrap.addEventListener('focusout', (e) => { if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('shut', 'kb'); syncBusy(); });
+    wrap.addEventListener('mouseleave', () => { wrap.classList.remove('shut'); syncBusy(); });
+    wrap.addEventListener('mouseenter', () => { wrap.classList.remove('shut'); syncBusy(); });
+    // Kopf neu einpassen bei anderer Fensterbreite, neuem Verbindungstext und nach dem Laden der Schriften.
+    addEventListener('resize', fitTop);
+    const live = $('#live');
+    if (live && window.MutationObserver) new MutationObserver(fitTop).observe(live, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTop);
+  })();
 
   function renderOverview() {
     const visible = tasks.filter((t) => !t.archived || state.closed);
@@ -2736,7 +2837,9 @@
     const s = Math.floor((Date.now() - Date.parse(iso)) / 1000);
     if (!isFinite(s)) return '';
     const v = Math.max(0, s);
-    if (fmt === 'min') { const m = Math.max(1, Math.floor(v / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; }
+    // min: Dauer im Kopf, auf Deutsch „12 Min.“ (W-0055). short: unter einer Minute in Sekunden, danach wie min.
+    if (fmt === 'min' || (fmt === 'short' && v >= 60)) { const m = Math.max(1, Math.floor(v / 60)); return m < 60 ? tr('{n} min', { n: m }) : tr('{h} h {m} min', { h: Math.floor(m / 60), m: m % 60 }); }
+    if (fmt === 'short') return v + ' s';
     if (fmt === 'sec') return v < 60 ? v + ' s' : Math.floor(v / 60) + ':' + lvPad(v % 60) + ' min';
     return Math.floor(v / 60) + ':' + lvPad(v % 60);
   }
@@ -4279,8 +4382,9 @@
       let d = false;
       for (const [id, c] of changes) if (Date.now() - c.at > HIGHLIGHT_MS) { changes.delete(id); d = true; }
       if (d) renderBoard();
-      // Zeitangaben der Live-Ansicht und der Pille im Kopf weiterzählen.
-      $$('#viewLive [data-since], #busy [data-since]').forEach((el) => { el.textContent = lvSinceText(el.dataset.since, el.dataset.fmt); });
+      // Zeitangaben der Live-Ansicht, des Chips im Kopf und seines Popovers weiterzählen, auch im Text für Screenreader.
+      $$('#viewLive [data-since], #busy [data-since], #busyPop [data-since]').forEach((el) => { el.textContent = lvSinceText(el.dataset.since, el.dataset.fmt); });
+      if (busyLabel) { const bl = busyLabel(); if ($('#busy').getAttribute('aria-label') !== bl) $('#busy').setAttribute('aria-label', bl); }
       if (Date.now() >= liveDeadline) { liveDeadline = Infinity; reload(); }
       runWhenSaved();
     }, 1000);

@@ -1715,6 +1715,169 @@ export async function selftest({ keep = false, browser = false, verbose = false,
     });
   }
 
+  // W-0055: Die Live-Anzeige im Kopf ist ein kompakter Chip (Aufgabe und Dauer, Zahl der Agenten). Auch bei langem
+  // Titel und zwei Agenten überdeckt er weder Reiter noch Suche; die Einzelheiten stehen im Popover, das bei Maus,
+  // Tastatur oder dem ersten Tipp aufgeht. Mit WORKS_SELFTEST_SHOTS=<Ordner> legt der Schritt Nachher-Bilder dort ab.
+  if (browser) {
+    await step('Kopfleiste: Live-Chip bei langem Text, Popover, Handy (W-0055)', async () => {
+      const kp = path.join(base, 'kopfleiste');
+      fs.mkdirSync(kp, { recursive: true });
+      if (!fs.existsSync(path.join(kp, '.works', 'config.json'))) w(['init'], { cwd: kp });
+      const longTitle = 'Discord: Nachrichten nach 10 s löschen, Verlauf im Dashboard und Knöpfe für alles Weitere';
+      const add = (title) => (w(['new', '--type=feature', `--title=${title}`, '--priority=P3'], { cwd: kp }).out.match(/W-\d+/) || [])[0];
+      const main = add(longTitle); const l1 = add('Discord-Panel ohne Testprojekte'); const l2 = add('Status des Bots im Dashboard');
+      const wdir = path.join(kp, '.works');
+      const ago = (ms) => new Date(Date.now() - ms).toISOString();
+      fs.writeFileSync(path.join(wdir, 'lanes.json'), JSON.stringify({ lanes: [l1, l2].map((task) => ({ task, branch: `feature/${task.toLowerCase()}`, path: path.join(base, 'lanes', task), started: ago(30 * 60000), status: 'aktiv' })) }));
+      const entry = (task, extra = {}) => ({ at: ago(20000), task, tool: 'Bash', verb: 'Befehl', what: 'npm test', ok: true, ...extra });
+      const act = (current) => fs.writeFileSync(path.join(wdir, 'activity.json'), JSON.stringify({ busy: true, since: ago(12 * 60000 + 5000), current, recent: [], lanes: { [l1]: entry(l1, { lane: true }), [l2]: entry(l2, { lane: true }) } }));
+      act(entry(main));
+      const br = await launchChromium(log);
+      if (!br) return;
+      const shots = process.env.WORKS_SELFTEST_SHOTS || '';
+      if (shots) fs.mkdirSync(shots, { recursive: true });
+      const errs = [];
+      try {
+        const port = await highPort();
+        w(['board', '--serve', '--detach', `--port=${port}`], { cwd: kp });
+        const url = `http://127.0.0.1:${port}/`;
+        const p = await br.newPage({ viewport: { width: 1880, height: 900 }, colorScheme: 'light' });
+        p.on('pageerror', (e) => errs.push(e.message));
+        await p.goto(url); await p.waitForSelector('.card'); await p.waitForSelector('#busy:not([hidden])', { timeout: 10000 });
+        // Nach der ersten Änderung steht neben dem Punkt „Live, Stand 20:25:46“ statt „Live“; so sieht der Kopf meist aus.
+        act(entry(main));
+        await p.waitForFunction(() => /Stand/.test(document.querySelector('#live').textContent), null, { timeout: 10000 }).catch(() => errs.push('Verbindungsanzeige zeigt nach einer Änderung keinen Stand'));
+        // Lage von Chip, Reitern, Suche und Aktionen; Text von Chip und Popover so, wie er auf dem Bildschirm steht.
+        const look = () => p.evaluate(() => {
+          const box = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return r.width && r.height ? { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width } : null; };
+          const pop = document.querySelector('#busyPop');
+          return {
+            chip: box('#busy'), views: box('#views'), search: box('.top .search'), actions: box('.top .actions'), brand: box('.top .brand'), h1: box('#project'),
+            h1cut: document.querySelector('#project').scrollWidth > document.querySelector('#project').clientWidth + 1,
+            text: document.querySelector('#busy').innerText, label: document.querySelector('#busy').getAttribute('aria-label') || '',
+            pop: pop && getComputedStyle(pop).display !== 'none' ? { box: box('#busyPop'), text: pop.innerText } : null,
+            wide: document.documentElement.scrollWidth > window.innerWidth + 1, vw: window.innerWidth,
+            view: (document.querySelector('#views [aria-pressed="true"]') || {}).dataset?.view || '',
+            active: document.activeElement ? document.activeElement.id || `${document.activeElement.tagName.toLowerCase()}.${document.activeElement.className}:${document.activeElement.textContent.trim().slice(0, 30)}` : '',
+          };
+        });
+        const hit = (a, b) => !!a && !!b && a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+        const spaceBefore = (s) => /\s[,.;:!?]/.test(s || '');
+        // Chip und Projektname überdecken weder Reiter noch Suche oder Aktionen, die Suche bleibt bedienbar, nichts ragt
+        // aus dem Fenster. Bei 1880 px bleiben die Reiter in der ersten Zeile.
+        const layout = async (tag, widths, chip = true) => {
+          for (const width of widths) {
+            await p.setViewportSize({ width, height: 900 }); await p.mouse.move(width - 5, 880); await p.waitForTimeout(250);
+            const k = await look();
+            for (const [what, a] of [['Chip', k.chip], ['Projektname', k.h1]]) for (const [name, other] of [['Reiter', k.views], ['Suche', k.search], ['Aktionen', k.actions]]) if (hit(a, other)) errs.push(`${tag} ${width}: ${what} überdeckt ${name} (${JSON.stringify({ [what]: a, [name]: other })})`);
+            if (chip && (!k.chip || k.chip.r > k.vw)) errs.push(`${tag} ${width}: Chip fehlt oder ragt aus dem Fenster (${JSON.stringify(k.chip)})`);
+            if (k.views.r > k.vw + 0.5 || k.actions.r > k.vw + 0.5) errs.push(`${tag} ${width}: Reiter oder Aktionen ragen aus dem Fenster`);
+            if (!k.h1 || k.h1.w < 60) errs.push(`${tag} ${width}: Projektname zusammengedrückt (${k.h1 ? Math.round(k.h1.w) : 0} px)`);
+            if (k.search && k.search.w < 139) errs.push(`${tag} ${width}: Suche nur ${Math.round(k.search.w)} px breit`);
+            if (width === 1880 && k.views.t > k.brand.b) errs.push(`${tag} 1880: Reiter in die zweite Zeile verschoben`);
+            if (width === 1880 && k.h1cut) errs.push(`${tag} 1880: Projektname gekürzt, obwohl der Verbindungstext noch Platz abgeben kann`);
+          }
+        };
+        await layout('Arbeitet', [1880, 1720, 1400, 1024]);
+        for (const width of [1880, 1400]) {
+          await p.setViewportSize({ width, height: 900 }); await p.mouse.move(width - 5, 880); await p.waitForTimeout(250);
+          const k = await look();
+          if (spaceBefore(k.text)) errs.push(`${width}: Leerzeichen vor Satzzeichen im Chip (${JSON.stringify(k.text)})`);
+          if (k.text.includes(longTitle.slice(0, 20))) errs.push(`${width}: Chip zeigt den ganzen Titel statt nur der Aufgabe (${k.text})`);
+          if (!k.text.includes(main) || !/1[23] Min\./.test(k.text)) errs.push(`${width}: Chip zeigt nicht Aufgabe und Dauer in Min. (${JSON.stringify(k.text)})`);
+          if (!k.label.includes(main) || !k.label.includes(longTitle) || !/2 Agenten/.test(k.label)) errs.push(`${width}: aria-label ohne vollen Text (${k.label})`);
+          // Maus über dem Chip: Popover mit Titel der Aufgabe und den beiden Agenten mit ihren Aufgaben.
+          await p.hover('#busy'); await p.waitForTimeout(250);
+          const o = await look();
+          if (!o.pop) errs.push(`${width}: Popover geht bei Maus über dem Chip nicht auf`);
+          else {
+            if (Math.abs(o.views.t - k.views.t) > 0.5 || Math.abs(o.views.l - k.views.l) > 0.5) errs.push(`${width}: Offenes Popover verschiebt die Reiter`);
+            // innerText folgt text-transform: Die Zwischenzeile „2 Agenten parallel“ steht in Großbuchstaben.
+            for (const part of [longTitle, l1, 'Discord-Panel ohne Testprojekte', l2, 'Status des Bots im Dashboard', '2 Agenten', 'Zur Live-Ansicht']) if (!o.pop.text.toLowerCase().includes(part.toLowerCase())) errs.push(`${width}: Popover ohne "${part}" (${o.pop.text.replace(/\n/g, ' | ')})`);
+            if (spaceBefore(o.pop.text)) errs.push(`${width}: Leerzeichen vor Satzzeichen im Popover (${JSON.stringify(o.pop.text)})`);
+            if (o.pop.box.r > o.vw || o.pop.box.l < 0) errs.push(`${width}: Popover ragt aus dem Fenster (${JSON.stringify(o.pop.box)})`);
+          }
+          if (width === 1880) {
+            // Tastatur: Fokus auf dem Chip öffnet das Popover, Tab erreicht den Knopf darin, Esc schließt.
+            await p.mouse.move(width - 5, 880); await p.focus('a.skip'); await p.keyboard.press('Tab'); await p.waitForTimeout(150);
+            let f = await look();
+            if (f.active !== 'busy' || !f.pop) errs.push(`Tastatur: Fokus auf dem Chip öffnet das Popover nicht (${f.active}, ${!!f.pop})`);
+            await p.keyboard.press('Tab'); await p.waitForTimeout(150);
+            f = await look();
+            if (!f.pop || f.active !== 'busyGo') errs.push(`Tastatur: Knopf im Popover nicht erreichbar (${f.active}, ${!!f.pop})`);
+            await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+            f = await look();
+            if (f.pop) errs.push('Tastatur: Esc schließt das Popover nicht');
+            if (f.view !== 'board') errs.push(`Tastatur: Esc wechselt die Ansicht (${f.view})`);
+            if (f.active !== 'busy') errs.push(`Tastatur: Nach Esc steht der Fokus nicht wieder auf dem Chip (${f.active})`);
+            // Enter auf dem Chip führt wie ein Klick in die Live-Ansicht, das Popover bleibt zu.
+            await p.keyboard.press('Enter'); await p.waitForTimeout(250);
+            f = await look();
+            if (f.view !== 'live' || f.pop) errs.push(`Tastatur: Enter auf dem Chip (Ansicht ${f.view}, Popover ${f.pop ? 'offen' : 'zu'})`);
+            await p.keyboard.press('1'); await p.waitForTimeout(250);
+            await p.evaluate(() => document.activeElement.blur());
+          }
+          if (width === 1400 && shots) {
+            await p.setViewportSize({ width: 1440, height: 900 }); await p.hover('#busy'); await p.waitForTimeout(300);
+            await p.screenshot({ path: path.join(shots, 'kopfleiste-light-1440.png'), clip: { x: 0, y: 0, width: 1440, height: 420 } });
+          }
+        }
+        // Freigabe: Chip in der Warnfarbe mit „Freigabe nötig“ und der Wartezeit.
+        await p.setViewportSize({ width: 1880, height: 900 }); await p.mouse.move(1875, 880);
+        act(entry(main, { at: ago(2 * 60000 + 5000), running: true, perm: true, permSince: ago(2 * 60000 + 5000), what: 'npm install -D vitest' }));
+        try { await p.waitForSelector('#busy.perm', { timeout: 10000 }); } catch { errs.push('Freigabe: Chip wechselt nicht in die Warnfarbe'); }
+        const pm = await look();
+        if (!/^Freigabe nötig/.test(pm.text.trim()) || !/2 Min\./.test(pm.text)) errs.push(`Freigabe: Chip zeigt nicht "Freigabe nötig · 2 Min." (${JSON.stringify(pm.text)})`);
+        if (shots) { await p.hover('#busy'); await p.waitForTimeout(300); await p.screenshot({ path: path.join(shots, 'kopfleiste-freigabe-light-1880.png'), clip: { x: 0, y: 0, width: 1880, height: 360 } }); await p.mouse.move(1875, 880); }
+        await layout('Freigabe', [1880, 1720, 1400]);
+        act(entry(main));
+        await p.waitForSelector('#busy:not(.perm)', { timeout: 10000 }).catch(() => errs.push('Freigabe: Warnfarbe bleibt nach der Freigabe'));
+        // Handy: kein seitliches Scrollen, erster Tipp öffnet das Popover, Tipp daneben schließt, der nächste Tipp auf
+        // den Chip führt in die Live-Ansicht.
+        const ctx = await br.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, colorScheme: 'dark' });
+        const m = await ctx.newPage();
+        m.on('pageerror', (e) => errs.push('mobil: ' + e.message));
+        await m.goto(url); await m.waitForSelector('.card'); await m.waitForSelector('#busy:not([hidden])', { timeout: 10000 });
+        const mlook = () => m.evaluate(() => {
+          const pop = document.querySelector('#busyPop'); const r = pop ? pop.getBoundingClientRect() : null;
+          return { open: !!pop && getComputedStyle(pop).display !== 'none', l: r ? r.left : 0, r: r ? r.right : 0, wide: document.documentElement.scrollWidth > window.innerWidth + 1, vw: window.innerWidth, view: (document.querySelector('#views [aria-pressed="true"]') || {}).dataset?.view || '', h1: document.querySelector('#project').getBoundingClientRect().width };
+        });
+        const tap = (sel) => m.tap(sel, { timeout: 3000 }).catch((e) => errs.push(`390: Tipp auf ${sel} geht nicht (${e.message.split('\n')[0]})`));
+        let ml = await mlook();
+        if (ml.wide) errs.push('390: seitliches Scrollen');
+        if (ml.h1 < 60) errs.push(`390: Projektname zusammengedrückt (${Math.round(ml.h1)} px)`);
+        await tap('#busy'); await m.waitForTimeout(250);
+        ml = await mlook();
+        if (!ml.open) errs.push('390: erster Tipp öffnet das Popover nicht');
+        if (ml.view !== 'board') errs.push(`390: erster Tipp wechselt schon die Ansicht (${ml.view})`);
+        if (ml.open && (ml.l < 0 || ml.r > ml.vw)) errs.push(`390: Popover ragt aus dem Fenster (${Math.round(ml.l)} bis ${Math.round(ml.r)})`);
+        if (ml.wide) errs.push('390: seitliches Scrollen mit offenem Popover');
+        if (shots) await m.screenshot({ path: path.join(shots, 'kopfleiste-dark-390.png') });
+        await tap('#project'); await m.waitForTimeout(250);
+        if ((await mlook()).open) errs.push('390: Tipp daneben schließt das Popover nicht');
+        await tap('#busy'); await m.waitForTimeout(200); await tap('#busy'); await m.waitForTimeout(400);
+        ml = await mlook();
+        if (ml.view !== 'live') errs.push(`390: zweiter Tipp führt nicht in die Live-Ansicht (${ml.view})`);
+        if (ml.open) errs.push('390: Popover bleibt nach dem Wechsel in die Live-Ansicht offen');
+        await ctx.close();
+        // Verbindung weg (wie im gemeldeten Bild): „Verbindung getrennt, neuer Versuch läuft“ neben dem Chip.
+        w(['board', '--stop'], { cwd: kp, ok: false });
+        try {
+          await p.waitForSelector('#live.off', { timeout: 15000 }); await layout('Getrennt', [1880, 1720]);
+          if (shots) { await p.setViewportSize({ width: 1880, height: 900 }); await p.screenshot({ path: path.join(shots, 'kopfleiste-getrennt-light-1880.png'), clip: { x: 0, y: 0, width: 1880, height: 120 } }); }
+        } catch { errs.push('Getrennt: Verbindungsanzeige wechselt nicht auf getrennt'); }
+        // Ohne Chip bekommt der Verbindungstext den Platz zurück; auch dann überdeckt nichts die Reiter.
+        await p.evaluate(() => { document.querySelector('#busy').hidden = true; document.querySelector('#busyWrap').hidden = true; });
+        await layout('Ohne Chip', [1880, 1720], false);
+        if (shots) { await p.setViewportSize({ width: 1880, height: 900 }); await p.screenshot({ path: path.join(shots, 'kopfleiste-ohne-chip-light-1880.png'), clip: { x: 0, y: 0, width: 1880, height: 120 } }); }
+      } finally {
+        await br.close();
+        w(['board', '--stop'], { cwd: kp, ok: false });
+      }
+      expect(!errs.length, errs.join('\n'));
+    });
+  }
+
   // W-0054 im Browser: Wird ein Board gestoppt, wird sein Tab kein zweiter Hub. Ein Tab mit nur einer Seite im Verlauf
   // schließt sich; einer mit Verlauf zeigt die ruhige Karte über dem grauen Board, Titel „Beendet · …“, graues Symbol.
   // Drei Boards, damit der Hub-Tab beim Stopp eines Boards Hub bleibt (bei einem verbliebenen Board folgt er ihm, W-0032).
