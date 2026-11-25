@@ -3,13 +3,13 @@ id: W-0061
 title: "CI rot: works Selbsttest, Schritt Selbsttest"
 type: bug
 priority: P2
-status: in-arbeit
+status: erledigt
 effort:
 risk:
 created: 2026-11-25
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: fix/w-0061-ci-rot-works-selbsttest
 tags: []
@@ -73,9 +73,7 @@ stopRequested zählt nur eine stop.req mit der eigenen PID; requestStop schreibt
 ## Offene Fragen
 
 ## Übergabe
-Stand: 2026-11-25 18:17
-
-Fix: stopRequested nur mit eigener PID, requestStop in einem Zug, works discord start wartet solange der Prozess lebt und zeigt vier Log-Zeilen. Tests: mit Browser 62/62, ohne WebSocket 55/55, works-bot grün.
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
@@ -83,3 +81,4 @@ Fix: stopRequested nur mit eigener PID, requestStop in einem Zug, works discord 
 - 2026-11-25: Akzeptanzkriterien: "Der Fehler lässt sich mit den Reproduktionsschritten nicht mehr auslösen" abgehakt
 - 2026-11-25: Akzeptanzkriterien: "Regressionstest deckt den Fall ab oder der Verzicht ist begründet" abgehakt
 - 2026-11-25: Übergabe aktualisiert
+- 2026-11-25: Abgeschlossen (Status: in-arbeit → erledigt), DoD bestätigt
