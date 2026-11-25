@@ -1942,7 +1942,7 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       if (hasWs) {
         const sel = comps.find((c) => c.type === 3);
         expect(sel && sel.custom_id === 'w:proj::' && sel.options.some((o) => o.label === 'projekt'), `Auswahlmenü fehlt: ${JSON.stringify(comps).slice(0, 300)}`);
-        for (const id of ['w:queue::', 'w:ins::', 'w:new::', 'w:help::']) expect(comps.some((c) => c.custom_id === id), `Knopf ${id} fehlt`);
+        for (const id of ['w:queue::', 'w:ins::', 'w:new::', 'w:hist::', 'w:help::']) expect(comps.some((c) => c.custom_id === id), `Knopf ${id} fehlt`);
         const send = async (opts, what) => {
           for (let n = 1; ; n++) {
             const id = fake.interact(opts);
@@ -1987,6 +1987,94 @@ export async function selftest({ keep = false, browser = false, verbose = false,
       await wa(['discord', 'set', 'cleanup.seconds=3600'], { extraEnv: denv, ok: false });
       await wa(['discord', 'stop'], { extraEnv: denv, ok: false });
     }
+  });
+
+  // W-0050: Verlauf nach P2 hinter dem Knopf im Panel und /works verlauf, nur für den Aufrufer, mit Filtern; er steht in
+  // state.json und übersteht einen Neustart.
+  await step('Discord: Verlauf mit Knopf und /works verlauf, nur für dich, übersteht einen Neustart (W-0050)', async () => {
+    const botM = await import(pathToFileURL(path.join(HERE, 'discord-bot.mjs')).href);
+    const ui = await import(pathToFileURL(path.join(HERE, 'discord-ui.mjs')).href);
+    const { embedProblems } = await import(fromUrl);
+    // Grenzen von Discord: Embeds, höchstens 5 Zeilen, Auswahl allein in ihrer Zeile mit 1 bis 25 Optionen, custom_id
+    // nach dem Schema, das auch der Dienst des gemeinsamen Bots verlangt.
+    const okView = (v, what) => {
+      for (const e of v.embeds || []) expect(!embedProblems(e).length, `${what}: ${embedProblems(e)}`);
+      const rows = v.components || [];
+      expect(rows.length <= 5, `${what}: ${rows.length} Zeilen`);
+      for (const r of rows) {
+        for (const c of r.components) {
+          expect(ui.CID_RE.test(c.custom_id || ''), `${what}: custom_id ${c.custom_id}`);
+          if (c.type === 3) expect(r.components.length === 1 && c.options.length >= 1 && c.options.length <= 25 && c.options.every((o) => o.label.length <= 100 && o.value.length <= 100 && String(o.description || '').length <= 100), `${what}: Auswahl ${JSON.stringify(c).slice(0, 200)}`);
+        }
+      }
+    };
+    const pickC = (v, a) => (v.components || []).flatMap((r) => r.components).find((c) => (c.custom_id || '').startsWith(`w:${a}:`));
+    // Ohne Prozess: höchstens 300 Einträge und 7 Tage, die neueste Fassung je Schlüssel, Filter und Seiten.
+    const cfg = botM.normalizeConfig({});
+    const t = (de) => de;
+    const A = 'aaaaaaaaaaaaaaaa'; const B = 'bbbbbbbbbbbbbbbb';
+    const hb = new botM.Bot({ rest: {}, log: () => {} });
+    Object.assign(hb.state, { history: [], projects: { [A]: { name: 'eins', root: 'x', snap: { name: 'eins', tasks: {} } }, [B]: { name: 'zwei', root: 'y', snap: { name: 'zwei', tasks: {} } } } });
+    const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
+    hb.remember('alt', { type: 'report_week', title: 'Uralt', at: ago(8 * 1440) }, A);
+    for (let i = 0; i < 310; i++) hb.remember(`k${i}`, { type: i % 2 ? 'ci_red' : 'review', id: `W-${i}`, title: 'y'.repeat(300), sha: 'abc1234', project: 'eins', state: 'open', at: ago(i * 10 + 1) }, i % 3 ? A : B);
+    expect(hb.state.history.length === 300 && !hb.state.history.some((x) => x.k === 'alt'), `Verlauf nicht begrenzt: ${hb.state.history.length}`);
+    hb.remember('k0', { type: 'review', id: 'W-0', state: 'accepted', project: 'eins', at: ago(0) }, B);
+    const k0 = hb.state.history.filter((x) => x.k === 'k0');
+    expect(k0.length === 1 && k0[0].ev.state === 'accepted', 'nicht die neueste Fassung je Schlüssel');
+    let v = hb.historyView(cfg, t, {});
+    okView(v, 'Verlauf 24 Std.');
+    has(v.embeds[0].title, 'Verlauf · letzte 24 Stunden');
+    expect(v.embeds[0].description.split('\n').length === 10, 'nicht 10 Einträge je Seite');
+    expect(pickC(v, 'hist') && pickC(v, 'hist').custom_id === 'w:hist::d-1', `Knopf Ältere: ${JSON.stringify(pickC(v, 'hist'))}`);
+    v = hb.historyView(cfg, t, { rid: B, range: 'w', page: 1 });
+    okView(v, 'Verlauf zwei');
+    expect(v.embeds[0].description.split('\n').every((l) => l.includes('**zwei**')), 'Filter nach Projekt wirkt nicht');
+    expect(pickC(v, 'histr').options.find((o) => o.default).value === 'w' && pickC(v, 'histp').options.find((o) => o.default).value === B, 'Auswahl zeigt den Filter nicht');
+    expect(v.components.flatMap((r) => r.components).filter((c) => /^w:hist:/.test(c.custom_id)).length === 2, 'Knöpfe Neuere und Ältere fehlen');
+    const entry = hb.historyEntry(pickC(v, 'histv').options[0].value, cfg, t, 'de');
+    expect(entry.embeds[0].timestamp && !entry.components && !entry.content, `Eintrag: ${JSON.stringify(entry).slice(0, 200)}`);
+    okView(entry, 'Eintrag');
+    // Mit Bot: Eintrag in state.json, nach einem Neustart noch da, Knopf und Befehl nur für den Aufrufer.
+    const stateHist = () => { try { return JSON.parse(fs.readFileSync(path.join(ddir, 'state.json'), 'utf8')).history || []; } catch { return []; } };
+    await wa(['discord', 'start'], { extraEnv: denv, ok: false });
+    try {
+      w(['discord', 'emit', 'report', `--json=${JSON.stringify({ title: 'Verlauf-Probe', summary: 'steht im Verlauf' })}`], { extraEnv: denv });
+      await dwait(() => findMsg((e) => e.title === 'Verlauf-Probe'), 'Nachricht für den Verlauf');
+      await dwait(() => stateHist().some((x) => x.ev.title === 'Verlauf-Probe'), 'Eintrag in state.json');
+      await wa(['discord', 'stop'], { extraEnv: denv });
+      await wa(['discord', 'start'], { extraEnv: denv });
+      expect(stateHist().length <= 300 && stateHist().some((x) => x.ev.title === 'Verlauf-Probe'), 'Verlauf nach dem Neustart weg');
+      if (hasWs) {
+        const send = async (opts, what) => {
+          for (let n = 1; ; n++) {
+            const id = fake.interact(opts);
+            try { await dwait(() => fake.callbacks.get(id), `${what}: Eingang`, 5000); return id; } catch (e) { if (n >= 3) throw e; }
+          }
+        };
+        const ask = async (opts, what) => { const id = await send(opts, what); const a = await dwait(() => fake.answerOf(id), what); return { ...a, cb: fake.callbacks.get(id) }; };
+        const d = await dwait(() => { const x = dashOf('projekt'); return x && x.m.components.length ? x : null; }, 'Dashboard mit Knöpfen');
+        let a = await ask({ type: 3, customId: 'w:hist::', messageId: d.m.id }, 'Knopf Verlauf');
+        expect(a.cb.type === 5 && a.cb.data.flags & 64, 'Verlauf nicht nur für dich');
+        has(JSON.stringify(a.data.embeds), 'Verlauf-Probe', 'Eintrag von vor dem Neustart im Verlauf');
+        okView(a.data, 'Antwort Verlauf');
+        a = await ask({ type: 3, customId: pickC(a.data, 'histr').custom_id, messageId: a.data.id, values: ['w'] }, 'Zeitraum 7 Tage');
+        has(a.data.embeds[0].title, 'letzte 7 Tage');
+        const ps = pickC(a.data, 'histp');
+        const mine = ps && ps.options.find((o) => o.label.endsWith(': projekt'));
+        if (mine) { a = await ask({ type: 3, customId: ps.custom_id, messageId: a.data.id, values: [mine.value] }, 'Projekt wählen'); has(a.data.embeds[0].title, '· projekt'); }
+        const vs = pickC(a.data, 'histv');
+        const one = vs && vs.options.find((o) => o.label.includes('Verlauf-Probe'));
+        expect(one, `Eintrag fehlt in der Auswahl: ${JSON.stringify(vs).slice(0, 300)}`);
+        a = await ask({ type: 3, customId: vs.custom_id, messageId: a.data.id, values: [one.value] }, 'Eintrag ansehen');
+        expect(a.data.embeds[0].title === 'Verlauf-Probe' && a.data.embeds[0].description === 'steht im Verlauf' && !(a.data.components || []).length, `Eintrag: ${JSON.stringify(a.data).slice(0, 300)}`);
+        a = await ask({ sub: 'history', options: [{ name: 'project', value: 'projekt' }] }, '/works verlauf');
+        expect(a.cb.type === 5 && a.cb.data.flags & 64, '/works verlauf nicht nur für dich');
+        has(a.data.embeds[0].title, 'Verlauf'); has(a.data.embeds[0].title, '· projekt');
+        has(JSON.stringify((await ask({ sub: 'history', user: '777' }, 'Verlauf für Fremde')).data), 'Nicht für dich');
+      }
+      expect(!fake.problems.length, `Discord-Grenzen verletzt: ${JSON.stringify(fake.problems)}`);
+    } finally { await wa(['discord', 'stop'], { extraEnv: denv, ok: false }); }
   });
 
   // W-0051: Das Panel zeigt nur Projekte, deren Ordner .works/config.json hat. Fehlt der Ordner oder steht das Projekt

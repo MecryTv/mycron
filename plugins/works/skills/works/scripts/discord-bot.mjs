@@ -41,6 +41,7 @@ const RETRY = FAST ? 200 : 15000;
 // W-0051: so lange darf .works/config.json fehlen (Branch-Wechsel), bevor ein Projekt aus Panel und state.json fällt.
 const GONE_AFTER = FAST ? 2000 : 60000;
 const SILENT = 4096;
+const DAY_MS = 86400000;
 const COLOR = { need: 0xe8a33d, done: 0x23a55a, red: 0xf23f43, run: 0x5865f2, gone: 0x80848e, status: 0x8e8cf7 };
 const PALETTE = [0x8e8cf7, 0xe8a33d, 0x3aa7a3, 0xd16ba5, 0x5aa9e6, 0x9bc53d, 0xf08a4b];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -191,7 +192,7 @@ export function renderDashboard(list, cfg, { ci = {}, interactive = false, now =
     })],
     components: interactive ? [
       ...(options.length ? [{ type: 1, components: [{ type: 3, custom_id: 'w:proj::', placeholder: t('Projekt wählen · Details nur für dich', 'Pick a project · details only for you'), options }] }] : []),
-      { type: 1, components: [button(2, t('Warteschlange', 'Queue'), 'w:queue::'), button(1, t('Anweisung an Claude', 'Instruction for Claude'), 'w:ins::'), button(2, t('Neue Aufgabe', 'New task'), 'w:new::'), button(2, t('Hilfe', 'Help'), 'w:help::')] },
+      { type: 1, components: [button(2, t('Warteschlange', 'Queue'), 'w:queue::'), button(1, t('Anweisung an Claude', 'Instruction for Claude'), 'w:ins::'), button(2, t('Neue Aufgabe', 'New task'), 'w:new::'), button(2, t('Verlauf', 'History'), 'w:hist::'), button(2, t('Hilfe', 'Help'), 'w:help::')] },
     ] : [],
   };
 }
@@ -338,6 +339,17 @@ const dur = (ms, t) => {
   if (m < 2880) return t(`${Math.floor(m / 60)} Std.${m % 60 ? ` ${m % 60} Min.` : ''}`, `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`);
   return t(`${Math.round(m / 1440)} Tage`, `${Math.round(m / 1440)} days`);
 };
+
+// Verlauf (W-0050): Zeiträume mit Kurz- und Langnamen (de, en), Einträge je Seite, Symbol je Art, kurze Kennung für
+// Auswahlmenüs (Werte bis 100 Zeichen), Zusammenfassung aus dem Titel der Einzelnachricht.
+const HIST_SPAN = { d: [DAY_MS, ['24 Std.', '24 h'], ['letzte 24 Stunden', 'last 24 hours']], t: [3 * DAY_MS, ['3 Tage', '3 days'], ['letzte 3 Tage', 'last 3 days']], w: [7 * DAY_MS, ['7 Tage', '7 days'], ['letzte 7 Tage', 'last 7 days']] };
+const HIST_PAGE = 10;
+const HIST_SYM = { start: '▶', perm: '⏳', idle: '⏳', question: '❓', review: '👀', returned: '↩', done: '✓', p1: '❗', ship: '⬆', ci_red: '✕', ci_green: '✓', queue_empty: '∅', report_day: '📋', report_week: '📋' };
+const histId = (k) => crypto.createHash('sha1').update(String(k)).digest('hex').slice(0, 12);
+function summaryOf(ev, cfg, lang) {
+  const s = renderEvent(ev, cfg, { lang }).embeds[0].title || '';
+  return ev.id && !s.includes(ev.id) ? `${s} · ${label(cfg, ev.id, ev.title)}` : s;
+}
 
 // Zustand der Karte: der jüngste offene wartende Eintrag, sonst der zuletzt geänderte (u). Eine erledigte oder
 // verworfene Aufgabe ohne offenen Eintrag ist erledigt, außer während works ship. task: Stand der Aufgabe aus dem
@@ -1192,6 +1204,54 @@ export class Bot {
     return { embeds: [{ color: colorOf(pr.snap.name), title: cut(t(`${pr.snap.name} · ${open.length} offen`, `${pr.snap.name} · ${open.length} open`), 256), description: trimTo(lines.join('\n') || t('Nichts offen.', 'Nothing open.'), 4000), ...(open.length > 25 ? { footer: { text: t(`und ${open.length - 25} weitere im Board`, `and ${open.length - 25} more in the board`) } } : {}) }] };
   }
 
+  // Verlauf nach Entwurf P2 (W-0050), nur für den Aufrufer: 10 Einträge je Seite mit Symbol, Projekt, Text und
+  // relativer Zeit; darunter Auswahl Eintrag ansehen, Projekt und Zeitraum, Knöpfe Neuere und Ältere. rid: nur dieses
+  // Projekt; range: d (24 Std.), t (3 Tage), w (7 Tage).
+  historyView(cfg, t, { rid = '', range = 'd', page = 0, lang = '' } = {}) {
+    const span = HIST_SPAN[range] ? range : 'd';
+    const [ms, short, long] = HIST_SPAN[span];
+    const now = Date.now();
+    const projects = this.liveProjects(cfg);
+    const names = Object.fromEntries(Object.entries(this.state.projects).map(([r, p]) => [r, p.name || (p.snap && p.snap.name) || '']));
+    const all = (this.state.history || []).filter((x) => (!rid || x.rid === rid) && now - msOf(x.at, 0) < ms);
+    const pages = Math.max(1, Math.ceil(all.length / HIST_PAGE));
+    const pg = Math.min(Math.max(0, Number(page) || 0), pages - 1);
+    const items = all.slice(pg * HIST_PAGE, (pg + 1) * HIST_PAGE);
+    const nameOf = (x) => cut(names[x.rid] || x.ev.project || '?', 40);
+    const sym = (x) => HIST_SYM[x.ev.type] || KIND[kindOf(x.ev)][1];
+    const lines = items.map((x) => `${sym(x)} **${nameOf(x)}** ${cut(summaryOf(x.ev, cfg, lang), 150)} · ${rel(x.at)}`);
+    const n = all.length;
+    const embed = {
+      color: COLOR.run,
+      title: cut(`${t(`Verlauf · ${long[0]} · ${n} ${n === 1 ? 'Nachricht' : 'Nachrichten'}`, `History · ${long[1]} · ${n} ${n === 1 ? 'message' : 'messages'}`)}${rid ? ` · ${names[rid] || '?'}` : ''}`, 256),
+      description: trimTo(lines.join('\n') || t('Nichts in diesem Zeitraum.', 'Nothing in this period.'), 4000),
+      footer: { text: `${t('Im Kanal nach der Frist gelöscht, hier 7 Tage', 'Deleted in the channel after the period, kept here for 7 days')}${pages > 1 ? t(` · Seite ${pg + 1} von ${pages}`, ` · page ${pg + 1} of ${pages}`) : ''}` },
+    };
+    const id = (r, p) => `${r}-${p}`;
+    const components = [];
+    if (items.length) {
+      components.push({ type: 1, components: [{ type: 3, custom_id: cid('histv', rid, id(span, pg)), placeholder: t('Eintrag ansehen · mit allen Feldern', 'View an entry · with all fields'),
+        options: items.map((x) => ({ label: cut(`${sym(x)} ${summaryOf(x.ev, cfg, lang)}`, 100), value: histId(x.k), description: cut(`${nameOf(x)} · ${hhmm(x.at)}`, 100) })) }] });
+    }
+    if (projects.length > 1 || rid) {
+      components.push({ type: 1, components: [{ type: 3, custom_id: cid('histp', '', id(span, 0)), placeholder: t('Projekt', 'Project'),
+        options: [{ label: t('Projekt: alle', 'Project: all'), value: 'all', default: !rid }, ...projects.slice(0, 24).map((p) => ({ label: cut(t(`Projekt: ${p.name}`, `Project: ${p.name}`), 100), value: p.rid, default: p.rid === rid }))] }] });
+    }
+    components.push({ type: 1, components: [{ type: 3, custom_id: cid('histr', rid, id(span, 0)), placeholder: t('Zeitraum', 'Period'),
+      options: Object.entries(HIST_SPAN).map(([k, [, s]]) => ({ label: t(`Zeitraum: ${s[0]}`, `Period: ${s[1]}`), value: k, default: k === span })) }] });
+    const nav = [...(pg > 0 ? act(2, t('◀ Neuere', '◀ Newer'), cid('hist', rid, id(span, pg - 1))) : []), ...(pg < pages - 1 ? act(2, t('Ältere ▶', 'Older ▶'), cid('hist', rid, id(span, pg + 1))) : [])];
+    if (nav.length) components.push({ type: 1, components: nav });
+    return { embeds: [embed], components };
+  }
+
+  // Ein Eintrag des Verlaufs mit allen Feldern, wie er im Kanal stand, ohne Knöpfe und ohne Erwähnung.
+  historyEntry(hid, cfg, t, lang) {
+    const x = (this.state.history || []).find((y) => histId(y.k) === hid);
+    if (!x) throw new Error(t('Diesen Eintrag gibt es nicht mehr (älter als 7 Tage).', 'This entry is gone (older than 7 days).'));
+    const e = renderEvent(x.ev, cfg, { lang }).embeds[0];
+    return { embeds: [{ ...e, timestamp: new Date(msOf(x.at, Date.now())).toISOString() }] };
+  }
+
   bugView(pr, id, cfg, t) {
     const b = loadTasks(pr.root).find((x) => x.id === id);
     if (!b) throw new Error(t(`${id} gibt es nicht mehr.`, `${id} no longer exists.`));
@@ -1220,6 +1280,7 @@ export class Bot {
     if (i.type === 2) {
       const { sub, opts } = subOf(i);
       if (sub === 'status' && !opts.project) return this.overview(cfg, t);
+      if (sub === 'history') return this.historyView(cfg, t, { rid: opts.project ? this.pick(cfg, t, { name: opts.project }).rid : '', lang });
       const pr = this.pick(cfg, t, { name: opts.project || '' });
       if (sub === 'status') return renderStatus({ ...pr.snap, recent: pr.recent, ci: this.state.ci[pr.rid] || null }, cfg, { lang });
       if (sub === 'tasks') return this.taskList(pr, cfg, t);
@@ -1230,6 +1291,16 @@ export class Bot {
     const p = parseCid(i.data && i.data.custom_id);
     if (!p) throw new Error(t('Unbekannter Knopf.', 'Unknown button.'));
     if (i.type === 3 && p.act === 'queue') return this.queueView(cfg, t);
+    // Verlauf (W-0050): Knopf im Dashboard und die Auswahlen der Ansicht; Zeitraum und Seite stehen in der custom_id.
+    if (i.type === 3 && ['hist', 'histv', 'histp', 'histr'].includes(p.act)) {
+      const v = String((i.data.values || [])[0] || '');
+      if (p.act === 'histv') return this.historyEntry(v, cfg, t, lang);
+      const [r, n] = (p.id || 'd-0').split('-');
+      let o = { rid: p.rid, range: r, page: Number(n) || 0, lang };
+      if (p.act === 'histp') o = { ...o, rid: /^[0-9a-f]{16}$/.test(v) ? v : '', page: 0 };
+      if (p.act === 'histr') o = { ...o, range: v, page: 0 };
+      return this.historyView(cfg, t, o);
+    }
     if (i.type === 3 && p.act === 'proj') return this.detail(this.pick(cfg, t, { rid: String((i.data.values || [])[0] || '') || '-' }), cfg, t, lang);
     // Knöpfe des Dashboards tragen kein Projekt: das aus dem Dialog, sonst das einzige oder das, in dem Claude gerade ist.
     const pr = this.pick(cfg, t, p.rid ? { rid: p.rid } : { name: i.type === 5 ? modalValues(i.data).project || '' : '', active: true });
