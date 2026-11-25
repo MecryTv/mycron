@@ -28,13 +28,18 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) | Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden | Feature | P3 Mittel | Backlog |  |  |  | unvollständig |
+| [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) | Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden | Feature | P3 Mittel | Backlog |  |  |  | unvollständig, 1 offene Frage |
 | [W-0055](tasks/W-0055-kopfleiste-im-board-live-anzeige-von/task.md) | Kopfleiste im Board: Live-Anzeige von Claude bei langem Text kaputt | Bug | P3 Mittel | Backlog | S |  |  |  |
 | [W-0053](tasks/W-0053-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest mit Browser, Selbsttest | Bug | P4 Niedrig | Backlog |  |  |  |  |
 
 ## Unvollständig erfasst
 
 - [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden (Quelle: manuell)
+
+## Offene Fragen
+
+- [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden
+  - Vorschlag für den Fall, dass der Browser das Schließen verbietet: statt eines zweiten Hubs eine schlichte Seite „Board beendet“ mit Hinweis und Knopf „Hier den Hub öffnen“. Passt das so, oder soll ich vorher Entwürfe für diese Seite zeigen?
 
 ## Zuletzt erledigt
 

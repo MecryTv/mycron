@@ -39,7 +39,10 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 
 ## Umsetzungsplan
 <!-- Konkrete Schritte in sinnvoller Reihenfolge. Unteraufgaben gehören hierher, nicht in eigene Ordner. -->
-- [ ] 
+- [ ] Erkennen: Endet das Board eines Tabs, fragt der Tab die anderen laufenden Boards (/boards aus dem letzten Stand), ob dort schon ein works-Tab offen ist (/tabs, nur Zahl; dafür CORS nur für http://127.0.0.1:* und localhost)
+- [ ] Ist einer offen: window.close() versuchen; klappt das nicht (von Hand geöffnete Tabs darf eine Seite nicht schließen), statt eines zweiten Hubs eine schlichte Seite „Board beendet“ zeigen: Hinweis, dass der Hub schon in einem anderen Tab offen ist, Knopf „Hier den Hub öffnen“
+- [ ] Ist keiner offen: wie bisher zum Hub oder zum verbliebenen Board
+- [ ] Selbsttest (Browser): zwei Tabs, Board B endet, am Ende nur ein Hub-Tab; Doku board.md beide Sprachen
 
 ## Betroffene Dateien
 <!-- Pfade mit kurzer Notiz, was dort passiert. -->
@@ -52,6 +55,7 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 
 ## Offene Fragen
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
+- [ ] Vorschlag für den Fall, dass der Browser das Schließen verbietet: statt eines zweiten Hubs eine schlichte Seite „Board beendet“ mit Hinweis und Knopf „Hier den Hub öffnen“. Passt das so, oder soll ich vorher Entwürfe für diese Seite zeigen?
 
 ## Übergabe
 <!-- Wird am Ende jeder Arbeitsphase mit `works handoff` überschrieben. -->
@@ -60,3 +64,4 @@ Wunsch des Nutzers am 2026-11-24 (nach W-0049): Schließt sich ein Board (gestop
 - 2026-11-24: Aufgabe angelegt
 - 2026-11-24: Priorität: P3 → P3
 - 2026-11-25: Beziehung: W-0057 related
+- 2026-11-25: Vorgehen ausgearbeitet (Umsetzungsplan) und Frage zum Fall „Browser verbietet das Schließen“ eingetragen; W-0057 ist ausgeliefert, damit entstehen zwei Hub-Tabs nur noch, wenn ein Board-Tab offen bleibt, dessen Board endet.
