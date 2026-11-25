@@ -100,3 +100,4 @@ Fertig zur Abnahme. Umgesetzt nach Entwurf B in board.js (renderBusy, fitTop), b
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
 - 2026-11-25: Entscheidung E1 dokumentiert: Neben dem Chip nur der Verbindungspunkt
+- 2026-11-25: Parallele Arbeit beendet
