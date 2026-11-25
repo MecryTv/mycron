@@ -41,7 +41,7 @@ The service listens on `127.0.0.1:8787`, reachable only from the server itself. 
 
 If you prefer Docker secrets: set `DISCORD_TOKEN_FILE` to the path of a file that contains the token, instead of `DISCORD_TOKEN`.
 
-Optional settings in `.env`: `WORKS_BOT_GUILD_CAP` (devices per server, default 20), `WORKS_BOT_MSG_CAP` (remembered messages per device, default 300).
+Optional settings in `.env`: `WORKS_BOT_GUILD_CAP` (devices per server, default 20), `WORKS_BOT_MSG_CAP` (remembered messages per device, default 300), `WORKS_BOT_LANG` (language of the bot status, `en` or `de`, default `en`).
 
 ## 3. Reverse proxy
 
@@ -92,7 +92,8 @@ Then in Discord, in the channel works should post to: `/works link` (shown as `/
 
 ## Operation
 
-- Update: `git pull && docker compose up -d --build`. The service registers `/works` when it starts, so new subcommands of the works plugin (such as `/works history` from W-0050) appear only after this restart; buttons work without it.
+- Update: `git pull && docker compose up -d --build`. The service registers `/works` when it starts, so new subcommands of the works plugin (such as `/works history` from W-0050) appear only after this restart; buttons work without it. The same goes for a new bot status (W-0056).
+- Bot status: one for every server, so it never names a project or a task. It shows how many people use works through the bot, "5 people use works" (with `WORKS_BOT_LANG=de`: "5 Leute nutzen works"). People are distinct Discord users with a working link; several devices count once, broken links not at all. Below two people it shows `/works help`. The service checks the count every minute and sets a new status at most every 5 minutes, because Discord throttles status changes.
 - Logs: `docker compose logs -f works-bot`. They contain no tokens, keys or message contents.
 - Backup: the volume `works-bot-data` (`links.json`). Without it, every device has to link again.
 - Revoke: in Discord `/works unlink` in the channel (all devices there), or `works discord unlink` on a computer. `/works help` lists the linked devices of a server, broken ones marked.
