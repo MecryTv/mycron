@@ -52,6 +52,10 @@ const PICKUP = FAST ? 2000 : 10000;
 const ANSWER = FAST ? 20000 : 120000;
 // Discord codes that mean the bot can no longer use the channel: the link is broken.
 const BROKEN = new Set([50001, 50013, 10003]);
+// Bot status (W-0056): one text for every server, so one language for all (WORKS_BOT_LANG=de or en, default en).
+// Discord throttles presence updates: a new status at most every five minutes.
+const STATUS_DE = /^de/i.test(env.WORKS_BOT_LANG || '');
+const STATUS_MIN = FAST ? 300 : 5 * 60000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 // Never logs tokens, keys or message contents.
@@ -151,6 +155,23 @@ async function guildName(id) {
   const name = await Promise.race([discord(() => rest.get(`/guilds/${id}`)).then((g) => g.name || '').catch(() => ''), new Promise((r) => setTimeout(() => r(''), 3000))]);
   if (name) guildNames.set(id, name);
   return name;
+}
+
+// Status of the shared bot (W-0056): how many people use works through it, never a project or a task. People are the
+// distinct Discord users with a working link (several devices count once, broken links not at all). Below two the
+// count says nothing to others ("1 people"), so the status points to the help instead.
+function statusText() {
+  const n = new Set(Object.values(store.links).filter((l) => !l.broken).map((l) => l.user_id)).size;
+  if (n < 2) return '/works help';
+  return STATUS_DE ? `${n} Leute nutzen works` : `${n} people use works`;
+}
+let statusShown = '';
+let statusAt = 0;
+function updateStatus() {
+  const text = statusText();
+  if (!gateway || text === statusShown || Date.now() - statusAt < STATUS_MIN) return;
+  statusShown = text; statusAt = Date.now();
+  gateway.setStatus(text);
 }
 
 function newCode() {
@@ -584,10 +605,13 @@ async function start() {
   app = await retrying('start', () => rest.get('/oauth2/applications/@me'));
   try { await rest.put(`/applications/${app.id}/commands`, commands({ shared: true })); } catch (e) { log('registering /works failed:', e.message); }
   const g = await retrying('gateway', () => rest.get('/gateway/bot'));
-  // One bot for everybody: its status points to the help instead of a project (W-0044).
-  gateway = new Gateway({ token: TOKEN, url: g.url, intents: 1, status: '/works help', log: (s) => log(s), onFatal: (code) => { log(`gateway closed for good (code ${code})`); process.exit(1); }, onDispatch });
+  // One bot for everybody: its status counts the people, or points to the help (W-0044, W-0056). It goes along with
+  // the identify; changes after that come from updateStatus, checked every minute.
+  statusShown = statusText(); statusAt = Date.now();
+  gateway = new Gateway({ token: TOKEN, url: g.url, intents: 1, status: statusShown, log: (s) => log(s), onFatal: (code) => { log(`gateway closed for good (code ${code})`); process.exit(1); }, onDispatch });
   gateway.start();
   setInterval(prune, FAST ? 1000 : 60000).unref();
+  setInterval(updateStatus, FAST ? 200 : 60000).unref();
   server.listen(PORT, HOST, () => log(`works-bot ${me.username} listening on ${HOST}:${PORT}`));
 }
 

@@ -182,10 +182,15 @@ function startProcess(cli) {
   const child = spawn(process.execPath, [cli, 'discord', 'run'], { cwd: discordDir(), detached: true, windowsHide: true, stdio: ['ignore', log, log], env: { ...process.env, WORKS_ACTOR: '' } });
   child.unref();
   fs.closeSync(log);
+  started.pid = child.pid;
   return child.pid;
 }
 
-const requestStop = (pid) => fs.writeFileSync(dfile('stop.req'), String(pid));
+// PID des zuletzt gestarteten Bots: works discord start wartet, solange dieser Prozess lebt (W-0061).
+export const started = { pid: 0 };
+
+// In einem Zug (W-0061): Ein Bot, der stop.req gerade liest, sieht nie eine halbe PID.
+const requestStop = (pid) => { const tmp = `${dfile('stop.req')}.${process.pid}.tmp`; fs.writeFileSync(tmp, String(pid)); fs.renameSync(tmp, dfile('stop.req')); };
 
 // Bot starten, wenn eingerichtet und nicht schon da. Eine ältere Version bekommt die Bitte zu gehen, die neue
 // startet sofort und übernimmt, sobald die alte weg ist. Board- und Sitzungsstart warten so nicht.

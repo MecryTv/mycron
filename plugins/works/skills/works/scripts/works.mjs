@@ -47,7 +47,7 @@ import { findSimilar } from './similar.mjs';
 import { taskUsage, projectUsage, liveUsage, fmtTokens, fmtCost } from './usage.mjs';
 import { seedDemo, simulate, defaultDemoPath } from './demo.mjs';
 import { adaptToType, repairTasks, insertAfter, GOAL_SECTION } from './sections.mjs';
-import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion, lastPort, OWN_CLI } from './server-control.mjs';
+import { readServer, clearServer, findServerProcesses, stopProcess, startDetached, newestCli, cliVersion, lastPort, OWN_CLI, isAlive } from './server-control.mjs';
 import { BOARD_VIEWS, loadPlaywright, takeShots, boardPrepare } from './shot.mjs';
 import { tr, languages, languageSource, setLanguage, normLang, settingsFile, LANGUAGE_NAMES, variants, LANG_MIGRATION } from './i18n.mjs';
 
@@ -2239,6 +2239,7 @@ async function cmdChecks() {
   } else if (sub === 'record') {
     const t = findTask(root, config, pos.shift());
     const name = pos.shift();
+    if (!name) fail(tr('Usage: works checks record <ID> <name> --status ok|warn|fail [--note ..]'));
     try { recordCheck(root, t, name, String(flags.status || 'ok'), flags.note && flags.note !== true ? String(flags.note) : ''); } catch (e) { fail(e.message); }
     refresh(root);
     out(tr('{name} recorded for {id}: {status}', { name, id: t.id, status: flags.status || 'ok' }));
@@ -3019,12 +3020,15 @@ async function cmdDiscord() {
     if (sub === 'restart') await d.stopBot();
     const r = await d.ensureBot({ force: true });
     if (r === 'läuft') { out(tr('Bot is already running (PID {pid}).', { pid: d.botInfo().pid })); return; }
-    const until = Date.now() + 15000;
-    while (Date.now() < until && !d.botInfo()) await new Promise((res) => setTimeout(res, 100));
+    // W-0061: Auf einem überlasteten Rechner braucht der Bot länger als 15 s bis zur Sperrdatei. Warten, solange sein
+    // Prozess lebt (höchstens 60 s); hat er sich schon beendet, gleich melden, mit den letzten Zeilen des Logs.
+    const pid = d.started.pid;
+    const until = Date.now() + 60000;
+    while (Date.now() < until && !d.botInfo() && (!pid || isAlive(pid))) await new Promise((res) => setTimeout(res, 100));
     const info = d.botInfo();
     if (!info) {
       let last = '';
-      try { last = fs.readFileSync(d.dfile('bot.log'), 'utf8').trim().split('\n').pop(); } catch { /* kein Log */ }
+      try { last = fs.readFileSync(d.dfile('bot.log'), 'utf8').trim().split('\n').slice(-4).join(' | '); } catch { /* kein Log */ }
       fail(tr('Bot does not start. {last}', { last }));
     }
     out(tr('Bot started (PID {pid}). Log: {file}', { pid: info.pid, file: d.dfile('bot.log') }));

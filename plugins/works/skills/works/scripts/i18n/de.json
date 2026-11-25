@@ -2737,5 +2737,6 @@
   "last opened {ago}": "zuletzt geöffnet {ago}",
   "Starting …": "Startet …",
   "The board of {name} did not start. Details in .works/server.log in the project.": "Das Board von {name} ist nicht gestartet. Details in .works/server.log im Projekt.",
-  "Open this project there with \"Open board\", or start it anyway: works board --serve --detach --no-hub": "Dort öffnest du dieses Projekt mit „Board öffnen“, oder du startest es trotzdem: works board --serve --detach --no-hub"
+  "Open this project there with \"Open board\", or start it anyway: works board --serve --detach --no-hub": "Dort öffnest du dieses Projekt mit „Board öffnen“, oder du startest es trotzdem: works board --serve --detach --no-hub",
+  "Usage: works checks record <ID> <name> --status ok|warn|fail [--note ..]": "Aufruf: works checks record <ID> <name> --status ok|warn|fail [--note ..]"
 }
