@@ -3,7 +3,7 @@ id: W-0055
 title: "Kopfleiste im Board: Live-Anzeige von Claude bei langem Text kaputt"
 type: bug
 priority: P3
-status: backlog
+status: in-arbeit
 effort: S
 risk:
 created: 2026-11-24
@@ -11,7 +11,7 @@ updated: 2026-11-25
 due:
 completed:
 milestone:
-branch:
+branch: fix/w-0055-kopfleiste-im-board-live
 tags: [ui, board]
 blocked_by: []
 blocks: []
@@ -44,6 +44,10 @@ Gemeldet vom Nutzer am 2026-11-24 mit Screenshot: In der Kopfleiste des Boards i
 
 ## Ursache
 <!-- Nach der Analyse ausfüllen: Root Cause, nicht nur das Symptom. -->
+- Die Pille `button.busy#busy` steht in `.brand` und hat `white-space: nowrap`, kann also nicht schrumpfen. `.brand` selbst hat `min-width: 0`: Wird die Zeile knapp, schrumpft nur der Kasten der Marke, ihr Inhalt läuft über die Reiter. Was in der Marke schrumpfen kann, ist allein der Projektname (`h1` mit `overflow: hidden`), er wurde bis auf 0 px gedrückt; das Suchfeld hatte keine Mindestbreite und schrumpfte bis auf das `/`.
+- Der Verbindungstext daneben („Live, Stand 20:25:46“, „Verbindung getrennt, neuer Versuch läuft“) ist ebenfalls `nowrap` und schrumpft nicht. Im gemeldeten Bild nahm er zusammen mit der Pille rund 550 px ein.
+- Zeitkasten und Leerzeichen vor dem Komma: Die Pille ist `inline-flex` mit `gap: 7px`. Der Satz besteht aus Text und dem `<span class="num">` aus `lvSince()`, jedes Stück wird ein eigenes Flex-Element mit 7 px Abstand. So steht „1 min“ abgesetzt da, und zwischen ihm und dem folgenden „, 1 Agent“ (aus `join(', ')`) liegt der Abstand wie ein Leerzeichen vor dem Komma.
+- Belegt mit dem neuen Selbsttest gegen den alten Stand: bei 1880 px Suche 48 px breit, bei 390 px Projektname 0 px, innerText „seit\n12 min\n, 2 Agenten parallel“.
 
 ## Lösung
 <!-- Was wurde geändert und warum genau so? -->
@@ -72,3 +76,4 @@ Art: vorher · Hinzugefügt: 2026-11-24
 - 2026-11-25: Entwurf C „Eigene Zeile bei Platzmangel“ angehängt
 - 2026-11-25: Entwürfe A bis C mit Fable 5.2 gestaltet, auf Basis des echten board.css. Befund: .brand hat min-width 0, die Pille white-space nowrap ohne Schrumpfen, deshalb ragt sie über die Reiter; der Zeitkasten ist span.num aus lvSince(), das Leerzeichen vor dem Komma kommt aus join(', '). Wartet auf die Wahl des Nutzers.
 - 2026-11-25: Entwurf B „Kompakter Chip mit Popover“ gewählt. Grund: Nutzer am 2026-11-25: Beide B
+- 2026-11-25: Parallel gestartet im Worktree W-0055-kopfleiste-im-board (Status: backlog → in-arbeit)

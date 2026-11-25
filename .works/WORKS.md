@@ -1,18 +1,18 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-25 19:58 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-25 20:41 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 3 | 0 | 1 | 0 | 0 | 0 | 58 | 0 |
+| 1 | 0 | 1 | 1 | 0 | 0 | 59 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 2 · P4 Niedrig: 1
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 2 · P4 Niedrig: 1
 
 ## Aktive Aufgabe
 
-[W-0062](tasks/W-0062-ci-rot-works-selbsttest-schritt/task.md) CI rot: works Selbsttest, Schritt Selbsttest (In Arbeit), letzte Übergabe 2026-11-25 19:34
+[W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden (Review), letzte Übergabe 2026-11-25 20:40
 
 ## Kritisch (P1)
 
@@ -22,14 +22,13 @@ _Keine Einträge._
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0062](tasks/W-0062-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest | Bug | P2 Hoch | In Arbeit |  |  |  |  |
+| [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) | Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden | Feature | P3 Mittel | Review |  |  |  |  |
+| [W-0055](tasks/W-0055-kopfleiste-im-board-live-anzeige-von/task.md) | Kopfleiste im Board: Live-Anzeige von Claude bei langem Text kaputt | Bug | P3 Mittel | In Arbeit | S |  |  |  |
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) | Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden | Feature | P3 Mittel | Backlog |  |  |  |  |
-| [W-0055](tasks/W-0055-kopfleiste-im-board-live-anzeige-von/task.md) | Kopfleiste im Board: Live-Anzeige von Claude bei langem Text kaputt | Bug | P3 Mittel | Backlog | S |  |  |  |
 | [W-0053](tasks/W-0053-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest mit Browser, Selbsttest | Bug | P4 Niedrig | Backlog |  |  |  |  |
 
 ## Zuletzt erledigt
@@ -44,8 +43,8 @@ _Keine Einträge._
 | [W-0059](tasks/W-0059-live-hintergrundbefehle-und-ihr-ende-im/task.md) | Live: Hintergrundbefehle und ihr Ende im Board anzeigen | Feature | P2 Hoch | 2026-11-25 |
 | [W-0060](tasks/W-0060-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest mit Browser | Bug | P2 Hoch | 2026-11-25 |
 | [W-0061](tasks/W-0061-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest | Bug | P2 Hoch | 2026-11-25 |
+| [W-0062](tasks/W-0062-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest | Bug | P2 Hoch | 2026-11-25 |
 | [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | 2026-11-24 |
-| [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | 2026-11-24 |
 
 ## Ideen
 
