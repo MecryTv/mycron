@@ -3,13 +3,13 @@ id: W-0059
 title: "Live: Hintergrundbefehle und ihr Ende im Board anzeigen"
 type: feature
 priority: P2
-status: review
+status: erledigt
 effort: M
 risk:
 created: 2026-11-25
 updated: 2026-11-25
 due:
-completed:
+completed: 2026-11-25
 milestone:
 branch: feature/w-0059-live-hintergrundbefehle-und
 tags: [board, live]
@@ -58,9 +58,7 @@ Wunsch des Nutzers am 2026-11-25: Läuft bei Claude etwas im Hintergrund (Bash m
 <!-- Fragen an den Nutzer, die Claude nicht selbst klären kann. Format: - [ ] Frage -->
 
 ## Übergabe
-Stand: 2026-11-25 19:34
-
-Umgesetzt in Commit 01f9c42 auf feature/w-0059-live-hintergrundbefehle-und. PostToolUse trägt Befehle mit backgroundTaskId unter background in activity.json ein (live.mjs: recordBackground, findBgOutput); boardData liefert je Befehl Stand und Exit-Code aus den letzten 512 Byte der Ausgabedatei (bgStatus, backgroundOf), ohne Pfad und Ausgabe; der Fingerabdruck in serve.mjs enthält den Stand, damit das Board beim Ende nachlädt. Live-Ansicht: Abschnitt Im Hintergrund über den Prüfungen (board.js lvBgHtml), Texte in de.json, Doku in board.md und hooks.md. Tests: Selbsttest-Schritt 'Live: Hintergrundbefehle und ihr Ende', data.json des Test-Boards, Browserprüfung inklusive Ende ohne Neuladen; mit Browser 66/66, ohne WebSocket 57/57. Offen für die Abnahme: im echten Board einmal einen Befehl mit run_in_background starten und zusehen, wie er von läuft auf Exit-Code wechselt. Grenzen: Hintergrund-Agenten zählen nicht mit; was zwölf Stunden ohne Exit-Zeile läuft, gilt als verwaist und verschwindet.
+Abgeschlossen am 2026-11-25. Keine offene Übergabe.
 
 ## Verlauf
 - 2026-11-25: Aufgabe angelegt
@@ -86,3 +84,4 @@ Umgesetzt in Commit 01f9c42 auf feature/w-0059-live-hintergrundbefehle-und. Post
 - 2026-11-25: Übergabe aktualisiert
 - 2026-11-25: Status: in-arbeit → review (Grund: Agent fertig)
 - 2026-11-25: Parallele Arbeit beendet
+- 2026-11-25: Abgeschlossen (Status: review → erledigt), DoD bestätigt

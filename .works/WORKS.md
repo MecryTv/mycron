@@ -1,18 +1,14 @@
 # Works
 
-> Automatisch erzeugt am 2026-11-25 19:35 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
+> Automatisch erzeugt am 2026-11-25 19:47 durch `works index`. Nicht von Hand bearbeiten. Inhalte gehören in die task.md der jeweiligen Aufgabe.
 
 ## Überblick
 
 | Backlog | Geplant | In Arbeit | Review | Blockiert | Überfällig | Erledigt | Verworfen |
 |---|---|---|---|---|---|---|---|
-| 3 | 0 | 0 | 1 | 0 | 0 | 57 | 0 |
+| 3 | 0 | 0 | 0 | 0 | 0 | 58 | 0 |
 
-Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 1 · P3 Mittel: 2 · P4 Niedrig: 1
-
-## Aktive Aufgabe
-
-[W-0059](tasks/W-0059-live-hintergrundbefehle-und-ihr-ende-im/task.md) Live: Hintergrundbefehle und ihr Ende im Board anzeigen (Review), letzte Übergabe 2026-11-25 19:34
+Offen nach Priorität: P1 Kritisch: 0 · P2 Hoch: 0 · P3 Mittel: 2 · P4 Niedrig: 1
 
 ## Kritisch (P1)
 
@@ -20,26 +16,15 @@ _Keine Einträge._
 
 ## In Arbeit und Review
 
-| ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
-|---|---|---|---|---|---|---|---|---|
-| [W-0059](tasks/W-0059-live-hintergrundbefehle-und-ihr-ende-im/task.md) | Live: Hintergrundbefehle und ihr Ende im Board anzeigen | Feature | P2 Hoch | Review | M |  |  |  |
+_Keine Einträge._
 
 ## Geplant und Backlog
 
 | ID | Titel | Typ | Prio | Status | Aufwand | Fällig | Meilenstein | Hinweise |
 |---|---|---|---|---|---|---|---|---|
-| [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) | Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden | Feature | P3 Mittel | Backlog |  |  |  | unvollständig, 1 offene Frage |
+| [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) | Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden | Feature | P3 Mittel | Backlog |  |  |  |  |
 | [W-0055](tasks/W-0055-kopfleiste-im-board-live-anzeige-von/task.md) | Kopfleiste im Board: Live-Anzeige von Claude bei langem Text kaputt | Bug | P3 Mittel | Backlog | S |  |  |  |
 | [W-0053](tasks/W-0053-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest mit Browser, Selbsttest | Bug | P4 Niedrig | Backlog |  |  |  |  |
-
-## Unvollständig erfasst
-
-- [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden (Quelle: manuell)
-
-## Offene Fragen
-
-- [W-0054](tasks/W-0054-tab-eines-geschlossenen-boards/task.md) Tab eines geschlossenen Boards schließt sich, statt zum zweiten Hub zu werden
-  - Vorschlag für den Fall, dass der Browser das Schließen verbietet: statt eines zweiten Hubs eine schlichte Seite „Board beendet“ mit Hinweis und Knopf „Hier den Hub öffnen“. Passt das so, oder soll ich vorher Entwürfe für diese Seite zeigen?
 
 ## Zuletzt erledigt
 
@@ -50,11 +35,11 @@ _Keine Einträge._
 | [W-0056](tasks/W-0056-discord-status-des-bots-allgemein-statt/task.md) | Discord: Status des Bots allgemein statt aufgabenbezogen | Bug | P2 Hoch | 2026-11-25 |
 | [W-0057](tasks/W-0057-offenes-board-wechselt-immer-sofort-zum/task.md) | Offenes Board wechselt immer sofort zum Hub, wenn ein weiteres startet | Feature | P2 Hoch | 2026-11-25 |
 | [W-0058](tasks/W-0058-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest | Bug | P2 Hoch | 2026-11-25 |
+| [W-0059](tasks/W-0059-live-hintergrundbefehle-und-ihr-ende-im/task.md) | Live: Hintergrundbefehle und ihr Ende im Board anzeigen | Feature | P2 Hoch | 2026-11-25 |
 | [W-0060](tasks/W-0060-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest mit Browser | Bug | P2 Hoch | 2026-11-25 |
 | [W-0061](tasks/W-0061-ci-rot-works-selbsttest-schritt/task.md) | CI rot: works Selbsttest, Schritt Selbsttest | Bug | P2 Hoch | 2026-11-25 |
 | [W-0038](tasks/W-0038-board-einstellungen-fuer-den-discord-bot/task.md) | Board: Einstellungen für den Discord-Bot | Feature | P2 Hoch | 2026-11-24 |
 | [W-0041](tasks/W-0041-alles-auf-englisch-sprache-umschaltbar/task.md) | Alles auf Englisch, Sprache umschaltbar | Feature | P2 Hoch | 2026-11-24 |
-| [W-0044](tasks/W-0044-discord-ein-dashboard-mit-bild-statt/task.md) | Discord: ein Dashboard mit Bild statt Statuspost je Projekt, Status des Bots | Feature | P2 Hoch | 2026-11-24 |
 
 ## Ideen
 
